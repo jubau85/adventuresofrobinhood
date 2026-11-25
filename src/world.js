@@ -1,8 +1,8 @@
 // Weltgenerator: Gelände, Fluss, Siedlungen, Straßen, Felder, Bäume, Gebäude.
 // Alles ist deterministisch aus dem Seed, daher muss nur der Seed gespeichert werden.
 
-import { MAP, CHUNK, T, TERRAIN_COST, SETTLEMENTS } from './data.js';
-import { mulberry32, makeNoise, fbm, rpick } from './rng.js';
+import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS } from './data.js';
+import { mulberry32, makeNoise, fbm, rpick, hash2 } from './rng.js';
 
 // ---------------------------------------------------------------- A*
 export class MinHeap {
@@ -106,6 +106,15 @@ export function tileAt(W, x, y) {
   return W.tiles[j * W.N + i];
 }
 
+// Geländehöhe (Pixel) an einem beliebigen Weltpunkt, bilinear aus den Eckpunkten
+export function groundZ(W, x, y) {
+  const N = W.N, M = W.M;
+  if (!(x >= 0 && y >= 0 && x < N && y < N)) return 0;
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const a = W.vh[j * M + i], b = W.vh[j * M + i + 1], c = W.vh[(j + 1) * M + i], d = W.vh[(j + 1) * M + i + 1];
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+
 export function isWalkable(W, x, y) {
   if (x < 0.3 || y < 0.3 || x > W.N - 0.3 || y > W.N - 0.3) return false;
   return W.tiles[Math.floor(y) * W.N + Math.floor(x)] !== T.WATER;
@@ -191,8 +200,72 @@ export function generateWorld(seed) {
   buildRoads(W);
   for (const s of W.sites) addFields(W, s, rng);
   for (const s of W.sites) genBuildings(W, s, rng);
+  computeHeights(W);
+  flattenSites(W);
   placeTrees(W, rng);
   return W;
+}
+
+// Höhen an den Kachelecken: Wasser liegt auf 0, Land steigt mit der Erhebung an
+function computeHeights(W) {
+  const N = W.N, M = N + 1;
+  const vh = new Float32Array(M * M), vwater = new Uint8Array(M * M);
+  const nD = makeNoise(W.seed * 11 + 3);
+  for (let y = 0; y <= N; y++) for (let x = 0; x <= N; x++) {
+    let s = 0, n = 0, water = false;
+    for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
+      const tx = x + dx, ty = y + dy;
+      if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
+      const i = ty * N + tx;
+      if (W.tiles[i] === T.WATER || W.tiles[i] === T.BRIDGE) water = true;
+      s += W.elev[i]; n++;
+    }
+    const k = y * M + x;
+    if (water) { vh[k] = 0; vwater[k] = 1; continue; }
+    const e = n ? s / n : 0.4;
+    const t = Math.max(0, Math.min(1, (e - 0.36) / 0.42));
+    // Grundform plus Kuppen und Rücken im Hügelland
+    const hill = Math.max(0, Math.min(1, (e - 0.52) / 0.16));
+    const bumps = (fbm(nD, x / 5.5, y / 5.5, 3) - 0.5) * 58 * hill;
+    vh[k] = Math.min(HMAX + 16, Math.max(1, Math.pow(t, 1.4) * HMAX * 0.8 + bumps + 2 + (hash2(x, y, 4242) - 0.5) * 0.8));
+  }
+  // Ufer abflachen: je näher am Wasser, desto niedriger (keine senkrechten Uferwände)
+  const dist = new Int16Array(M * M).fill(-1);
+  const queue = [];
+  for (let k = 0; k < M * M; k++) if (vwater[k]) { dist[k] = 0; queue.push(k); }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const k = queue[qi], x = k % M, y = (k / M) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= M || ny >= M) continue;
+      const nk = ny * M + nx;
+      if (dist[nk] >= 0) continue;
+      dist[nk] = dist[k] + 1;
+      queue.push(nk);
+    }
+  }
+  for (let k = 0; k < M * M; k++) if (dist[k] > 0) vh[k] = Math.min(vh[k], 3 + dist[k] * 11);
+  W.M = M; W.vh = vh; W.vwater = vwater;
+}
+
+// Orte stehen auf ebenem Grund, Burgen etwas erhöht
+function flattenSites(W) {
+  const M = W.M;
+  for (const s of W.sites) {
+    const c = [s.ty * M + s.tx, s.ty * M + s.tx + 1, (s.ty + 1) * M + s.tx, (s.ty + 1) * M + s.tx + 1];
+    let target = c.reduce((a, i) => a + W.vh[i], 0) / 4;
+    if (s.type === 'spieler' || s.type === 'burg') target += 9;
+    target = Math.min(target, HMAX + 16);
+    const r = s.clear + 4;
+    for (let vy = s.ty - r; vy <= s.ty + r + 1; vy++) for (let vx = s.tx - r; vx <= s.tx + r + 1; vx++) {
+      if (vx < 0 || vy < 0 || vx >= M || vy >= M) continue;
+      const i = vy * M + vx;
+      if (W.vwater[i]) continue;
+      const d = Math.hypot(vx - s.x, vy - s.y);
+      const w = Math.max(0, Math.min(1, (d - (s.clear - 1)) / 3.5));
+      W.vh[i] = target * (1 - w) + W.vh[i] * w;
+    }
+  }
 }
 
 function carveRiver(tiles, N, rng, noise) {
@@ -422,6 +495,19 @@ function genBuildings(W, s, rng) {
     wall: o.wall ?? rpick(rng, ['plaster', 'timber', 'timber']),
     roof: o.roof ?? 'thatch', chimney: rng() < 0.45, lit: rng() < 0.75,
   });
+  const props = (b) => {
+    if (b.kind !== 'house' || rng() > 0.7) return;
+    const kinds = s.type === 'stadt' || s.type === 'abtei' ? ['fass', 'fass', 'karren', 'beet'] : ['heu', 'holzstapel', 'fass', 'karren', 'beet', 'heu'];
+    const n = rng() < 0.35 ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const side = rng() < 0.5;
+      const x = side ? b.x + b.wx / 2 + 0.3 + rng() * 0.25 : b.x + (rng() - 0.5) * b.wx * 0.8;
+      const y = side ? b.y + (rng() - 0.5) * b.wy * 0.8 : b.y + b.wy / 2 + 0.3 + rng() * 0.25;
+      const t = W.tiles[Math.floor(y) * W.N + Math.floor(x)];
+      if (t === T.WATER || t === T.ROAD || t === T.BRIDGE) continue;
+      W.buildings.push({ kind: 'prop', prop: rpick(rng, kinds), x, y, v: rng(), site: s.id });
+    }
+  };
   const ring = (count, rMin, rMax, mk, gap = 1.7) => {
     let placed = 0;
     for (let tries = 0; placed < count && tries < count * 60; tries++) {
@@ -429,7 +515,7 @@ function genBuildings(W, s, rng) {
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
       if (!freeSpot(W, x, y, gap)) continue;
       if (Math.hypot(x - s.x, y - s.y) < 1.6) continue;
-      add(mk(x, y));
+      props(add(mk(x, y)));
       placed++;
     }
   };
@@ -486,14 +572,15 @@ function placeTrees(W, rng) {
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const t = W.tiles[y * N + x];
     let n = 0, kind = 'laub';
-    if (t === T.FOREST) n = rng() < 0.55 ? 2 : 1;
+    if (t === T.FOREST) { n = rng() < 0.55 ? 2 : 1; if (rng() < 0.22) kind = 'mix'; }
     else if (t === T.GRASS && rng() < 0.03) n = 1;
+    else if ((t === T.GRASS || t === T.SAND) && rng() < 0.045) { n = 1; kind = 'busch'; }
     else if (t === T.HILLS) { if (rng() < 0.12) { n = 1; kind = 'fels'; } else if (rng() < 0.08) { n = 1; kind = 'nadel'; } }
     for (let k = 0; k < n; k++) {
       const ox = x + 0.15 + rng() * 0.7, oy = y + 0.15 + rng() * 0.7;
       if (nearSite(ox, oy)) continue;
       if (t === T.GRASS && nearBuilding(ox, oy)) continue;
-      let kk = kind;
+      let kk = kind === 'mix' ? (k === 0 ? 'busch' : 'laub') : kind;
       if (kk === 'laub' && (W.elev[y * N + x] > 0.56 || rng() < 0.3)) kk = 'nadel';
       const ci = Math.floor(oy / CHUNK) * CN + Math.floor(ox / CHUNK);
       W.chunkObjs[ci].push({ kind: kk, x: ox, y: oy, v: Math.floor(rng() * 3), s: 0.8 + rng() * 0.45 });

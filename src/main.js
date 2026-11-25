@@ -2,7 +2,8 @@
 
 import { G, log } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS } from './data.js';
-import { generateWorld } from './world.js';
+import { generateWorld, groundZ } from './world.js';
+import { spawnAnimals, updateAnimals } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
   setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers,
@@ -11,12 +12,12 @@ import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction } from './politics.js';
 import { castleSite } from './castle.js';
 import { updateTime } from './sim.js';
-import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap } from './render.js';
+import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
-import { isoX, isoY, screenToWorld } from './iso.js';
+import { isoX, isoY } from './iso.js';
 
 const keys = new Set();
 let viewCanvas, mini;
@@ -49,6 +50,7 @@ function newGame(name) {
   spawnPeasants();
   maintainGroups(true);
   rebuildUnits();
+  spawnAnimals();
   for (const s of G.world.sites) refreshTownQuests(s);
   startWorld();
   log(`Willkommen in Ashcombe, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
@@ -58,7 +60,7 @@ function newGame(name) {
 function startWorld() {
   resetRender();
   const p = G.s.player;
-  G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y);
+  G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
   G.cam.zoom = G.view.w < 720 ? 0.75 : 1;
   G.started = true;
   G.fast = false;
@@ -85,6 +87,7 @@ function loadGame() {
   if (!data) { log('Kein Spielstand gefunden.', 'bad'); return false; }
   try {
     deserialize(data);
+    spawnAnimals();
     G.messages = [];
     startWorld();
     log(`Spielstand geladen: Tag ${G.s.day}.`, 'gold');
@@ -180,7 +183,7 @@ function clickWorld(px, py) {
   if (!G.started || panelOpen() || dialogOpen()) return;
   const u = unitAtScreen(px, py);
   if (u && clickUnit(u)) return;
-  const wp = screenToWorld(px, py, G.cam, G.view.w, G.view.h);
+  const wp = screenToGround(px, py);
   const p = G.s.player;
   p.attackTarget = null;
   let site = null;
@@ -218,6 +221,13 @@ function toggleFast() {
   if (!G.fast && inCombat()) { log('Im Kampf vergeht die Zeit nicht schneller.', 'bad'); return; }
   G.fast = !G.fast;
 }
+
+function setPixel(on) {
+  G.pixel = on;
+  try { localStorage.setItem('ritter-pixel', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
+  log(on ? 'Pixel-Look an.' : 'Pixel-Look aus.');
+}
+G.togglePixel = () => setPixel(!G.pixel);
 
 function zoom(f) { G.cam.zoom = Math.max(0.55, Math.min(1.8, G.cam.zoom * f)); }
 
@@ -272,6 +282,7 @@ function onKey(e) {
     case '2': setOrder('halten'); break;
     case '3': setOrder('angriff'); break;
     case 't': toggleFast(); break;
+    case 'g': G.togglePixel(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
     default: return;
@@ -342,6 +353,7 @@ function step(dt) {
   updateUnits(dt);
   updateGroups(dt);
   updateProjectiles(dt);
+  updateAnimals(dt);
 }
 
 function updateFx(dt) {
@@ -354,7 +366,7 @@ function updateFx(dt) {
 
 function updateCamera(dt) {
   const p = G.s.player;
-  const tx = isoX(p.x, p.y), ty = isoY(p.x, p.y) - 12;
+  const tx = isoX(p.x, p.y), ty = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y) - 12;
   const k = Math.min(1, dt * 6);
   G.cam.x += (tx - G.cam.x) * k;
   G.cam.y += (ty - G.cam.y) * k;
@@ -395,13 +407,14 @@ function boot(hotData) {
   viewCanvas = byId('view');
   mini = byId('minimap');
   initRender(viewCanvas);
+  try { G.pixel = localStorage.getItem('ritter-pixel') === '1'; } catch (e) { G.pixel = false; }
   initUI();
   bindInput();
   resize();
   window.addEventListener('resize', resize);
   let resumed = false;
   if (hotData && hotData.save) {
-    try { deserialize(hotData.save); startWorld(); resumed = true; } catch (e) { resumed = false; }
+    try { deserialize(hotData.save); spawnAnimals(); startWorld(); resumed = true; } catch (e) { resumed = false; }
   }
   if (!resumed) showTitle();
   try {

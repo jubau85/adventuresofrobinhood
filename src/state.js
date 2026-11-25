@@ -6,6 +6,8 @@ export const G = {
   units: [],          // alle Einheiten, die gerade in der Welt sind
   groups: [],         // KI-Gruppen auf der Karte
   peasants: [],       // Dorfbewohner (nur Atmosphäre)
+  animals: [],        // Tiere (nur Atmosphäre)
+  pixel: false,       // Pixel-Look
   projectiles: [],
   fx: [],
   cam: { x: 0, y: 0, zoom: 1 },

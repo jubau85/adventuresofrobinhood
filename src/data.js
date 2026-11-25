@@ -4,6 +4,7 @@ export const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 export const TH = 32;            // Kachelhöhe
 export const MAP = 160;          // Kartengröße in Kacheln
 export const CHUNK = 8;          // Kacheln pro Render-Chunk
+export const HMAX = 52;          // größte Geländehöhe in Pixeln
 export const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 export const DAYS_PER_SEASON = 6;
 export const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];

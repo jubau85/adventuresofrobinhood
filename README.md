@@ -25,6 +25,8 @@ node tools/build.mjs
 ## Was schon drin ist
 
 - **Große, zufällig erzeugte Welt:** 160 × 160 Felder mit Fluss, Seen, Wäldern und Hügeln. Dazu 15 Orte (Städte, Dörfer, Burgen, Abteien, ein verstecktes Lager), die durch Straßen und Brücken verbunden sind.
+- **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren. Optionaler Pixel-Look mit Taste G.
+- **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf den Seen und Vogelschwärme.
 - **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Schnee im Winter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
 - **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
 - **Die Burg Ashcombe:** Ausbau von der Ruine über Holzburg und Steinburg zur Festung. Neun Gebäude mit je drei Stufen (Rittersaal, Unterkunft, Schmiede, Stallungen, Holzfäller, Steinbruch, Markt, Kapelle, Wachtürme). Jedes Gebäude ist auf der Karte zu sehen, während des Baus mit Gerüst.
@@ -46,6 +48,7 @@ node tools/build.mjs
 | T | Zeitraffer |
 | I J P M | Gefolge, Aufträge, Politik, Karte |
 | Mausrad | Zoom |
+| G | Pixel-Look an und aus |
 | Esc | Schließen und Menü |
 
 ## Aufbau des Codes
@@ -59,7 +62,8 @@ node tools/build.mjs
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |
 | `src/sim.js` | Uhrzeit, Jahreszeiten, Tageswechsel |
-| `src/render.js` | Isometrischer Canvas-Renderer, Minikarte |
+| `src/render.js` | Isometrischer Canvas-Renderer mit Höhenrelief, Schatten, Pixel-Modus, Minikarte |
+| `src/animals.js` | Tiere (Schafe, Kühe, Hühner, Hirsche, Enten) |
 | `src/ui.js` | Kopfleiste und alle Tafeln |
 | `src/save.js` | Speichern und Laden |
 | `src/main.js` | Start, Hauptschleife, Eingabe |
