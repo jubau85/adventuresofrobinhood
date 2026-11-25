@@ -19,7 +19,7 @@ export const ANIMAL_INFO = {
   huhn: { name: 'Huhn', hp: 3, fleisch: [1, 1], farm: true },
 };
 
-const DEER_TARGET = 36, DUCK_TARGET = 24;
+const DEER_TARGET = 80, DUCK_TARGET = 50;
 
 function animalOk(kind, x, y) {
   const t = tileAt(G.world, x, y);
@@ -65,6 +65,7 @@ function spawnWild(kind, count, far) {
     for (let k = 0; k < 300; k++) {
       const x = 3 + Math.random() * (N - 6), y = 3 + Math.random() * (N - 6);
       if (tileAt(W, x, y) !== want) continue;
+      if (kind === 'ente' && W.sea[Math.floor(y) * N + Math.floor(x)]) continue;   // Enten auf Flüssen und Seen, nicht auf hoher See
       if (far && Math.hypot(x - G.s.player.x, y - G.s.player.y) < far) continue;
       addHerd(kind, { x, y }, kind === 'hirsch' ? 2 + Math.floor(Math.random() * 2) : 2, kind === 'hirsch' ? 6 : 2.5);
       break;
@@ -81,15 +82,15 @@ export function spawnAnimals() {
       if (home) addHerd(kind, home, h.n, h.r, s.id);
     }
   }
-  spawnWild('hirsch', 16);
-  spawnWild('ente', 12);
+  spawnWild('hirsch', 36);
+  spawnWild('ente', 26);
 }
 
 // Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
 export function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
-  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 2, 25);
-  if (count('ente') < DUCK_TARGET) spawnWild('ente', 1, 20);
+  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 4, 25);
+  if (count('ente') < DUCK_TARGET) spawnWild('ente', 2, 20);
   for (const s of G.world.sites) {
     for (const [kind, h] of Object.entries(farmHerds(s))) {
       if (!h.n) continue;

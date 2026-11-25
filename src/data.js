@@ -2,14 +2,19 @@
 
 export const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 export const TH = 32;            // Kachelhöhe
-export const MAP = 160;          // Kartengröße in Kacheln
+export const MAP = 320;          // Kartengröße in Kacheln
 export const CHUNK = 8;          // Kacheln pro Render-Chunk
 export const HMAX = 52;          // größte Geländehöhe in Pixeln
 export const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 export const DAYS_PER_SEASON = 6;
 export const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
-export const SAVE_KEY = 'ritter-ohne-land-v1';
-export const SAVE_VERSION = 1;
+export const SAVE_KEY = 'a-knights-tale-v2';
+export const SAVE_VERSION = 2;
+
+// Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
+// Eine Kachel entspricht etwa 2,5 km. Längengrade sind mit cos(51,5°) gestaucht.
+export const GEO = { lonW: -6.4, latN: 55.3, dLon: 0.03715, dLat: 0.023125 };
+export function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }
 
 export const T = { WATER: 0, GRASS: 1, FOREST: 2, HILLS: 3, ROAD: 4, FIELD: 5, BRIDGE: 6, SAND: 7 };
 export const TERRAIN_SPEED = [0, 1, 0.62, 0.75, 1.3, 0.95, 1.25, 0.9];
@@ -42,6 +47,11 @@ export const FACTIONS = {
     name: 'Waldleute', short: 'Waldleute', color: '#8a7a3e', rivals: ['normannen', 'gilde'],
     desc: 'Geächtete, Wilderer und Enteignete. Sie leben in den Wäldern und hoffen auf König Richard.',
     ally: 'Wegelagerer meiden dich, im Rittersaal melden sich Langbogenschützen.',
+  },
+  franken: {
+    name: 'Krone Frankreichs', short: 'Franzosen', color: '#3a56a8', rivals: ['normannen'],
+    desc: 'König Philipp und seine Barone. Sie wollen die Normandie, solange Richard fern ist.',
+    ally: 'Französische Häfen verlangen keinen Fährlohn, im Rittersaal melden sich Armbrustschützen.',
   },
 };
 export const FACTION_IDS = Object.keys(FACTIONS);
@@ -110,6 +120,7 @@ export const CLASSES = {
   reisiger: { name: 'Reisiger', hp: 55, atk: 5, def: 3, speed: 1.45, cost: 140, wage: 7, start: { waffe: 'kurzschwert', ruestung: 'lederwams', schild: 'rundschild' } },
   knecht: { name: 'Waffenknecht', hp: 48, atk: 4, def: 2, speed: 1.45, cost: 70, wage: 4, start: { waffe: 'speer', ruestung: 'gambeson', schild: 'holzschild' } },
   schuetze: { name: 'Bogenschütze', hp: 36, atk: 3, def: 1, speed: 1.5, bow: 1.4, cost: 80, wage: 5, start: { waffe: 'kurzbogen', ruestung: 'gambeson' } },
+  armbruster: { name: 'Armbrustschütze', hp: 42, atk: 4, def: 2, speed: 1.4, bow: 1.3, cost: 150, wage: 8, start: { waffe: 'armbrust', ruestung: 'gambeson' } },
   waldlaeufer: { name: 'Langbogenschütze', hp: 40, atk: 4, def: 1, speed: 1.55, bow: 1.6, cost: 160, wage: 8, start: { waffe: 'langbogen', ruestung: 'lederwams' } },
   bauer: { name: 'Bauernbursche', hp: 32, atk: 3, def: 1, speed: 1.45, cost: 25, wage: 2, start: { waffe: 'knueppel' } },
   bandit: { name: 'Wegelagerer', hp: 30, atk: 3, def: 1, speed: 1.41 },
@@ -130,37 +141,45 @@ export const NPC_TYPES = {
   haendler: { cls: 'zivil', name: 'Händler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'haendler' },
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
+  sergent: { cls: 'soldat', name: 'Sergent', eq: { waffe: 'speer', ruestung: 'kettenhemd', schild: 'drachenschild' }, lv: [1, 3], look: 'franken' },
+  arbaletrier: { cls: 'soldat', name: 'Arbalétrier', eq: { waffe: 'armbrust', ruestung: 'gambeson' }, lv: [1, 3], look: 'franken' },
+  chevalier: { cls: 'ritter', name: 'Chevalier', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'wappenschild', pferd: 'zelter' }, lv: [2, 4], look: 'franken' },
 };
 
 // Gruppen, die auf der Karte unterwegs sind
 export const GROUP_TYPES = {
   banditen: {
     name: 'Wegelagerer', nom: 'Wegelagerer', acc: 'die Wegelagerer', pl: true, faction: null, hostile: true, members: [['bandit', 1, 3], ['bandit_bogen', 0, 1], ['bandit_boss', 0, 1]],
-    gold: [15, 45], itemChance: 0.25, renown: 1, count: 7, spawn: 'wild', speed: 1.18,
+    gold: [15, 45], itemChance: 0.25, renown: 1, count: 16, spawn: 'wild', speed: 1.18,
   },
   raubritter: {
     name: 'Raubritter', nom: 'Raubritter', acc: 'die Raubritter', pl: true, faction: null, hostile: true, members: [['raubritter', 1, 1], ['soeldner', 1, 2], ['armbrust', 0, 1]],
-    gold: [70, 150], itemChance: 0.6, renown: 4, count: 2, spawn: 'wild', speed: 1.24, minDay: 3,
+    gold: [70, 150], itemChance: 0.6, renown: 4, count: 5, spawn: 'wild', speed: 1.24, minDay: 3,
   },
   patrouille: {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
-    gold: [25, 50], itemChance: 0.3, renown: 2, count: 3, spawn: 'patrol', speed: 1.24,
+    gold: [25, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
   },
   steuer: {
     name: 'Steuereintreiber', nom: 'Der Steuereintreiber und seine Wache', acc: 'den Steuereintreiber', pl: true, faction: 'normannen', members: [['vogt', 1, 1], ['soldat', 2, 3]],
-    gold: [140, 240], itemChance: 0.2, renown: 3, count: 2, spawn: 'route', speed: 1.12,
+    gold: [140, 240], itemChance: 0.2, renown: 3, count: 4, spawn: 'route', speed: 1.12,
     kill: { normannen: -18, sachsen: 8, waldleute: 10 },
   },
   haendler: {
     name: 'Händlerzug', nom: 'Der Händlerzug', acc: 'den Händlerzug', pl: false, faction: 'gilde', members: [['haendler', 1, 1], ['wache', 1, 2]],
-    gold: [50, 110], goods: true, renown: 0, count: 3, spawn: 'route', speed: 1.12,
+    gold: [50, 110], goods: true, renown: 0, count: 8, spawn: 'route', speed: 1.12,
     kill: { gilde: -20, waldleute: 5 },
   },
   waldleute: {
     name: 'Waldleute', nom: 'Waldleute', acc: 'die Waldleute', pl: true, faction: 'waldleute', members: [['waldmann', 2, 3]],
-    gold: [5, 25], renown: 2, count: 2, spawn: 'forest', speed: 1.3,
+    gold: [5, 25], renown: 2, count: 4, spawn: 'forest', speed: 1.3,
     kill: { waldleute: -15, normannen: 6 },
+  },
+  franzosen: {
+    name: 'Französische Streife', nom: 'Eine französische Streife', acc: 'die französische Streife', pl: false, faction: 'franken', members: [['sergent', 2, 3], ['arbaletrier', 1, 1], ['chevalier', 0, 1]],
+    gold: [30, 70], itemChance: 0.35, renown: 3, count: 5, spawn: 'patrol', speed: 1.22, realms: ['fr', 'fl', 'nd'],
+    kill: { franken: -14, normannen: 6 },
   },
 };
 
@@ -172,7 +191,7 @@ export const BUILDINGS = {
       { name: 'Ruine', eff: 'Ein paar Mauerstümpfe und dein Zelt.' },
       { name: 'Holzburg', cost: { gold: 250, holz: 40 }, days: 2, eff: 'Palisade und Holzturm. Erlaubt Gebäude der Stufe 2.' },
       { name: 'Steinburg', cost: { gold: 900, holz: 30, stein: 80 }, days: 3, need: { renown: 25 }, eff: 'Steinmauern, Türme und ein Bergfried. Erlaubt Gebäude der Stufe 3.' },
-      { name: 'Festung', cost: { gold: 2400, stein: 160, eisen: 40 }, days: 4, need: { renown: 70, allies: 1 }, eff: 'Eine Festung, die man im ganzen Norden kennt. +2 Gefolge.' },
+      { name: 'Festung', cost: { gold: 2400, stein: 160, eisen: 40 }, days: 4, need: { renown: 70, allies: 1 }, eff: 'Eine Festung, die man in ganz England kennt. +2 Gefolge.' },
     ],
   },
   halle: {
@@ -265,36 +284,109 @@ export const CASTLE_LAYOUT = {
 
 // ---------------------------------------------------------------- Siedlungen
 export const SETTLEMENTS = [
-  { id: 'ashcombe', name: 'Ashcombe', type: 'spieler', faction: null, clear: 11, produces: [], demands: [],
-    desc: 'Dein Erbe: ein verfallener Burgstall über dem Fluss. Der Vogt hat dir nur die Steine gelassen.' },
-  { id: 'york', name: 'York', type: 'stadt', faction: 'gilde', clear: 8, produces: ['wolle', 'bier', 'salz'], demands: ['eisen', 'holz', 'wein', 'fleisch', 'felle'],
+  // ---------------- England (in Yorkshire etwas auseinandergezogen, damit jeder Ort Platz hat)
+  { id: 'ashcombe', name: 'Ashcombe', type: 'spieler', faction: null, clear: 11, realm: 'en', lon: -1.81, lat: 53.62, produces: [], demands: [],
+    desc: 'Dein Erbe: ein verfallener Burgstall am Rand der Pennines. Der Vogt hat dir nur die Steine gelassen.' },
+  { id: 'york', name: 'York', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -0.95, lat: 54.05, produces: ['wolle', 'bier', 'salz'], demands: ['eisen', 'holz', 'wein', 'fleisch', 'felle'],
     desc: 'Die größte Stadt des Nordens. Flämische Wollhändler, Zünfte und ein Erzbischof, der überall mitredet.' },
-  { id: 'doncaster', name: 'Doncaster', type: 'stadt', faction: 'normannen', clear: 8, produces: ['eisen', 'salz'], demands: ['getreide', 'wolle', 'bier', 'fleisch', 'felle'],
-    desc: 'Sitz des Vogts. Hier wird Recht gesprochen, meist zugunsten der Barone.' },
-  { id: 'ashby', name: 'Ashby', type: 'markt', faction: 'gilde', clear: 8, produces: ['wein', 'wolle'], demands: ['getreide', 'bier', 'holz', 'fleisch'],
-    desc: 'Marktflecken mit Turnierwiese. Wer Rang und Namen hat, zeigt sich hier.' },
-  { id: 'rotherwood', name: 'Rotherwood', type: 'halle', faction: 'sachsen', clear: 7, produces: ['getreide', 'bier'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
-    desc: 'Die Halle eines alten sächsischen Thans. Gastfreundlich gegenüber jedem, der keine normannischen Sporen trägt.' },
-  { id: 'coningsburgh', name: 'Coningsburgh', type: 'burg', faction: 'sachsen', clear: 8, produces: ['stein', 'holz'], demands: ['wein', 'getreide', 'eisen'],
+  { id: 'london', name: 'London', type: 'stadt', faction: 'gilde', clear: 9, realm: 'en', lon: -0.10, lat: 51.51, port: true, produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'fleisch', 'felle', 'holz'],
+    desc: 'Die reichste Stadt des Reiches, mit dem Tower und dem Hafen an der Themse. Von hier segeln die Wollschiffe nach Brügge.' },
+  { id: 'nottingham', name: 'Nottingham', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -1.18, lat: 52.91, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
+    desc: 'Die Burg des Sheriffs auf dem Sandsteinfelsen. Prinz Johns Leute halten sie noch immer.' },
+  { id: 'coningsburgh', name: 'Coningsburgh', type: 'burg', faction: 'sachsen', clear: 8, realm: 'en', lon: -1.22, lat: 53.42, produces: ['stein', 'holz'], demands: ['wein', 'getreide', 'eisen'],
     desc: 'Mächtige Burg eines sächsischen Geschlechts, das noch immer von der alten Krone träumt.' },
-  { id: 'torquilstone', name: 'Torquilstone', type: 'burg', faction: 'normannen', clear: 8, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
+  { id: 'torquilstone', name: 'Torquilstone', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -0.51, lat: 53.83, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
     desc: 'Die Feste eines gefürchteten normannischen Barons. Ihre Kerker sind berüchtigt.' },
-  { id: 'tickhill', name: 'Tickhill', type: 'burg', faction: 'normannen', clear: 8, produces: ['stein', 'salz'], demands: ['getreide', 'wolle', 'fleisch'],
-    desc: 'Eine königliche Burg, von Prinz Johns Leuten besetzt.' },
-  { id: 'jorvaulx', name: 'Abtei Jorvaulx', type: 'abtei', faction: 'kirche', clear: 7, produces: ['wolle', 'bier', 'wein'], demands: ['salz', 'getreide', 'stein'],
-    desc: 'Eine reiche Zisterzienserabtei. Der Prior liebt guten Wein und die Jagd.' },
-  { id: 'templestowe', name: 'Templestowe', type: 'abtei', faction: 'kirche', clear: 7, produces: ['wein', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
-    desc: 'Komturei eines Ritterordens. Streng, wohlhabend und politisch.' },
-  { id: 'barnsdale', name: 'Lager im Barnsdale', type: 'lager', faction: 'waldleute', clear: 3, produces: ['wein', 'holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'eisen'],
+  { id: 'rotherwood', name: 'Rotherwood', type: 'halle', faction: 'sachsen', clear: 7, realm: 'en', lon: -1.70, lat: 53.21, produces: ['getreide', 'bier'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
+    desc: 'Die Halle eines alten sächsischen Thans. Gastfreundlich gegenüber jedem, der keine normannischen Sporen trägt.' },
+  { id: 'barnsdale', name: 'Lager im Barnsdale', type: 'lager', faction: 'waldleute', clear: 3, realm: 'en', lon: -1.18, lat: 53.72, produces: ['wein', 'holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'eisen'],
     desc: 'Ein verstecktes Lager tief im Wald. Wer hier sitzt, hat dem Gesetz der Barone abgeschworen.' },
-  { id: 'wetherby', name: 'Wetherby', type: 'dorf', faction: 'sachsen', clear: 6, produces: ['getreide', 'holz', 'fleisch'], demands: ['salz', 'eisen', 'bier'],
+  { id: 'sherwood', name: 'Lager im Sherwood', type: 'lager', faction: 'waldleute', clear: 3, realm: 'en', lon: -0.96, lat: 53.16, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
+    desc: 'Unter den alten Eichen des königlichen Forsts. Die Förster des Sheriffs trauen sich nur zu zehnt hierher.' },
+  { id: 'jorvaulx', name: 'Abtei Jorvaulx', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: -1.74, lat: 54.27, produces: ['wolle', 'bier', 'wein'], demands: ['salz', 'getreide', 'stein'],
+    desc: 'Eine reiche Zisterzienserabtei. Der Prior liebt guten Wein und die Jagd.' },
+  { id: 'templestowe', name: 'Templestowe', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: -0.73, lat: 53.55, produces: ['wein', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
+    desc: 'Komturei eines Ritterordens. Streng, wohlhabend und politisch.' },
+  { id: 'wetherby', name: 'Wetherby', type: 'dorf', faction: 'sachsen', clear: 6, realm: 'en', lon: -1.40, lat: 53.99, produces: ['getreide', 'holz', 'fleisch'], demands: ['salz', 'eisen', 'bier'],
     desc: 'Ein sächsisches Bauerndorf am Waldrand.' },
-  { id: 'hatfield', name: 'Hatfield', type: 'dorf', faction: 'normannen', clear: 6, produces: ['getreide', 'wolle', 'fleisch'], demands: ['bier', 'salz', 'holz'],
-    desc: 'Ein Dorf unter normannischer Grundherrschaft. Die Leute reden hier leise.' },
-  { id: 'sheffield', name: 'Sheffield', type: 'dorf', faction: 'sachsen', clear: 6, produces: ['eisen', 'holz'], demands: ['getreide', 'wein', 'felle'],
-    desc: 'Köhler und Schmiede. Das Eisen von hier ist gut.' },
-  { id: 'copmanhurst', name: 'Copmanhurst', type: 'dorf', faction: 'kirche', clear: 5, produces: ['bier', 'holz'], demands: ['wein', 'salz'],
-    desc: 'Eine Einsiedelei mit ein paar Hütten. Der Klausner braut ein erstaunlich gutes Bier.' },
+  { id: 'ashby', name: 'Ashby', type: 'markt', faction: 'gilde', clear: 8, realm: 'en', lon: -1.47, lat: 52.75, produces: ['wein', 'wolle'], demands: ['getreide', 'bier', 'holz', 'fleisch'],
+    desc: 'Marktflecken mit Turnierwiese. Wer Rang und Namen hat, zeigt sich hier.' },
+  { id: 'lincoln', name: 'Lincoln', type: 'stadt', faction: 'kirche', clear: 8, realm: 'en', lon: -0.48, lat: 53.21, produces: ['wolle', 'getreide', 'bier'], demands: ['wein', 'eisen', 'stein', 'felle'],
+    desc: 'Die Kathedrale über der Stadt ist das höchste Bauwerk der Christenheit. Der Bischof ist ein Freund des Königs.' },
+  { id: 'durham', name: 'Durham', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: -1.57, lat: 54.78, produces: ['stein', 'wolle'], demands: ['wein', 'getreide', 'salz'],
+    desc: 'Dom und Burg des Fürstbischofs hoch über der Flussschleife. Wer hier Zuflucht sucht, ist sicher.' },
+  { id: 'carlisle', name: 'Carlisle', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -2.93, lat: 54.89, produces: ['wolle', 'felle'], demands: ['getreide', 'wein', 'eisen', 'bier'],
+    desc: 'Grenzfeste gegen die Schotten. Die Besatzung ist rau und schlecht bezahlt.' },
+  { id: 'chester', name: 'Chester', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -2.89, lat: 53.19, produces: ['salz', 'stein'], demands: ['getreide', 'wein', 'fleisch'],
+    desc: 'Der Graf von Chester hält die Grenze zu Wales. Sein Salz kommt aus Cheshire.' },
+  { id: 'norwich', name: 'Norwich', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: 1.30, lat: 52.63, produces: ['wolle', 'getreide', 'salz'], demands: ['holz', 'eisen', 'wein', 'fleisch'],
+    desc: 'Wollstadt im flachen Osten. Die Weber hier sind die besten des Landes.' },
+  { id: 'ely', name: 'Ely', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.26, lat: 52.40, produces: ['getreide', 'bier', 'fleisch'], demands: ['stein', 'holz', 'salz'],
+    desc: 'Die Insel in den Fens. Mönche, Aale und Schilf, so weit das Auge reicht.' },
+  { id: 'oxford', name: 'Oxford', type: 'markt', faction: 'gilde', clear: 8, realm: 'en', lon: -1.26, lat: 51.75, produces: ['bier', 'wolle'], demands: ['wein', 'salz', 'fleisch', 'holz'],
+    desc: 'Marktstadt an der Themse, wo neuerdings Magister Latein und Logik lehren.' },
+  { id: 'bristol', name: 'Bristol', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -2.59, lat: 51.45, produces: ['wein', 'felle', 'eisen'], demands: ['getreide', 'wolle', 'bier'],
+    desc: 'Hafenstadt am Avon. Wein aus der Gascogne, Felle aus Irland.' },
+  { id: 'winchester', name: 'Winchester', type: 'stadt', faction: 'normannen', clear: 8, realm: 'en', lon: -1.31, lat: 51.06, produces: ['wein', 'eisen'], demands: ['getreide', 'fleisch', 'wolle', 'holz'],
+    desc: 'Die alte Königsstadt mit dem Schatz der Krone. Hier wird Richard ein zweites Mal gekrönt.' },
+  { id: 'portsmouth', name: 'Portsmouth', type: 'dorf', faction: 'normannen', clear: 6, realm: 'en', lon: -1.09, lat: 50.82, port: true, produces: ['salz', 'holz'], demands: ['getreide', 'bier', 'fleisch'],
+    desc: 'Hafen am Solent. Von hier setzen die Heere nach Barfleur über.' },
+  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.80, lat: 51.30, produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein'],
+    desc: 'Pilger aus aller Welt kommen zum Grab des heiligen Thomas.' },
+  { id: 'dover', name: 'Dover', type: 'burg', faction: 'normannen', clear: 7, realm: 'en', lon: 1.30, lat: 51.13, port: true, produces: ['stein', 'salz'], demands: ['getreide', 'wein', 'fleisch'],
+    desc: 'Die Burg über den Kreidefelsen wacht über die kürzeste Überfahrt nach Frankreich.' },
+  { id: 'exeter', name: 'Exeter', type: 'markt', faction: 'sachsen', clear: 7, realm: 'en', lon: -3.53, lat: 50.72, produces: ['wolle', 'felle', 'eisen'], demands: ['wein', 'salz', 'getreide'],
+    desc: 'Marktstadt im Westen. Zinn aus Cornwall und Wolle aus Devon wechseln hier den Besitzer.' },
+  // ---------------- Wales
+  { id: 'stdavids', name: 'St Davids', type: 'abtei', faction: 'kirche', clear: 6, realm: 'wa', lon: -5.20, lat: 51.89, produces: ['wolle', 'fleisch'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Kathedrale am Ende der Welt. Zwei Pilgerfahrten hierher wiegen eine nach Rom auf.' },
+  { id: 'brecon', name: 'Brecon', type: 'halle', faction: 'sachsen', clear: 6, realm: 'wa', lon: -3.39, lat: 51.95, produces: ['wolle', 'fleisch', 'felle'], demands: ['salz', 'eisen', 'wein'],
+    desc: 'Halle eines walisischen Fürsten in den Bergen. Man spricht hier nicht gern Französisch.' },
+  // ---------------- Normandie
+  { id: 'barfleur', name: 'Barfleur', type: 'dorf', faction: 'normannen', clear: 6, realm: 'nd', lon: -1.32, lat: 49.62, port: true, produces: ['salz', 'fleisch'], demands: ['wolle', 'eisen', 'bier'],
+    desc: 'Fischerhafen an der Spitze des Cotentin. Hier landen die Könige von England.' },
+  { id: 'caen', name: 'Caen', type: 'burg', faction: 'normannen', clear: 8, realm: 'nd', lon: -0.36, lat: 49.18, produces: ['stein', 'getreide'], demands: ['wein', 'wolle', 'eisen'],
+    desc: 'Die Burg des Eroberers. Der Kalkstein von Caen steckt in halb England.' },
+  { id: 'rouen', name: 'Rouen', type: 'stadt', faction: 'normannen', clear: 8, realm: 'nd', lon: 1.10, lat: 49.44, produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
+    desc: 'Hauptstadt der Normandie an der Seine. Richards Seneschall hält sie gegen König Philipp.' },
+  { id: 'montstmichel', name: 'Mont-Saint-Michel', type: 'abtei', faction: 'kirche', clear: 6, realm: 'nd', lon: -1.48, lat: 48.60, produces: ['salz', 'wolle'], demands: ['wein', 'getreide', 'holz'],
+    desc: 'Die Abtei auf dem Felsen im Watt. Bei Flut ist sie eine Insel.' },
+  // ---------------- Frankreich und Flandern
+  { id: 'calais', name: 'Calais', type: 'dorf', faction: 'gilde', clear: 6, realm: 'fl', lon: 1.86, lat: 50.93, port: true, produces: ['salz', 'fleisch'], demands: ['wolle', 'bier', 'holz'],
+    desc: 'Ein Fischerort an der engsten Stelle des Kanals. Bei klarem Wetter sieht man die Felsen von Dover.' },
+  { id: 'brugge', name: 'Brügge', type: 'stadt', faction: 'gilde', clear: 8, realm: 'fl', lon: 3.22, lat: 51.20, port: true, produces: ['wein', 'eisen', 'salz'], demands: ['wolle', 'getreide', 'felle'],
+    desc: 'Die flämische Handelsstadt lebt von englischer Wolle. Die Tuchhallen sind voller Kaufleute aus aller Welt.' },
+  { id: 'gent', name: 'Gent', type: 'markt', faction: 'gilde', clear: 7, realm: 'fl', lon: 3.72, lat: 51.05, produces: ['wolle', 'bier'], demands: ['getreide', 'fleisch', 'holz'],
+    desc: 'Die Weberstadt an der Schelde. Ihre Tuche gehen bis nach Konstantinopel.' },
+  { id: 'amiens', name: 'Amiens', type: 'markt', faction: 'franken', clear: 7, realm: 'fr', lon: 2.30, lat: 49.89, produces: ['getreide', 'wolle', 'bier'], demands: ['salz', 'eisen', 'wein'],
+    desc: 'Marktstadt an der Somme. König Philipp hat sie erst vor wenigen Jahren an sich gezogen.' },
+  { id: 'gisors', name: 'Gisors', type: 'burg', faction: 'franken', clear: 7, realm: 'fr', lon: 1.78, lat: 49.28, produces: ['stein', 'eisen'], demands: ['getreide', 'wein', 'fleisch'],
+    desc: 'Die umkämpfte Grenzburg im Vexin. Seit dem letzten Jahr wehen hier die Lilien.' },
+  { id: 'paris', name: 'Paris', type: 'stadt', faction: 'franken', clear: 9, realm: 'fr', lon: 2.35, lat: 48.86, produces: ['wein', 'getreide', 'eisen'], demands: ['wolle', 'holz', 'salz', 'fleisch', 'felle'],
+    desc: 'König Philipps Hauptstadt. An der Seine baut man eine neue Kathedrale und eine Mauer um die ganze Stadt.' },
+  { id: 'chartres', name: 'Chartres', type: 'abtei', faction: 'kirche', clear: 7, realm: 'fr', lon: 1.49, lat: 48.45, produces: ['getreide', 'wein'], demands: ['stein', 'holz', 'eisen'],
+    desc: 'Der Dom ist in diesem Jahr abgebrannt. Jetzt sucht der Bischof Steine, Holz und Spender.' },
+  { id: 'reims', name: 'Reims', type: 'abtei', faction: 'kirche', clear: 7, realm: 'fr', lon: 4.03, lat: 49.26, produces: ['wein', 'wolle'], demands: ['salz', 'fleisch', 'getreide'],
+    desc: 'Hier werden die Könige Frankreichs gesalbt. Die Weinberge der Champagne reichen bis an die Stadt.' },
+  { id: 'troyes', name: 'Troyes', type: 'markt', faction: 'gilde', clear: 8, realm: 'fr', lon: 4.07, lat: 48.30, produces: ['wein', 'salz', 'wolle'], demands: ['felle', 'eisen', 'fleisch', 'holz'],
+    desc: 'Die Messestadt der Champagne. Zweimal im Jahr trifft sich hier halb Europa zum Handel.' },
+];
+
+// Fähren zwischen den Häfen: Kosten in Gold je Person, Dauer in Stunden
+export const FERRIES = [
+  { a: 'dover', b: 'calais', cost: 4, hours: 5, ship: 'Fährschiff' },
+  { a: 'portsmouth', b: 'barfleur', cost: 7, hours: 12, ship: 'Kogge' },
+  { a: 'london', b: 'brugge', cost: 9, hours: 20, ship: 'Wollschiff' },
+];
+
+// Beschriftungen der großen Karte
+export const REGIONS = [
+  { name: 'ENGLAND', lon: -1.2, lat: 52.3, size: 1.3 }, { name: 'WALES', lon: -3.7, lat: 52.35, size: 1 },
+  { name: 'NORMANDIE', lon: 0.2, lat: 49.0, size: 1 }, { name: 'FRANKREICH', lon: 2.9, lat: 48.6, size: 1.3 },
+  { name: 'FLANDERN', lon: 3.2, lat: 50.75, size: 0.9 }, { name: 'BRETAGNE', lon: -3.1, lat: 48.25, size: 0.9 },
+  { name: 'IRLAND', lon: -6.36, lat: 53.15, size: 0.8, align: 'left' }, { name: 'SCHOTTLAND', lon: -3.9, lat: 55.18, size: 0.8 },
+  { name: 'Ärmelkanal', lon: -2.3, lat: 50.05, size: 0.9, sea: true }, { name: 'Nordsee', lon: 2.6, lat: 53.6, size: 1.1, sea: true },
+  { name: 'Irische See', lon: -4.6, lat: 53.7, size: 0.8, sea: true }, { name: 'Atlantik', lon: -5.6, lat: 49.2, size: 0.9, sea: true },
 ];
 
 export const TYPE_NAME = {
@@ -313,6 +405,7 @@ export const LOOKS = {
   haendler: { tunic: '#3d6fa3', trim: '#e0c070' },
   wache: { tunic: '#556b7d', trim: '#c9c2b0' },
   wald: { tunic: '#3f6b2f', trim: '#2c4a20', hood: '#355a28' },
+  franken: { tunic: '#3a56a8', trim: '#e8cf5a' },
   bauer: { tunic: '#9a8461', trim: '#6e5c40' },
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
@@ -334,5 +427,5 @@ export const NAMES_M = ['Aelfric', 'Eadric', 'Wulfstan', 'Oswin', 'Godwin', 'Leo
   'Beorn', 'Cenric', 'Dunstan', 'Hereward', 'Wat', 'Hob', 'Dickon', 'Tom', 'Jack', 'Will', 'Ranulf', 'Hugo', 'Raoul',
   'Gilbert', 'Renaud', 'Thibaut', 'Alain', 'Ivo', 'Walter', 'Simon', 'Roger', 'Odo', 'Ulf', 'Brand'];
 export const NAMES_F = ['Aelfgifu', 'Edith', 'Godgifu', 'Hilda', 'Mildred', 'Wynflaed', 'Alys', 'Maud', 'Joan', 'Agnes', 'Emma', 'Matilda', 'Gytha', 'Eadgyth'];
-export const EPITHETS = ['Langbein', 'Eisenhand', 'vom Moor', 'aus Wetherby', 'Schnellpfeil', 'Rabenhaar', 'Bärentatze', 'Krummnase',
+export const EPITHETS = ['Langbein', 'Eisenhand', 'vom Moor', 'aus Wetherby', 'von der Küste', 'Schnellpfeil', 'Rabenhaar', 'Bärentatze', 'Krummnase',
   'von der Furt', 'Zweifinger', 'Steinbrecher', 'Flinkfinger', 'vom Weiher', 'Eichenherz', 'Graumantel', 'Rotbart', 'Hammerfaust', 'Kiesel'];

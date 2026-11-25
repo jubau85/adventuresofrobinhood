@@ -3,14 +3,15 @@
 import { G, uid, log, homeName, playerColor } from './state.js';
 import {
   CLASSES, ITEMS, NPC_TYPES, GROUP_TYPES, T, TERRAIN_SPEED, NAMES_M, NAMES_F, EPITHETS,
-  GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS,
+  GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS, FERRIES,
 } from './data.js';
-import { isWalkable, findPath, tileAt, nearestWalkable } from './world.js';
+import { isWalkable, findPath, tileAt, nearestWalkable, landAt, groundZ } from './world.js';
+import { isoX, isoY } from './iso.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed } from './politics.js';
-import { cargoFree, addCargo } from './economy.js';
+import { cargoFree, addCargo, siteById } from './economy.js';
 import { castleSite } from './castle.js';
-import { hourOf } from './sim.js';
+import { hourOf, passHours } from './sim.js';
 import { hitAnimal } from './animals.js';
 
 // ---------------------------------------------------------------- Werte
@@ -218,7 +219,7 @@ function followPath(u, dt, mult = 1) {
 
 export function setPlayerPath(x, y) {
   const p = G.s.player;
-  const path = findPath(G.world, p.x, p.y, x, y);
+  const path = findPath(G.world, p.x, p.y, x, y, 250000);
   p.path = path; p.pathI = 0;
   return !!path;
 }
@@ -615,12 +616,27 @@ function farFromSites(x, y, d) {
   return G.world.sites.every((s) => Math.hypot(s.x - x, s.y - y) > d);
 }
 
+// Landmassen, auf denen es Orte gibt (Irland bleibt unbewohnt)
+function settledLand(x, y) {
+  const l = landAt(G.world, x, y);
+  return l > 0 && G.world.sites.some((s) => s.land === l);
+}
+
 function sitesFor(type) {
   const S = G.world.sites;
-  if (type === 'steuer') return S.filter((s) => s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle');
+  const gt = GROUP_TYPES[type];
+  if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && (s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle'));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (type === 'patrouille') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler');
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && (!gt.realms || gt.realms.includes(s.realm)));
   return S;
+}
+
+// Ziele auf derselben Landmasse in sinnvoller Entfernung
+function reachableSites(list, x, y, minD = 0, maxD = 110) {
+  const l = landAt(G.world, x, y);
+  const same = list.filter((s) => s.land === l);
+  const inRange = same.filter((s) => { const d = Math.hypot(s.x - x, s.y - y); return d > minD && d < maxD; });
+  return inRange.length ? inRange : same;
 }
 
 function findSpawnPos(type, opts) {
@@ -630,21 +646,23 @@ function findSpawnPos(type, opts) {
     for (let k = 0; k < 200; k++) {
       const a = Math.random() * Math.PI * 2, r = rand(n.rMin ?? 6, n.r);
       const x = n.x + Math.cos(a) * r, y = n.y + Math.sin(a) * r;
-      if (isWalkable(G.world, x, y) && farFromPlayer(x, y, 10)) return { x, y };
+      if (isWalkable(G.world, x, y) && farFromPlayer(x, y, 10) && landAt(G.world, x, y) === landAt(G.world, n.x, n.y)) return { x, y };
     }
   }
   const minP = opts.initial ? 18 : 30;
   switch (gt.spawn) {
     case 'wild':
-      return randomTile((t, x, y) => (t === T.FOREST || t === T.HILLS) && farFromSites(x, y, 12) && farFromPlayer(x, y, minP));
+      return randomTile((t, x, y) => (t === T.FOREST || t === T.HILLS) && farFromSites(x, y, 12) && farFromPlayer(x, y, minP) && settledLand(x, y), 800);
     case 'forest': {
-      const camp = G.world.sites.find((s) => s.type === 'lager');
-      return randomTile((t, x, y) => t === T.FOREST && farFromPlayer(x, y, minP) && (!camp || Math.hypot(camp.x - x, camp.y - y) < 40));
+      const camp = pick(G.world.sites.filter((s) => s.type === 'lager'));
+      return tileNear(camp, 40, (t, x, y) => t === T.FOREST && farFromPlayer(x, y, minP));
     }
-    case 'patrol':
-      return randomTile((t, x, y) => t === T.ROAD && farFromPlayer(x, y, minP) && farFromSites(x, y, 5), 1200);
+    case 'patrol': {
+      const s = pick(sitesFor(type));
+      return tileNear(s, 26, (t, x, y) => t === T.ROAD && farFromPlayer(x, y, minP) && farFromSites(x, y, 5));
+    }
     case 'route': {
-      const S = type === 'steuer' ? G.world.sites.filter((s) => s.faction === 'normannen') : sitesFor(type);
+      const S = type === 'steuer' ? sitesFor('steuer').filter((s) => s.faction === 'normannen') : sitesFor(type);
       const cand = S.filter((s) => farFromPlayer(s.x, s.y, minP));
       const s = pick(cand.length ? cand : S);
       return { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
@@ -652,6 +670,19 @@ function findSpawnPos(type, opts) {
     default:
       return null;
   }
+}
+
+// Zufälliges passendes Feld im Umkreis eines Ortes (auf dessen Landmasse)
+function tileNear(site, r, pred) {
+  if (!site) return null;
+  const W = G.world, N = W.N;
+  for (let k = 0; k < 400; k++) {
+    const x = Math.floor(site.x + rand(-r, r)), y = Math.floor(site.y + rand(-r, r));
+    if (x < 2 || y < 2 || x >= N - 2 || y >= N - 2) continue;
+    if (W.landId[y * N + x] !== site.land) continue;
+    if (pred(W.tiles[y * N + x], x + 0.5, y + 0.5)) return { x: x + 0.5, y: y + 0.5 };
+  }
+  return null;
 }
 
 export function spawnGroup(type, opts = {}) {
@@ -697,15 +728,14 @@ function chooseDest(g) {
       if (isWalkable(W, x, y)) dest = { x, y };
     }
   } else if (gt.spawn === 'patrol') {
-    const s = pick(sitesFor('patrouille'));
-    dest = { x: s.x + rand(-2, 2), y: s.y + rand(-2, 2) };
+    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 8, 80));
+    if (s) dest = { x: s.x + rand(-2, 2), y: s.y + rand(-2, 2) };
   } else {
-    const opts = sitesFor(g.type).filter((s) => Math.hypot(s.x - g.x, s.y - g.y) > 15);
-    const s = pick(opts.length ? opts : sitesFor(g.type));
-    dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
+    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 15, 100));
+    if (s) dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
   }
   if (!dest) { g.wait = 3; return; }
-  g.path = findPath(W, g.x, g.y, dest.x, dest.y, 30000);
+  g.path = findPath(W, g.x, g.y, dest.x, dest.y, 50000);
   g.pathI = 0;
   if (!g.path) g.wait = rand(3, 6);
 }
@@ -759,7 +789,7 @@ export function maintainGroups(initial = false) {
   for (const [type, gt] of Object.entries(GROUP_TYPES)) {
     if (gt.minDay && G.s.day < gt.minDay && !initial) continue;
     if (gt.minDay && initial) continue;
-    const want = gt.count + (type === 'banditen' ? Math.min(4, Math.floor(G.s.day / 6)) : 0);
+    const want = gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
     const n = initial ? want : Math.min(2, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });
@@ -781,4 +811,41 @@ export function spawnPeasants() {
       G.peasants.push(v);
     }
   }
+}
+
+// ---------------------------------------------------------------- Seefahrt
+// Fähren verbinden England mit Frankreich und Flandern. Die Überfahrt kostet Gold je Kopf und Zeit.
+export function ferryRoutes(siteId) {
+  return FERRIES.filter((f) => f.a === siteId || f.b === siteId).map((f) => ({ ...f, to: f.a === siteId ? f.b : f.a }));
+}
+
+export function ferryCost(route) {
+  const from = siteById(route.a), to = siteById(route.b);
+  const french = (s) => s && (s.realm === 'fr' || s.realm === 'fl');
+  if (isAlly('franken') && (french(from) || french(to))) return 0;
+  const riders = [G.s.player, ...partyMembers()];
+  const horses = riders.filter((u) => u.eq && u.eq.pferd).length;
+  return route.cost * riders.length + horses * Math.ceil(route.cost / 2);
+}
+
+export function sail(fromId, toId) {
+  const route = ferryRoutes(fromId).find((r) => r.to === toId);
+  const to = siteById(toId);
+  if (!route || !to) return false;
+  if (inCombat()) { log('Mitten im Kampf legt kein Schiff ab.', 'bad'); return false; }
+  const cost = ferryCost(route);
+  if (G.s.gold < cost) { log(`Die Überfahrt kostet ${cost} Gold. So viel hast du nicht.`, 'bad'); return false; }
+  G.s.gold -= cost;
+  passHours(route.hours);
+  const p = G.s.player;
+  const q = to.quay || to;
+  p.x = q.x; p.y = q.y;
+  p.path = null; p.attackTarget = null; p.huntTarget = null; p.chase = null;
+  G.pendingSite = null;
+  partyMembers().forEach((c) => { placeNear(c, q.x, q.y, 1.6); c.path = null; c.chase = null; });
+  G.s.safeTime = Math.max(G.s.safeTime || 0, 10);
+  G.cam.x = isoX(p.x, p.y);
+  G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y) - 12;
+  log(`Nach ${route.hours} Stunden auf See legt ${route.ship === 'Kogge' ? 'die' : 'das'} ${route.ship} in ${to.name} an.${cost ? ` Fährlohn: ${cost} Gold.` : ' Die Franzosen verlangen von dir keinen Fährlohn.'}`, 'good');
+  return true;
 }

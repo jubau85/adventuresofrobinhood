@@ -39,7 +39,7 @@ function newGame(opts) {
   });
   G.s = {
     seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
-    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5 },
+    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0 }, construction: null, recruits: [], recruitDay: 0 },
     towns: {}, quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
@@ -174,6 +174,11 @@ function nearestSite() {
   for (const s of G.world.sites) {
     const d = Math.hypot(s.x - p.x, s.y - p.y);
     if (d < interactRadius(s) && d < bd) { bd = d; best = s; }
+    // Am Kai eines Hafens kann man den Ort ebenfalls betreten (Fähre)
+    if (s.quay) {
+      const dq = Math.hypot(s.quay.x - p.x, s.quay.y - p.y);
+      if (dq < 3 && dq < bd) { bd = dq; best = s; }
+    }
   }
   return best;
 }

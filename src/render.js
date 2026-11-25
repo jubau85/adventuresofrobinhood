@@ -2,7 +2,7 @@
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
 
 import { G, homeName, playerColor } from './state.js';
-import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS } from './data.js';
+import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt } from './world.js';
@@ -349,6 +349,55 @@ function drawTent(c, b) {
   c.beginPath(); c.moveTo(px, py - 7); c.lineTo(px + 6, py - 5.5); c.lineTo(px, py - 4); c.fill();
 }
 
+// Kogge am Liegeplatz: Rumpf längs zur Küste, Rahsegel mit Streifen, Wimpel im Wind
+function drawShip(c, b) {
+  const th = (b.dir || 0) + Math.PI / 2;
+  const ux = Math.cos(th), uy = Math.sin(th), vx = -uy, vy = ux;
+  const bob = Math.sin(G.time * 1.3 + b.x) * 1.2;
+  const at = (a, w, z) => P(b.x + ux * a + vx * w, b.y + uy * a + vy * w, z + bob);
+  // Wellen am Rumpf
+  c.fillStyle = 'rgba(235,245,250,0.35)';
+  c.beginPath(); const fw = at(1.1, 0, -1); c.ellipse(fw[0], fw[1], 9, 3, 0, 0, Math.PI * 2); c.fill();
+  const outline = (z, k) => [at(1.15 * k, 0, z), at(0.7 * k, 0.36 * k, z), at(-0.75 * k, 0.36 * k, z), at(-1.0 * k, 0.2 * k, z), at(-1.0 * k, -0.2 * k, z), at(-0.75 * k, -0.36 * k, z), at(0.7 * k, -0.36 * k, z)];
+  const low = outline(0, 0.82), deck = outline(9, 1);
+  // Bordwand: zwischen Wasserlinie und Deck
+  const side = [];
+  for (const p of low) side.push(p);
+  for (const p of deck) side.push(p);
+  poly(c, hull(side), '#4e3423');
+  c.strokeStyle = 'rgba(30,18,10,0.5)'; c.lineWidth = 1;
+  c.beginPath(); for (let k = 0; k < low.length; k++) { const m = lerp2(low[k], deck[k], 0.5); if (k) c.lineTo(m[0], m[1]); else c.moveTo(m[0], m[1]); } c.closePath(); c.stroke();
+  poly(c, deck, '#8a6440');
+  // Achter- und Vorderkastell
+  const castle = (a) => { const q = [at(a - 0.22, -0.3, 9), at(a + 0.22, -0.3, 9), at(a + 0.22, 0.3, 9), at(a - 0.22, 0.3, 9)]; const top = q.map((p) => [p[0], p[1] - 6]); poly(c, hull(q.concat(top)), '#6b4a2e'); poly(c, top, '#9a7350'); };
+  castle(-0.72); castle(0.8);
+  // Mast, Rah und Segel
+  const foot = at(0.05, 0, 9), head = at(0.05, 0, 46);
+  c.strokeStyle = '#3a2618'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(foot[0], foot[1]); c.lineTo(head[0], head[1]); c.stroke();
+  const bl = Math.sin(G.time * 0.9 + b.y) * 1.5;
+  const top = head[1] + 7, bot = head[1] + 30, half = 15;
+  c.beginPath();
+  c.moveTo(head[0] - half, top);
+  c.lineTo(head[0] + half, top);
+  c.quadraticCurveTo(head[0] + half + 3 + bl, (top + bot) / 2, head[0] + half - 1, bot);
+  c.quadraticCurveTo(head[0], bot + 4 + bl, head[0] - half + 1, bot);
+  c.quadraticCurveTo(head[0] - half - 3 + bl, (top + bot) / 2, head[0] - half, top);
+  c.closePath();
+  c.fillStyle = '#ece2c8'; c.fill();
+  c.save(); c.clip();
+  c.fillStyle = '#a8382c';
+  for (let k = -half + 4; k < half; k += 10) c.fillRect(head[0] + k, top, 5, bot - top + 6);
+  c.restore();
+  c.strokeStyle = 'rgba(60,40,25,0.55)'; c.lineWidth = 1; c.stroke();
+  c.strokeStyle = '#3a2618'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(head[0] - half - 2, top); c.lineTo(head[0] + half + 2, top); c.stroke();
+  // Wimpel
+  const t = G.time * 3 + b.x;
+  c.fillStyle = '#d8b54a';
+  c.beginPath(); c.moveTo(head[0], head[1]); c.lineTo(head[0] + 11, head[1] + 2 + Math.sin(t) * 1.5); c.lineTo(head[0], head[1] + 4); c.fill();
+}
+
 function drawStall(c, b) {
   const x0 = b.x - 0.4, x1 = b.x + 0.4, y0 = b.y - 0.3, y1 = b.y + 0.3;
   c.strokeStyle = '#5a4030'; c.lineWidth = 1.5;
@@ -612,7 +661,7 @@ function buildStaticParts() {
   for (const b of W.buildings) {
     const f = {
       house: drawHouse, church: drawChurch, longhall: drawLonghall, tent: drawTent, stall: drawStall,
-      well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp,
+      well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
     }[b.kind];
     if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
   }
@@ -2159,6 +2208,32 @@ export function render() {
     ctx.fillText(a.label, sp.x, yy);
   }
   drawCelebration(ctx, dt);
+  drawCompass(ctx, w, h);
+}
+
+function drawCompass(c, w, h) {
+  const cx = w - 46, cy = h - (w < 720 ? 128 : 96), r = 22;
+  c.save();
+  c.translate(cx, cy);
+  c.fillStyle = 'rgba(28,20,14,0.62)';
+  c.beginPath(); c.arc(0, 0, r + 9, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(214,173,76,0.75)'; c.lineWidth = 1.2;
+  c.beginPath(); c.arc(0, 0, r + 6, 0, Math.PI * 2); c.stroke();
+  // Richtungen im Bild: Norden ist Kachel -y, Osten +x
+  const dir = (dx, dy) => { const sx = (dx - dy) * HW, sy = (dx + dy) * HH, l = Math.hypot(sx, sy); return [sx / l, sy / l]; };
+  const pts = [['N', dir(0, -1), '#e8c35a'], ['O', dir(1, 0), '#e9dfc6'], ['S', dir(0, 1), '#e9dfc6'], ['W', dir(-1, 0), '#e9dfc6']];
+  for (const [label, [ux, uy], col] of pts) {
+    const vx = -uy, vy = ux;
+    c.fillStyle = label === 'N' ? '#c9483a' : 'rgba(233,223,198,0.85)';
+    c.beginPath(); c.moveTo(ux * r, uy * r); c.lineTo(vx * 4, vy * 4); c.lineTo(-vx * 4, -vy * 4); c.closePath(); c.fill();
+    c.font = `700 ${label === 'N' ? 13 : 10}px "IM Fell English SC", Georgia, serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = col;
+    c.fillText(label, ux * (r + 15), uy * (r + 15));
+  }
+  c.fillStyle = '#d6ad4c'; c.beginPath(); c.arc(0, 0, 2.5, 0, Math.PI * 2); c.fill();
+  c.restore();
+  c.textBaseline = 'alphabetic';
 }
 
 // ---------------------------------------------------------------- Minikarte
@@ -2171,81 +2246,138 @@ const MINI_COL = [
 
 function buildMinimap() {
   const W = G.world, N = W.N, M = W.M;
-  const cv = makeCanvas(N * 2, N);
+  const cv = makeCanvas(N, N);
   const g = cv.getContext('2d');
-  const img = g.createImageData(N * 2, N);
+  const img = g.createImageData(N, N);
   const cols = MINI_COL[seasonIndex()].map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const t = W.tiles[j * N + i];
-    const hT = W.vh[j * M + i], hR = W.vh[j * M + i + 1], hL = W.vh[(j + 1) * M + i];
-    const f = t === T.WATER ? 1 : 1 + Math.max(-0.3, Math.min(0.28, ((hR - hT) - (hL - hT)) / 16));
-    const mx = i - j + N - 1, my = Math.floor((i + j) / 2);
-    const col = cols[t];
-    for (const ox of [0, 1]) {
-      const o = (my * N * 2 + mx + ox) * 4;
-      img.data[o] = Math.min(255, col[0] * f); img.data[o + 1] = Math.min(255, col[1] * f); img.data[o + 2] = Math.min(255, col[2] * f); img.data[o + 3] = 255;
-    }
+    const k = j * N + i, t = W.tiles[k];
+    let f = 1;
+    if (t === T.WATER) f = W.sea[k] ? 0.86 : 1.08;
+    else f = 1 + Math.max(-0.28, Math.min(0.26, (W.vh[j * M + i] - W.vh[(j + 1) * M + i + 1]) / 14));
+    const col = cols[t], o = k * 4;
+    img.data[o] = Math.min(255, col[0] * f); img.data[o + 1] = Math.min(255, col[1] * f); img.data[o + 2] = Math.min(255, col[2] * f); img.data[o + 3] = 255;
   }
   g.putImageData(img, 0, 0);
   minimapBase = cv;
   minimapSeason = seasonIndex();
 }
 
-export function miniPos(x, y, scale) {
-  const N = G.world.N;
-  return { x: (x - y + N - 1) * scale, y: ((x + y) / 2) * scale };
-}
-
-export function miniToWorld(mx, my, scale) {
-  const N = G.world.N;
-  const a = mx / scale - (N - 1), b = (my / scale) * 2;
-  return { x: (a + b) / 2, y: (b - a) / 2 };
-}
+// Kartenansicht: v = { ox, oy, s, dx, dy } (Welt -> Bild: (x - ox) * s + dx)
+export function miniPos(x, y, v) { return { x: (x - v.ox) * v.s + v.dx, y: (y - v.oy) * v.s + v.dy }; }
+export function miniToWorld(mx, my, v) { return { x: (mx - v.dx) / v.s + v.ox, y: (my - v.dy) / v.s + v.oy }; }
 
 export function drawMap(c, w, h, opts = {}) {
   if (!minimapBase || minimapSeason !== seasonIndex()) buildMinimap();
-  const N = G.world.N;
-  const scale = Math.min(w / (N * 2), h / N);
-  c.clearRect(0, 0, w, h);
-  c.imageSmoothingEnabled = false;
-  c.drawImage(minimapBase, 0, 0, N * 2 * scale, N * scale);
-  c.imageSmoothingEnabled = true;
+  const W = G.world, N = W.N;
   const p = G.s.player;
+  const big = !!opts.big;
+  let v;
+  if (big) {
+    const s = Math.min(w, h) / N;
+    v = { ox: 0, oy: 0, s, dx: (w - N * s) / 2, dy: (h - N * s) / 2 };
+  } else {
+    const s = opts.zoom || 2.6;
+    v = { ox: p.x - w / (2 * s), oy: p.y - h / (2 * s), s, dx: 0, dy: 0 };
+  }
+  c.clearRect(0, 0, w, h);
+  c.fillStyle = '#35627d'; c.fillRect(0, 0, w, h);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
+  c.imageSmoothingEnabled = true;
+  if (big) drawMapDecor(c, v);
   for (const g of G.groups) {
-    if (Math.hypot(g.x - p.x, g.y - p.y) > (opts.big ? 30 : 24)) continue;
-    const q = miniPos(g.x, g.y, scale);
+    if (Math.hypot(g.x - p.x, g.y - p.y) > (big ? 30 : 24)) continue;
+    const q = miniPos(g.x, g.y, v);
     c.fillStyle = g.engaged || g.provoked ? '#ff4a3a' : g.faction ? FACTIONS[g.faction].color : '#3a2a1a';
-    c.beginPath(); c.arc(q.x, q.y, opts.big ? 3.5 : 2.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(q.x, q.y, big ? 3 : 2.4, 0, Math.PI * 2); c.fill();
   }
   for (const qq of G.s.quests) {
     const t = questTarget(qq);
-    const q = miniPos(t.x, t.y, scale);
-    c.strokeStyle = '#ffe066'; c.lineWidth = opts.big ? 2 : 1.4;
-    c.beginPath(); c.arc(q.x, q.y, opts.big ? 8 : 5, 0, Math.PI * 2); c.stroke();
+    const q = miniPos(t.x, t.y, v);
+    c.strokeStyle = '#ffe066'; c.lineWidth = big ? 2 : 1.4;
+    c.beginPath(); c.arc(q.x, q.y, big ? 7 : 5, 0, Math.PI * 2); c.stroke();
   }
   c.textAlign = 'center';
-  for (const s of G.world.sites) {
-    const q = miniPos(s.x, s.y, scale);
+  const RANK = { spieler: 0, stadt: 1, burg: 2, abtei: 3, markt: 4, halle: 5, dorf: 6, lager: 7 };
+  const placed = [];
+  const order = W.sites.slice().sort((a, b) => RANK[a.type] - RANK[b.type]);
+  for (const s of order) {
+    const q = miniPos(s.x, s.y, v);
+    if (q.x < -20 || q.y < -20 || q.x > w + 20 || q.y > h + 20) continue;
     const col = s.faction ? FACTIONS[s.faction].color : '#ffd65a';
-    const r = opts.big ? 5 : 3;
+    const r = big ? (s.type === 'stadt' || s.type === 'spieler' ? 4.5 : 3.5) : 3;
     c.fillStyle = '#1d140c'; c.fillRect(q.x - r - 1, q.y - r - 1, r * 2 + 2, r * 2 + 2);
     c.fillStyle = col; c.fillRect(q.x - r, q.y - r, r * 2, r * 2);
-    if (opts.big) {
-      c.font = '600 13px "Alegreya Sans", sans-serif';
+    placed.push({ x0: q.x - r - 1, y0: q.y - r - 1, x1: q.x + r + 1, y1: q.y + r + 1 });
+    if (!big && v.s < 4) continue;
+    const fs = big ? (s.type === 'stadt' || s.type === 'spieler' ? 13 : 11) : 11;
+    c.font = `600 ${fs}px "Alegreya Sans", sans-serif`;
+    const label = s.type === 'lager' ? s.name.replace(/^Lager im /, '') : s.name;
+    const tw = c.measureText(label).width;
+    // Über, unter, rechts oder links vom Ort, sonst weglassen
+    const spots = [[q.x, q.y - r - 4, 'center'], [q.x, q.y + r + fs + 1, 'center'], [q.x + r + 3, q.y + fs * 0.35, 'left'], [q.x - r - 3, q.y + fs * 0.35, 'right']];
+    for (const [lx, ly, al] of spots) {
+      const x0 = al === 'center' ? lx - tw / 2 : al === 'left' ? lx : lx - tw;
+      const box = { x0: x0 - 1, y0: ly - fs + 2, x1: x0 + tw + 1, y1: ly + 2 };
+      if (placed.some((o) => box.x0 < o.x1 && box.x1 > o.x0 && box.y0 < o.y1 && box.y1 > o.y0)) continue;
+      placed.push(box);
+      c.textAlign = al;
       c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,6,0.85)';
-      c.strokeText(s.name, q.x, q.y - 9); c.fillStyle = '#f3ead2'; c.fillText(s.name, q.x, q.y - 9);
+      c.strokeText(label, lx, ly); c.fillStyle = s.type === 'spieler' ? '#ffe9a0' : '#f3ead2'; c.fillText(label, lx, ly);
+      break;
     }
   }
-  const q = miniPos(p.x, p.y, scale);
+  c.textAlign = 'center';
+  const q = miniPos(p.x, p.y, v);
   c.fillStyle = '#ffffff'; c.strokeStyle = '#1d140c'; c.lineWidth = 2;
-  c.beginPath(); c.arc(q.x, q.y, opts.big ? 5 : 3.2, 0, Math.PI * 2); c.stroke(); c.fill();
-  if (!opts.big) {
+  c.beginPath(); c.arc(q.x, q.y, big ? 5 : 3.4, 0, Math.PI * 2); c.stroke(); c.fill();
+  if (!big) {
     const { w: vw, h: vh } = G.view;
-    const corners = [[0, 0], [vw, 0], [vw, vh], [0, vh]].map(([sx, sy]) => { const wp = screenToWorld(sx, sy, G.cam, vw, vh); return miniPos(wp.x, wp.y, scale); });
-    c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1;
+    const corners = [[0, 0], [vw, 0], [vw, vh], [0, vh]].map(([sx, sy]) => { const wp = screenToWorld(sx, sy, G.cam, vw, vh); return miniPos(wp.x, wp.y, v); });
+    c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 1;
     c.beginPath(); corners.forEach((pt, k) => (k ? c.lineTo(pt.x, pt.y) : c.moveTo(pt.x, pt.y))); c.closePath(); c.stroke();
+    c.font = '700 11px "IM Fell English SC", Georgia, serif';
+    c.fillStyle = '#e8c35a'; c.textAlign = 'center';
+    c.fillText('N', w - 9, 13);
   }
-  return scale;
+  return v;
+}
+
+// Große Karte: Fährlinien, Landschaftsnamen, Windrose
+function drawMapDecor(c, v) {
+  const W = G.world;
+  c.save();
+  c.setLineDash([5, 4]);
+  c.strokeStyle = 'rgba(240,230,200,0.75)'; c.lineWidth = 1.5;
+  for (const f of FERRIES) {
+    const a = W.sites.find((s) => s.id === f.a), b = W.sites.find((s) => s.id === f.b);
+    if (!a || !b) continue;
+    const pa = miniPos((a.dock || a).x, (a.dock || a).y, v), pb = miniPos((b.dock || b).x, (b.dock || b).y, v);
+    c.beginPath(); c.moveTo(pa.x, pa.y); c.lineTo(pb.x, pb.y); c.stroke();
+  }
+  c.setLineDash([]);
+  c.textAlign = 'center';
+  for (const r of REGIONS) {
+    const t = geoToTile(r.lon, r.lat), q = miniPos(t.x, t.y, v);
+    const fs = Math.round(15 * r.size * Math.max(0.7, v.s / 2.2));
+    c.font = r.sea ? `italic 500 ${fs}px "Alegreya", Georgia, serif` : `600 ${fs}px "IM Fell English SC", Georgia, serif`;
+    c.fillStyle = r.sea ? 'rgba(200,225,240,0.6)' : 'rgba(40,28,16,0.42)';
+    if (!r.sea && 'letterSpacing' in c) c.letterSpacing = `${Math.round(fs * 0.25)}px`;
+    c.textAlign = r.align || 'center';
+    if (!r.sea) { c.lineWidth = 3; c.strokeStyle = 'rgba(245,236,210,0.28)'; c.strokeText(r.name, q.x, q.y); }
+    c.fillText(r.name, q.x, q.y);
+    c.textAlign = 'center';
+    if ('letterSpacing' in c) c.letterSpacing = '0px';
+  }
+  // Windrose oben rechts
+  const cx = v.dx + W.N * v.s - 34, cy = v.dy + 38;
+  c.fillStyle = 'rgba(28,20,14,0.55)'; c.beginPath(); c.arc(cx, cy, 22, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#c9483a'; c.beginPath(); c.moveTo(cx, cy - 18); c.lineTo(cx + 5, cy); c.lineTo(cx - 5, cy); c.fill();
+  c.fillStyle = '#e9dfc6'; c.beginPath(); c.moveTo(cx, cy + 18); c.lineTo(cx + 5, cy); c.lineTo(cx - 5, cy); c.fill();
+  c.font = '700 12px "IM Fell English SC", Georgia, serif'; c.fillStyle = '#e8c35a';
+  c.fillText('N', cx, cy - 24);
+  c.restore();
 }
 
 // Treffer-Test für Klicks auf Einheiten (Bildschirmkoordinaten)

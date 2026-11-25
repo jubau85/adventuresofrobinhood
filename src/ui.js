@@ -3,7 +3,7 @@
 import { G, log, homeName } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS,
+  TYPE_NAME, SEASONS, REGIONS,
 } from './data.js';
 import {
   buy, sell, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
@@ -16,9 +16,10 @@ import {
   bLevel, levelName, partyCap, cargoCap, buildInfo, startBuild, hire, setCompanionStatus, dismiss,
   castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses,
 } from './castle.js';
-import { partyMembers, equip, unequip, previewEquip, xpNeeded, setPlayerPath } from './units.js';
+import { partyMembers, equip, unequip, previewEquip, xpNeeded, setPlayerPath, ferryRoutes, ferryCost, sail } from './units.js';
 import { seasonIndex, yearOf, clockText, passHours } from './sim.js';
 import { drawMap, miniToWorld } from './render.js';
+import { landAt } from './world.js';
 
 export function byId(id) { return document.getElementById(id); }
 
@@ -158,15 +159,15 @@ function itemStats(id) {
   return p.join(' · ');
 }
 
+// Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
 function dirText(from, to) {
   const dx = to.x - from.x, dy = to.y - from.y;
   const d = Math.hypot(dx, dy);
   if (d < 4) return 'ganz in der Nähe';
-  const sx = dx - dy, sy = (dx + dy) / 2;
-  const a = (Math.atan2(sx, -sy) * 180) / Math.PI;
+  const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
   const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
   const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
-  return `${Math.round(d)} Felder Richtung ${name}`;
+  return `${Math.round(d * 1.6)} Meilen Richtung ${name}`;
 }
 
 function questCard(q, buttons) {
@@ -189,7 +190,7 @@ function townPanel() {
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div>`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div>${site.port ? `<div class="actions">${harbourActions(site)}</div>` : ''}`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -218,8 +219,19 @@ function townInfo(site) {
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${harbourActions(site)}
     </div>
   </div>`;
+}
+
+// Hafen: Überfahrten mit Preis und Dauer. Der Hafen liegt vor den Mauern und ist immer offen.
+function harbourActions(site) {
+  const routes = site.port ? ferryRoutes(site.id) : [];
+  if (!routes.length) return '';
+  return `<h3>Hafen</h3>${routes.map((r) => {
+    const to = siteById(r.to), cost = ferryCost(r);
+    return `<div class="action"><div><b>${esc(r.ship)} nach ${esc(to.name)}</b><p>${r.hours} Stunden auf See, mit Gefolge und Pferden. ${cost ? `Fährlohn ${fmt(cost)} Gold.` : 'Für Freunde der Krone Frankreichs kostenlos.'}</p></div><button class="btn" data-act="sail" data-to="${r.to}" ${G.s.gold < cost ? 'disabled' : ''}>Ablegen</button></div>`;
+  }).join('')}`;
 }
 
 function marketTable(site) {
@@ -430,7 +442,7 @@ function questsPanel() {
   const p = G.s.player;
   const goal = `<div class="goal">
     <h3>Dein Ziel</h3>
-    <p>Mach ${esc(homeName())} zur Festung und gewinne zwei Fraktionen als Verbündete. Dann ist dein Name im ganzen Norden bekannt.</p>
+    <p>Mach ${esc(homeName())} zur Festung und gewinne zwei Fraktionen als Verbündete. Dann kennt man deinen Namen von York bis Paris.</p>
     <div class="chips"><span class="chip ${G.s.castle.level >= 3 ? 'ok' : ''}">Burg: ${esc(levelName())} (${G.s.castle.level}/3)</span><span class="chip ${alliesCount() >= 2 ? 'ok' : ''}">Verbündete ${alliesCount()}/2</span><span class="chip">Ruhm ${fmt(G.s.renown)}</span><span class="chip">${G.s.stats.quests} Aufträge erfüllt</span></div>
   </div>`;
   const list = G.s.quests.map((q) => {
@@ -466,34 +478,55 @@ function politicsPanel() {
 }
 
 // ---------------------------------------------------------------- Karte
-let mapScale = 1;
+let mapView = null;
 function mapPanel() {
   return {
-    title: 'Karte des Nordens', sub: 'Klicke auf einen Ort, um dorthin zu reisen.', tabs: [],
-    body: `<div class="mapwrap"><canvas id="bigmap" width="960" height="480" aria-label="Karte"></canvas></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span></p>`,
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Übers Meer geht es nur mit dem Schiff.', tabs: [],
+    body: `<div class="mapwrap"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas></div>
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="dash"></span>Fähre</span></p>`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.parentElement;
-      const w = Math.min(960, wrap.clientWidth || 960);
-      cv.width = w * 2; cv.height = w;
-      cv.style.width = `${w}px`; cv.style.height = `${w / 2}px`;
+      const w = Math.max(240, Math.min(760, wrap.clientWidth || 720, Math.round(window.innerHeight * 0.66)));
+      cv.width = w * 2; cv.height = w * 2;
+      cv.style.width = `${w}px`; cv.style.height = `${w}px`;
       const c = cv.getContext('2d');
       c.scale(2, 2);
-      mapScale = drawMap(c, w, w / 2, { big: true });
+      mapView = drawMap(c, w, w, { big: true });
       cv.onclick = (e) => {
         const r = cv.getBoundingClientRect();
-        const wp = miniToWorld(e.clientX - r.left, e.clientY - r.top, mapScale);
-        let target = wp, site = null;
-        for (const s of G.world.sites) if (Math.hypot(s.x - wp.x, s.y - wp.y) < 4) { site = s; target = s; }
-        if (setPlayerPath(target.x, target.y + (site && site.type === 'spieler' ? 2.6 : 0))) {
-          G.pendingSite = site;
-          log(site ? `Du reist nach ${site.name}.` : 'Du brichst auf.');
-          closePanel();
-        } else log('Dorthin führt kein Weg.', 'bad');
+        const wp = miniToWorld(e.clientX - r.left, e.clientY - r.top, mapView);
+        let target = wp, site = null, best = 5;
+        for (const s of G.world.sites) { const d = Math.hypot(s.x - wp.x, s.y - wp.y); if (d < best) { best = d; site = s; target = s; } }
+        travelTo(target, site);
       };
     },
   };
+}
+
+// Reise über die Karte. Liegt das Ziel jenseits des Meeres, geht es zum passenden Hafen.
+function travelTo(target, site) {
+  const p = G.s.player, W = G.world;
+  const here = landAt(W, p.x, p.y), there = landAt(W, target.x, target.y);
+  if (there && here && there !== here) {
+    const ports = W.sites.filter((s) => s.port && s.land === here && ferryRoutes(s.id).some((r) => siteById(r.to).land === there));
+    ports.sort((x, y) => Math.hypot(x.x - p.x, x.y - p.y) - Math.hypot(y.x - p.x, y.y - p.y));
+    // Bester Hafen: kurzer Weg dorthin und vom Zielhafen weiter, kurze Überfahrt
+    const score = (s) => Math.min(...ferryRoutes(s.id).filter((r) => siteById(r.to).land === there).map((r) => { const d = siteById(r.to); return Math.hypot(s.x - p.x, s.y - p.y) + Math.hypot(d.x - target.x, d.y - target.y) + r.hours * 2; }));
+    ports.sort((x, y) => score(x) - score(y));
+    const port = ports[0];
+    if (port && setPlayerPath(port.x, port.y)) {
+      G.pendingSite = port;
+      log(`Nach ${site ? site.name : 'dort'} führt kein Landweg. Du reist zum Hafen von ${port.name} und nimmst dort ein Schiff.`);
+      closePanel();
+    } else log('Dorthin führt kein Landweg. Du brauchst ein Schiff.', 'bad');
+    return;
+  }
+  if (setPlayerPath(target.x, target.y + (site && site.type === 'spieler' ? 2.6 : 0))) {
+    G.pendingSite = site;
+    log(site ? `Du reist nach ${site.name}.` : 'Du brichst auf.');
+    closePanel();
+  } else log('Dorthin führt kein Weg.', 'bad');
 }
 
 // ---------------------------------------------------------------- Menü & Hilfe
@@ -544,6 +577,8 @@ function helpPanel() {
         <li>Wer einer Fraktion hilft, verärgert ihre Rivalen. Ab +${ALLY_AT} wird eine Fraktion zum Verbündeten und gewährt Vorteile.</li>
         <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in ${esc(homeName())} ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
         <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab.</li>
+        <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
+        <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
       </ol></div>
     </div>`,
   };
@@ -552,7 +587,7 @@ function helpPanel() {
 function victoryPanel() {
   return {
     title: `${G.s.player.female ? 'Herrin' : 'Herr'} von ${homeName()}`, tabs: [],
-    body: `<div class="victory"><p class="lede">Die Festung ${esc(homeName())} steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus dem ganzen Norden zu deinem Tor.</p>
+    body: `<div class="victory"><p class="lede">Die Festung ${esc(homeName())} steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus ganz England und aus der Normandie zu deinem Tor.</p>
       <p>Du hast in ${G.s.day} Tagen ${G.s.stats.quests} Aufträge erfüllt und ${fmt(G.s.renown)} Ruhm gesammelt.</p>
       <button class="btn primary" data-act="resume">Weiterregieren</button></div>`,
   };
@@ -566,6 +601,7 @@ const ACTIONS = {
   resume: () => closePanel(),
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   gift: () => giveGift(G.ui.arg),
+  sail: (d) => { if (sail(G.ui.arg.id, d.to)) closePanel(); },
   rest: () => {
     passHours(4);
     const p = G.s.player;

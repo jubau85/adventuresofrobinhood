@@ -1,8 +1,8 @@
 {
-  "name": "ritter-ohne-land",
-  "version": "0.1.0",
+  "name": "a-knights-tale",
+  "version": "0.2.0",
   "private": true,
-  "description": "Isometrisches Burgen-, Handels- und Politik-Spiel im England des Jahres 1194.",
+  "description": "Isometrisches Burgen-, Handels- und Politik-Spiel in England und Frankreich im Jahr 1194.",
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8080",

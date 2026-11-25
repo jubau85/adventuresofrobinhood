@@ -1,8 +1,8 @@
-# Design: Ritter ohne Land
+# Design: A Knight's Tale
 
 ## Idee
 
-Ein isometrisches Rollenspiel mit lebendiger Welt im Geist der Abenteuerspiele der frühen 90er. Größer und politischer angelegt, näher an *Ivanhoe* als an der Räuberromantik. Der Spieler ist ein enterbter Ritter, der 1194 vom Kreuzzug heimkehrt. Er macht aus einer Burgruine den Mittelpunkt seiner Macht und muss sich zwischen den Parteien des Nordens entscheiden.
+Ein isometrisches Rollenspiel mit lebendiger Welt im Geist der Abenteuerspiele der frühen 90er. Größer und politischer angelegt, näher an *Ivanhoe* als an der Räuberromantik. Der Spieler ist ein enterbter Ritter, der 1194 vom Kreuzzug heimkehrt. Er macht aus einer Burgruine den Mittelpunkt seiner Macht und muss sich zwischen den Parteien in England und Frankreich entscheiden.
 
 ## Säulen
 
@@ -30,12 +30,14 @@ Langfristiges Ziel im Prototyp: Ashcombe zur **Festung** ausbauen und **zwei Ver
 | Kirche & Orden | Frieden, Spenden, Einfluss | (keine) | Schnellere Heilung, Ruhm |
 | Kaufmannsgilde | Sichere Straßen | Waldleute | Bessere Preise, Handelsanteile |
 | Waldleute | Gerechtigkeit, Richards Rückkehr | Normannen, Gilde | Banden meiden dich, Langbogenschützen |
+| Krone Frankreichs | Die Normandie | Normannen | Freie Überfahrt, Armbrustschützen |
 
 Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen greifen an, Überfälle auf die Burg).
 
-## Stand des Prototyps (v0.1)
+## Stand des Prototyps (v0.2)
 
-- Weltgenerator mit Fluss, Seen, Wald, Hügeln, 15 Orten, Straßen, Brücken, Feldern
+- Karte von England und Frankreich (320 × 320) mit echten Küsten, Flüssen, Bergland und Wäldern, 41 Orten an historischen Stellen, Straßen, Brücken und Häfen
+- Fähren über den Kanal und die Nordsee
 - Tag und Nacht mit Lichtern, vier Jahreszeiten (Schnee, Herbstlaub)
 - Spieler und Gefolge mit Reiten, Ausrüstung, Stufen, Befehlen
 - Sechs Gruppentypen mit eigener Route und eigenem Verhalten

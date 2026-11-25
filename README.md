@@ -1,12 +1,12 @@
-# Ritter ohne Land
+# A Knight's Tale
 
-Ein isometrisches Burgen-, Handels- und Politikspiel im Browser. Es spielt im England des Jahres 1194: König Richard ist in Gefangenschaft, normannische Barone und sächsische Thane belauern einander, in den Wäldern leben die Geächteten. Du kehrst als enterbter Ritter vom Kreuzzug zurück und machst aus einer Burgruine eine Festung.
+Ein isometrisches Burgen-, Handels- und Politikspiel im Browser. Es spielt in England und Frankreich im Jahr 1194: König Richard ist eben aus der Gefangenschaft zurück, Prinz Johns Barone halten noch die Burgen, König Philipp greift nach der Normandie. Sächsische Thane murren, in den Wäldern leben die Geächteten. Du kehrst als enterbter Ritter vom Kreuzzug zurück und machst aus einer Burgruine eine Festung.
 
 Das Spiel ist ein geistiger Nachfolger der isometrischen Abenteuerspiele der frühen 90er. Es ist ein eigenständiges Spiel mit eigener Welt, eigenen Figuren und eigenen Regeln.
 
 ## Spielen
 
-**Ohne Installation:** `dist/ritter-ohne-land.html` herunterladen und im Browser öffnen.
+**Ohne Installation:** `dist/a-knights-tale.html` herunterladen und im Browser öffnen.
 
 **Zum Entwickeln** (Module direkt aus `src/`, ES-Module brauchen einen lokalen Server):
 
@@ -27,13 +27,16 @@ node tools/build.mjs
 - **Startmenü:** Animiertes Titelbild bei Sonnenuntergang. Du wählst deinen Namen, den Namen deiner Burg, Ritter oder Ritterin und eine von sechs Wappenfarben, mit Vorschau. Farbe und Name erscheinen im ganzen Spiel: Gefolge, Banner, Meldungen, Karte.
 - **Musik:** Wird live im Browser erzeugt, mit Laute, Flöte, Hörnern, Bordun und Trommeln. Es gibt ein episches Titelthema, Reisemusik im Dreiertakt, ruhigere Nachtmusik und Trommeln im Kampf. Taste L schaltet sie an und aus.
 
-- **Große, zufällig erzeugte Welt:** 160 × 160 Felder mit Fluss, Seen, Wäldern und Hügeln. Dazu 15 Orte (Städte, Dörfer, Burgen, Abteien, ein verstecktes Lager), die durch Straßen und Brücken verbunden sind.
+- **Karte von England und Frankreich:** 320 × 320 Felder, eine Kachel sind etwa 2,5 km. Die Küsten von England, Wales, Nordfrankreich, Flandern und der Ostrand Irlands, dazu Wight, Man und die Kanalinseln. Echte Flüsse (Themse, Severn, Trent, Ouse, Seine, Marne, Oise, Somme, Schelde und andere), Bergland an den richtigen Stellen (Pennines, Lake District, Snowdonia, Dartmoor, Ardennen) und die alten Wälder (Sherwood, Barnsdale, New Forest, Weald, Fontainebleau).
+- **41 Orte an ihren historischen Stellen:** London, York, Nottingham, Lincoln, Canterbury, Dover, Winchester, Rouen, Caen, Paris, Chartres, Brügge, Troyes und viele mehr, dazu die Schauplätze aus *Ivanhoe* in Yorkshire. Straßen und Brücken verbinden die Orte auf jeder Landmasse. Die Details (Verlauf der Küste, Wälder, Straßen) unterscheiden sich mit jedem neuen Spiel ein wenig.
+- **Schiffe übers Meer:** Fähren von Dover nach Calais, von Portsmouth nach Barfleur und ein Wollschiff von London nach Brügge. Die Überfahrt kostet Fährlohn je Kopf und Pferd und dauert einige Stunden. Wer auf der Karte ein Ziel jenseits des Meeres anklickt, reitet automatisch zum passenden Hafen.
+- **Kompass und eingenordete Karte:** In der Schrägansicht liegt Norden rechts oben, der Kompass in der Ecke zeigt es an. Die Minikarte zeigt die Umgebung, die große Karte (M) ganz England und Frankreich mit Fährlinien und Landschaftsnamen.
 - **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren.
 - **Drei Grafikstufen (Taste G oder Menü):**
   - **Klar** (Standard)
   - **Pixel:** halbe Auflösung, grobe Pixel
   - **Retro:** Amiga-Stil mit eigener 32-Farben-Palette und feinem Dithering
-- **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf den Seen und Vogelschwärme.
+- **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf Flüssen und Seen und Vogelschwärme.
 - **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Schnee im Winter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
 - **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
 - **Die Burg Ashcombe:** Ausbau von der Ruine über Holzburg und Steinburg zur Festung. Neun Gebäude mit je drei Stufen (Rittersaal, Unterkunft, Schmiede, Stallungen, Holzfäller, Steinbruch, Markt, Kapelle, Wachtürme). Jeder Ausbau ist auf der Karte zu sehen:
@@ -46,7 +49,7 @@ node tools/build.mjs
 - **Gefolge:** Leute im Rittersaal anwerben, ausrüsten (Waffe, Rüstung, Schild, Pferd) und in Scharmützel führen. Dazu Befehle (folgen, Stellung halten, angreifen), Erfahrung und Stufen, Sold, Garnison und Verwundete.
 - **Jagd:** Mit Bogen oder Armbrust Hirsche und Enten jagen. Hirsche fliehen, Bogenschützen im Gefolge schießen mit. Fleisch und Felle lassen sich einlagern oder in Städten verkaufen. Wilderei kann den Normannen auffallen, fremdes Vieh zu schießen gilt als Diebstahl. Die Bestände wachsen täglich nach.
 - **Handel:** Jeder Ort erzeugt und braucht andere Waren. Die Preise richten sich nach dem Vorrat. Holz, Stein und Eisen braucht man auch für den Burgbau.
-- **Politik:** Fünf Fraktionen (Sachsen, Normannen, Kirche, Gilde, Waldleute) mit Rivalitäten. Aufträge, Geschenke und Überfälle verschieben das Ansehen. Verbündete gewähren Vorteile, Feinde überfallen deine Burg.
+- **Politik:** Sechs Fraktionen (Sachsen, Normannen, Kirche, Gilde, Waldleute und die Krone Frankreichs) mit Rivalitäten. Als Freund der Franzosen fährst du umsonst über den Kanal und kannst Armbrustschützen anwerben. Aufträge, Geschenke und Überfälle verschieben das Ansehen. Verbündete gewähren Vorteile, Feinde überfallen deine Burg.
 - **Speichern:** Automatisch jeden Morgen im Browser, dazu manuell über das Menü.
 
 ## Steuerung
@@ -71,8 +74,9 @@ node tools/build.mjs
 | Datei | Inhalt |
 | --- | --- |
 | `src/data.js` | Alle Spieldaten und Balancing-Werte: Fraktionen, Waren, Gegenstände, Klassen, Gruppen, Gebäude, Orte |
-| `src/world.js` | Weltgenerator aus dem Seed, A*-Wegfindung |
-| `src/units.js` | Einheiten, Werte, Kampf, Gefolge, KI-Gruppen, Dorfbewohner |
+| `src/geo.js` | Küsten, Flüsse, Bergland und Wälder als Längen- und Breitengrade |
+| `src/world.js` | Weltgenerator (Küsten rastern, Flüsse, Orte, Straßen je Landmasse, Häfen), A*-Wegfindung |
+| `src/units.js` | Einheiten, Werte, Kampf, Gefolge, KI-Gruppen, Dorfbewohner, Fähren |
 | `src/economy.js` | Märkte, Preise, Ladung, Ausrüstungshandel |
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |

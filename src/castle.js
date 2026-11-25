@@ -102,6 +102,7 @@ export function refreshRecruits() {
   const classes = ['bauer', 'knecht', 'schuetze', 'knecht', 'schuetze'];
   if (hl >= 2) classes.push('reisiger', 'reisiger');
   if (isAlly('waldleute')) classes.push('waldlaeufer', 'waldlaeufer');
+  if (isAlly('franken')) classes.push('armbruster', 'armbruster');
   const n = 2 + hl;
   const lvMin = hl >= 3 ? 2 : 1;
   const lvMax = Math.min(7, 1 + hl + Math.floor(G.s.renown / 40));

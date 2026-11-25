@@ -1,7 +1,8 @@
-// Weltgenerator: Gelände, Fluss, Siedlungen, Straßen, Felder, Bäume, Gebäude.
+// Weltgenerator: Küsten, Flüsse, Bergland, Siedlungen, Straßen, Häfen, Felder, Bäume, Gebäude.
 // Alles ist deterministisch aus dem Seed, daher muss nur der Seed gespeichert werden.
 
-import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS } from './data.js';
+import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile } from './data.js';
+import { COAST_GB, COAST_IRELAND, COAST_CONTINENT, ISLANDS, RIVERS, UPLANDS, FORESTS } from './geo.js';
 import { mulberry32, makeNoise, fbm, rpick, hash2 } from './rng.js';
 
 // ---------------------------------------------------------------- A*
@@ -185,7 +186,7 @@ export function nearestWalkable(W, tx, ty, maxR = 8) {
 }
 
 // Pfad zwischen zwei Weltpunkten (Fließkomma). Gibt Wegpunkte zurück oder null.
-export function findPath(W, fx, fy, tx, ty, maxIter = 40000) {
+export function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
   const N = W.N;
   const cl = (v) => Math.max(0, Math.min(N - 1, Math.floor(v)));
   let sx = cl(fx), sy = cl(fy), gx = cl(tx), gy = cl(ty);
@@ -200,8 +201,11 @@ export function findPath(W, fx, fy, tx, ty, maxIter = 40000) {
     gx = a.x; gy = a.y; tx = gx + 0.5; ty = gy + 0.5;
   }
   if (sx === gx && sy === gy) return [{ x: tx, y: ty }];
+  if (W.landId[sy * N + sx] !== W.landId[gy * N + gx]) return null;
   const tiles = W.tiles, extra = W.extraCost, block = W.block;
-  const idx = astar(N, sx, sy, gx, gy, (i) => (block[i] ? 1e9 : TERRAIN_COST[tiles[i]] + extra[i]), { hMul: 0.6, maxIter });
+  const far = Math.hypot(gx - sx, gy - sy);
+  const hMul = far > 90 ? 0.95 : far > 45 ? 0.8 : 0.6;
+  const idx = astar(N, sx, sy, gx, gy, (i) => (block[i] ? 1e9 : TERRAIN_COST[tiles[i]] + extra[i]), { hMul, maxIter });
   if (!idx) return null;
   const pts = [];
   let pdx = 0, pdy = 0;
@@ -226,29 +230,46 @@ export function generateWorld(seed) {
   const elev = new Float32Array(N * N);
   const extraCost = new Float32Array(N * N);
   const nE = makeNoise(seed * 7 + 1), nM = makeNoise(seed * 13 + 5), nR = makeNoise(seed * 3 + 11);
+  const nW = makeNoise(seed * 17 + 23), nW2 = makeNoise(seed * 19 + 29);
 
+  // Küste: gerasterte Umrisse, leicht verwirbelt
+  const poly = rasterLand(N);
+  const land = new Uint8Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const wx = x + (fbm(nW, x / 9, y / 9, 3) - 0.5) * 5.5 + (nW2(x / 2.5, y / 2.5) - 0.5) * 1.3;
+    const wy = y + (fbm(nW, x / 9 + 71, y / 9 + 37, 3) - 0.5) * 5.5 + (nW2(x / 2.5 + 13, y / 2.5 + 7) - 0.5) * 1.3;
+    const sx = Math.max(0, Math.min(N - 1, Math.floor(wx))), sy = Math.max(0, Math.min(N - 1, Math.floor(wy)));
+    land[y * N + x] = poly[sy * N + sx];
+  }
+  smoothLand(land, N);
+  const sea = findSea(land, N);
+  // Eingeschlossene Tümpel aus der Verwirbelung werden Land
+  for (let i = 0; i < N * N; i++) if (!land[i] && !sea[i]) land[i] = 1;
+  const dSea = distanceField(N, (i) => sea[i] === 1);
+
+  // Gelände: Höhe aus Bergland und Rauschen, Wald aus Waldgebieten und Rauschen
+  const upl = new Float32Array(N * N), wood = new Float32Array(N * N);
+  addInfluence(N, upl, UPLANDS);
+  addInfluence(N, wood, FORESTS);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x;
-    let e = fbm(nE, x / 26, y / 26, 4);
-    const m = fbm(nM, x / 19 + 50, y / 19 + 50, 4);
-    const edge = Math.max(Math.abs(x - N / 2), Math.abs(y - N / 2)) / (N / 2);
-    if (edge > 0.88) e += (edge - 0.88) * 1.2;   // Ränder werden hügelig
+    if (sea[i]) { tiles[i] = T.WATER; elev[i] = 0.25; continue; }
+    const rough = 0.85 + (fbm(nE, x / 6 + 40, y / 6 + 40, 3) - 0.5) * 0.9;
+    const e = 0.42 + (fbm(nE, x / 20, y / 20, 4) - 0.5) * 0.2 + Math.min(1, dSea[i] / 10) * 0.06 + upl[i] * rough;
     elev[i] = e;
-    let t = T.GRASS;
-    if (e < 0.34) t = T.WATER;
-    else if (e > 0.665) t = T.HILLS;
-    else if (m > 0.53) t = T.FOREST;
-    tiles[i] = t;
+    const m = fbm(nM, x / 13 + 50, y / 13 + 50, 4) + wood[i];
+    tiles[i] = e > 0.665 ? T.HILLS : m > 0.62 ? T.FOREST : T.GRASS;
   }
 
-  carveRiver(tiles, N, rng, nR);
-
-  const W = { N, seed, tiles, elev, extraCost, sites: [], buildings: [], chunkObjs: [], CN: N / CHUNK, roads: [] };
+  const W = { N, seed, tiles, elev, extraCost, sea, sites: [], buildings: [], chunkObjs: [], CN: N / CHUNK, roads: [] };
+  carveRivers(W, nR);
+  W.landId = labelLand(W);
 
   placeSettlements(W, rng);
   for (const s of W.sites) clearAround(W, s);
   addShores(W);
   buildRoads(W);
+  placeDocks(W);
   for (const s of W.sites) addFields(W, s, rng);
   for (const s of W.sites) genBuildings(W, s, rng);
   computeHeights(W);
@@ -256,6 +277,156 @@ export function generateWorld(seed) {
   placeTrees(W, rng);
   buildStaticWalls(W);
   return W;
+}
+
+// Landmasse an einer Stelle (0 = Meer). Gruppen und Wege bleiben auf ihrer Landmasse.
+export function landAt(W, x, y) {
+  const i = Math.floor(y) * W.N + Math.floor(x);
+  return x < 0 || y < 0 || x >= W.N || y >= W.N ? 0 : W.landId[i];
+}
+
+const toTilePts = (pts) => pts.map(([lon, lat]) => geoToTile(lon, lat));
+
+// Umrisse zeilenweise rastern (gerade-ungerade-Regel), 1 = Land
+function rasterLand(N) {
+  const out = new Uint8Array(N * N);
+  const polys = [COAST_GB, COAST_IRELAND, COAST_CONTINENT, ...ISLANDS].map(toTilePts);
+  const xs = [];
+  for (const P of polys) {
+    for (let j = 0; j < N; j++) {
+      const yc = j + 0.5;
+      xs.length = 0;
+      for (let k = 0; k < P.length; k++) {
+        const p = P[k], q = P[(k + 1) % P.length];
+        if ((p.y <= yc) !== (q.y <= yc)) xs.push(p.x + ((yc - p.y) / (q.y - p.y)) * (q.x - p.x));
+      }
+      xs.sort((u, v) => u - v);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const x0 = Math.max(0, Math.ceil(xs[k] - 0.5)), x1 = Math.min(N - 1, Math.floor(xs[k + 1] - 0.5));
+        for (let x = x0; x <= x1; x++) out[j * N + x] = 1;
+      }
+    }
+  }
+  return out;
+}
+
+// Einzelne Land- und Wasserkrümel entfernen
+function smoothLand(land, N) {
+  const src = new Uint8Array(land);
+  for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && src[(y + dy) * N + x + dx]) n++;
+    const i = y * N + x;
+    if (src[i] && n <= 1) land[i] = 0;
+    else if (!src[i] && n >= 7) land[i] = 1;
+  }
+}
+
+// Meer: Wasser, das mit dem Kartenrand verbunden ist
+function findSea(land, N) {
+  const sea = new Uint8Array(N * N);
+  const q = [];
+  for (let k = 0; k < N; k++) for (const i of [k, (N - 1) * N + k, k * N, k * N + N - 1]) if (!land[i] && !sea[i]) { sea[i] = 1; q.push(i); }
+  for (let h = 0; h < q.length; h++) {
+    const i = q[h], x = i % N, y = (i / N) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+      const ni = ny * N + nx;
+      if (!land[ni] && !sea[ni]) { sea[ni] = 1; q.push(ni); }
+    }
+  }
+  return sea;
+}
+
+// Abstand (in Kacheln, 4er-Nachbarschaft) zu den Feldern, für die src(i) gilt
+function distanceField(N, src) {
+  const d = new Int16Array(N * N).fill(-1);
+  const q = [];
+  for (let i = 0; i < N * N; i++) if (src(i)) { d[i] = 0; q.push(i); }
+  for (let h = 0; h < q.length; h++) {
+    const i = q[h], x = i % N, y = (i / N) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+      const ni = ny * N + nx;
+      if (d[ni] < 0) { d[ni] = d[i] + 1; q.push(ni); }
+    }
+  }
+  return d;
+}
+
+function segDist(px, py, p, q) {
+  const dx = q.x - p.x, dy = q.y - p.y, l2 = dx * dx + dy * dy;
+  let t = l2 ? ((px - p.x) * dx + (py - p.y) * dy) / l2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - p.x - t * dx, py - p.y - t * dy);
+}
+
+// Einfluss von Linienzügen mit glockenförmigem Abfall aufaddieren
+function addInfluence(N, field, list) {
+  for (const f of list) {
+    const P = toTilePts(f.pts), R = f.r * 2.6;
+    const x0 = Math.max(0, Math.floor(Math.min(...P.map((p) => p.x)) - R)), x1 = Math.min(N - 1, Math.ceil(Math.max(...P.map((p) => p.x)) + R));
+    const y0 = Math.max(0, Math.floor(Math.min(...P.map((p) => p.y)) - R)), y1 = Math.min(N - 1, Math.ceil(Math.max(...P.map((p) => p.y)) + R));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      let d = Infinity;
+      if (P.length === 1) d = Math.hypot(x + 0.5 - P[0].x, y + 0.5 - P[0].y);
+      else for (let k = 0; k + 1 < P.length; k++) d = Math.min(d, segDist(x + 0.5, y + 0.5, P[k], P[k + 1]));
+      if (d < R) field[y * N + x] += f.a * Math.exp(-(d * d) / (f.r * f.r));
+    }
+  }
+}
+
+// Flüsse und Seen als Wasserbänder entlang der Linienzüge, mit leichten Mäandern
+function carveRivers(W, nR) {
+  const N = W.N;
+  RIVERS.forEach((r, ri) => {
+    const P = toTilePts(r.pts);
+    let L = 0;
+    for (let k = 0; k + 1 < P.length; k++) L += Math.hypot(P[k + 1].x - P[k].x, P[k + 1].y - P[k].y);
+    let acc = 0;
+    for (let k = 0; k + 1 < P.length; k++) {
+      const p = P[k], q = P[k + 1], len = Math.hypot(q.x - p.x, q.y - p.y);
+      if (len < 1e-6) continue;
+      const nx = -(q.y - p.y) / len, ny = (q.x - p.x) / len;
+      const steps = Math.ceil(len / 0.3);
+      for (let st = 0; st <= steps; st++) {
+        const t = st / steps, dd = acc + t * len, f = dd / L;
+        const w = r.w[0] + (r.w[1] - r.w[0]) * f;
+        const amp = r.lake ? 0.3 : 1.3 * Math.min(1, dd / 6, (L - dd) / 6);
+        const off = (nR(dd * 0.09, ri * 7.3) - 0.5) * 2 * amp;
+        const cx = p.x + (q.x - p.x) * t + nx * off, cy = p.y + (q.y - p.y) * t + ny * off;
+        for (let y = Math.floor(cy - w); y <= Math.ceil(cy + w); y++) for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
+          if (x < 0 || y < 0 || x >= N || y >= N) continue;
+          if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= w) W.tiles[y * N + x] = T.WATER;
+        }
+      }
+      acc += len;
+    }
+  });
+}
+
+// Zusammenhängende Landmassen nummerieren (Flüsse zählen zum Land)
+function labelLand(W) {
+  const N = W.N, id = new Int16Array(N * N);
+  let next = 0;
+  for (let s = 0; s < N * N; s++) {
+    if (W.sea[s] || id[s]) continue;
+    next++;
+    const q = [s];
+    id[s] = next;
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h], x = i % N, y = (i / N) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+        const ni = ny * N + nx;
+        if (!W.sea[ni] && !id[ni]) { id[ni] = next; q.push(ni); }
+      }
+    }
+  }
+  return id;
 }
 
 // Höhen an den Kachelecken: Wasser liegt auf 0, Land steigt mit der Erhebung an
@@ -320,23 +491,6 @@ function flattenSites(W) {
   }
 }
 
-function carveRiver(tiles, N, rng, noise) {
-  let x = N * (0.3 + rng() * 0.4), y = 0, a = Math.PI / 2;
-  const base = Math.PI / 2;
-  for (let step = 0; step < 3000 && y < N - 1 && x > 1 && x < N - 2; step++) {
-    a += (noise(step * 0.04, 3.3) - 0.5) * 0.3 + (base - a) * 0.02;
-    a = Math.max(base - 1.0, Math.min(base + 1.0, a));
-    x += Math.cos(a) * 0.5;
-    y += Math.sin(a) * 0.5;
-    const w = 0.85 + noise(step * 0.02, 9.1) * 0.9;
-    for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
-      const tx = Math.floor(x + ox), ty = Math.floor(y + oy);
-      if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
-      if (Math.hypot(tx + 0.5 - x, ty + 0.5 - y) <= w) tiles[ty * N + tx] = T.WATER;
-    }
-  }
-}
-
 function countAround(W, cx, cy, r, type) {
   let n = 0;
   for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
@@ -348,40 +502,81 @@ function countAround(W, cx, cy, r, type) {
   return n;
 }
 
+// Nächstes Wasserfeld (Abstand in Kacheln) im Umkreis r, sonst Infinity
+function waterDist(W, cx, cy, r) {
+  let best = Infinity;
+  for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
+    const x = cx + ox, y = cy + oy;
+    if (x < 0 || y < 0 || x >= W.N || y >= W.N) continue;
+    if (W.tiles[y * W.N + x] === T.WATER) best = Math.min(best, Math.hypot(ox, oy));
+  }
+  return best;
+}
+
+// Mindestabstand zweier Orte: die eigene Burg braucht Platz, Lager kommen mit wenig aus
+function siteGap(a, b) {
+  const lager = a.type === 'lager' || b.type === 'lager';
+  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 13 : 17;
+  if (lager) return 10;
+  return Math.max(10, a.clear + b.clear - 2);
+}
+
+// Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse)
 function placeSettlements(W, rng) {
   const N = W.N;
   for (const def of SETTLEMENTS) {
-    let best = null;
-    for (let attempt = 0; attempt < 900 && !best; attempt++) {
-      const minD = attempt < 400 ? 24 : attempt < 700 ? 18 : 12;
-      let x, y;
-      if (def.type === 'spieler') {
-        x = N / 2 + (rng() - 0.5) * 50; y = N / 2 + (rng() - 0.5) * 50;
-      } else {
-        x = 12 + rng() * (N - 24); y = 12 + rng() * (N - 24);
+    const g = geoToTile(def.lon, def.lat);
+    const gx = Math.floor(g.x), gy = Math.floor(g.y);
+    const near = nearestWalkableTile(W, gx, gy);
+    const home = W.landId[near.y * N + near.x];
+    const margin = def.clear + 4;
+    const tryFind = (strict, maxR) => {
+      let best = null, bestScore = Infinity, bestR = -1;
+      for (let r = 0; r <= maxR; r++) {
+        if (best && r > bestR + 4) break;
+        for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
+          if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+          const x = gx + ox, y = gy + oy;
+          if (x < margin || y < margin || x >= N - margin || y >= N - margin) continue;
+          const i = y * N + x;
+          if (W.tiles[i] === T.WATER || W.landId[i] !== home) continue;
+          if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < siteGap(s, def))) continue;
+          const waterR = def.port ? (def.type === 'burg' ? 7 : def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
+          if (countAround(W, x, y, waterR, T.WATER) > 0) continue;
+          let score = Math.hypot(ox, oy);
+          if (strict && def.port) {
+            const dw = waterDist(W, x, y, 12);
+            if (dw > 11) continue;
+            score += dw * 0.5;
+          }
+          if (def.type === 'lager') {
+            const f = countAround(W, x, y, 5, T.FOREST);
+            if (strict && f < 24) continue;
+            score += (70 - f) * 0.15;
+          } else {
+            if (W.tiles[i] === T.HILLS) score += 3;
+            score += countAround(W, x, y, 3, T.HILLS) * 0.3;
+          }
+          if (score < bestScore) { bestScore = score; best = { x, y }; bestR = r; }
+        }
       }
-      x = Math.floor(x); y = Math.floor(y);
-      if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < minD)) continue;
-      const waterR = def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
-      if (countAround(W, x, y, waterR, T.WATER) > 0) continue;
-      if (def.type === 'lager') {
-        if (countAround(W, x, y, 5, T.FOREST) < 55) continue;
-      } else if (attempt < 600) {
-        if (W.tiles[y * N + x] === T.HILLS && rng() < 0.8) continue;
-        if (countAround(W, x, y, 3, T.HILLS) > 10) continue;
-      }
-      best = { x, y };
-    }
-    if (!best) {
-      // Notlösung: irgendein trockenes Feld weit genug weg
-      for (let k = 0; k < 4000 && !best; k++) {
-        const x = 10 + Math.floor(rng() * (N - 20)), y = 10 + Math.floor(rng() * (N - 20));
-        if (W.tiles[y * N + x] !== T.WATER && !W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < 10)) best = { x, y };
-      }
-    }
-    if (!best) best = { x: N / 2, y: N / 2 };
-    W.sites.push({ ...def, tx: best.x, ty: best.y, x: best.x + 0.5, y: best.y + 0.5 });
+      return best;
+    };
+    const best = tryFind(true, 26) || tryFind(false, 44) || near;
+    W.sites.push({ ...def, tx: best.x, ty: best.y, x: best.x + 0.5, y: best.y + 0.5, land: home });
   }
+}
+
+function nearestWalkableTile(W, tx, ty) {
+  const N = W.N;
+  for (let r = 0; r < N; r++) {
+    for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
+      if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+      const x = tx + ox, y = ty + oy;
+      if (x >= 0 && y >= 0 && x < N && y < N && W.tiles[y * N + x] !== T.WATER) return { x, y };
+    }
+  }
+  return { x: tx, y: ty };
 }
 
 function clearAround(W, s) {
@@ -421,43 +616,11 @@ function roadPoint(s) {
   return { x: s.tx, y: s.ty };
 }
 
-function buildRoads(W) {
-  const N = W.N;
-  const sites = W.sites.filter((s) => s.type !== 'lager');
-  // Minimaler Spannbaum (Prim) + ein paar Querverbindungen
-  const inTree = [sites[0]], rest = sites.slice(1), edges = [];
-  while (rest.length) {
-    let best = null;
-    for (const a of inTree) for (const b of rest) {
-      const d = Math.hypot(a.tx - b.tx, a.ty - b.ty);
-      if (!best || d < best.d) best = { a, b, d };
-    }
-    edges.push(best);
-    inTree.push(best.b);
-    rest.splice(rest.indexOf(best.b), 1);
-  }
-  const has = (a, b) => edges.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
-  const extra = [];
-  for (const a of sites) for (const b of sites) {
-    if (a.id >= b.id || has(a, b)) continue;
-    const d = Math.hypot(a.tx - b.tx, a.ty - b.ty);
-    if (d < 46) extra.push({ a, b, d });
-  }
-  extra.sort((p, q) => p.d - q.d);
-  edges.push(...extra.slice(0, 5));
-
-  // Innenhöfe ummauerter Orte sind für Straßen tabu
-  const yard = new Uint8Array(N * N);
-  for (const s of W.sites) {
-    const r = WALLED[s.type];
-    if (!r) continue;
-    for (let oy = -r + 1; oy <= r - 1; oy++) for (let ox = -r + 1; ox <= r - 1; ox++) {
-      const x = s.tx + ox, y = s.ty + oy;
-      if (x >= 0 && y >= 0 && x < N && y < N) yard[y * N + x] = 1;
-    }
-  }
-  const roadCost = (i) => {
-    if (yard[i]) return 60;
+// Straßenkosten: Meer ist unpassierbar, über Flüsse führen Brücken
+function makeRoadCost(W, yard) {
+  return (i) => {
+    if (W.sea[i]) return 1e9;
+    if (yard && yard[i]) return 60;
     switch (W.tiles[i]) {
       case T.ROAD: case T.BRIDGE: return 0.35;
       case T.GRASS: return 1;
@@ -469,11 +632,63 @@ function buildRoads(W) {
       default: return 1;
     }
   };
+}
+
+function paveRoad(W, idx) {
+  for (const i of idx) W.tiles[i] = W.tiles[i] === T.WATER || W.tiles[i] === T.BRIDGE ? T.BRIDGE : T.ROAD;
+}
+
+function buildRoads(W) {
+  const N = W.N;
+  // Je Landmasse ein minimaler Spannbaum (Prim) plus ein paar Querverbindungen
+  const byLand = new Map();
+  for (const s of W.sites) {
+    if (s.type === 'lager') continue;
+    if (!byLand.has(s.land)) byLand.set(s.land, []);
+    byLand.get(s.land).push(s);
+  }
+  const edges = [];
+  for (const sites of byLand.values()) {
+    if (sites.length < 2) continue;
+    const inTree = [sites[0]], rest = sites.slice(1), own = [];
+    while (rest.length) {
+      let best = null;
+      for (const a of inTree) for (const b of rest) {
+        const d = Math.hypot(a.tx - b.tx, a.ty - b.ty);
+        if (!best || d < best.d) best = { a, b, d };
+      }
+      own.push(best);
+      inTree.push(best.b);
+      rest.splice(rest.indexOf(best.b), 1);
+    }
+    const has = (a, b) => own.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+    const extra = [];
+    for (const a of sites) for (const b of sites) {
+      if (a.id >= b.id || has(a, b)) continue;
+      const d = Math.hypot(a.tx - b.tx, a.ty - b.ty);
+      if (d < 58) extra.push({ a, b, d });
+    }
+    extra.sort((p, q) => p.d - q.d);
+    edges.push(...own, ...extra.slice(0, Math.round(sites.length / 3)));
+  }
+
+  // Innenhöfe ummauerter Orte sind für Straßen tabu
+  const yard = new Uint8Array(N * N);
+  for (const s of W.sites) {
+    const r = WALLED[s.type];
+    if (!r) continue;
+    for (let oy = -r + 1; oy <= r - 1; oy++) for (let ox = -r + 1; ox <= r - 1; ox++) {
+      const x = s.tx + ox, y = s.ty + oy;
+      if (x >= 0 && y >= 0 && x < N && y < N) yard[y * N + x] = 1;
+    }
+  }
+  const roadCost = makeRoadCost(W, yard);
+  edges.sort((p, q) => p.d - q.d);
   for (const e of edges) {
     const pa = roadPoint(e.a), pb = roadPoint(e.b);
-    const idx = astar(N, pa.x, pa.y, pb.x, pb.y, roadCost, { diag: false, maxIter: 120000, hMul: 0.35 });
+    const idx = astar(N, pa.x, pa.y, pb.x, pb.y, roadCost, { diag: false, maxIter: 260000, hMul: 0.4 });
     if (!idx) continue;
-    for (const i of idx) W.tiles[i] = W.tiles[i] === T.WATER || W.tiles[i] === T.BRIDGE ? T.BRIDGE : T.ROAD;
+    paveRoad(W, idx);
     W.roads.push([e.a.id, e.b.id]);
   }
   // Zufahrt durch das Tor bis in den Hof
@@ -486,20 +701,61 @@ function buildRoads(W) {
     }
   }
 
-  // Lager der Waldleute: sicherstellen, dass es erreichbar ist (Trampelpfad, wenn nötig)
-  const camp = W.sites.find((s) => s.type === 'lager');
-  if (camp) {
+  // Lager der Waldleute: sicherstellen, dass sie erreichbar sind (Trampelpfad, wenn nötig)
+  for (const camp of W.sites.filter((s) => s.type === 'lager')) {
     let nearest = null;
-    for (const s of sites) {
+    for (const s of byLand.get(camp.land) || []) {
       const d = Math.hypot(s.tx - camp.tx, s.ty - camp.ty);
       if (!nearest || d < nearest.d) nearest = { s, d };
     }
+    if (!nearest) continue;
     const walk = (i) => (W.tiles[i] === T.WATER ? 1e9 : TERRAIN_COST[W.tiles[i]]);
-    const ok = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, walk, { maxIter: 80000, hMul: 0.5 });
+    const ok = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, walk, { maxIter: 120000, hMul: 0.6 });
     if (!ok) {
-      const idx = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, roadCost, { diag: false, maxIter: 120000, hMul: 0.35 });
+      const idx = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, roadCost, { diag: false, maxIter: 200000, hMul: 0.4 });
       if (idx) for (const i of idx) if (W.tiles[i] === T.WATER) W.tiles[i] = T.BRIDGE;
     }
+  }
+}
+
+// Häfen: ein Liegeplatz im Wasser, ein Kai an Land und ein Weg vom Ort dorthin
+function placeDocks(W) {
+  const N = W.N;
+  const water = (x, y) => x >= 0 && y >= 0 && x < N && y < N && W.tiles[y * N + x] === T.WATER;
+  for (const s of W.sites) {
+    if (!s.port) continue;
+    let best = null;
+    const minR = (WALLED[s.type] || 3) + 2.5;
+    for (let y = s.ty - 15; y <= s.ty + 15; y++) for (let x = s.tx - 15; x <= s.tx + 15; x++) {
+      if (!water(x, y) || Math.hypot(x - s.tx, y - s.ty) < minR) continue;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && water(x + dx, y + dy)) n++;
+      if (n < 6) continue;
+      // Kai: Landfeld direkt neben dem Liegeplatz
+      let quay = null;
+      for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const qx = x + dx * 2, qy = y + dy * 2;
+        if (qx < 1 || qy < 1 || qx >= N - 1 || qy >= N - 1) continue;
+        const t = W.tiles[qy * N + qx];
+        if (t !== T.WATER && t !== T.BRIDGE && W.landId[qy * N + qx] === s.land) {
+          if (!quay || Math.hypot(qx - s.tx, qy - s.ty) < Math.hypot(quay.x - s.tx, quay.y - s.ty)) quay = { x: qx, y: qy, dx, dy };
+        }
+      }
+      if (!quay) continue;
+      const d = Math.hypot(x - s.tx, y - s.ty) + (W.sea[y * N + x] ? 0 : 1.5);
+      if (!best || d < best.d) best = { x, y, d, quay };
+    }
+    if (!best) { s.port = false; continue; }
+    const q = best.quay;
+    // Steg vom Kai zum Liegeplatz
+    const sx = q.x - q.dx, sy = q.y - q.dy;
+    if (W.tiles[sy * N + sx] === T.WATER) W.tiles[sy * N + sx] = T.BRIDGE;
+    s.dock = { x: best.x + 0.5, y: best.y + 0.5 };
+    s.quay = { x: q.x + 0.5, y: q.y + 0.5 };
+    const rp = roadPoint(s);
+    const idx = astar(N, rp.x, rp.y, q.x, q.y, makeRoadCost(W, null), { diag: false, maxIter: 40000, hMul: 0.5 });
+    if (idx) paveRoad(W, idx.filter((i) => W.tiles[i] !== T.WATER));
+    W.buildings.push({ kind: 'ship', x: s.dock.x, y: s.dock.y, site: s.id, dir: Math.atan2(best.y - q.y, best.x - q.x), noCost: true });
   }
 }
 

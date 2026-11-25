@@ -1,4 +1,4 @@
-// Bündelt das Spiel in eine einzige HTML-Datei (dist/ritter-ohne-land.html).
+// Bündelt das Spiel in eine einzige HTML-Datei (dist/a-knights-tale.html).
 // Die Module werden in Abhängigkeitsreihenfolge aneinandergehängt; import/export entfallen.
 // Aufruf: node tools/build.mjs [--fragment <pfad>]
 //   --fragment schreibt zusätzlich eine Fassung ohne <html>/<head>/<body>-Gerüst.
@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ORDER = ['data', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'economy', 'politics', 'castle', 'sim', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
+const ORDER = ['data', 'geo', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'economy', 'politics', 'castle', 'sim', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
 function topLevelNames(src) {
@@ -54,7 +54,7 @@ html = html.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n
 html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\n(function () {\n'use strict';\n${js}\n})();\n</script>`);
 
 mkdirSync(join(ROOT, 'dist'), { recursive: true });
-const out = join(ROOT, 'dist', 'ritter-ohne-land.html');
+const out = join(ROOT, 'dist', 'a-knights-tale.html');
 writeFileSync(out, html);
 console.log(`Geschrieben: ${out} (${(html.length / 1024).toFixed(0)} KB)`);
 
