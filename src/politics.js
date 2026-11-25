@@ -89,13 +89,13 @@ function makeQuest(site) {
       break;
     case 'bote': {
       // Meist ein Ort in der Nähe, manchmal eine Botschaft übers Meer
-      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 110);
+      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 170);
       const tgt = pick(near.length && Math.random() < 0.8 ? near : others);
       const overSea = tgt.land !== site.land;
       q.target = tgt.id;
       q.days = overSea ? 7 : 5;
       const d = Math.hypot(tgt.x - site.x, tgt.y - site.y);
-      q.reward = { gold: Math.round(30 + d * 0.9 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
+      q.reward = { gold: Math.round(30 + d * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
       q.title = `Botschaft nach ${tgt.name}`;
       q.desc = overSea ? `Bring einen versiegelten Brief nach ${tgt.name}. Dafür musst du übers Meer: Schiffe fahren in Dover, Portsmouth und London.` : `Bring einen versiegelten Brief nach ${tgt.name}.`;
       break;

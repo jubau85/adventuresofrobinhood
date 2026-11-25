@@ -2,18 +2,22 @@
 
 export const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 export const TH = 32;            // Kachelhöhe
-export const MAP = 320;          // Kartengröße in Kacheln
+export const MAP = 512;          // Kartengröße in Kacheln
 export const CHUNK = 8;          // Kacheln pro Render-Chunk
 export const HMAX = 52;          // größte Geländehöhe in Pixeln
 export const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 export const DAYS_PER_SEASON = 6;
 export const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
-export const SAVE_KEY = 'a-knights-tale-v2';
-export const SAVE_VERSION = 2;
+export const SAVE_KEY = 'a-knights-tale-v3';
+export const SAVE_VERSION = 3;
 
 // Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
-// Eine Kachel entspricht etwa 2,5 km. Längengrade sind mit cos(51,5°) gestaucht.
-export const GEO = { lonW: -6.4, latN: 55.3, dLon: 0.03715, dLat: 0.023125 };
+// Eine Kachel entspricht etwa 1,6 km. Längengrade sind mit cos(51,5°) gestaucht.
+const LAT_N = 55.3, LAT_S = 47.9;
+export const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
+export const KM_PER_TILE = GEO.dLat * 111.2;
+// Maßstab gegenüber der ersten Fassung (320 Kacheln): Reichweiten in geo.js sind darauf bezogen
+export const GEO_SCALE = MAP / 320;
 export function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }
 
 export const T = { WATER: 0, GRASS: 1, FOREST: 2, HILLS: 3, ROAD: 4, FIELD: 5, BRIDGE: 6, SAND: 7 };
@@ -150,35 +154,35 @@ export const NPC_TYPES = {
 export const GROUP_TYPES = {
   banditen: {
     name: 'Wegelagerer', nom: 'Wegelagerer', acc: 'die Wegelagerer', pl: true, faction: null, hostile: true, members: [['bandit', 1, 3], ['bandit_bogen', 0, 1], ['bandit_boss', 0, 1]],
-    gold: [15, 45], itemChance: 0.25, renown: 1, count: 16, spawn: 'wild', speed: 1.18,
+    gold: [15, 45], itemChance: 0.25, renown: 1, count: 24, spawn: 'wild', speed: 1.18,
   },
   raubritter: {
     name: 'Raubritter', nom: 'Raubritter', acc: 'die Raubritter', pl: true, faction: null, hostile: true, members: [['raubritter', 1, 1], ['soeldner', 1, 2], ['armbrust', 0, 1]],
-    gold: [70, 150], itemChance: 0.6, renown: 4, count: 5, spawn: 'wild', speed: 1.24, minDay: 3,
+    gold: [70, 150], itemChance: 0.6, renown: 4, count: 7, spawn: 'wild', speed: 1.24, minDay: 3,
   },
   patrouille: {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
-    gold: [25, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
+    gold: [25, 50], itemChance: 0.3, renown: 2, count: 9, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
   },
   steuer: {
     name: 'Steuereintreiber', nom: 'Der Steuereintreiber und seine Wache', acc: 'den Steuereintreiber', pl: true, faction: 'normannen', members: [['vogt', 1, 1], ['soldat', 2, 3]],
-    gold: [140, 240], itemChance: 0.2, renown: 3, count: 4, spawn: 'route', speed: 1.12,
+    gold: [140, 240], itemChance: 0.2, renown: 3, count: 6, spawn: 'route', speed: 1.12,
     kill: { normannen: -18, sachsen: 8, waldleute: 10 },
   },
   haendler: {
     name: 'Händlerzug', nom: 'Der Händlerzug', acc: 'den Händlerzug', pl: false, faction: 'gilde', members: [['haendler', 1, 1], ['wache', 1, 2]],
-    gold: [50, 110], goods: true, renown: 0, count: 8, spawn: 'route', speed: 1.12,
+    gold: [50, 110], goods: true, renown: 0, count: 12, spawn: 'route', speed: 1.12,
     kill: { gilde: -20, waldleute: 5 },
   },
   waldleute: {
     name: 'Waldleute', nom: 'Waldleute', acc: 'die Waldleute', pl: true, faction: 'waldleute', members: [['waldmann', 2, 3]],
-    gold: [5, 25], renown: 2, count: 4, spawn: 'forest', speed: 1.3,
+    gold: [5, 25], renown: 2, count: 5, spawn: 'forest', speed: 1.3,
     kill: { waldleute: -15, normannen: 6 },
   },
   franzosen: {
     name: 'Französische Streife', nom: 'Eine französische Streife', acc: 'die französische Streife', pl: false, faction: 'franken', members: [['sergent', 2, 3], ['arbaletrier', 1, 1], ['chevalier', 0, 1]],
-    gold: [30, 70], itemChance: 0.35, renown: 3, count: 5, spawn: 'patrol', speed: 1.22, realms: ['fr', 'fl', 'nd'],
+    gold: [30, 70], itemChance: 0.35, renown: 3, count: 7, spawn: 'patrol', speed: 1.22, realms: ['fr', 'fl', 'nd'],
     kill: { franken: -14, normannen: 6 },
   },
 };
@@ -331,7 +335,7 @@ export const SETTLEMENTS = [
     desc: 'Die alte Königsstadt mit dem Schatz der Krone. Hier wird Richard ein zweites Mal gekrönt.' },
   { id: 'portsmouth', name: 'Portsmouth', type: 'dorf', faction: 'normannen', clear: 6, realm: 'en', lon: -1.09, lat: 50.82, port: true, produces: ['salz', 'holz'], demands: ['getreide', 'bier', 'fleisch'],
     desc: 'Hafen am Solent. Von hier setzen die Heere nach Barfleur über.' },
-  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.80, lat: 51.30, produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein'],
+  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.72, lat: 51.27, produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein'],
     desc: 'Pilger aus aller Welt kommen zum Grab des heiligen Thomas.' },
   { id: 'dover', name: 'Dover', type: 'burg', faction: 'normannen', clear: 7, realm: 'en', lon: 1.30, lat: 51.13, port: true, produces: ['stein', 'salz'], demands: ['getreide', 'wein', 'fleisch'],
     desc: 'Die Burg über den Kreidefelsen wacht über die kürzeste Überfahrt nach Frankreich.' },

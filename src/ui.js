@@ -3,7 +3,7 @@
 import { G, log, homeName } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS, REGIONS,
+  TYPE_NAME, SEASONS, REGIONS, KM_PER_TILE,
 } from './data.js';
 import {
   buy, sell, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
@@ -167,7 +167,7 @@ function dirText(from, to) {
   const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
   const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
   const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
-  return `${Math.round(d * 1.6)} Meilen Richtung ${name}`;
+  return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
 }
 
 function questCard(q, buttons) {
@@ -479,26 +479,59 @@ function politicsPanel() {
 
 // ---------------------------------------------------------------- Karte
 let mapView = null;
+const mapState = { zoom: 2, cx: null, cy: null };
 function mapPanel() {
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Übers Meer geht es nur mit dem Schiff.', tabs: [],
-    body: `<div class="mapwrap"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas></div>
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff.', tabs: [],
+    body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
+      <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="dash"></span>Fähre</span></p>`,
     after: () => {
       const cv = byId('bigmap');
-      const wrap = cv.parentElement;
+      const wrap = cv.closest('.mapwrap');
       const w = Math.max(240, Math.min(760, wrap.clientWidth || 720, Math.round(window.innerHeight * 0.66)));
       cv.width = w * 2; cv.height = w * 2;
       cv.style.width = `${w}px`; cv.style.height = `${w}px`;
       const c = cv.getContext('2d');
       c.scale(2, 2);
-      mapView = drawMap(c, w, w, { big: true });
-      cv.onclick = (e) => {
-        const r = cv.getBoundingClientRect();
-        const wp = miniToWorld(e.clientX - r.left, e.clientY - r.top, mapView);
-        let target = wp, site = null, best = 5;
-        for (const s of G.world.sites) { const d = Math.hypot(s.x - wp.x, s.y - wp.y); if (d < best) { best = d; site = s; target = s; } }
+      const p = G.s.player;
+      if (mapState.cx === null) { mapState.cx = p.x; mapState.cy = p.y; }
+      const draw = () => {
+        mapView = drawMap(c, w, w, { big: true, zoom: mapState.zoom, cx: mapState.cx, cy: mapState.cy });
+        // Mitte auf den tatsächlich gezeigten Ausschnitt setzen (am Rand begrenzt)
+        const mid = miniToWorld(w / 2, w / 2, mapView);
+        mapState.cx = mid.x; mapState.cy = mid.y;
+      };
+      draw();
+      G.ui.redrawMap = draw;
+      const at = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+      // Ziehen verschiebt, Mausrad zoomt um den Mauszeiger, ein Klick ohne Ziehen reist
+      let drag = null;
+      cv.onpointerdown = (e) => { drag = { ...at(e), cx: mapState.cx, cy: mapState.cy, moved: false }; cv.setPointerCapture(e.pointerId); };
+      cv.onpointermove = (e) => {
+        if (!drag) return;
+        const q = at(e), dx = q.x - drag.x, dy = q.y - drag.y;
+        if (Math.hypot(dx, dy) > 5) drag.moved = true;
+        if (drag.moved) { mapState.cx = drag.cx - dx / mapView.s; mapState.cy = drag.cy - dy / mapView.s; draw(); }
+      };
+      cv.onpointerup = (e) => {
+        const d = drag; drag = null;
+        if (!d || d.moved) return;
+        const q = at(e);
+        const wp = miniToWorld(q.x, q.y, mapView);
+        let target = wp, site = null, best = 7 / Math.max(1, mapView.s);
+        best = Math.max(best, 4);
+        for (const s of G.world.sites) { const dd = Math.hypot(s.x - wp.x, s.y - wp.y); if (dd < best) { best = dd; site = s; target = s; } }
         travelTo(target, site);
+      };
+      cv.onwheel = (e) => {
+        e.preventDefault();
+        const q = at(e), before = miniToWorld(q.x, q.y, mapView);
+        mapState.zoom = Math.max(1, Math.min(5, mapState.zoom * (e.deltaY < 0 ? 1.25 : 0.8)));
+        draw();
+        const after = miniToWorld(q.x, q.y, mapView);
+        mapState.cx += before.x - after.x; mapState.cy += before.y - after.y;
+        draw();
       };
     },
   };
@@ -602,6 +635,11 @@ const ACTIONS = {
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   gift: () => giveGift(G.ui.arg),
   sail: (d) => { if (sail(G.ui.arg.id, d.to)) closePanel(); },
+  mapzoom: (d) => {
+    if (d.d === 'home') { mapState.cx = G.s.player.x; mapState.cy = G.s.player.y; mapState.zoom = Math.max(mapState.zoom, 2); }
+    else mapState.zoom = Math.max(1, Math.min(5, mapState.zoom * (d.d === '1' ? 1.5 : 1 / 1.5)));
+    if (G.ui.redrawMap) G.ui.redrawMap();
+  },
   rest: () => {
     passHours(4);
     const p = G.s.player;

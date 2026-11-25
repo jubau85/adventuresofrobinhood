@@ -219,7 +219,7 @@ function followPath(u, dt, mult = 1) {
 
 export function setPlayerPath(x, y) {
   const p = G.s.player;
-  const path = findPath(G.world, p.x, p.y, x, y, 250000);
+  const path = findPath(G.world, p.x, p.y, x, y, 450000);
   p.path = path; p.pathI = 0;
   return !!path;
 }
@@ -632,7 +632,7 @@ function sitesFor(type) {
 }
 
 // Ziele auf derselben Landmasse in sinnvoller Entfernung
-function reachableSites(list, x, y, minD = 0, maxD = 110) {
+function reachableSites(list, x, y, minD = 0, maxD = 170) {
   const l = landAt(G.world, x, y);
   const same = list.filter((s) => s.land === l);
   const inRange = same.filter((s) => { const d = Math.hypot(s.x - x, s.y - y); return d > minD && d < maxD; });
@@ -655,11 +655,11 @@ function findSpawnPos(type, opts) {
       return randomTile((t, x, y) => (t === T.FOREST || t === T.HILLS) && farFromSites(x, y, 12) && farFromPlayer(x, y, minP) && settledLand(x, y), 800);
     case 'forest': {
       const camp = pick(G.world.sites.filter((s) => s.type === 'lager'));
-      return tileNear(camp, 40, (t, x, y) => t === T.FOREST && farFromPlayer(x, y, minP));
+      return tileNear(camp, 55, (t, x, y) => t === T.FOREST && farFromPlayer(x, y, minP));
     }
     case 'patrol': {
       const s = pick(sitesFor(type));
-      return tileNear(s, 26, (t, x, y) => t === T.ROAD && farFromPlayer(x, y, minP) && farFromSites(x, y, 5));
+      return tileNear(s, 36, (t, x, y) => t === T.ROAD && farFromPlayer(x, y, minP) && farFromSites(x, y, 5));
     }
     case 'route': {
       const S = type === 'steuer' ? sitesFor('steuer').filter((s) => s.faction === 'normannen') : sitesFor(type);
@@ -728,14 +728,14 @@ function chooseDest(g) {
       if (isWalkable(W, x, y)) dest = { x, y };
     }
   } else if (gt.spawn === 'patrol') {
-    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 8, 80));
+    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 10, 120));
     if (s) dest = { x: s.x + rand(-2, 2), y: s.y + rand(-2, 2) };
   } else {
-    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 15, 100));
+    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 20, 150));
     if (s) dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
   }
   if (!dest) { g.wait = 3; return; }
-  g.path = findPath(W, g.x, g.y, dest.x, dest.y, 50000);
+  g.path = findPath(W, g.x, g.y, dest.x, dest.y, 90000);
   g.pathI = 0;
   if (!g.path) g.wait = rand(3, 6);
 }

@@ -246,7 +246,11 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .repbar { position: relative; height: 8px; margin: 8px 0 10px; border-radius: 4px; background: linear-gradient(90deg, rgba(154,51,38,0.55), rgba(90,67,48,0.18) 50%, rgba(77,122,51,0.55)); }
 .repbar .mark { position: absolute; top: -3px; width: 2px; height: 14px; background: rgba(42,30,20,0.5); }
 .repbar .val { position: absolute; top: -4px; width: 12px; height: 16px; margin-left: -6px; border-radius: 3px; background: var(--c); box-shadow: 0 0 0 2px var(--parchment), 0 0 0 3px rgba(42,30,20,0.6); }
-.mapwrap { width: 100%; display: flex; justify-content: center; }
+.mapwrap { width: 100%; display: flex; justify-content: center; position: relative; }
+#bigmap { touch-action: none; cursor: grab; border-radius: 4px; }
+.mapbox { position: relative; line-height: 0; }
+.mapzoom { position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 4px; line-height: 1; }
+.mapzoom .btn { width: 32px; height: 32px; padding: 0; font-size: 18px; line-height: 1; }
 #bigmap { max-width: 100%; border-radius: 4px; background: #1d2418; cursor: crosshair; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3); }
 .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 8px !important; font-family: var(--font-ui); font-size: 13px; }
 .legend .dash { display: inline-block; width: 18px; height: 0; margin-right: 5px; border-top: 2px dashed var(--parchment-3); vertical-align: 3px; }
@@ -462,18 +466,22 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 
 const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 const TH = 32;            // Kachelhöhe
-const MAP = 320;          // Kartengröße in Kacheln
+const MAP = 512;          // Kartengröße in Kacheln
 const CHUNK = 8;          // Kacheln pro Render-Chunk
 const HMAX = 52;          // größte Geländehöhe in Pixeln
 const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 const DAYS_PER_SEASON = 6;
 const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
-const SAVE_KEY = 'a-knights-tale-v2';
-const SAVE_VERSION = 2;
+const SAVE_KEY = 'a-knights-tale-v3';
+const SAVE_VERSION = 3;
 
 // Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
-// Eine Kachel entspricht etwa 2,5 km. Längengrade sind mit cos(51,5°) gestaucht.
-const GEO = { lonW: -6.4, latN: 55.3, dLon: 0.03715, dLat: 0.023125 };
+// Eine Kachel entspricht etwa 1,6 km. Längengrade sind mit cos(51,5°) gestaucht.
+const LAT_N = 55.3, LAT_S = 47.9;
+const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
+const KM_PER_TILE = GEO.dLat * 111.2;
+// Maßstab gegenüber der ersten Fassung (320 Kacheln): Reichweiten in geo.js sind darauf bezogen
+const GEO_SCALE = MAP / 320;
 function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }
 
 const T = { WATER: 0, GRASS: 1, FOREST: 2, HILLS: 3, ROAD: 4, FIELD: 5, BRIDGE: 6, SAND: 7 };
@@ -610,35 +618,35 @@ const NPC_TYPES = {
 const GROUP_TYPES = {
   banditen: {
     name: 'Wegelagerer', nom: 'Wegelagerer', acc: 'die Wegelagerer', pl: true, faction: null, hostile: true, members: [['bandit', 1, 3], ['bandit_bogen', 0, 1], ['bandit_boss', 0, 1]],
-    gold: [15, 45], itemChance: 0.25, renown: 1, count: 16, spawn: 'wild', speed: 1.18,
+    gold: [15, 45], itemChance: 0.25, renown: 1, count: 24, spawn: 'wild', speed: 1.18,
   },
   raubritter: {
     name: 'Raubritter', nom: 'Raubritter', acc: 'die Raubritter', pl: true, faction: null, hostile: true, members: [['raubritter', 1, 1], ['soeldner', 1, 2], ['armbrust', 0, 1]],
-    gold: [70, 150], itemChance: 0.6, renown: 4, count: 5, spawn: 'wild', speed: 1.24, minDay: 3,
+    gold: [70, 150], itemChance: 0.6, renown: 4, count: 7, spawn: 'wild', speed: 1.24, minDay: 3,
   },
   patrouille: {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
-    gold: [25, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
+    gold: [25, 50], itemChance: 0.3, renown: 2, count: 9, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
   },
   steuer: {
     name: 'Steuereintreiber', nom: 'Der Steuereintreiber und seine Wache', acc: 'den Steuereintreiber', pl: true, faction: 'normannen', members: [['vogt', 1, 1], ['soldat', 2, 3]],
-    gold: [140, 240], itemChance: 0.2, renown: 3, count: 4, spawn: 'route', speed: 1.12,
+    gold: [140, 240], itemChance: 0.2, renown: 3, count: 6, spawn: 'route', speed: 1.12,
     kill: { normannen: -18, sachsen: 8, waldleute: 10 },
   },
   haendler: {
     name: 'Händlerzug', nom: 'Der Händlerzug', acc: 'den Händlerzug', pl: false, faction: 'gilde', members: [['haendler', 1, 1], ['wache', 1, 2]],
-    gold: [50, 110], goods: true, renown: 0, count: 8, spawn: 'route', speed: 1.12,
+    gold: [50, 110], goods: true, renown: 0, count: 12, spawn: 'route', speed: 1.12,
     kill: { gilde: -20, waldleute: 5 },
   },
   waldleute: {
     name: 'Waldleute', nom: 'Waldleute', acc: 'die Waldleute', pl: true, faction: 'waldleute', members: [['waldmann', 2, 3]],
-    gold: [5, 25], renown: 2, count: 4, spawn: 'forest', speed: 1.3,
+    gold: [5, 25], renown: 2, count: 5, spawn: 'forest', speed: 1.3,
     kill: { waldleute: -15, normannen: 6 },
   },
   franzosen: {
     name: 'Französische Streife', nom: 'Eine französische Streife', acc: 'die französische Streife', pl: false, faction: 'franken', members: [['sergent', 2, 3], ['arbaletrier', 1, 1], ['chevalier', 0, 1]],
-    gold: [30, 70], itemChance: 0.35, renown: 3, count: 5, spawn: 'patrol', speed: 1.22, realms: ['fr', 'fl', 'nd'],
+    gold: [30, 70], itemChance: 0.35, renown: 3, count: 7, spawn: 'patrol', speed: 1.22, realms: ['fr', 'fl', 'nd'],
     kill: { franken: -14, normannen: 6 },
   },
 };
@@ -791,7 +799,7 @@ const SETTLEMENTS = [
     desc: 'Die alte Königsstadt mit dem Schatz der Krone. Hier wird Richard ein zweites Mal gekrönt.' },
   { id: 'portsmouth', name: 'Portsmouth', type: 'dorf', faction: 'normannen', clear: 6, realm: 'en', lon: -1.09, lat: 50.82, port: true, produces: ['salz', 'holz'], demands: ['getreide', 'bier', 'fleisch'],
     desc: 'Hafen am Solent. Von hier setzen die Heere nach Barfleur über.' },
-  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.80, lat: 51.30, produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein'],
+  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.72, lat: 51.27, produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein'],
     desc: 'Pilger aus aller Welt kommen zum Grab des heiligen Thomas.' },
   { id: 'dover', name: 'Dover', type: 'burg', faction: 'normannen', clear: 7, realm: 'en', lon: 1.30, lat: 51.13, port: true, produces: ['stein', 'salz'], demands: ['getreide', 'wein', 'fleisch'],
     desc: 'Die Burg über den Kreidefelsen wacht über die kürzeste Überfahrt nach Frankreich.' },
@@ -1378,7 +1386,7 @@ function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
   if (W.landId[sy * N + sx] !== W.landId[gy * N + gx]) return null;
   const tiles = W.tiles, extra = W.extraCost, block = W.block;
   const far = Math.hypot(gx - sx, gy - sy);
-  const hMul = far > 90 ? 0.95 : far > 45 ? 0.8 : 0.6;
+  const hMul = far > 140 ? 0.95 : far > 70 ? 0.8 : 0.6;
   const idx = astar(N, sx, sy, gx, gy, (i) => (block[i] ? 1e9 : TERRAIN_COST[tiles[i]] + extra[i]), { hMul, maxIter });
   if (!idx) return null;
   const pts = [];
@@ -1405,13 +1413,14 @@ function generateWorld(seed) {
   const extraCost = new Float32Array(N * N);
   const nE = makeNoise(seed * 7 + 1), nM = makeNoise(seed * 13 + 5), nR = makeNoise(seed * 3 + 11);
   const nW = makeNoise(seed * 17 + 23), nW2 = makeNoise(seed * 19 + 29);
+  const K = GEO_SCALE;
 
   // Küste: gerasterte Umrisse, leicht verwirbelt
   const poly = rasterLand(N);
   const land = new Uint8Array(N * N);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const wx = x + (fbm(nW, x / 9, y / 9, 3) - 0.5) * 5.5 + (nW2(x / 2.5, y / 2.5) - 0.5) * 1.3;
-    const wy = y + (fbm(nW, x / 9 + 71, y / 9 + 37, 3) - 0.5) * 5.5 + (nW2(x / 2.5 + 13, y / 2.5 + 7) - 0.5) * 1.3;
+    const wx = x + (fbm(nW, x / (9 * K), y / (9 * K), 3) - 0.5) * 5.5 * K + (nW2(x / 2.5, y / 2.5) - 0.5) * 1.3;
+    const wy = y + (fbm(nW, x / (9 * K) + 71, y / (9 * K) + 37, 3) - 0.5) * 5.5 * K + (nW2(x / 2.5 + 13, y / 2.5 + 7) - 0.5) * 1.3;
     const sx = Math.max(0, Math.min(N - 1, Math.floor(wx))), sy = Math.max(0, Math.min(N - 1, Math.floor(wy)));
     land[y * N + x] = poly[sy * N + sx];
   }
@@ -1429,9 +1438,9 @@ function generateWorld(seed) {
     const i = y * N + x;
     if (sea[i]) { tiles[i] = T.WATER; elev[i] = 0.25; continue; }
     const rough = 0.85 + (fbm(nE, x / 6 + 40, y / 6 + 40, 3) - 0.5) * 0.9;
-    const e = 0.42 + (fbm(nE, x / 20, y / 20, 4) - 0.5) * 0.2 + Math.min(1, dSea[i] / 10) * 0.06 + upl[i] * rough;
+    const e = 0.42 + (fbm(nE, x / (20 * K), y / (20 * K), 4) - 0.5) * 0.2 + Math.min(1, dSea[i] / (10 * K)) * 0.06 + upl[i] * rough;
     elev[i] = e;
-    const m = fbm(nM, x / 13 + 50, y / 13 + 50, 4) + wood[i];
+    const m = fbm(nM, x / (13 * Math.sqrt(K)) + 50, y / (13 * Math.sqrt(K)) + 50, 4) + wood[i];
     tiles[i] = e > 0.665 ? T.HILLS : m > 0.62 ? T.FOREST : T.GRASS;
   }
 
@@ -1540,14 +1549,15 @@ function segDist(px, py, p, q) {
 // Einfluss von Linienzügen mit glockenförmigem Abfall aufaddieren
 function addInfluence(N, field, list) {
   for (const f of list) {
-    const P = toTilePts(f.pts), R = f.r * 2.6;
+    const r = f.r * GEO_SCALE;
+    const P = toTilePts(f.pts), R = r * 2.6;
     const x0 = Math.max(0, Math.floor(Math.min(...P.map((p) => p.x)) - R)), x1 = Math.min(N - 1, Math.ceil(Math.max(...P.map((p) => p.x)) + R));
     const y0 = Math.max(0, Math.floor(Math.min(...P.map((p) => p.y)) - R)), y1 = Math.min(N - 1, Math.ceil(Math.max(...P.map((p) => p.y)) + R));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       let d = Infinity;
       if (P.length === 1) d = Math.hypot(x + 0.5 - P[0].x, y + 0.5 - P[0].y);
       else for (let k = 0; k + 1 < P.length; k++) d = Math.min(d, segDist(x + 0.5, y + 0.5, P[k], P[k + 1]));
-      if (d < R) field[y * N + x] += f.a * Math.exp(-(d * d) / (f.r * f.r));
+      if (d < R) field[y * N + x] += f.a * Math.exp(-(d * d) / (r * r));
     }
   }
 }
@@ -1567,9 +1577,9 @@ function carveRivers(W, nR) {
       const steps = Math.ceil(len / 0.3);
       for (let st = 0; st <= steps; st++) {
         const t = st / steps, dd = acc + t * len, f = dd / L;
-        const w = r.w[0] + (r.w[1] - r.w[0]) * f;
-        const amp = r.lake ? 0.3 : 1.3 * Math.min(1, dd / 6, (L - dd) / 6);
-        const off = (nR(dd * 0.09, ri * 7.3) - 0.5) * 2 * amp;
+        const w = (r.w[0] + (r.w[1] - r.w[0]) * f) * (r.lake ? GEO_SCALE : 1 + (GEO_SCALE - 1) * 0.35);
+        const amp = r.lake ? 0.3 : 1.3 * GEO_SCALE * Math.min(1, dd / 6, (L - dd) / 6);
+        const off = (nR(dd * 0.09 / GEO_SCALE, ri * 7.3) - 0.5) * 2 * amp;
         const cx = p.x + (q.x - p.x) * t + nx * off, cy = p.y + (q.y - p.y) * t + ny * off;
         for (let y = Math.floor(cy - w); y <= Math.ceil(cy + w); y++) for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
           if (x < 0 || y < 0 || x >= N || y >= N) continue;
@@ -1690,9 +1700,9 @@ function waterDist(W, cx, cy, r) {
 // Mindestabstand zweier Orte: die eigene Burg braucht Platz, Lager kommen mit wenig aus
 function siteGap(a, b) {
   const lager = a.type === 'lager' || b.type === 'lager';
-  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 13 : 17;
-  if (lager) return 10;
-  return Math.max(10, a.clear + b.clear - 2);
+  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 18 : 26;
+  if (lager) return 16;
+  return a.clear + b.clear + 6;
 }
 
 // Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse)
@@ -1715,7 +1725,7 @@ function placeSettlements(W, rng) {
           const i = y * N + x;
           if (W.tiles[i] === T.WATER || W.landId[i] !== home) continue;
           if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < siteGap(s, def))) continue;
-          const waterR = def.port ? (def.type === 'burg' ? 7 : def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
+          const waterR = def.port ? (def.type === 'burg' || def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
           if (countAround(W, x, y, waterR, T.WATER) > 0) continue;
           let score = Math.hypot(ox, oy);
           if (strict && def.port) {
@@ -1736,7 +1746,7 @@ function placeSettlements(W, rng) {
       }
       return best;
     };
-    const best = tryFind(true, 26) || tryFind(false, 44) || near;
+    const best = tryFind(true, 34) || tryFind(false, 56) || near;
     W.sites.push({ ...def, tx: best.x, ty: best.y, x: best.x + 0.5, y: best.y + 0.5, land: home });
   }
 }
@@ -1840,7 +1850,7 @@ function buildRoads(W) {
     for (const a of sites) for (const b of sites) {
       if (a.id >= b.id || has(a, b)) continue;
       const d = Math.hypot(a.tx - b.tx, a.ty - b.ty);
-      if (d < 58) extra.push({ a, b, d });
+      if (d < 58 * GEO_SCALE) extra.push({ a, b, d });
     }
     extra.sort((p, q) => p.d - q.d);
     edges.push(...own, ...extra.slice(0, Math.round(sites.length / 3)));
@@ -1860,7 +1870,7 @@ function buildRoads(W) {
   edges.sort((p, q) => p.d - q.d);
   for (const e of edges) {
     const pa = roadPoint(e.a), pb = roadPoint(e.b);
-    const idx = astar(N, pa.x, pa.y, pb.x, pb.y, roadCost, { diag: false, maxIter: 260000, hMul: 0.4 });
+    const idx = astar(N, pa.x, pa.y, pb.x, pb.y, roadCost, { diag: false, maxIter: 600000, hMul: 0.45 });
     if (!idx) continue;
     paveRoad(W, idx);
     W.roads.push([e.a.id, e.b.id]);
@@ -1884,9 +1894,9 @@ function buildRoads(W) {
     }
     if (!nearest) continue;
     const walk = (i) => (W.tiles[i] === T.WATER ? 1e9 : TERRAIN_COST[W.tiles[i]]);
-    const ok = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, walk, { maxIter: 120000, hMul: 0.6 });
+    const ok = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, walk, { maxIter: 250000, hMul: 0.6 });
     if (!ok) {
-      const idx = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, roadCost, { diag: false, maxIter: 200000, hMul: 0.4 });
+      const idx = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, roadCost, { diag: false, maxIter: 400000, hMul: 0.45 });
       if (idx) for (const i of idx) if (W.tiles[i] === T.WATER) W.tiles[i] = T.BRIDGE;
     }
   }
@@ -2289,7 +2299,7 @@ function followPath(u, dt, mult = 1) {
 
 function setPlayerPath(x, y) {
   const p = G.s.player;
-  const path = findPath(G.world, p.x, p.y, x, y, 250000);
+  const path = findPath(G.world, p.x, p.y, x, y, 450000);
   p.path = path; p.pathI = 0;
   return !!path;
 }
@@ -2702,7 +2712,7 @@ function sitesFor(type) {
 }
 
 // Ziele auf derselben Landmasse in sinnvoller Entfernung
-function reachableSites(list, x, y, minD = 0, maxD = 110) {
+function reachableSites(list, x, y, minD = 0, maxD = 170) {
   const l = landAt(G.world, x, y);
   const same = list.filter((s) => s.land === l);
   const inRange = same.filter((s) => { const d = Math.hypot(s.x - x, s.y - y); return d > minD && d < maxD; });
@@ -2725,11 +2735,11 @@ function findSpawnPos(type, opts) {
       return randomTile((t, x, y) => (t === T.FOREST || t === T.HILLS) && farFromSites(x, y, 12) && farFromPlayer(x, y, minP) && settledLand(x, y), 800);
     case 'forest': {
       const camp = pick(G.world.sites.filter((s) => s.type === 'lager'));
-      return tileNear(camp, 40, (t, x, y) => t === T.FOREST && farFromPlayer(x, y, minP));
+      return tileNear(camp, 55, (t, x, y) => t === T.FOREST && farFromPlayer(x, y, minP));
     }
     case 'patrol': {
       const s = pick(sitesFor(type));
-      return tileNear(s, 26, (t, x, y) => t === T.ROAD && farFromPlayer(x, y, minP) && farFromSites(x, y, 5));
+      return tileNear(s, 36, (t, x, y) => t === T.ROAD && farFromPlayer(x, y, minP) && farFromSites(x, y, 5));
     }
     case 'route': {
       const S = type === 'steuer' ? sitesFor('steuer').filter((s) => s.faction === 'normannen') : sitesFor(type);
@@ -2798,14 +2808,14 @@ function chooseDest(g) {
       if (isWalkable(W, x, y)) dest = { x, y };
     }
   } else if (gt.spawn === 'patrol') {
-    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 8, 80));
+    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 10, 120));
     if (s) dest = { x: s.x + rand(-2, 2), y: s.y + rand(-2, 2) };
   } else {
-    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 15, 100));
+    const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 20, 150));
     if (s) dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
   }
   if (!dest) { g.wait = 3; return; }
-  g.path = findPath(W, g.x, g.y, dest.x, dest.y, 50000);
+  g.path = findPath(W, g.x, g.y, dest.x, dest.y, 90000);
   g.pathI = 0;
   if (!g.path) g.wait = rand(3, 6);
 }
@@ -2942,7 +2952,7 @@ const ANIMAL_INFO = {
   huhn: { name: 'Huhn', hp: 3, fleisch: [1, 1], farm: true },
 };
 
-const DEER_TARGET = 80, DUCK_TARGET = 50;
+const DEER_TARGET = 130, DUCK_TARGET = 80;
 
 function animalOk(kind, x, y) {
   const t = tileAt(G.world, x, y);
@@ -3005,15 +3015,15 @@ function spawnAnimals() {
       if (home) addHerd(kind, home, h.n, h.r, s.id);
     }
   }
-  spawnWild('hirsch', 36);
-  spawnWild('ente', 26);
+  spawnWild('hirsch', 60);
+  spawnWild('ente', 40);
 }
 
 // Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
 function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
-  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 4, 25);
-  if (count('ente') < DUCK_TARGET) spawnWild('ente', 2, 20);
+  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 6, 25);
+  if (count('ente') < DUCK_TARGET) spawnWild('ente', 3, 20);
   for (const s of G.world.sites) {
     for (const [kind, h] of Object.entries(farmHerds(s))) {
       if (!h.n) continue;
@@ -3347,13 +3357,13 @@ function makeQuest(site) {
       break;
     case 'bote': {
       // Meist ein Ort in der Nähe, manchmal eine Botschaft übers Meer
-      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 110);
+      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 170);
       const tgt = pick(near.length && Math.random() < 0.8 ? near : others);
       const overSea = tgt.land !== site.land;
       q.target = tgt.id;
       q.days = overSea ? 7 : 5;
       const d = Math.hypot(tgt.x - site.x, tgt.y - site.y);
-      q.reward = { gold: Math.round(30 + d * 0.9 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
+      q.reward = { gold: Math.round(30 + d * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
       q.title = `Botschaft nach ${tgt.name}`;
       q.desc = overSea ? `Bring einen versiegelten Brief nach ${tgt.name}. Dafür musst du übers Meer: Schiffe fahren in Dover, Portsmouth und London.` : `Bring einen versiegelten Brief nach ${tgt.name}.`;
       break;
@@ -6105,10 +6115,13 @@ function drawMap(c, w, h, opts = {}) {
   const big = !!opts.big;
   let v;
   if (big) {
-    const s = Math.min(w, h) / N;
-    v = { ox: 0, oy: 0, s, dx: (w - N * s) / 2, dy: (h - N * s) / 2 };
+    // Große Karte: Zoomstufe 1 zeigt alles, darüber ein Ausschnitt um (cx, cy)
+    const s = (Math.min(w, h) / N) * (opts.zoom || 1);
+    const fit = (len, c) => (N * s <= len ? { o: 0, d: (len - N * s) / 2 } : { o: Math.max(0, Math.min(N - len / s, c - len / (2 * s))), d: 0 });
+    const fx = fit(w, opts.cx ?? N / 2), fy = fit(h, opts.cy ?? N / 2);
+    v = { ox: fx.o, oy: fy.o, s, dx: fx.d, dy: fy.d };
   } else {
-    const s = opts.zoom || 2.6;
+    const s = opts.zoom || 2.3;
     v = { ox: p.x - w / (2 * s), oy: p.y - h / (2 * s), s, dx: 0, dy: 0 };
   }
   c.clearRect(0, 0, w, h);
@@ -6191,7 +6204,7 @@ function drawMapDecor(c, v) {
   c.textAlign = 'center';
   for (const r of REGIONS) {
     const t = geoToTile(r.lon, r.lat), q = miniPos(t.x, t.y, v);
-    const fs = Math.round(15 * r.size * Math.max(0.7, v.s / 2.2));
+    const fs = Math.round(15 * r.size * Math.max(0.75, Math.min(1.6, v.s / 1.6)));
     c.font = r.sea ? `italic 500 ${fs}px "Alegreya", Georgia, serif` : `600 ${fs}px "IM Fell English SC", Georgia, serif`;
     c.fillStyle = r.sea ? 'rgba(200,225,240,0.6)' : 'rgba(40,28,16,0.42)';
     if (!r.sea && 'letterSpacing' in c) c.letterSpacing = `${Math.round(fs * 0.25)}px`;
@@ -6202,7 +6215,7 @@ function drawMapDecor(c, v) {
     if ('letterSpacing' in c) c.letterSpacing = '0px';
   }
   // Windrose oben rechts
-  const cx = v.dx + W.N * v.s - 34, cy = v.dy + 38;
+  const cx = Math.min(v.dx + W.N * v.s, c.canvas.width / 2) - 34, cy = v.dy + 38;
   c.fillStyle = 'rgba(28,20,14,0.55)'; c.beginPath(); c.arc(cx, cy, 22, 0, Math.PI * 2); c.fill();
   c.fillStyle = '#c9483a'; c.beginPath(); c.moveTo(cx, cy - 18); c.lineTo(cx + 5, cy); c.lineTo(cx - 5, cy); c.fill();
   c.fillStyle = '#e9dfc6'; c.beginPath(); c.moveTo(cx, cy + 18); c.lineTo(cx + 5, cy); c.lineTo(cx - 5, cy); c.fill();
@@ -6839,7 +6852,7 @@ function dirText(from, to) {
   const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
   const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
   const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
-  return `${Math.round(d * 1.6)} Meilen Richtung ${name}`;
+  return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
 }
 
 function questCard(q, buttons) {
@@ -7151,26 +7164,59 @@ function politicsPanel() {
 
 // ---------------------------------------------------------------- Karte
 let mapView = null;
+const mapState = { zoom: 2, cx: null, cy: null };
 function mapPanel() {
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Übers Meer geht es nur mit dem Schiff.', tabs: [],
-    body: `<div class="mapwrap"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas></div>
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff.', tabs: [],
+    body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
+      <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="dash"></span>Fähre</span></p>`,
     after: () => {
       const cv = byId('bigmap');
-      const wrap = cv.parentElement;
+      const wrap = cv.closest('.mapwrap');
       const w = Math.max(240, Math.min(760, wrap.clientWidth || 720, Math.round(window.innerHeight * 0.66)));
       cv.width = w * 2; cv.height = w * 2;
       cv.style.width = `${w}px`; cv.style.height = `${w}px`;
       const c = cv.getContext('2d');
       c.scale(2, 2);
-      mapView = drawMap(c, w, w, { big: true });
-      cv.onclick = (e) => {
-        const r = cv.getBoundingClientRect();
-        const wp = miniToWorld(e.clientX - r.left, e.clientY - r.top, mapView);
-        let target = wp, site = null, best = 5;
-        for (const s of G.world.sites) { const d = Math.hypot(s.x - wp.x, s.y - wp.y); if (d < best) { best = d; site = s; target = s; } }
+      const p = G.s.player;
+      if (mapState.cx === null) { mapState.cx = p.x; mapState.cy = p.y; }
+      const draw = () => {
+        mapView = drawMap(c, w, w, { big: true, zoom: mapState.zoom, cx: mapState.cx, cy: mapState.cy });
+        // Mitte auf den tatsächlich gezeigten Ausschnitt setzen (am Rand begrenzt)
+        const mid = miniToWorld(w / 2, w / 2, mapView);
+        mapState.cx = mid.x; mapState.cy = mid.y;
+      };
+      draw();
+      G.ui.redrawMap = draw;
+      const at = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+      // Ziehen verschiebt, Mausrad zoomt um den Mauszeiger, ein Klick ohne Ziehen reist
+      let drag = null;
+      cv.onpointerdown = (e) => { drag = { ...at(e), cx: mapState.cx, cy: mapState.cy, moved: false }; cv.setPointerCapture(e.pointerId); };
+      cv.onpointermove = (e) => {
+        if (!drag) return;
+        const q = at(e), dx = q.x - drag.x, dy = q.y - drag.y;
+        if (Math.hypot(dx, dy) > 5) drag.moved = true;
+        if (drag.moved) { mapState.cx = drag.cx - dx / mapView.s; mapState.cy = drag.cy - dy / mapView.s; draw(); }
+      };
+      cv.onpointerup = (e) => {
+        const d = drag; drag = null;
+        if (!d || d.moved) return;
+        const q = at(e);
+        const wp = miniToWorld(q.x, q.y, mapView);
+        let target = wp, site = null, best = 7 / Math.max(1, mapView.s);
+        best = Math.max(best, 4);
+        for (const s of G.world.sites) { const dd = Math.hypot(s.x - wp.x, s.y - wp.y); if (dd < best) { best = dd; site = s; target = s; } }
         travelTo(target, site);
+      };
+      cv.onwheel = (e) => {
+        e.preventDefault();
+        const q = at(e), before = miniToWorld(q.x, q.y, mapView);
+        mapState.zoom = Math.max(1, Math.min(5, mapState.zoom * (e.deltaY < 0 ? 1.25 : 0.8)));
+        draw();
+        const after = miniToWorld(q.x, q.y, mapView);
+        mapState.cx += before.x - after.x; mapState.cy += before.y - after.y;
+        draw();
       };
     },
   };
@@ -7274,6 +7320,11 @@ const ACTIONS = {
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   gift: () => giveGift(G.ui.arg),
   sail: (d) => { if (sail(G.ui.arg.id, d.to)) closePanel(); },
+  mapzoom: (d) => {
+    if (d.d === 'home') { mapState.cx = G.s.player.x; mapState.cy = G.s.player.y; mapState.zoom = Math.max(mapState.zoom, 2); }
+    else mapState.zoom = Math.max(1, Math.min(5, mapState.zoom * (d.d === '1' ? 1.5 : 1 / 1.5)));
+    if (G.ui.redrawMap) G.ui.redrawMap();
+  },
   rest: () => {
     passHours(4);
     const p = G.s.player;

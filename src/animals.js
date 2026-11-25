@@ -19,7 +19,7 @@ export const ANIMAL_INFO = {
   huhn: { name: 'Huhn', hp: 3, fleisch: [1, 1], farm: true },
 };
 
-const DEER_TARGET = 80, DUCK_TARGET = 50;
+const DEER_TARGET = 130, DUCK_TARGET = 80;
 
 function animalOk(kind, x, y) {
   const t = tileAt(G.world, x, y);
@@ -82,15 +82,15 @@ export function spawnAnimals() {
       if (home) addHerd(kind, home, h.n, h.r, s.id);
     }
   }
-  spawnWild('hirsch', 36);
-  spawnWild('ente', 26);
+  spawnWild('hirsch', 60);
+  spawnWild('ente', 40);
 }
 
 // Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
 export function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
-  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 4, 25);
-  if (count('ente') < DUCK_TARGET) spawnWild('ente', 2, 20);
+  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 6, 25);
+  if (count('ente') < DUCK_TARGET) spawnWild('ente', 3, 20);
   for (const s of G.world.sites) {
     for (const [kind, h] of Object.entries(farmHerds(s))) {
       if (!h.n) continue;

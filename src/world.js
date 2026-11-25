@@ -1,7 +1,7 @@
 // Weltgenerator: Küsten, Flüsse, Bergland, Siedlungen, Straßen, Häfen, Felder, Bäume, Gebäude.
 // Alles ist deterministisch aus dem Seed, daher muss nur der Seed gespeichert werden.
 
-import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile } from './data.js';
+import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE } from './data.js';
 import { COAST_GB, COAST_IRELAND, COAST_CONTINENT, ISLANDS, RIVERS, UPLANDS, FORESTS } from './geo.js';
 import { mulberry32, makeNoise, fbm, rpick, hash2 } from './rng.js';
 
@@ -204,7 +204,7 @@ export function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
   if (W.landId[sy * N + sx] !== W.landId[gy * N + gx]) return null;
   const tiles = W.tiles, extra = W.extraCost, block = W.block;
   const far = Math.hypot(gx - sx, gy - sy);
-  const hMul = far > 90 ? 0.95 : far > 45 ? 0.8 : 0.6;
+  const hMul = far > 140 ? 0.95 : far > 70 ? 0.8 : 0.6;
   const idx = astar(N, sx, sy, gx, gy, (i) => (block[i] ? 1e9 : TERRAIN_COST[tiles[i]] + extra[i]), { hMul, maxIter });
   if (!idx) return null;
   const pts = [];
@@ -231,13 +231,14 @@ export function generateWorld(seed) {
   const extraCost = new Float32Array(N * N);
   const nE = makeNoise(seed * 7 + 1), nM = makeNoise(seed * 13 + 5), nR = makeNoise(seed * 3 + 11);
   const nW = makeNoise(seed * 17 + 23), nW2 = makeNoise(seed * 19 + 29);
+  const K = GEO_SCALE;
 
   // Küste: gerasterte Umrisse, leicht verwirbelt
   const poly = rasterLand(N);
   const land = new Uint8Array(N * N);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const wx = x + (fbm(nW, x / 9, y / 9, 3) - 0.5) * 5.5 + (nW2(x / 2.5, y / 2.5) - 0.5) * 1.3;
-    const wy = y + (fbm(nW, x / 9 + 71, y / 9 + 37, 3) - 0.5) * 5.5 + (nW2(x / 2.5 + 13, y / 2.5 + 7) - 0.5) * 1.3;
+    const wx = x + (fbm(nW, x / (9 * K), y / (9 * K), 3) - 0.5) * 5.5 * K + (nW2(x / 2.5, y / 2.5) - 0.5) * 1.3;
+    const wy = y + (fbm(nW, x / (9 * K) + 71, y / (9 * K) + 37, 3) - 0.5) * 5.5 * K + (nW2(x / 2.5 + 13, y / 2.5 + 7) - 0.5) * 1.3;
     const sx = Math.max(0, Math.min(N - 1, Math.floor(wx))), sy = Math.max(0, Math.min(N - 1, Math.floor(wy)));
     land[y * N + x] = poly[sy * N + sx];
   }
@@ -255,9 +256,9 @@ export function generateWorld(seed) {
     const i = y * N + x;
     if (sea[i]) { tiles[i] = T.WATER; elev[i] = 0.25; continue; }
     const rough = 0.85 + (fbm(nE, x / 6 + 40, y / 6 + 40, 3) - 0.5) * 0.9;
-    const e = 0.42 + (fbm(nE, x / 20, y / 20, 4) - 0.5) * 0.2 + Math.min(1, dSea[i] / 10) * 0.06 + upl[i] * rough;
+    const e = 0.42 + (fbm(nE, x / (20 * K), y / (20 * K), 4) - 0.5) * 0.2 + Math.min(1, dSea[i] / (10 * K)) * 0.06 + upl[i] * rough;
     elev[i] = e;
-    const m = fbm(nM, x / 13 + 50, y / 13 + 50, 4) + wood[i];
+    const m = fbm(nM, x / (13 * Math.sqrt(K)) + 50, y / (13 * Math.sqrt(K)) + 50, 4) + wood[i];
     tiles[i] = e > 0.665 ? T.HILLS : m > 0.62 ? T.FOREST : T.GRASS;
   }
 
@@ -366,14 +367,15 @@ function segDist(px, py, p, q) {
 // Einfluss von Linienzügen mit glockenförmigem Abfall aufaddieren
 function addInfluence(N, field, list) {
   for (const f of list) {
-    const P = toTilePts(f.pts), R = f.r * 2.6;
+    const r = f.r * GEO_SCALE;
+    const P = toTilePts(f.pts), R = r * 2.6;
     const x0 = Math.max(0, Math.floor(Math.min(...P.map((p) => p.x)) - R)), x1 = Math.min(N - 1, Math.ceil(Math.max(...P.map((p) => p.x)) + R));
     const y0 = Math.max(0, Math.floor(Math.min(...P.map((p) => p.y)) - R)), y1 = Math.min(N - 1, Math.ceil(Math.max(...P.map((p) => p.y)) + R));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       let d = Infinity;
       if (P.length === 1) d = Math.hypot(x + 0.5 - P[0].x, y + 0.5 - P[0].y);
       else for (let k = 0; k + 1 < P.length; k++) d = Math.min(d, segDist(x + 0.5, y + 0.5, P[k], P[k + 1]));
-      if (d < R) field[y * N + x] += f.a * Math.exp(-(d * d) / (f.r * f.r));
+      if (d < R) field[y * N + x] += f.a * Math.exp(-(d * d) / (r * r));
     }
   }
 }
@@ -393,9 +395,9 @@ function carveRivers(W, nR) {
       const steps = Math.ceil(len / 0.3);
       for (let st = 0; st <= steps; st++) {
         const t = st / steps, dd = acc + t * len, f = dd / L;
-        const w = r.w[0] + (r.w[1] - r.w[0]) * f;
-        const amp = r.lake ? 0.3 : 1.3 * Math.min(1, dd / 6, (L - dd) / 6);
-        const off = (nR(dd * 0.09, ri * 7.3) - 0.5) * 2 * amp;
+        const w = (r.w[0] + (r.w[1] - r.w[0]) * f) * (r.lake ? GEO_SCALE : 1 + (GEO_SCALE - 1) * 0.35);
+        const amp = r.lake ? 0.3 : 1.3 * GEO_SCALE * Math.min(1, dd / 6, (L - dd) / 6);
+        const off = (nR(dd * 0.09 / GEO_SCALE, ri * 7.3) - 0.5) * 2 * amp;
         const cx = p.x + (q.x - p.x) * t + nx * off, cy = p.y + (q.y - p.y) * t + ny * off;
         for (let y = Math.floor(cy - w); y <= Math.ceil(cy + w); y++) for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
           if (x < 0 || y < 0 || x >= N || y >= N) continue;
@@ -516,9 +518,9 @@ function waterDist(W, cx, cy, r) {
 // Mindestabstand zweier Orte: die eigene Burg braucht Platz, Lager kommen mit wenig aus
 function siteGap(a, b) {
   const lager = a.type === 'lager' || b.type === 'lager';
-  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 13 : 17;
-  if (lager) return 10;
-  return Math.max(10, a.clear + b.clear - 2);
+  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 18 : 26;
+  if (lager) return 16;
+  return a.clear + b.clear + 6;
 }
 
 // Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse)
@@ -541,7 +543,7 @@ function placeSettlements(W, rng) {
           const i = y * N + x;
           if (W.tiles[i] === T.WATER || W.landId[i] !== home) continue;
           if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < siteGap(s, def))) continue;
-          const waterR = def.port ? (def.type === 'burg' ? 7 : def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
+          const waterR = def.port ? (def.type === 'burg' || def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
           if (countAround(W, x, y, waterR, T.WATER) > 0) continue;
           let score = Math.hypot(ox, oy);
           if (strict && def.port) {
@@ -562,7 +564,7 @@ function placeSettlements(W, rng) {
       }
       return best;
     };
-    const best = tryFind(true, 26) || tryFind(false, 44) || near;
+    const best = tryFind(true, 34) || tryFind(false, 56) || near;
     W.sites.push({ ...def, tx: best.x, ty: best.y, x: best.x + 0.5, y: best.y + 0.5, land: home });
   }
 }
@@ -666,7 +668,7 @@ function buildRoads(W) {
     for (const a of sites) for (const b of sites) {
       if (a.id >= b.id || has(a, b)) continue;
       const d = Math.hypot(a.tx - b.tx, a.ty - b.ty);
-      if (d < 58) extra.push({ a, b, d });
+      if (d < 58 * GEO_SCALE) extra.push({ a, b, d });
     }
     extra.sort((p, q) => p.d - q.d);
     edges.push(...own, ...extra.slice(0, Math.round(sites.length / 3)));
@@ -686,7 +688,7 @@ function buildRoads(W) {
   edges.sort((p, q) => p.d - q.d);
   for (const e of edges) {
     const pa = roadPoint(e.a), pb = roadPoint(e.b);
-    const idx = astar(N, pa.x, pa.y, pb.x, pb.y, roadCost, { diag: false, maxIter: 260000, hMul: 0.4 });
+    const idx = astar(N, pa.x, pa.y, pb.x, pb.y, roadCost, { diag: false, maxIter: 600000, hMul: 0.45 });
     if (!idx) continue;
     paveRoad(W, idx);
     W.roads.push([e.a.id, e.b.id]);
@@ -710,9 +712,9 @@ function buildRoads(W) {
     }
     if (!nearest) continue;
     const walk = (i) => (W.tiles[i] === T.WATER ? 1e9 : TERRAIN_COST[W.tiles[i]]);
-    const ok = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, walk, { maxIter: 120000, hMul: 0.6 });
+    const ok = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, walk, { maxIter: 250000, hMul: 0.6 });
     if (!ok) {
-      const idx = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, roadCost, { diag: false, maxIter: 200000, hMul: 0.4 });
+      const idx = astar(N, camp.tx, camp.ty, nearest.s.tx, nearest.s.ty, roadCost, { diag: false, maxIter: 400000, hMul: 0.45 });
       if (idx) for (const i of idx) if (W.tiles[i] === T.WATER) W.tiles[i] = T.BRIDGE;
     }
   }

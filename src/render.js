@@ -2274,10 +2274,13 @@ export function drawMap(c, w, h, opts = {}) {
   const big = !!opts.big;
   let v;
   if (big) {
-    const s = Math.min(w, h) / N;
-    v = { ox: 0, oy: 0, s, dx: (w - N * s) / 2, dy: (h - N * s) / 2 };
+    // Große Karte: Zoomstufe 1 zeigt alles, darüber ein Ausschnitt um (cx, cy)
+    const s = (Math.min(w, h) / N) * (opts.zoom || 1);
+    const fit = (len, c) => (N * s <= len ? { o: 0, d: (len - N * s) / 2 } : { o: Math.max(0, Math.min(N - len / s, c - len / (2 * s))), d: 0 });
+    const fx = fit(w, opts.cx ?? N / 2), fy = fit(h, opts.cy ?? N / 2);
+    v = { ox: fx.o, oy: fy.o, s, dx: fx.d, dy: fy.d };
   } else {
-    const s = opts.zoom || 2.6;
+    const s = opts.zoom || 2.3;
     v = { ox: p.x - w / (2 * s), oy: p.y - h / (2 * s), s, dx: 0, dy: 0 };
   }
   c.clearRect(0, 0, w, h);
@@ -2360,7 +2363,7 @@ function drawMapDecor(c, v) {
   c.textAlign = 'center';
   for (const r of REGIONS) {
     const t = geoToTile(r.lon, r.lat), q = miniPos(t.x, t.y, v);
-    const fs = Math.round(15 * r.size * Math.max(0.7, v.s / 2.2));
+    const fs = Math.round(15 * r.size * Math.max(0.75, Math.min(1.6, v.s / 1.6)));
     c.font = r.sea ? `italic 500 ${fs}px "Alegreya", Georgia, serif` : `600 ${fs}px "IM Fell English SC", Georgia, serif`;
     c.fillStyle = r.sea ? 'rgba(200,225,240,0.6)' : 'rgba(40,28,16,0.42)';
     if (!r.sea && 'letterSpacing' in c) c.letterSpacing = `${Math.round(fs * 0.25)}px`;
@@ -2371,7 +2374,7 @@ function drawMapDecor(c, v) {
     if ('letterSpacing' in c) c.letterSpacing = '0px';
   }
   // Windrose oben rechts
-  const cx = v.dx + W.N * v.s - 34, cy = v.dy + 38;
+  const cx = Math.min(v.dx + W.N * v.s, c.canvas.width / 2) - 34, cy = v.dy + 38;
   c.fillStyle = 'rgba(28,20,14,0.55)'; c.beginPath(); c.arc(cx, cy, 22, 0, Math.PI * 2); c.fill();
   c.fillStyle = '#c9483a'; c.beginPath(); c.moveTo(cx, cy - 18); c.lineTo(cx + 5, cy); c.lineTo(cx - 5, cy); c.fill();
   c.fillStyle = '#e9dfc6'; c.beginPath(); c.moveTo(cx, cy + 18); c.lineTo(cx + 5, cy); c.lineTo(cx - 5, cy); c.fill();

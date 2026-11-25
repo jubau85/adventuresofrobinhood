@@ -36,7 +36,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 
 ## Stand des Prototyps (v0.2)
 
-- Karte von England und Frankreich (320 × 320) mit echten Küsten, Flüssen, Bergland und Wäldern, 41 Orten an historischen Stellen, Straßen, Brücken und Häfen
+- Karte von England und Frankreich (512 × 512, etwa 1,6 km je Feld) mit echten Küsten, Flüssen, Bergland und Wäldern, 41 Orten an historischen Stellen, Straßen, Brücken und Häfen
 - Fähren über den Kanal und die Nordsee
 - Tag und Nacht mit Lichtern, vier Jahreszeiten (Schnee, Herbstlaub)
 - Spieler und Gefolge mit Reiten, Ausrüstung, Stufen, Befehlen
