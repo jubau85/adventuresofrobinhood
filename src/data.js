@@ -240,7 +240,7 @@ export const BUILDINGS = {
     ],
   },
   wehr: {
-    name: 'Wachtürme', desc: 'Türme und Wachen schützen Ashcombe vor Überfällen.', levels: [
+    name: 'Wachtürme', desc: 'Türme und Wachen schützen deine Burg vor Überfällen.', levels: [
       null,
       { cost: { gold: 120, holz: 30 }, days: 1, eff: '+15 Verteidigung' },
       { cost: { gold: 350, stein: 40 }, days: 2, eff: '+35 Verteidigung' },
@@ -316,6 +316,16 @@ export const LOOKS = {
   bauer: { tunic: '#9a8461', trim: '#6e5c40' },
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
+// Wappenfarben zur Wahl im Startmenü
+export const HERALDRY = [
+  { id: 'blau', name: 'Königsblau', color: '#2c4f86' },
+  { id: 'rot', name: 'Blutrot', color: '#9a2f2a' },
+  { id: 'gruen', name: 'Waldgrün', color: '#3f6b2f' },
+  { id: 'purpur', name: 'Purpur', color: '#5e2f6e' },
+  { id: 'ocker', name: 'Ocker', color: '#a8791f' },
+  { id: 'schwarz', name: 'Rabenschwarz', color: '#2b2a2e' },
+];
+
 export const PEASANT_TUNICS = ['#9a8461', '#8a6e4b', '#a8946a', '#7d6a55', '#94704a', '#b0a07a', '#8c5f45', '#6f7a55'];
 export const HAIR = ['#3b2a1e', '#5a3d26', '#8a6a3a', '#c9a35a', '#2a2420', '#7a3a1e', '#9a9088'];
 

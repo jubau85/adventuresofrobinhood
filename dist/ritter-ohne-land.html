@@ -269,30 +269,64 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 /* ---------------------------------------------------------------- Titel */
 #title {
   position: absolute; inset: 0; z-index: 30; overflow: auto;
-  display: grid; place-items: center;
-  padding-block: 24px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  background: radial-gradient(ellipse at 50% 30%, rgba(34,25,17,0.55), rgba(18,12,7,0.92) 70%);
+  background: #141a36;
 }
 #title[hidden] { display: none; }
+#title-art { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.title-wrap {
+  position: relative; min-height: 100%;
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 420px); align-items: center; gap: 24px 40px;
+  padding-block: 32px;
+  padding-left: max(28px, env(safe-area-inset-left, 0px));
+  padding-right: max(28px, env(safe-area-inset-right, 0px));
+}
+.title-head { align-self: start; padding-top: 4vh; max-width: 640px; }
+.title-head .eyebrow { margin: 0; font-family: var(--font-head); font-size: 17px; letter-spacing: 0.1em; color: #ffd9a0; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
+.title-head h1 {
+  margin: 4px 0 14px; font-family: var(--font-title); font-weight: 400; font-size: clamp(56px, 9vw, 118px); line-height: 0.95; text-wrap: balance;
+  color: #f6e2b0; background: linear-gradient(#fff3d2, #e6b85a 60%, #b07a2a); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 0 rgba(40,20,10,0.75)) drop-shadow(0 10px 24px rgba(0,0,0,0.6));
+}
+.title-head .intro { margin: 0; max-width: 54ch; font-family: var(--font-body); font-size: 18px; line-height: 1.5; color: #f4e6cc; text-shadow: 0 2px 6px rgba(0,0,0,0.85); }
 .title-card {
-  width: min(640px, 100%); padding: 30px 34px 26px; text-align: left;
+  padding: 22px 24px 20px;
   background: var(--parchment); color: var(--ink);
   background-image: radial-gradient(ellipse at 15% 0%, rgba(255,255,255,0.4), transparent 60%), radial-gradient(ellipse at 100% 100%, rgba(120,80,30,0.25), transparent 55%);
-  border: 2px solid var(--oak-edge); border-radius: 5px; box-shadow: 0 0 0 5px rgba(34,25,17,0.8), 0 30px 70px rgba(0,0,0,0.6);
+  border: 2px solid var(--oak-edge); border-radius: 5px; box-shadow: 0 0 0 5px rgba(34,25,17,0.85), 0 30px 70px rgba(0,0,0,0.6);
   font-family: var(--font-body);
+  display: flex; flex-direction: column; gap: 12px;
 }
-.eyebrow { margin: 0; font-family: var(--font-head); font-size: 15px; letter-spacing: 0.08em; color: var(--wax); }
-.title-card h1 { margin: 2px 0 10px; font-family: var(--font-title); font-weight: 400; font-size: clamp(44px, 9vw, 74px); line-height: 1; color: var(--ink); text-wrap: balance; }
-.intro { margin: 0 0 16px; font-size: 17px; line-height: 1.5; max-width: 60ch; }
-.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; max-width: 320px; }
-.field label { font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
-#name-input { padding: 8px 10px; font-family: var(--font-head); font-size: 20px; color: var(--ink); background: #f5ecd3; border: 1px solid #a88d5c; border-radius: 4px; color-scheme: light; }
-#name-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
-.title-card .btn { padding: 9px 18px; font-size: 16px; }
-.howto { margin: 16px 0 4px; padding: 12px 0 0; border-top: 1px solid var(--parchment-3); list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
-.title-card .hint { margin: 8px 0 0; }
+.title-card h2 { margin: 0; font-family: var(--font-head); font-weight: 400; font-size: 26px; color: var(--ink); }
+.title-card .field { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.title-card .field > label, .title-card legend { padding: 0; font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.title-card legend .muted { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 6px; }
+.title-card input[type="text"], .title-card input:not([type]) { padding: 8px 10px; font-family: var(--font-head); font-size: 20px; color: var(--ink); background: #f5ecd3; border: 1px solid #a88d5c; border-radius: 4px; color-scheme: light; }
+.title-card input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.seg { display: inline-flex; border: 1px solid #a88d5c; border-radius: 4px; overflow: hidden; align-self: flex-start; }
+.seg label { cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; padding: 6px 16px; font-family: var(--font-ui); font-weight: 600; font-size: 15px; background: #f5ecd3; }
+.seg input:checked + span { background: var(--gold); color: #2a1a08; }
+.seg input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: -3px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches label { cursor: pointer; }
+.swatches input { position: absolute; opacity: 0; pointer-events: none; }
+.swatches span { display: block; width: 34px; height: 34px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25), 0 0 0 1px rgba(42,30,20,0.5); }
+.swatches input:checked + span { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35), 0 0 0 3px var(--parchment), 0 0 0 5px var(--gold-deep); }
+.swatches input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 4px; }
+.preview { border-radius: 4px; background: linear-gradient(#d9c79c, #c9b27c); box-shadow: inset 0 0 0 1px rgba(90,67,48,0.35); }
+#hero-preview { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; max-width: 100%; }
+.title-card .btn { padding: 9px 20px; font-size: 16px; }
+.title-card .row { margin-top: 0; }
+.title-card .hint { margin: 0 !important; }
+.music-toggle {
+  position: fixed; z-index: 31; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(14px + env(safe-area-inset-top, 0px));
+  padding: 6px 12px; border-radius: 16px; cursor: pointer;
+  background: rgba(20,12,8,0.65); border: 1px solid rgba(255,217,160,0.5); color: #ffe6b8;
+  font-family: var(--font-ui); font-weight: 600; font-size: 14px;
+}
+.music-toggle:hover { background: rgba(20,12,8,0.85); }
+.music-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------- Schmal */
 @media (max-width: 720px) {
@@ -314,7 +348,10 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   #log { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
   .msg:nth-last-child(n+4) { display: none; }
   #prompt { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); font-size: 14px; }
-  .title-card { padding: 22px 18px; }
+  .title-wrap { grid-template-columns: 1fr; padding-block: 56px 24px; }
+  .title-head { padding-top: 0; }
+  .title-head .intro { font-size: 16px; }
+  .title-card { padding: 18px 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -355,6 +392,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
     <button data-tool="fast" title="Zeitraffer (T)"><span>Zeitraffer</span><kbd>T</kbd></button>
     <button data-tool="zoomin" class="narrow-only" title="Näher (+)"><span>+</span></button>
     <button data-tool="zoomout" class="narrow-only" title="Weiter (−)"><span>−</span></button>
+    <button data-tool="music" title="Musik an und aus (L)"><span id="music-label">Musik</span><kbd>L</kbd></button>
     <button data-tool="menu" title="Menü (Esc)"><span>Menü</span><kbd>Esc</kbd></button>
   </nav>
 
@@ -375,26 +413,43 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   </div>
 
   <section id="title">
-    <div class="title-card">
-      <p class="eyebrow">England, im Jahre des Herrn 1194</p>
-      <h1>Ritter ohne Land</h1>
-      <p class="intro">König Richard sitzt auf dem Heimweg vom Kreuzzug in Gefangenschaft. Prinz Johns normannische Barone pressen das Land aus, die alten sächsischen Familien murren, und in den Wäldern sammeln sich die Geächteten. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben: Ashcombe.</p>
-      <div class="field">
-        <label for="name-input">Dein Name</label>
-        <input id="name-input" maxlength="28" value="Aldric" autocomplete="off" spellcheck="false">
-      </div>
-      <div class="row">
-        <button class="btn primary" id="btn-new">Neues Spiel</button>
-        <button class="btn" id="btn-continue" hidden>Weiterspielen</button>
-      </div>
-      <p class="hint" id="continue-info"></p>
-      <ul class="howto">
-        <li><b>Ashcombe ausbauen</b>: Holz, Stein und Gold machen aus der Ruine eine Festung.</li>
-        <li><b>Gefolge anführen</b>: Leute anwerben, ausrüsten und in Scharmützel führen.</li>
-        <li><b>Politik treiben</b>: Aufträge für Sachsen, Normannen, Kirche, Gilde oder Waldleute.</li>
-      </ul>
-      <p class="hint">Klick oder WASD: gehen · E: betreten · R: reiten · Leertaste: angreifen · H: Hilfe</p>
+    <canvas id="title-art" aria-hidden="true"></canvas>
+    <div class="title-wrap">
+      <header class="title-head">
+        <p class="eyebrow">England, im Jahre des Herrn 1194</p>
+        <h1>Ritter ohne Land</h1>
+        <p class="intro">König Richard sitzt auf dem Heimweg vom Kreuzzug in Gefangenschaft. Prinz Johns Barone pressen das Land aus, die sächsischen Familien murren, in den Wäldern sammeln sich die Geächteten. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben.</p>
+      </header>
+      <form class="title-card" id="setup-form" autocomplete="off" novalidate>
+        <h2>Wer kehrt heim?</h2>
+        <div class="field">
+          <label for="name-input">Dein Name</label>
+          <input id="name-input" maxlength="24" value="Aldric" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="castle-input">Name deiner Burg</label>
+          <input id="castle-input" maxlength="20" value="Ashcombe" spellcheck="false">
+        </div>
+        <fieldset class="field">
+          <legend>Figur</legend>
+          <div class="seg">
+            <label><input type="radio" name="figur" value="m" checked><span>Ritter</span></label>
+            <label><input type="radio" name="figur" value="w"><span>Ritterin</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Wappenfarbe <span id="color-name" class="muted"></span></legend>
+          <div class="swatches" id="color-swatches"></div>
+        </fieldset>
+        <div class="preview"><canvas id="hero-preview" width="300" height="150" aria-label="Vorschau deiner Figur"></canvas></div>
+        <div class="row">
+          <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
+          <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
+        </div>
+        <p class="hint" id="continue-info"></p>
+      </form>
     </div>
+    <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
   </section>
 </div>
 <script>
@@ -644,7 +699,7 @@ const BUILDINGS = {
     ],
   },
   wehr: {
-    name: 'Wachtürme', desc: 'Türme und Wachen schützen Ashcombe vor Überfällen.', levels: [
+    name: 'Wachtürme', desc: 'Türme und Wachen schützen deine Burg vor Überfällen.', levels: [
       null,
       { cost: { gold: 120, holz: 30 }, days: 1, eff: '+15 Verteidigung' },
       { cost: { gold: 350, stein: 40 }, days: 2, eff: '+35 Verteidigung' },
@@ -720,6 +775,16 @@ const LOOKS = {
   bauer: { tunic: '#9a8461', trim: '#6e5c40' },
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
+// Wappenfarben zur Wahl im Startmenü
+const HERALDRY = [
+  { id: 'blau', name: 'Königsblau', color: '#2c4f86' },
+  { id: 'rot', name: 'Blutrot', color: '#9a2f2a' },
+  { id: 'gruen', name: 'Waldgrün', color: '#3f6b2f' },
+  { id: 'purpur', name: 'Purpur', color: '#5e2f6e' },
+  { id: 'ocker', name: 'Ocker', color: '#a8791f' },
+  { id: 'schwarz', name: 'Rabenschwarz', color: '#2b2a2e' },
+];
+
 const PEASANT_TUNICS = ['#9a8461', '#8a6e4b', '#a8946a', '#7d6a55', '#94704a', '#b0a07a', '#8c5f45', '#6f7a55'];
 const HAIR = ['#3b2a1e', '#5a3d26', '#8a6a3a', '#c9a35a', '#2a2420', '#7a3a1e', '#9a9088'];
 
@@ -847,6 +912,10 @@ function log(text, kind = 'info') {
   if (G.messages.length > 60) G.messages.shift();
   if (G.onLog) G.onLog();
 }
+
+// Name und Farben des Spielers (im Startmenü gewählt)
+function homeName() { return (G.s && G.s.castleName) || 'Ashcombe'; }
+function playerColor() { return (G.s && G.s.color) || '#2c4f86'; }
 
 // ===== world.js =====
 // Weltgenerator: Gelände, Fluss, Siedlungen, Straßen, Felder, Bäume, Gebäude.
@@ -1564,9 +1633,26 @@ function makeNpc(typeId, x, y, levelBonus = 0) {
   return u;
 }
 
+// Wappenfarben des Spielers: Spieler in voller Farbe, Gefolge etwas heller
+const heraldCache = new Map();
+function heraldLook(color, light = false) {
+  const key = color + light;
+  let v = heraldCache.get(key);
+  if (v) return v;
+  let tunic = color;
+  if (light) {
+    const n = parseInt(color.slice(1), 16);
+    const f = (c) => Math.round(c + (255 - c) * 0.2);
+    tunic = '#' + ((f((n >> 16) & 255) << 16) | (f((n >> 8) & 255) << 8) | f(n & 255)).toString(16).padStart(6, '0');
+  }
+  v = { tunic, trim: '#d8b54a' };
+  heraldCache.set(key, v);
+  return v;
+}
+
 function unitLook(u) {
-  if (u.kind === 'player') return LOOKS.spieler;
-  if (u.kind === 'companion') return LOOKS.gefolge;
+  if (u.lookObj) return u.lookObj;
+  if (u.kind === 'player' || u.kind === 'companion') return heraldLook(playerColor(), u.kind === 'companion');
   return LOOKS[u.look] || LOOKS.bauer;
 }
 
@@ -1816,7 +1902,7 @@ function unitDown(t, killer) {
     t.woundedDays = 2;
     t.hp = 1;
     t.path = null;
-    log(`${t.name} ist schwer verwundet und wird nach Ashcombe gebracht.`, 'bad');
+    log(`${t.name} ist schwer verwundet und wird nach ${homeName()} gebracht.`, 'bad');
     G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 6 });
     return;
   }
@@ -1864,7 +1950,7 @@ function playerDefeated() {
   const lost = Math.floor(G.s.gold * 0.2);
   G.s.gold -= lost;
   for (const k of Object.keys(G.s.cargo)) G.s.cargo[k] = Math.floor(G.s.cargo[k] / 2);
-  log(`Du wurdest niedergeschlagen. Bauern bringen dich nach Ashcombe. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
+  log(`Du wurdest niedergeschlagen. Bauern bringen dich nach ${homeName()}. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
   const site = castleSite();
   p.dead = false;
   p.x = site.x + 0.3; p.y = site.y + 2.6;
@@ -2807,7 +2893,7 @@ function giveGift(site) {
 
 
 // ===== castle.js =====
-// Die Burg Ashcombe: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
+// Die eigene Burg: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
 
 
@@ -2888,7 +2974,7 @@ function finishConstruction() {
   if (c.id === 'burg') {
     G.s.castle.level = c.level;
     setPlayerWalls(G.world, c.level >= 1);
-    log(`Ashcombe ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
+    log(`${homeName()} ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
     addRenown(5 * c.level);
     spawnPeasants();
     rebuildUnits();
@@ -3041,7 +3127,7 @@ function dailyCastle() {
   if (wages) parts.push(`−${wages} Sold`);
   if (bal.prod.holz) parts.push(`+${bal.prod.holz} Holz`);
   if (bal.prod.stein) parts.push(`+${bal.prod.stein} Stein`);
-  log(`Tag ${G.s.day} in Ashcombe: ${parts.join(', ')}.`);
+  log(`Tag ${G.s.day} in ${homeName()}: ${parts.join(', ')}.`);
 }
 
 function checkRaid() {
@@ -3055,7 +3141,7 @@ function checkRaid() {
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {
-      log(`${t.by} haben Ashcombe angegriffen. Die Besatzung hat sie zurückgeschlagen (Verteidigung ${def} gegen ${strength}).`, 'good');
+      log(`${t.by} haben ${homeName()} angegriffen. Die Besatzung hat sie zurückgeschlagen (Verteidigung ${def} gegen ${strength}).`, 'good');
       addRenown(2);
       for (const c of G.s.companions) if (c.status === 'garnison') grantXp(c, 15);
     } else {
@@ -3066,7 +3152,7 @@ function checkRaid() {
         const n = Math.floor((G.s.castle.storage[g] || 0) * 0.3);
         if (n > 0) { G.s.castle.storage[g] -= n; lost.push(`${n} ${GOODS[g].name}`); }
       }
-      log(`${t.by} haben Ashcombe überfallen (Verteidigung ${def} gegen ${strength})! Verloren: ${lostGold} Gold${lost.length ? ', ' + lost.join(', ') : ''}. Wachtürme und Garnison schützen.`, 'bad');
+      log(`${t.by} haben ${homeName()} überfallen (Verteidigung ${def} gegen ${strength})! Verloren: ${lostGold} Gold${lost.length ? ', ' + lost.join(', ') : ''}. Wachtürme und Garnison schützen.`, 'bad');
     }
     break;
   }
@@ -3785,7 +3871,7 @@ function buildStaticParts() {
   return parts;
 }
 
-// ---------------------------------------------------------------- Ashcombe: sichtbarer Ausbau
+// ---------------------------------------------------------------- Eigene Burg: sichtbarer Ausbau
 const BUILD_ICON = { halle: 'krone', kaserne: 'schwerter', schmiede: 'amboss', stall: 'hufeisen', holzfaeller: 'axt', steinbruch: 'hacke', markt: 'muenze', kapelle: 'kreuz', wehr: 'turm' };
 const PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0] };
 const TOWER_SPOTS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
@@ -3968,7 +4054,7 @@ function addCastleBuilding(add, id, L, p, s) {
       const wy = [0, 2.2, 2.6, 2.9][L], h = [0, 20, 24, 28][L];
       add(p.x, p.y, (c) => {
         drawHouse(c, { x: p.x, y: p.y, wx: 1.2 + L * 0.1, wy, h, rh: 13 + L * 2, wall: L === 1 ? 'timber' : 'stone', roof: L === 1 ? 'thatch' : L === 2 ? 'tile' : 'slate', lit: true, chimney: true, v: 0.75 });
-        if (L >= 2) banner(c, p.x + 0.45, p.y + wy / 2 - 0.15, h + 2, '#2c4f86');
+        if (L >= 2) banner(c, p.x + 0.45, p.y + wy / 2 - 0.15, h + 2, playerColor());
       });
       if (L === 3) add(p.x + 0.1, p.y - wy / 2 - 0.35, (c) => { drawBox(c, p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8, 46, '#ada798', 0, 'stone'); drawPyramid(c, p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8, 46, 22, ROOFS.slate); banner(c, p.x + 0.1, p.y - wy / 2 - 0.35, 68, '#d6ad4c'); });
       break;
@@ -4117,13 +4203,13 @@ function addTower(add, s, k, L) {
 function buildPlayerCastle() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
   const C = G.s.castle;
-  const parts = castlePieces(s, C.level, '#2c4f86');
+  const parts = castlePieces(s, C.level, playerColor());
   const z0 = groundZ(G.world, s.x, s.y);
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
   const lv = (id) => C.b[id] || 0;
   const pos = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
   const con = C.construction;
-  castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg Ashcombe · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
+  castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
 
   for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle']) {
     const L = lv(id), p = pos(id), building = con && con.id === id;
@@ -4798,6 +4884,7 @@ function drawFigure(c, u, x, y) {
     c.fillStyle = u.st.armorDef >= 12 ? '#aab0b5' : '#9aa1a6';
     if (u.st.armorDef >= 12) { c.fillRect(-3.6, yb - 23, 7.2, 6.5); c.strokeRect(-3.6, yb - 23, 7.2, 6.5); c.fillStyle = '#2a2a2a'; c.fillRect(-0.5, yb - 21, 4, 1); }
     else { c.beginPath(); c.arc(0, yb - 19.8, 3.6, Math.PI, Math.PI * 2); c.fill(); c.stroke(); c.fillRect(0.6, yb - 20, 1, 3); }
+    if (u.female) { c.fillStyle = u.hair || '#5a3d26'; c.fillRect(-4.6, yb - 18.5, 1.8, 7); c.fillRect(-5, yb - 12, 2.4, 1.6); }
   } else {
     c.fillStyle = u.hair || '#3b2a1e';
     c.beginPath(); c.arc(0, yb - 19.6, 3.4, Math.PI * 1.05, Math.PI * 1.95); c.fill();
@@ -4930,6 +5017,33 @@ function drawCarcass(c, f, x, y) {
   c.strokeStyle = shade(col, 0.6); c.lineWidth = 1.2;
   c.beginPath(); c.moveTo(x - 3 * big, y - 1); c.lineTo(x - 6 * big, y + 1.5); c.moveTo(x + 2 * big, y - 1); c.lineTo(x + 4 * big, y + 2); c.stroke();
   c.globalAlpha = 1;
+}
+
+// Vorschau der Spielfigur im Startmenü: Reiter mit Banner in der gewählten Farbe
+function drawHeroPreview(cv, color, female, t) {
+  const c = cv.getContext('2d');
+  const w = cv.width, h = cv.height, k = h / 150;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const g = c.createRadialGradient(w / 2, h * 0.78, 4, w / 2, h * 0.78, w * 0.5);
+  g.addColorStop(0, 'rgba(110,140,70,0.55)'); g.addColorStop(1, 'rgba(110,140,70,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.setTransform(k * 2.6, 0, 0, k * 2.6, w * 0.52, h * 0.86);
+  // Standarte
+  c.strokeStyle = '#4a3322'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(-22, 0); c.lineTo(-22, -42); c.stroke();
+  c.beginPath(); c.moveTo(-22, -42);
+  for (let q = 0; q <= 8; q++) { const u = q / 8; c.lineTo(-22 + u * 16, -42 + Math.sin(t * 3 + u * 5) * 1.5 * u); }
+  for (let q = 8; q >= 0; q--) { const u = q / 8; c.lineTo(-22 + u * 16, -32 - u * 1 + Math.sin(t * 3 + u * 5) * 1.5 * u); }
+  c.closePath(); c.fillStyle = color; c.fill(); c.strokeStyle = OUTLINE; c.lineWidth = 0.6; c.stroke();
+  c.fillStyle = '#d8b54a'; c.fillRect(-15.5, -40, 1.2, 7); c.fillRect(-18, -37.2, 6.4, 1.2);
+  const u = {
+    kind: 'preview', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'zelter' },
+    st: { armorDef: 6, horse: ITEMS.zelter, maxHp: 1 }, hp: 1, mounted: true, facing: 1, anim: t * 0.6, moving: true,
+    female, hair: female ? '#7a3a1e' : '#3b2a1e', lookObj: heraldLook(color, false), swing: 0, flash: 0, combatT: 0,
+  };
+  drawFigure(c, u, 6, 0);
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 // Tier unter dem Mauszeiger (für die Jagd)
@@ -5394,6 +5508,463 @@ function unitAtScreen(px, py) {
   return best;
 }
 
+// ===== titleart.js =====
+// Titelbild, im Code gemalt: Sonnenuntergang über den Hügeln, eine Burg auf dem Hügel
+// und ein Ritter zu Pferd im Gegenlicht. Banner und Wimpel tragen die gewählte Wappenfarbe.
+
+function hexRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgba(hex, a, k = 1) { const [r, g, b] = hexRgb(hex); return `rgba(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)},${a})`; }
+
+// Hügelkette als Funktion der x-Position
+function ridge(x, w, base, amp, seed, freq) {
+  const u = x / w;
+  return base - amp * (0.5 * Math.sin(u * 6.1 * freq + seed) + 0.3 * Math.sin(u * 13.7 * freq + seed * 2.1) + 0.2 * Math.sin(u * 29.3 * freq + seed * 3.7));
+}
+
+function fillRidge(c, w, h, base, amp, seed, freq, col) {
+  c.beginPath();
+  c.moveTo(0, h);
+  for (let x = 0; x <= w; x += 6) c.lineTo(x, ridge(x, w, base, amp, seed, freq));
+  c.lineTo(w, h);
+  c.closePath();
+  c.fillStyle = col;
+  c.fill();
+}
+
+function drawCastle(c, x, y, s, color, t) {
+  const dark = '#2a1a2a';
+  c.fillStyle = dark;
+  const rect = (rx, ry, rw, rh) => c.fillRect(x + rx * s, y - (ry + rh) * s, rw * s, rh * s);
+  const crenel = (rx, ry, rw) => { for (let k = 0; k < rw; k += 8) rect(rx + k, ry, 5, 5); };
+  // Mauer und Türme
+  rect(-120, 0, 240, 46); crenel(-120, 46, 240);
+  rect(-140, 0, 34, 84); crenel(-140, 84, 34);
+  rect(106, 0, 34, 84); crenel(106, 84, 34);
+  rect(-30, 0, 26, 64); crenel(-30, 64, 26);
+  // Bergfried
+  rect(-70, 0, 64, 132); crenel(-70, 132, 64);
+  rect(-58, 132, 18, 30); // Ecktürmchen
+  c.beginPath(); c.moveTo(x - 60 * s, y - 162 * s); c.lineTo(x - 49 * s, y - 182 * s); c.lineTo(x - 38 * s, y - 162 * s); c.fill();
+  // Tor
+  c.fillStyle = '#120a12';
+  c.beginPath(); c.moveTo(x + 40 * s, y); c.lineTo(x + 40 * s, y - 22 * s); c.quadraticCurveTo(x + 52 * s, y - 34 * s, x + 64 * s, y - 22 * s); c.lineTo(x + 64 * s, y); c.fill();
+  // Fenster mit Licht
+  const flick = 0.85 + Math.sin(t * 7) * 0.08 + Math.sin(t * 13.3) * 0.05;
+  c.fillStyle = `rgba(255,200,110,${flick})`;
+  for (const [wx, wy] of [[-56, 96], [-30, 96], [-56, 60], [-30, 60], [-130, 58], [116, 58], [-20, 40]]) c.fillRect(x + wx * s, y - wy * s, 5 * s, 9 * s);
+  const glow = c.createRadialGradient(x - 40 * s, y - 80 * s, 0, x - 40 * s, y - 80 * s, 90 * s);
+  glow.addColorStop(0, 'rgba(255,180,90,0.18)'); glow.addColorStop(1, 'rgba(255,180,90,0)');
+  c.fillStyle = glow; c.fillRect(x - 140 * s, y - 180 * s, 200 * s, 200 * s);
+  // Banner
+  const flag = (fx, fy, len) => {
+    c.strokeStyle = dark; c.lineWidth = 2 * s;
+    c.beginPath(); c.moveTo(x + fx * s, y - fy * s); c.lineTo(x + fx * s, y - (fy + 34) * s); c.stroke();
+    const top = y - (fy + 34) * s;
+    c.beginPath();
+    c.moveTo(x + fx * s, top);
+    for (let k = 0; k <= 10; k++) {
+      const u = k / 10;
+      c.lineTo(x + (fx + u * len) * s, top + Math.sin(t * 3 + u * 5 + fx) * 3 * u * s);
+    }
+    for (let k = 10; k >= 0; k--) {
+      const u = k / 10;
+      c.lineTo(x + (fx + u * len) * s, top + (14 - u * 4) * s + Math.sin(t * 3 + u * 5 + fx) * 3 * u * s);
+    }
+    c.closePath();
+    c.fillStyle = rgba(color, 1, 0.85); c.fill();
+    c.strokeStyle = 'rgba(255,170,90,0.6)'; c.lineWidth = 1; c.stroke();
+  };
+  flag(-49, 182, 40); flag(-123, 89, 30); flag(123, 89, 30);
+}
+
+function drawKnight(c, x, y, s, color, t) {
+  const sil = '#0e080d';
+  const rim = 'rgba(255,170,90,0.85)';
+  c.save();
+  c.translate(x, y);
+  c.scale(s, s);
+  const breath = Math.sin(t * 1.6) * 0.6;
+  // Umhang (hinter dem Reiter, weht im Wind)
+  c.beginPath();
+  c.moveTo(-6, -118);
+  for (let k = 0; k <= 8; k++) { const u = k / 8; c.lineTo(-6 - u * 70, -118 + u * 40 + Math.sin(t * 2.4 + u * 4) * 8 * u); }
+  for (let k = 8; k >= 0; k--) { const u = k / 8; c.lineTo(-14 - u * 62, -88 + u * 30 + Math.sin(t * 2.4 + u * 4 + 0.6) * 8 * u); }
+  c.closePath();
+  c.fillStyle = rgba(color, 1, 0.55); c.fill();
+  c.strokeStyle = rim; c.lineWidth = 1.2; c.stroke();
+  // Pferd
+  c.fillStyle = sil;
+  c.beginPath();
+  c.moveTo(-58, -64); // Kruppe
+  c.quadraticCurveTo(-60, -96, -20, -92); // Rücken
+  c.quadraticCurveTo(10, -90, 30, -100); // Widerrist
+  c.quadraticCurveTo(48, -132, 62, -140); // Hals
+  c.lineTo(70, -142); c.lineTo(86, -122); c.lineTo(82, -114); // Kopf
+  c.lineTo(66, -122); c.quadraticCurveTo(54, -100, 44, -76); // Kehle, Brust
+  c.quadraticCurveTo(10, -60, -40, -62);
+  c.closePath(); c.fill();
+  c.strokeStyle = rim; c.lineWidth = 1.4; c.stroke();
+  // Ohren und Mähne
+  c.beginPath(); c.moveTo(64, -140); c.lineTo(66, -152); c.lineTo(70, -142); c.fill();
+  // Beine
+  c.lineCap = 'round'; c.strokeStyle = sil; c.lineWidth = 7;
+  const leg = (x1, y1, x2, y2, x3, y3) => { c.beginPath(); c.moveTo(x1, y1); c.quadraticCurveTo(x2, y2, x3, y3); c.stroke(); };
+  leg(-46, -66, -50, -36, -54, 0);
+  leg(-30, -64, -26, -34, -30, 0);
+  leg(30, -70, 44, -50, 52, -40 + breath); // erhobenes Vorderbein
+  leg(36, -70, 34, -36, 36, 0);
+  // Schweif
+  c.lineWidth = 5;
+  c.beginPath(); c.moveTo(-58, -78); c.quadraticCurveTo(-82, -70 + Math.sin(t * 2) * 4, -76, -30); c.stroke();
+  // Reiter
+  c.fillStyle = sil;
+  c.beginPath();
+  c.moveTo(-14, -94); c.lineTo(12, -94); c.lineTo(8, -136); c.lineTo(-8, -138); c.closePath(); c.fill();
+  // Topfhelm
+  c.fillRect(-9, -158, 17, 20);
+  c.beginPath(); c.moveTo(-9, -158); c.lineTo(-1, -164); c.lineTo(8, -158); c.fill();
+  c.strokeStyle = rim; c.lineWidth = 1;
+  c.strokeRect(-9, -158, 17, 20);
+  c.fillStyle = 'rgba(255,170,90,0.9)'; c.fillRect(-6, -150, 14, 1.6);
+  // Schild in Wappenfarbe
+  c.beginPath(); c.moveTo(-2, -132); c.lineTo(22, -132); c.lineTo(22, -112); c.lineTo(10, -96); c.lineTo(-2, -112); c.closePath();
+  c.fillStyle = rgba(color, 1, 0.7); c.fill(); c.strokeStyle = rim; c.lineWidth = 1.2; c.stroke();
+  c.fillStyle = 'rgba(214,173,76,0.85)'; c.fillRect(9, -130, 2.4, 30); c.fillRect(1, -121, 18, 2.4);
+  // Lanze mit Wimpel
+  c.strokeStyle = sil; c.lineWidth = 3.2;
+  c.beginPath(); c.moveTo(-26, -60); c.lineTo(30, -250); c.stroke();
+  c.strokeStyle = rim; c.lineWidth = 0.8; c.beginPath(); c.moveTo(-25, -62); c.lineTo(31, -252); c.stroke();
+  c.beginPath();
+  const px = 26, py = -236;
+  c.moveTo(px, py);
+  for (let k = 0; k <= 8; k++) { const u = k / 8; c.lineTo(px + u * 58, py + 4 + Math.sin(t * 4 + u * 6) * 4 * u + u * 6); }
+  c.lineTo(px - 3, py + 14);
+  c.closePath();
+  c.fillStyle = rgba(color, 1, 0.95); c.fill(); c.strokeStyle = rim; c.lineWidth = 1; c.stroke();
+  c.restore();
+}
+
+const titleMotes = [];
+const titleBirds = [];
+
+function drawTitleArt(c, w, h, t, color) {
+  // Himmel
+  const sky = c.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#141a36'); sky.addColorStop(0.3, '#3a2a58'); sky.addColorStop(0.52, '#a9505a');
+  sky.addColorStop(0.64, '#e8894a'); sky.addColorStop(0.72, '#ffc874');
+  c.fillStyle = sky; c.fillRect(0, 0, w, h);
+  // Sterne oben
+  c.fillStyle = 'rgba(255,255,255,0.7)';
+  for (let k = 0; k < 40; k++) { const sx = (k * 197.3) % w, sy = (k * 61.7) % (h * 0.28); const tw = 0.5 + 0.5 * Math.sin(t * 2 + k); c.globalAlpha = 0.25 + 0.5 * tw * (1 - sy / (h * 0.28)); c.fillRect(sx, sy, 1.5, 1.5); }
+  c.globalAlpha = 1;
+  // Sonne mit Strahlen
+  const sx = w * 0.3, sy = h * 0.64, sr = Math.max(40, h * 0.085);
+  const glow = c.createRadialGradient(sx, sy, sr * 0.3, sx, sy, sr * 6);
+  glow.addColorStop(0, 'rgba(255,230,160,0.9)'); glow.addColorStop(0.15, 'rgba(255,190,110,0.45)'); glow.addColorStop(1, 'rgba(255,150,80,0)');
+  c.fillStyle = glow; c.fillRect(0, 0, w, h);
+  c.save();
+  c.translate(sx, sy); c.rotate(t * 0.02);
+  c.fillStyle = 'rgba(255,220,150,0.06)';
+  for (let k = 0; k < 12; k++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0, 0); c.lineTo(w * 1.2, -40); c.lineTo(w * 1.2, 40); c.closePath(); c.fill(); }
+  c.restore();
+  c.fillStyle = '#fff0c8'; c.beginPath(); c.arc(sx, sy, sr, 0, Math.PI * 2); c.fill();
+  // Wolkenbänder
+  for (let k = 0; k < 6; k++) {
+    const cy = h * (0.18 + k * 0.07), cxs = ((t * (6 + k * 2) + k * 300) % (w + 600)) - 300;
+    for (let j = 0; j < 4; j++) {
+      const ex = cxs + j * 140, ew = 180 + ((k * 37 + j * 53) % 120), eh = 10 + ((k + j) % 3) * 5;
+      const g = c.createLinearGradient(0, cy - eh, 0, cy + eh);
+      g.addColorStop(0, 'rgba(70,40,80,0.55)'); g.addColorStop(1, k > 2 ? 'rgba(255,160,100,0.55)' : 'rgba(200,110,120,0.4)');
+      c.fillStyle = g; c.beginPath(); c.ellipse(ex, cy, ew, eh, 0, 0, Math.PI * 2); c.fill();
+    }
+  }
+  // Ferne Hügel und Dunst
+  fillRidge(c, w, h, h * 0.7, h * 0.05, 1.3, 1.6, '#8a4e66');
+  c.fillStyle = 'rgba(255,190,140,0.12)'; c.fillRect(0, h * 0.62, w, h * 0.12);
+  fillRidge(c, w, h, h * 0.76, h * 0.06, 4.1, 1.1, '#5e3550');
+  // Burghügel
+  const cxB = w * 0.7;
+  c.beginPath(); c.moveTo(cxB - w * 0.28, h); c.quadraticCurveTo(cxB - w * 0.12, h * 0.66, cxB, h * 0.645); c.quadraticCurveTo(cxB + w * 0.14, h * 0.66, cxB + w * 0.32, h); c.closePath();
+  c.fillStyle = '#3d2438'; c.fill();
+  drawCastle(c, cxB, h * 0.652, Math.max(0.55, h / 1100), color, t);
+  // Nebel
+  for (let k = 0; k < 3; k++) {
+    const my = h * (0.78 + k * 0.05), mx = ((t * (10 + k * 5)) % (w + 400)) - 200;
+    const g = c.createRadialGradient(mx, my, 0, mx, my, w * 0.4);
+    g.addColorStop(0, 'rgba(255,210,180,0.16)'); g.addColorStop(1, 'rgba(255,210,180,0)');
+    c.fillStyle = g; c.fillRect(0, my - h * 0.1, w, h * 0.2);
+  }
+  fillRidge(c, w, h, h * 0.86, h * 0.04, 7.7, 0.9, '#28172a');
+  // Vordergrund mit Ritter
+  c.beginPath(); c.moveTo(0, h); c.lineTo(0, h * 0.8); c.quadraticCurveTo(w * 0.14, h * 0.74, w * 0.3, h * 0.79); c.quadraticCurveTo(w * 0.42, h * 0.84, w * 0.5, h); c.closePath();
+  c.fillStyle = '#140b12'; c.fill();
+  drawKnight(c, w * 0.17, h * 0.765, Math.max(0.5, h / 900), color, t);
+  // Vögel
+  if (titleBirds.length < 7 && Math.random() < 0.01) titleBirds.push({ x: -30, y: h * (0.2 + Math.random() * 0.25), v: 25 + Math.random() * 20, p: Math.random() * 6 });
+  c.strokeStyle = 'rgba(20,10,20,0.8)'; c.lineWidth = 1.6;
+  for (let i = titleBirds.length - 1; i >= 0; i--) {
+    const b = titleBirds[i];
+    b.x += b.v / 60; const f = Math.sin(t * 9 + b.p) * 3;
+    c.beginPath(); c.moveTo(b.x - 6, b.y - f); c.quadraticCurveTo(b.x - 2, b.y - 1, b.x, b.y); c.quadraticCurveTo(b.x + 2, b.y - 1, b.x + 6, b.y - f); c.stroke();
+    if (b.x > w + 40) titleBirds.splice(i, 1);
+  }
+  // Schwebende Funken
+  if (titleMotes.length < 40) titleMotes.push({ x: Math.random() * w, y: h * (0.6 + Math.random() * 0.4), v: 6 + Math.random() * 10, life: 0, max: 4 + Math.random() * 4 });
+  for (let i = titleMotes.length - 1; i >= 0; i--) {
+    const m = titleMotes[i];
+    m.life += 1 / 60; m.y -= m.v / 60; m.x += Math.sin(t + i) * 0.2;
+    if (m.life > m.max) { titleMotes.splice(i, 1); continue; }
+    c.fillStyle = `rgba(255,210,130,${0.6 * Math.sin((m.life / m.max) * Math.PI)})`;
+    c.fillRect(m.x, m.y, 2, 2);
+  }
+  // Vignette
+  const v = c.createRadialGradient(w / 2, h * 0.55, h * 0.3, w / 2, h * 0.55, Math.max(w, h) * 0.85);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(8,4,10,0.7)');
+  c.fillStyle = v; c.fillRect(0, 0, w, h);
+}
+
+// ===== audio.js =====
+// Musik, live im Browser erzeugt (Web Audio): gezupfte Laute, Flöte, Hörner, Bordun und Trommel.
+// Stimmungen: Titel (episch), Welt (Estampie im Dreiertakt), Nacht (ruhig), Kampf (Trommeln).
+// Startet erst nach einer Eingabe des Spielers, so wie Browser es verlangen.
+
+let ac = null, master = null, dry = null, wet = null;
+let enabled = true, started = false;
+let mood = 'titel', playingMood = null;
+let nextTime = 0, phraseIdx = 0, timer = null;
+let droneNodes = null;
+const pluckCache = new Map();
+
+const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+// ---------------------------------------------------------------- Einstellungen
+function musicEnabled() { return enabled; }
+
+function loadMusicPref() {
+  try { const v = localStorage.getItem('ritter-musik'); enabled = v === null ? true : v === '1'; } catch (e) { enabled = true; }
+  return enabled;
+}
+
+function setMusicEnabled(on) {
+  enabled = on;
+  try { localStorage.setItem('ritter-musik', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
+  if (!ac) { if (on) startAudio(); return; }
+  const now = ac.currentTime;
+  master.gain.cancelScheduledValues(now);
+  master.gain.setTargetAtTime(on ? 0.55 : 0, now, 0.4);
+  if (on && ac.state === 'suspended') ac.resume();
+}
+
+function setMood(m) { mood = m; }
+
+// ---------------------------------------------------------------- Aufbau
+function makeImpulse(seconds, decay) {
+  const sr = ac.sampleRate, len = Math.floor(sr * seconds);
+  const buf = ac.createBuffer(2, len, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return buf;
+}
+
+function startAudio() {
+  if (started || !enabled) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try { ac = new AC(); } catch (e) { return; }
+  started = true;
+  master = ac.createGain();
+  master.gain.value = 0;
+  const comp = ac.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.ratio.value = 3;
+  master.connect(comp); comp.connect(ac.destination);
+  dry = ac.createGain(); dry.gain.value = 0.85; dry.connect(master);
+  const conv = ac.createConvolver(); conv.buffer = makeImpulse(3.2, 2.6);
+  wet = ac.createGain(); wet.gain.value = 0.35; wet.connect(conv); conv.connect(master);
+  master.gain.setTargetAtTime(0.55, ac.currentTime, 1.2);
+  nextTime = ac.currentTime + 0.3;
+  timer = setInterval(tick, 150);
+  document.addEventListener('visibilitychange', () => {
+    if (!ac) return;
+    if (document.hidden) ac.suspend(); else if (enabled) ac.resume();
+  });
+}
+
+function out(node, send = 0.4) {
+  node.connect(dry);
+  if (send > 0) { const s = ac.createGain(); s.gain.value = send; node.connect(s); s.connect(wet); }
+}
+
+// ---------------------------------------------------------------- Instrumente
+function pluckBuffer(m) {
+  let b = pluckCache.get(m);
+  if (b) return b;
+  const sr = ac.sampleRate, len = Math.floor(sr * 2.4);
+  b = ac.createBuffer(1, len, sr);
+  const d = b.getChannelData(0);
+  const N = Math.max(2, Math.round(sr / midiHz(m)));
+  const ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+  let idx = 0;
+  for (let i = 0; i < len; i++) {
+    const a = ring[idx], c = ring[(idx + 1) % N];
+    ring[idx] = (a + c) * 0.5 * 0.996;
+    d[i] = a;
+    idx = (idx + 1) % N;
+  }
+  pluckCache.set(m, b);
+  return b;
+}
+
+function lute(m, t, vol = 0.32) {
+  const src = ac.createBufferSource();
+  src.buffer = pluckBuffer(m);
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2600;
+  const g = ac.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); out(g, 0.3);
+  src.start(t); src.stop(t + 2.4);
+}
+
+function flute(m, t, dur, vol = 0.12) {
+  const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = midiHz(m);
+  const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = midiHz(m) * 2;
+  const g2 = ac.createGain(); g2.gain.value = 0.12;
+  const lfo = ac.createOscillator(); lfo.frequency.value = 5.2;
+  const lg = ac.createGain(); lg.gain.value = 0;
+  lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(midiHz(m) * 0.008, t + Math.min(0.5, dur * 0.6));
+  lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.07);
+  g.gain.setValueAtTime(vol * 0.85, t + Math.max(0.08, dur - 0.12));
+  g.gain.linearRampToValueAtTime(0, t + dur + 0.05);
+  o.connect(g); o2.connect(g2); g2.connect(g); out(g, 0.5);
+  for (const n of [o, o2, lfo]) { n.start(t); n.stop(t + dur + 0.1); }
+}
+
+function horn(m, t, dur, vol = 0.07) {
+  const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = midiHz(m);
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
+  f.frequency.setValueAtTime(300, t); f.frequency.linearRampToValueAtTime(1400, t + 0.25); f.frequency.linearRampToValueAtTime(800, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.2);
+  g.gain.setValueAtTime(vol, t + dur - 0.3); g.gain.linearRampToValueAtTime(0, t + dur + 0.1);
+  o.connect(f); f.connect(g); out(g, 0.6);
+  o.start(t); o.stop(t + dur + 0.2);
+}
+
+function drum(t, vol = 0.5, low = true) {
+  const o = ac.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(low ? 95 : 160, t); o.frequency.exponentialRampToValueAtTime(low ? 45 : 90, t + 0.25);
+  const g = ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + (low ? 0.45 : 0.18));
+  o.connect(g); out(g, 0.25);
+  o.start(t); o.stop(t + 0.5);
+  const len = Math.floor(ac.sampleRate * 0.12);
+  const nb = ac.createBuffer(1, len, ac.sampleRate);
+  const d = nb.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const n = ac.createBufferSource(); n.buffer = nb;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = low ? 220 : 900;
+  const ng = ac.createGain(); ng.gain.value = vol * 0.35;
+  n.connect(bp); bp.connect(ng); out(ng, 0.2);
+  n.start(t);
+}
+
+function setDrone(on, roots = [38, 45]) {
+  if (droneNodes) {
+    const old = droneNodes;
+    const now = ac.currentTime;
+    old.g.gain.setTargetAtTime(0, now, 0.6);
+    setTimeout(() => old.oscs.forEach((o) => { try { o.stop(); } catch (e) { /* schon aus */ } }), 3000);
+    droneNodes = null;
+  }
+  if (!on) return;
+  const g = ac.createGain(); g.gain.value = 0;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520;
+  const oscs = roots.map((m, i) => { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = midiHz(m); o.detune.value = i ? 4 : -3; o.connect(f); o.start(); return o; });
+  f.connect(g); out(g, 0.5);
+  g.gain.setTargetAtTime(0.035, ac.currentTime, 1.5);
+  droneNodes = { g, oscs };
+}
+
+// ---------------------------------------------------------------- Noten
+// Titel: D-Moll, langsam und weit. Je Takt: Melodie [Ton, Schläge], Akkord für Hörner und Laute.
+const TITLE = {
+  bpm: 64, beats: 4,
+  bars: [
+    { mel: [[69, 2], [67, 1], [65, 1]], ch: [50, 57, 62] },
+    { mel: [[67, 2], [69, 1], [72, 1]], ch: [46, 53, 58] },
+    { mel: [[74, 3], [72, 1]], ch: [48, 55, 60] },
+    { mel: [[69, 4]], ch: [45, 52, 57] },
+    { mel: [[65, 2], [67, 1], [69, 1]], ch: [50, 57, 62] },
+    { mel: [[70, 2], [69, 1], [67, 1]], ch: [46, 53, 58] },
+    { mel: [[69, 2], [67, 1], [64, 1]], ch: [48, 55, 60] },
+    { mel: [[62, 4]], ch: [50, 57, 62] },
+  ],
+};
+
+// Welt: D-Dorisch im Dreiertakt. Vier Phrasen zu je vier Takten.
+const CH = { Dm: [50, 53, 57], G: [55, 59, 62], C: [48, 52, 55], Am: [45, 48, 52], F: [41, 45, 48], Em: [52, 55, 59] };
+const WORLD = [
+  { mel: [[[74, 1], [72, 0.5], [71, 0.5], [69, 1]], [[67, 1], [69, 1], [65, 1]], [[64, 1], [65, 0.5], [67, 0.5], [69, 1]], [[62, 3]]], ch: ['Dm', 'G', 'C', 'Dm'] },
+  { mel: [[[69, 1], [71, 0.5], [72, 0.5], [74, 1]], [[72, 1], [69, 1], [67, 1]], [[65, 1], [64, 1], [67, 1]], [[69, 3]]], ch: ['Am', 'F', 'C', 'Am'] },
+  { mel: [[[65, 0.5], [67, 0.5], [69, 1], [65, 1]], [[67, 0.5], [69, 0.5], [71, 1], [67, 1]], [[69, 1], [67, 1], [64, 1]], [[62, 3]]], ch: ['Dm', 'G', 'C', 'Dm'] },
+  { mel: [[[62, 1], [64, 1], [65, 1]], [[67, 1.5], [65, 0.5], [64, 1]], [[62, 1], [60, 1], [64, 1]], [[62, 3]]], ch: ['Dm', 'C', 'Am', 'Dm'] },
+];
+const WORLD_ORDER = [0, 1, 0, 2, 3, 1, 2, 0];
+
+function schedTitle(t0) {
+  const spb = 60 / TITLE.bpm;
+  let t = t0;
+  TITLE.bars.forEach((bar, i) => {
+    const barLen = TITLE.beats * spb;
+    for (const m of bar.ch) horn(m, t, barLen * 0.98, 0.05);
+    lute(bar.ch[0] - 12, t, 0.35);
+    [0, 1, 2, 1].forEach((k, j) => lute(bar.ch[k] + 12, t + j * spb, 0.16));
+    drum(t, 0.55); drum(t + 2 * spb, 0.3);
+    if (i % 4 === 3) { drum(t + 3 * spb, 0.25, false); drum(t + 3.5 * spb, 0.3, false); }
+    let mt = t;
+    for (const [m, b] of bar.mel) { flute(m, mt, b * spb * 0.95, 0.11); mt += b * spb; }
+    t += barLen;
+  });
+  return t;
+}
+
+function schedWorld(t0, kind) {
+  const bpm = kind === 'kampf' ? 132 : kind === 'nacht' ? 76 : 104;
+  const spb = 60 / bpm;
+  const ph = WORLD[WORLD_ORDER[phraseIdx % WORLD_ORDER.length]];
+  phraseIdx++;
+  let t = t0;
+  ph.mel.forEach((bar, bi) => {
+    const ch = CH[ph.ch[bi]];
+    const pattern = kind === 'nacht' ? [0, 2] : [0, 1, 2, 1, 2, 1];
+    const step = (3 * spb) / pattern.length;
+    pattern.forEach((k, j) => lute(ch[k] + (j % 3 === 2 ? 12 : 0), t + j * step, kind === 'nacht' ? 0.18 : 0.22));
+    if (kind !== 'nacht') {
+      drum(t, kind === 'kampf' ? 0.55 : 0.32);
+      drum(t + 2 * spb, kind === 'kampf' ? 0.35 : 0.14, false);
+      if (kind === 'kampf') { drum(t + spb, 0.3); drum(t + 2.5 * spb, 0.25, false); }
+    }
+    let mt = t;
+    for (const [m, b] of bar) { flute(m + (kind === 'nacht' ? -12 : 0), mt, b * spb * 0.92, kind === 'nacht' ? 0.08 : 0.1); mt += b * spb; }
+    t += 3 * spb;
+  });
+  return t;
+}
+
+function tick() {
+  if (!ac || !enabled) return;
+  if (ac.currentTime < nextTime - 0.8) return;
+  const t0 = Math.max(nextTime, ac.currentTime + 0.1);
+  if (mood !== playingMood) {
+    playingMood = mood;
+    setDrone(true, mood === 'titel' ? [38, 45] : mood === 'kampf' ? [38, 50] : [38, 45]);
+  }
+  nextTime = mood === 'titel' ? schedTitle(t0) : schedWorld(t0, mood);
+}
+
 // ===== ui.js =====
 // Oberfläche: Kopfleiste, Meldungen, Tafeln (Siedlung, Burg, Gefolge, Aufträge, Politik, Karte, Menü).
 
@@ -5680,7 +6251,7 @@ function castlePanel() {
     case 'markt': body = marketTable(site); break;
     default: body = castleBuild();
   }
-  return { title: `Burg Ashcombe`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
 function castleBuild() {
@@ -5710,7 +6281,7 @@ function castleBuild() {
   return `${conText}
     <div class="summary">
       <div><span class="label">Tagesbilanz</span><b class="${inc - cost >= 0 ? 'pos' : 'neg'}">${inc - cost >= 0 ? '+' : ''}${inc - cost} Gold</b><span class="muted">${bal.income.map(([n, v]) => `${n} +${v}`).join(', ')}${bal.costs.length ? '; ' + bal.costs.map(([n, v]) => `${n} −${v}`).join(', ') : ''}</span></div>
-      <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach Ashcombe.` : 'Ashcombe ist ein blühender Ort.'}</span></div>
+      <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach ${esc(homeName())}.` : `${esc(homeName())} ist ein blühender Ort.`}</span></div>
       <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">Täglich ${bal.prod.holz ? `+${bal.prod.holz} Holz` : 'kein Holz'}, ${bal.prod.stein ? `+${bal.prod.stein} Stein` : 'kein Stein'}. Baustoffe in deiner Ladung zählen mit.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
     </div>
@@ -5734,7 +6305,7 @@ function castleHall() {
   </article>`).join('');
   return `<p class="meta">Im Feld ${partyMembers().length}/${partyCap()} · In der Garnison ${G.s.companions.filter((c) => c.status === 'garnison').length} · Neue Anwärter ${next ? `in ${next} ${next === 1 ? 'Tag' : 'Tagen'}` : 'morgen'}</p>
     ${cards ? `<div class="rgrid">${cards}</div>` : '<p class="muted">Heute hat sich niemand gemeldet.</p>'}
-    <p class="hint">Wer nicht mehr ins Gefolge passt, bleibt in der Garnison und verteidigt Ashcombe.${isAlly('waldleute') ? '' : ' Langbogenschützen kommen nur, wenn die Waldleute dir vertrauen.'}</p>`;
+    <p class="hint">Wer nicht mehr ins Gefolge passt, bleibt in der Garnison und verteidigt ${esc(homeName())}.${isAlly('waldleute') ? '' : ' Langbogenschützen kommen nur, wenn die Waldleute dir vertrauen.'}</p>`;
 }
 
 function castleStore() {
@@ -5784,7 +6355,7 @@ function partyView(atCastle) {
   let moves = '';
   if (!isPlayer) {
     if (u.status === 'party') moves = '<button class="btn" data-act="status" data-s="garnison">In die Garnison schicken</button>';
-    if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : '<span class="muted">Ins Gefolge holen kannst du sie nur in Ashcombe.</span>';
+    if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : '<span class="muted">Ins Gefolge holen kannst du sie nur in ${esc(homeName())}.</span>';
     moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
   }
   const xp = `${u.xp}/${xpNeeded(u.level)} EP`;
@@ -5816,7 +6387,7 @@ function questsPanel() {
   const p = G.s.player;
   const goal = `<div class="goal">
     <h3>Dein Ziel</h3>
-    <p>Mach Ashcombe zur Festung und gewinne zwei Fraktionen als Verbündete. Dann ist dein Name im ganzen Norden bekannt.</p>
+    <p>Mach ${esc(homeName())} zur Festung und gewinne zwei Fraktionen als Verbündete. Dann ist dein Name im ganzen Norden bekannt.</p>
     <div class="chips"><span class="chip ${G.s.castle.level >= 3 ? 'ok' : ''}">Burg: ${esc(levelName())} (${G.s.castle.level}/3)</span><span class="chip ${alliesCount() >= 2 ? 'ok' : ''}">Verbündete ${alliesCount()}/2</span><span class="chip">Ruhm ${fmt(G.s.renown)}</span><span class="chip">${G.s.stats.quests} Aufträge erfüllt</span></div>
   </div>`;
   const list = G.s.quests.map((q) => {
@@ -5857,7 +6428,7 @@ function mapPanel() {
   return {
     title: 'Karte des Nordens', sub: 'Klicke auf einen Ort, um dorthin zu reisen.', tabs: [],
     body: `<div class="mapwrap"><canvas id="bigmap" width="960" height="480" aria-label="Karte"></canvas></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>Ashcombe</span><span><span class="ring"></span>Auftrag</span></p>`,
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span></p>`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.parentElement;
@@ -5895,6 +6466,7 @@ function menuPanel() {
         <span class="label">Grafik</span>
         ${[['klar', 'Klar'], ['pixel', 'Pixel'], ['retro', 'Retro']].map(([m, n]) => `<button class="btn sm${G.gfx === m ? ' primary' : ''}" data-act="gfx" data-mode="${m}" aria-pressed="${G.gfx === m}">${n}</button>`).join('')}
       </div>
+      <button class="btn" data-act="music">Musik ${G.musicOn && G.musicOn() ? 'ausschalten' : 'einschalten'}</button>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -5917,17 +6489,18 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
+        <dt>L</dt><dd>Musik an und aus</dd>
         <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
-        <li>In Ashcombe zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
+        <li>In ${esc(homeName())} zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
         <li>Siedlungen vergeben <b>Aufträge</b>. Sie bringen Gold, Ruhm und Ansehen.</li>
         <li><b>Handel</b> lohnt sich: Was ein Ort erzeugt, ist dort billig und anderswo gefragt. Stein und Eisen brauchst du für den Burgbau.</li>
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
         <li>Wer einer Fraktion hilft, verärgert ihre Rivalen. Ab +${ALLY_AT} wird eine Fraktion zum Verbündeten und gewährt Vorteile.</li>
-        <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in Ashcombe ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
-        <li>Feinde überfallen Ashcombe. Wachtürme und eine Garnison halten sie ab.</li>
+        <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in ${esc(homeName())} ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
+        <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab.</li>
       </ol></div>
     </div>`,
   };
@@ -5935,8 +6508,8 @@ function helpPanel() {
 
 function victoryPanel() {
   return {
-    title: 'Herr von Ashcombe', tabs: [],
-    body: `<div class="victory"><p class="lede">Die Festung Ashcombe steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus dem ganzen Norden zu deinem Tor.</p>
+    title: `${G.s.player.female ? 'Herrin' : 'Herr'} von ${homeName()}`, tabs: [],
+    body: `<div class="victory"><p class="lede">Die Festung ${esc(homeName())} steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus dem ganzen Norden zu deinem Tor.</p>
       <p>Du hast in ${G.s.day} Tagen ${G.s.stats.quests} Aufträge erfüllt und ${fmt(G.s.renown)} Ruhm gesammelt.</p>
       <button class="btn primary" data-act="resume">Weiterregieren</button></div>`,
   };
@@ -5993,6 +6566,7 @@ const ACTIONS = {
   save: () => { if (G.saveGame) G.saveGame(false); },
   loadgame: () => { if (G.loadGame) confirmDialog('Den letzten Spielstand laden? Nicht gespeicherter Fortschritt geht verloren.', 'Laden', () => { G.loadGame(); closePanel(); }); },
   help: () => openPanel('help'),
+  music: () => { if (G.toggleMusic) G.toggleMusic(); },
   gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
 };
@@ -6111,22 +6685,26 @@ function saveSummary(data = readSave()) {
 
 
 
+
+
+
 const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
-function newGame(name) {
+function newGame(opts) {
+  const { name, castleName, color, female } = opts;
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed);
   G.nextId = 1;
   const site = G.world.sites.find((s) => s.type === 'spieler');
   const player = makeUnit({
-    kind: 'player', cls: 'ritter', name, level: 1,
+    kind: 'player', cls: 'ritter', name, level: 1, female, hair: female ? '#7a3a1e' : '#3b2a1e',
     eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' },
     x: site.x + 0.3, y: site.y + 2.6,
   });
   G.s = {
-    seed, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
+    seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5 },
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0 }, construction: null, recruits: [], recruitDay: 0 },
@@ -6145,11 +6723,13 @@ function newGame(name) {
   spawnAnimals();
   for (const s of G.world.sites) refreshTownQuests(s);
   startWorld();
-  log(`Willkommen in Ashcombe, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
+  log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
   log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
 }
 
 function startWorld() {
+  const home = G.world.sites.find((s) => s.type === 'spieler');
+  home.name = homeName();
   setPlayerWalls(G.world, G.s.castle.level >= 1);
   resetRender();
   const p = G.s.player;
@@ -6165,14 +6745,62 @@ function startWorld() {
   updateHUD();
 }
 
+// Startmenü: Wappenfarben, Figur und Vorschau
+let titleColor = HERALDRY[0].color;
+let titleFemale = false;
+
+function buildSetupForm() {
+  const box = byId('color-swatches');
+  if (box.childElementCount) return;
+  box.innerHTML = HERALDRY.map((h, i) => `<label title="${h.name}"><input type="radio" name="farbe" value="${h.color}" data-name="${h.name}"${i === 0 ? ' checked' : ''}><span style="--c:${h.color}"></span></label>`).join('');
+  byId('color-name').textContent = HERALDRY[0].name;
+  box.addEventListener('change', (e) => {
+    const inp = e.target.closest('input');
+    if (!inp) return;
+    titleColor = inp.value;
+    byId('color-name').textContent = inp.dataset.name;
+  });
+  for (const r of document.querySelectorAll('input[name="figur"]')) {
+    r.addEventListener('change', () => {
+      titleFemale = r.value === 'w' && r.checked;
+      const ni = byId('name-input');
+      if (titleFemale && ni.value === 'Aldric') ni.value = 'Aelfgifu';
+      if (!titleFemale && ni.value === 'Aelfgifu') ni.value = 'Aldric';
+    });
+  }
+  byId('setup-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    startAudio();
+    const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
+    const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
+    newGame({ name, castleName, color: titleColor, female: titleFemale });
+  });
+}
+
+function updateMusicButtons() {
+  const on = musicEnabled();
+  const t = byId('btn-music-title');
+  t.textContent = on ? '♪ Musik an' : '♪ Musik aus';
+  t.setAttribute('aria-pressed', String(on));
+  const tool = document.querySelector('[data-tool="music"]');
+  if (tool) tool.classList.toggle('on', on);
+}
+
+function toggleMusic() {
+  setMusicEnabled(!musicEnabled());
+  updateMusicButtons();
+}
+G.toggleMusic = () => { toggleMusic(); };
+G.musicOn = () => musicEnabled();
+
 function showTitle() {
   G.started = false;
+  buildSetupForm();
   const info = saveSummary();
   const cont = byId('btn-continue');
   cont.hidden = !info;
   byId('continue-info').textContent = info ? `Gespeichert: ${info}` : '';
   byId('title').hidden = false;
-  byId('name-input').focus();
 }
 
 function loadGame() {
@@ -6230,7 +6858,7 @@ function checkNearSite() {
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
-    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? 'Burg Ashcombe verwalten' : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
+    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
   } else if (inCombat()) {
     showPrompt('<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>');
   } else showPrompt(null);
@@ -6365,6 +6993,7 @@ function tool(name) {
     case 'politics': togglePanel('politics'); break;
     case 'map': togglePanel('map'); break;
     case 'menu': togglePanel('menu'); break;
+    case 'music': toggleMusic(); break;
     case 'ride': if (!panelOpen()) toggleRide(); break;
     case 'order': cycleOrder(); break;
     case 'fast': toggleFast(); break;
@@ -6378,10 +7007,7 @@ function tool(name) {
 // ---------------------------------------------------------------- Eingabe
 function onKey(e) {
   const k = e.key.toLowerCase();
-  if (!byId('title').hidden) {
-    if (k === 'enter') byId('btn-new').click();
-    return;
-  }
+  if (!byId('title').hidden) return;
   if (dialogOpen()) {
     if (k === 'enter') closeDialog(true);
     if (k === 'escape') closeDialog(false);
@@ -6403,6 +7029,7 @@ function onKey(e) {
     case '2': setOrder('halten'); break;
     case '3': setOrder('angriff'); break;
     case 't': toggleFast(); break;
+    case 'l': toggleMusic(); break;
     case 'g': G.cycleGfx(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
@@ -6455,11 +7082,12 @@ function bindInput() {
     if (inCombat()) attackNearest(); else enterSite(nearestSite());
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
-  byId('btn-new').addEventListener('click', () => {
-    const name = byId('name-input').value.trim().slice(0, 28) || 'Aldric';
-    newGame(name);
-  });
-  byId('btn-continue').addEventListener('click', () => loadGame());
+  byId('btn-continue').addEventListener('click', () => { startAudio(); loadGame(); });
+  byId('btn-music-title').addEventListener('click', () => { toggleMusic(); startAudio(); });
+  // Browser erlauben Ton erst nach der ersten Eingabe
+  const firstGesture = () => { startAudio(); window.removeEventListener('pointerdown', firstGesture); window.removeEventListener('keydown', firstGesture); };
+  window.addEventListener('pointerdown', firstGesture);
+  window.addEventListener('keydown', firstGesture);
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.started) G.saveGame(true); });
 }
 
@@ -6521,9 +7149,30 @@ function frame(now) {
       drawMap(c, mini.width / 2, mini.height / 2);
       miniT = 0.25;
     }
+    setMood(inCombat() ? 'kampf' : darkness() > 0.35 ? 'nacht' : 'welt');
+  }
+  if (!byId('title').hidden) {
+    drawTitleScreen();
+    setMood('titel');
+    return requestAnimationFrame(frame);
   }
   render();
   requestAnimationFrame(frame);
+}
+
+// Titelbild und Vorschau zeichnen (nur solange das Startmenü offen ist)
+let titleCv = null, titleCtx = null;
+function drawTitleScreen() {
+  if (!titleCv) { titleCv = byId('title-art'); titleCtx = titleCv.getContext('2d'); }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  if (titleCv.width !== Math.round(w * dpr) || titleCv.height !== Math.round(h * dpr)) { titleCv.width = Math.round(w * dpr); titleCv.height = Math.round(h * dpr); }
+  titleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawTitleArt(titleCtx, w, h, G.time, titleColor);
+  const pv = byId('hero-preview');
+  const pw = Math.round(pv.clientWidth * dpr) || 300;
+  if (pv.width !== pw) { pv.width = pw; pv.height = Math.round(pw / 2); }
+  drawHeroPreview(pv, titleColor, titleFemale, G.time);
 }
 
 // ---------------------------------------------------------------- Boot
@@ -6533,7 +7182,9 @@ function boot(hotData) {
   initRender(viewCanvas);
   try { const v = localStorage.getItem('ritter-grafik'); G.gfx = GFX_MODES.includes(v) ? v : 'klar'; } catch (e) { G.gfx = 'klar'; }
   initUI();
+  loadMusicPref();
   bindInput();
+  updateMusicButtons();
   resize();
   window.addEventListener('resize', resize);
   let resumed = false;

@@ -36,3 +36,7 @@ export function log(text, kind = 'info') {
   if (G.messages.length > 60) G.messages.shift();
   if (G.onLog) G.onLog();
 }
+
+// Name und Farben des Spielers (im Startmenü gewählt)
+export function homeName() { return (G.s && G.s.castleName) || 'Ashcombe'; }
+export function playerColor() { return (G.s && G.s.color) || '#2c4f86'; }

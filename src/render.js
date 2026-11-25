@@ -1,14 +1,14 @@
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
 
-import { G } from './state.js';
+import { G, homeName, playerColor } from './state.js';
 import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt } from './world.js';
 import { conProgress } from './castle.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
-import { unitLook } from './units.js';
+import { unitLook, heraldLook } from './units.js';
 import { questTarget } from './politics.js';
 
 let canvas = null, ctx = null;
@@ -623,7 +623,7 @@ function buildStaticParts() {
   return parts;
 }
 
-// ---------------------------------------------------------------- Ashcombe: sichtbarer Ausbau
+// ---------------------------------------------------------------- Eigene Burg: sichtbarer Ausbau
 const BUILD_ICON = { halle: 'krone', kaserne: 'schwerter', schmiede: 'amboss', stall: 'hufeisen', holzfaeller: 'axt', steinbruch: 'hacke', markt: 'muenze', kapelle: 'kreuz', wehr: 'turm' };
 const PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0] };
 const TOWER_SPOTS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
@@ -806,7 +806,7 @@ function addCastleBuilding(add, id, L, p, s) {
       const wy = [0, 2.2, 2.6, 2.9][L], h = [0, 20, 24, 28][L];
       add(p.x, p.y, (c) => {
         drawHouse(c, { x: p.x, y: p.y, wx: 1.2 + L * 0.1, wy, h, rh: 13 + L * 2, wall: L === 1 ? 'timber' : 'stone', roof: L === 1 ? 'thatch' : L === 2 ? 'tile' : 'slate', lit: true, chimney: true, v: 0.75 });
-        if (L >= 2) banner(c, p.x + 0.45, p.y + wy / 2 - 0.15, h + 2, '#2c4f86');
+        if (L >= 2) banner(c, p.x + 0.45, p.y + wy / 2 - 0.15, h + 2, playerColor());
       });
       if (L === 3) add(p.x + 0.1, p.y - wy / 2 - 0.35, (c) => { drawBox(c, p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8, 46, '#ada798', 0, 'stone'); drawPyramid(c, p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8, 46, 22, ROOFS.slate); banner(c, p.x + 0.1, p.y - wy / 2 - 0.35, 68, '#d6ad4c'); });
       break;
@@ -955,13 +955,13 @@ function addTower(add, s, k, L) {
 function buildPlayerCastle() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
   const C = G.s.castle;
-  const parts = castlePieces(s, C.level, '#2c4f86');
+  const parts = castlePieces(s, C.level, playerColor());
   const z0 = groundZ(G.world, s.x, s.y);
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
   const lv = (id) => C.b[id] || 0;
   const pos = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
   const con = C.construction;
-  castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg Ashcombe · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
+  castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
 
   for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle']) {
     const L = lv(id), p = pos(id), building = con && con.id === id;
@@ -1636,6 +1636,7 @@ function drawFigure(c, u, x, y) {
     c.fillStyle = u.st.armorDef >= 12 ? '#aab0b5' : '#9aa1a6';
     if (u.st.armorDef >= 12) { c.fillRect(-3.6, yb - 23, 7.2, 6.5); c.strokeRect(-3.6, yb - 23, 7.2, 6.5); c.fillStyle = '#2a2a2a'; c.fillRect(-0.5, yb - 21, 4, 1); }
     else { c.beginPath(); c.arc(0, yb - 19.8, 3.6, Math.PI, Math.PI * 2); c.fill(); c.stroke(); c.fillRect(0.6, yb - 20, 1, 3); }
+    if (u.female) { c.fillStyle = u.hair || '#5a3d26'; c.fillRect(-4.6, yb - 18.5, 1.8, 7); c.fillRect(-5, yb - 12, 2.4, 1.6); }
   } else {
     c.fillStyle = u.hair || '#3b2a1e';
     c.beginPath(); c.arc(0, yb - 19.6, 3.4, Math.PI * 1.05, Math.PI * 1.95); c.fill();
@@ -1768,6 +1769,33 @@ function drawCarcass(c, f, x, y) {
   c.strokeStyle = shade(col, 0.6); c.lineWidth = 1.2;
   c.beginPath(); c.moveTo(x - 3 * big, y - 1); c.lineTo(x - 6 * big, y + 1.5); c.moveTo(x + 2 * big, y - 1); c.lineTo(x + 4 * big, y + 2); c.stroke();
   c.globalAlpha = 1;
+}
+
+// Vorschau der Spielfigur im Startmenü: Reiter mit Banner in der gewählten Farbe
+export function drawHeroPreview(cv, color, female, t) {
+  const c = cv.getContext('2d');
+  const w = cv.width, h = cv.height, k = h / 150;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const g = c.createRadialGradient(w / 2, h * 0.78, 4, w / 2, h * 0.78, w * 0.5);
+  g.addColorStop(0, 'rgba(110,140,70,0.55)'); g.addColorStop(1, 'rgba(110,140,70,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.setTransform(k * 2.6, 0, 0, k * 2.6, w * 0.52, h * 0.86);
+  // Standarte
+  c.strokeStyle = '#4a3322'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(-22, 0); c.lineTo(-22, -42); c.stroke();
+  c.beginPath(); c.moveTo(-22, -42);
+  for (let q = 0; q <= 8; q++) { const u = q / 8; c.lineTo(-22 + u * 16, -42 + Math.sin(t * 3 + u * 5) * 1.5 * u); }
+  for (let q = 8; q >= 0; q--) { const u = q / 8; c.lineTo(-22 + u * 16, -32 - u * 1 + Math.sin(t * 3 + u * 5) * 1.5 * u); }
+  c.closePath(); c.fillStyle = color; c.fill(); c.strokeStyle = OUTLINE; c.lineWidth = 0.6; c.stroke();
+  c.fillStyle = '#d8b54a'; c.fillRect(-15.5, -40, 1.2, 7); c.fillRect(-18, -37.2, 6.4, 1.2);
+  const u = {
+    kind: 'preview', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'zelter' },
+    st: { armorDef: 6, horse: ITEMS.zelter, maxHp: 1 }, hp: 1, mounted: true, facing: 1, anim: t * 0.6, moving: true,
+    female, hair: female ? '#7a3a1e' : '#3b2a1e', lookObj: heraldLook(color, false), swing: 0, flash: 0, combatT: 0,
+  };
+  drawFigure(c, u, 6, 0);
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 // Tier unter dem Mauszeiger (für die Jagd)

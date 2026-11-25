@@ -1,6 +1,6 @@
 // Einheiten, Gefolge, KI-Gruppen und Kampf.
 
-import { G, uid, log } from './state.js';
+import { G, uid, log, homeName, playerColor } from './state.js';
 import {
   CLASSES, ITEMS, NPC_TYPES, GROUP_TYPES, T, TERRAIN_SPEED, NAMES_M, NAMES_F, EPITHETS,
   GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS,
@@ -73,9 +73,26 @@ export function makeNpc(typeId, x, y, levelBonus = 0) {
   return u;
 }
 
+// Wappenfarben des Spielers: Spieler in voller Farbe, Gefolge etwas heller
+const heraldCache = new Map();
+export function heraldLook(color, light = false) {
+  const key = color + light;
+  let v = heraldCache.get(key);
+  if (v) return v;
+  let tunic = color;
+  if (light) {
+    const n = parseInt(color.slice(1), 16);
+    const f = (c) => Math.round(c + (255 - c) * 0.2);
+    tunic = '#' + ((f((n >> 16) & 255) << 16) | (f((n >> 8) & 255) << 8) | f(n & 255)).toString(16).padStart(6, '0');
+  }
+  v = { tunic, trim: '#d8b54a' };
+  heraldCache.set(key, v);
+  return v;
+}
+
 export function unitLook(u) {
-  if (u.kind === 'player') return LOOKS.spieler;
-  if (u.kind === 'companion') return LOOKS.gefolge;
+  if (u.lookObj) return u.lookObj;
+  if (u.kind === 'player' || u.kind === 'companion') return heraldLook(playerColor(), u.kind === 'companion');
   return LOOKS[u.look] || LOOKS.bauer;
 }
 
@@ -325,7 +342,7 @@ function unitDown(t, killer) {
     t.woundedDays = 2;
     t.hp = 1;
     t.path = null;
-    log(`${t.name} ist schwer verwundet und wird nach Ashcombe gebracht.`, 'bad');
+    log(`${t.name} ist schwer verwundet und wird nach ${homeName()} gebracht.`, 'bad');
     G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 6 });
     return;
   }
@@ -373,7 +390,7 @@ function playerDefeated() {
   const lost = Math.floor(G.s.gold * 0.2);
   G.s.gold -= lost;
   for (const k of Object.keys(G.s.cargo)) G.s.cargo[k] = Math.floor(G.s.cargo[k] / 2);
-  log(`Du wurdest niedergeschlagen. Bauern bringen dich nach Ashcombe. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
+  log(`Du wurdest niedergeschlagen. Bauern bringen dich nach ${homeName()}. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
   const site = castleSite();
   p.dead = false;
   p.x = site.x + 0.3; p.y = site.y + 2.6;

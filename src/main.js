@@ -1,7 +1,9 @@
 // Einstieg: Spielstart, Hauptschleife, Eingabe, Kamera.
 
-import { G, log } from './state.js';
-import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS } from './data.js';
+import { G, log, homeName } from './state.js';
+import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
+import { drawTitleArt } from './titleart.js';
+import { startAudio, setMood, musicEnabled, setMusicEnabled, loadMusicPref } from './audio.js';
 import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO } from './animals.js';
 import {
@@ -12,29 +14,31 @@ import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction } from './politics.js';
 import { castleSite } from './castle.js';
 import { updateTime } from './sim.js';
-import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen } from './render.js';
+import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
+import { darkness } from './sim.js';
 import { isoX, isoY } from './iso.js';
 
 const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
-function newGame(name) {
+function newGame(opts) {
+  const { name, castleName, color, female } = opts;
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed);
   G.nextId = 1;
   const site = G.world.sites.find((s) => s.type === 'spieler');
   const player = makeUnit({
-    kind: 'player', cls: 'ritter', name, level: 1,
+    kind: 'player', cls: 'ritter', name, level: 1, female, hair: female ? '#7a3a1e' : '#3b2a1e',
     eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' },
     x: site.x + 0.3, y: site.y + 2.6,
   });
   G.s = {
-    seed, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
+    seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5 },
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0 }, construction: null, recruits: [], recruitDay: 0 },
@@ -53,11 +57,13 @@ function newGame(name) {
   spawnAnimals();
   for (const s of G.world.sites) refreshTownQuests(s);
   startWorld();
-  log(`Willkommen in Ashcombe, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
+  log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
   log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
 }
 
 function startWorld() {
+  const home = G.world.sites.find((s) => s.type === 'spieler');
+  home.name = homeName();
   setPlayerWalls(G.world, G.s.castle.level >= 1);
   resetRender();
   const p = G.s.player;
@@ -73,14 +79,62 @@ function startWorld() {
   updateHUD();
 }
 
+// Startmenü: Wappenfarben, Figur und Vorschau
+let titleColor = HERALDRY[0].color;
+let titleFemale = false;
+
+function buildSetupForm() {
+  const box = byId('color-swatches');
+  if (box.childElementCount) return;
+  box.innerHTML = HERALDRY.map((h, i) => `<label title="${h.name}"><input type="radio" name="farbe" value="${h.color}" data-name="${h.name}"${i === 0 ? ' checked' : ''}><span style="--c:${h.color}"></span></label>`).join('');
+  byId('color-name').textContent = HERALDRY[0].name;
+  box.addEventListener('change', (e) => {
+    const inp = e.target.closest('input');
+    if (!inp) return;
+    titleColor = inp.value;
+    byId('color-name').textContent = inp.dataset.name;
+  });
+  for (const r of document.querySelectorAll('input[name="figur"]')) {
+    r.addEventListener('change', () => {
+      titleFemale = r.value === 'w' && r.checked;
+      const ni = byId('name-input');
+      if (titleFemale && ni.value === 'Aldric') ni.value = 'Aelfgifu';
+      if (!titleFemale && ni.value === 'Aelfgifu') ni.value = 'Aldric';
+    });
+  }
+  byId('setup-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    startAudio();
+    const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
+    const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
+    newGame({ name, castleName, color: titleColor, female: titleFemale });
+  });
+}
+
+function updateMusicButtons() {
+  const on = musicEnabled();
+  const t = byId('btn-music-title');
+  t.textContent = on ? '♪ Musik an' : '♪ Musik aus';
+  t.setAttribute('aria-pressed', String(on));
+  const tool = document.querySelector('[data-tool="music"]');
+  if (tool) tool.classList.toggle('on', on);
+}
+
+function toggleMusic() {
+  setMusicEnabled(!musicEnabled());
+  updateMusicButtons();
+}
+G.toggleMusic = () => { toggleMusic(); };
+G.musicOn = () => musicEnabled();
+
 function showTitle() {
   G.started = false;
+  buildSetupForm();
   const info = saveSummary();
   const cont = byId('btn-continue');
   cont.hidden = !info;
   byId('continue-info').textContent = info ? `Gespeichert: ${info}` : '';
   byId('title').hidden = false;
-  byId('name-input').focus();
 }
 
 function loadGame() {
@@ -138,7 +192,7 @@ function checkNearSite() {
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
-    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? 'Burg Ashcombe verwalten' : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
+    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
   } else if (inCombat()) {
     showPrompt('<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>');
   } else showPrompt(null);
@@ -273,6 +327,7 @@ function tool(name) {
     case 'politics': togglePanel('politics'); break;
     case 'map': togglePanel('map'); break;
     case 'menu': togglePanel('menu'); break;
+    case 'music': toggleMusic(); break;
     case 'ride': if (!panelOpen()) toggleRide(); break;
     case 'order': cycleOrder(); break;
     case 'fast': toggleFast(); break;
@@ -286,10 +341,7 @@ function tool(name) {
 // ---------------------------------------------------------------- Eingabe
 function onKey(e) {
   const k = e.key.toLowerCase();
-  if (!byId('title').hidden) {
-    if (k === 'enter') byId('btn-new').click();
-    return;
-  }
+  if (!byId('title').hidden) return;
   if (dialogOpen()) {
     if (k === 'enter') closeDialog(true);
     if (k === 'escape') closeDialog(false);
@@ -311,6 +363,7 @@ function onKey(e) {
     case '2': setOrder('halten'); break;
     case '3': setOrder('angriff'); break;
     case 't': toggleFast(); break;
+    case 'l': toggleMusic(); break;
     case 'g': G.cycleGfx(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
@@ -363,11 +416,12 @@ function bindInput() {
     if (inCombat()) attackNearest(); else enterSite(nearestSite());
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
-  byId('btn-new').addEventListener('click', () => {
-    const name = byId('name-input').value.trim().slice(0, 28) || 'Aldric';
-    newGame(name);
-  });
-  byId('btn-continue').addEventListener('click', () => loadGame());
+  byId('btn-continue').addEventListener('click', () => { startAudio(); loadGame(); });
+  byId('btn-music-title').addEventListener('click', () => { toggleMusic(); startAudio(); });
+  // Browser erlauben Ton erst nach der ersten Eingabe
+  const firstGesture = () => { startAudio(); window.removeEventListener('pointerdown', firstGesture); window.removeEventListener('keydown', firstGesture); };
+  window.addEventListener('pointerdown', firstGesture);
+  window.addEventListener('keydown', firstGesture);
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.started) G.saveGame(true); });
 }
 
@@ -429,9 +483,30 @@ function frame(now) {
       drawMap(c, mini.width / 2, mini.height / 2);
       miniT = 0.25;
     }
+    setMood(inCombat() ? 'kampf' : darkness() > 0.35 ? 'nacht' : 'welt');
+  }
+  if (!byId('title').hidden) {
+    drawTitleScreen();
+    setMood('titel');
+    return requestAnimationFrame(frame);
   }
   render();
   requestAnimationFrame(frame);
+}
+
+// Titelbild und Vorschau zeichnen (nur solange das Startmenü offen ist)
+let titleCv = null, titleCtx = null;
+function drawTitleScreen() {
+  if (!titleCv) { titleCv = byId('title-art'); titleCtx = titleCv.getContext('2d'); }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  if (titleCv.width !== Math.round(w * dpr) || titleCv.height !== Math.round(h * dpr)) { titleCv.width = Math.round(w * dpr); titleCv.height = Math.round(h * dpr); }
+  titleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawTitleArt(titleCtx, w, h, G.time, titleColor);
+  const pv = byId('hero-preview');
+  const pw = Math.round(pv.clientWidth * dpr) || 300;
+  if (pv.width !== pw) { pv.width = pw; pv.height = Math.round(pw / 2); }
+  drawHeroPreview(pv, titleColor, titleFemale, G.time);
 }
 
 // ---------------------------------------------------------------- Boot
@@ -441,7 +516,9 @@ function boot(hotData) {
   initRender(viewCanvas);
   try { const v = localStorage.getItem('ritter-grafik'); G.gfx = GFX_MODES.includes(v) ? v : 'klar'; } catch (e) { G.gfx = 'klar'; }
   initUI();
+  loadMusicPref();
   bindInput();
+  updateMusicButtons();
   resize();
   window.addEventListener('resize', resize);
   let resumed = false;

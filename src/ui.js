@@ -1,6 +1,6 @@
 // Oberfläche: Kopfleiste, Meldungen, Tafeln (Siedlung, Burg, Gefolge, Aufträge, Politik, Karte, Menü).
 
-import { G, log } from './state.js';
+import { G, log, homeName } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
   TYPE_NAME, SEASONS,
@@ -294,7 +294,7 @@ function castlePanel() {
     case 'markt': body = marketTable(site); break;
     default: body = castleBuild();
   }
-  return { title: `Burg Ashcombe`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
 function castleBuild() {
@@ -324,7 +324,7 @@ function castleBuild() {
   return `${conText}
     <div class="summary">
       <div><span class="label">Tagesbilanz</span><b class="${inc - cost >= 0 ? 'pos' : 'neg'}">${inc - cost >= 0 ? '+' : ''}${inc - cost} Gold</b><span class="muted">${bal.income.map(([n, v]) => `${n} +${v}`).join(', ')}${bal.costs.length ? '; ' + bal.costs.map(([n, v]) => `${n} −${v}`).join(', ') : ''}</span></div>
-      <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach Ashcombe.` : 'Ashcombe ist ein blühender Ort.'}</span></div>
+      <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach ${esc(homeName())}.` : `${esc(homeName())} ist ein blühender Ort.`}</span></div>
       <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">Täglich ${bal.prod.holz ? `+${bal.prod.holz} Holz` : 'kein Holz'}, ${bal.prod.stein ? `+${bal.prod.stein} Stein` : 'kein Stein'}. Baustoffe in deiner Ladung zählen mit.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
     </div>
@@ -348,7 +348,7 @@ function castleHall() {
   </article>`).join('');
   return `<p class="meta">Im Feld ${partyMembers().length}/${partyCap()} · In der Garnison ${G.s.companions.filter((c) => c.status === 'garnison').length} · Neue Anwärter ${next ? `in ${next} ${next === 1 ? 'Tag' : 'Tagen'}` : 'morgen'}</p>
     ${cards ? `<div class="rgrid">${cards}</div>` : '<p class="muted">Heute hat sich niemand gemeldet.</p>'}
-    <p class="hint">Wer nicht mehr ins Gefolge passt, bleibt in der Garnison und verteidigt Ashcombe.${isAlly('waldleute') ? '' : ' Langbogenschützen kommen nur, wenn die Waldleute dir vertrauen.'}</p>`;
+    <p class="hint">Wer nicht mehr ins Gefolge passt, bleibt in der Garnison und verteidigt ${esc(homeName())}.${isAlly('waldleute') ? '' : ' Langbogenschützen kommen nur, wenn die Waldleute dir vertrauen.'}</p>`;
 }
 
 function castleStore() {
@@ -398,7 +398,7 @@ function partyView(atCastle) {
   let moves = '';
   if (!isPlayer) {
     if (u.status === 'party') moves = '<button class="btn" data-act="status" data-s="garnison">In die Garnison schicken</button>';
-    if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : '<span class="muted">Ins Gefolge holen kannst du sie nur in Ashcombe.</span>';
+    if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : '<span class="muted">Ins Gefolge holen kannst du sie nur in ${esc(homeName())}.</span>';
     moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
   }
   const xp = `${u.xp}/${xpNeeded(u.level)} EP`;
@@ -430,7 +430,7 @@ function questsPanel() {
   const p = G.s.player;
   const goal = `<div class="goal">
     <h3>Dein Ziel</h3>
-    <p>Mach Ashcombe zur Festung und gewinne zwei Fraktionen als Verbündete. Dann ist dein Name im ganzen Norden bekannt.</p>
+    <p>Mach ${esc(homeName())} zur Festung und gewinne zwei Fraktionen als Verbündete. Dann ist dein Name im ganzen Norden bekannt.</p>
     <div class="chips"><span class="chip ${G.s.castle.level >= 3 ? 'ok' : ''}">Burg: ${esc(levelName())} (${G.s.castle.level}/3)</span><span class="chip ${alliesCount() >= 2 ? 'ok' : ''}">Verbündete ${alliesCount()}/2</span><span class="chip">Ruhm ${fmt(G.s.renown)}</span><span class="chip">${G.s.stats.quests} Aufträge erfüllt</span></div>
   </div>`;
   const list = G.s.quests.map((q) => {
@@ -471,7 +471,7 @@ function mapPanel() {
   return {
     title: 'Karte des Nordens', sub: 'Klicke auf einen Ort, um dorthin zu reisen.', tabs: [],
     body: `<div class="mapwrap"><canvas id="bigmap" width="960" height="480" aria-label="Karte"></canvas></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>Ashcombe</span><span><span class="ring"></span>Auftrag</span></p>`,
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span></p>`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.parentElement;
@@ -509,6 +509,7 @@ function menuPanel() {
         <span class="label">Grafik</span>
         ${[['klar', 'Klar'], ['pixel', 'Pixel'], ['retro', 'Retro']].map(([m, n]) => `<button class="btn sm${G.gfx === m ? ' primary' : ''}" data-act="gfx" data-mode="${m}" aria-pressed="${G.gfx === m}">${n}</button>`).join('')}
       </div>
+      <button class="btn" data-act="music">Musik ${G.musicOn && G.musicOn() ? 'ausschalten' : 'einschalten'}</button>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -531,17 +532,18 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
+        <dt>L</dt><dd>Musik an und aus</dd>
         <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
-        <li>In Ashcombe zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
+        <li>In ${esc(homeName())} zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
         <li>Siedlungen vergeben <b>Aufträge</b>. Sie bringen Gold, Ruhm und Ansehen.</li>
         <li><b>Handel</b> lohnt sich: Was ein Ort erzeugt, ist dort billig und anderswo gefragt. Stein und Eisen brauchst du für den Burgbau.</li>
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
         <li>Wer einer Fraktion hilft, verärgert ihre Rivalen. Ab +${ALLY_AT} wird eine Fraktion zum Verbündeten und gewährt Vorteile.</li>
-        <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in Ashcombe ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
-        <li>Feinde überfallen Ashcombe. Wachtürme und eine Garnison halten sie ab.</li>
+        <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in ${esc(homeName())} ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
+        <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab.</li>
       </ol></div>
     </div>`,
   };
@@ -549,8 +551,8 @@ function helpPanel() {
 
 function victoryPanel() {
   return {
-    title: 'Herr von Ashcombe', tabs: [],
-    body: `<div class="victory"><p class="lede">Die Festung Ashcombe steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus dem ganzen Norden zu deinem Tor.</p>
+    title: `${G.s.player.female ? 'Herrin' : 'Herr'} von ${homeName()}`, tabs: [],
+    body: `<div class="victory"><p class="lede">Die Festung ${esc(homeName())} steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus dem ganzen Norden zu deinem Tor.</p>
       <p>Du hast in ${G.s.day} Tagen ${G.s.stats.quests} Aufträge erfüllt und ${fmt(G.s.renown)} Ruhm gesammelt.</p>
       <button class="btn primary" data-act="resume">Weiterregieren</button></div>`,
   };
@@ -607,6 +609,7 @@ const ACTIONS = {
   save: () => { if (G.saveGame) G.saveGame(false); },
   loadgame: () => { if (G.loadGame) confirmDialog('Den letzten Spielstand laden? Nicht gespeicherter Fortschritt geht verloren.', 'Laden', () => { G.loadGame(); closePanel(); }); },
   help: () => openPanel('help'),
+  music: () => { if (G.toggleMusic) G.toggleMusic(); },
   gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
 };

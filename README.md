@@ -24,6 +24,9 @@ node tools/build.mjs
 
 ## Was schon drin ist
 
+- **Startmenü:** Animiertes Titelbild bei Sonnenuntergang. Du wählst deinen Namen, den Namen deiner Burg, Ritter oder Ritterin und eine von sechs Wappenfarben, mit Vorschau. Farbe und Name erscheinen im ganzen Spiel: Gefolge, Banner, Meldungen, Karte.
+- **Musik:** Wird live im Browser erzeugt, mit Laute, Flöte, Hörnern, Bordun und Trommeln. Es gibt ein episches Titelthema, Reisemusik im Dreiertakt, ruhigere Nachtmusik und Trommeln im Kampf. Taste L schaltet sie an und aus.
+
 - **Große, zufällig erzeugte Welt:** 160 × 160 Felder mit Fluss, Seen, Wäldern und Hügeln. Dazu 15 Orte (Städte, Dörfer, Burgen, Abteien, ein verstecktes Lager), die durch Straßen und Brücken verbunden sind.
 - **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren.
 - **Drei Grafikstufen (Taste G oder Menü):**
@@ -60,6 +63,7 @@ node tools/build.mjs
 | I J P M | Gefolge, Aufträge, Politik, Karte |
 | Mausrad | Zoom |
 | G | Grafik wechseln: klar, Pixel, Retro |
+| L | Musik an und aus |
 | Esc | Schließen und Menü |
 
 ## Aufbau des Codes
@@ -74,7 +78,9 @@ node tools/build.mjs
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |
 | `src/sim.js` | Uhrzeit, Jahreszeiten, Tageswechsel |
 | `src/render.js` | Isometrischer Canvas-Renderer mit Höhenrelief, Schatten, Retro-Modus (Palette, Dithering), Minikarte |
-| `src/animals.js` | Tiere (Schafe, Kühe, Hühner, Hirsche, Enten) |
+| `src/animals.js` | Tiere und Jagd |
+| `src/titleart.js` | Gemaltes, animiertes Titelbild |
+| `src/audio.js` | Musik mit Web Audio (Instrumente, Noten, Stimmungen) |
 | `src/ui.js` | Kopfleiste und alle Tafeln |
 | `src/save.js` | Speichern und Laden |
 | `src/main.js` | Start, Hauptschleife, Eingabe |

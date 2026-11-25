@@ -1,6 +1,6 @@
-// Die Burg Ashcombe: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
+// Die eigene Burg: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
-import { G, log } from './state.js';
+import { G, log, homeName } from './state.js';
 import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
@@ -79,7 +79,7 @@ function finishConstruction() {
   if (c.id === 'burg') {
     G.s.castle.level = c.level;
     setPlayerWalls(G.world, c.level >= 1);
-    log(`Ashcombe ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
+    log(`${homeName()} ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
     addRenown(5 * c.level);
     spawnPeasants();
     rebuildUnits();
@@ -232,7 +232,7 @@ export function dailyCastle() {
   if (wages) parts.push(`−${wages} Sold`);
   if (bal.prod.holz) parts.push(`+${bal.prod.holz} Holz`);
   if (bal.prod.stein) parts.push(`+${bal.prod.stein} Stein`);
-  log(`Tag ${G.s.day} in Ashcombe: ${parts.join(', ')}.`);
+  log(`Tag ${G.s.day} in ${homeName()}: ${parts.join(', ')}.`);
 }
 
 function checkRaid() {
@@ -246,7 +246,7 @@ function checkRaid() {
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {
-      log(`${t.by} haben Ashcombe angegriffen. Die Besatzung hat sie zurückgeschlagen (Verteidigung ${def} gegen ${strength}).`, 'good');
+      log(`${t.by} haben ${homeName()} angegriffen. Die Besatzung hat sie zurückgeschlagen (Verteidigung ${def} gegen ${strength}).`, 'good');
       addRenown(2);
       for (const c of G.s.companions) if (c.status === 'garnison') grantXp(c, 15);
     } else {
@@ -257,7 +257,7 @@ function checkRaid() {
         const n = Math.floor((G.s.castle.storage[g] || 0) * 0.3);
         if (n > 0) { G.s.castle.storage[g] -= n; lost.push(`${n} ${GOODS[g].name}`); }
       }
-      log(`${t.by} haben Ashcombe überfallen (Verteidigung ${def} gegen ${strength})! Verloren: ${lostGold} Gold${lost.length ? ', ' + lost.join(', ') : ''}. Wachtürme und Garnison schützen.`, 'bad');
+      log(`${t.by} haben ${homeName()} überfallen (Verteidigung ${def} gegen ${strength})! Verloren: ${lostGold} Gold${lost.length ? ', ' + lost.join(', ') : ''}. Wachtürme und Garnison schützen.`, 'bad');
     }
     break;
   }
