@@ -14,7 +14,7 @@ import {
 } from './politics.js';
 import {
   bLevel, levelName, partyCap, cargoCap, buildInfo, startBuild, hire, setCompanionStatus, dismiss,
-  castleDefense, dailyBalance, storeCargo, loadCargo, castleSite,
+  castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses,
 } from './castle.js';
 import { partyMembers, equip, unequip, previewEquip, xpNeeded, setPlayerPath } from './units.js';
 import { seasonIndex, yearOf, clockText, passHours } from './sim.js';
@@ -302,7 +302,7 @@ function castleBuild() {
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0), cost = bal.costs.reduce((a, [, v]) => a + v, 0);
   const con = c.construction;
-  const conText = con ? `<div class="notice"><b>Im Bau:</b> ${con.id === 'burg' ? BUILDINGS.burg.levels[con.level].name : `${BUILDINGS[con.id].name} Stufe ${con.level}`}, fertig an Tag ${con.done}.</div>` : '';
+  const conText = con ? `<div class="notice"><b>Im Bau:</b> ${con.id === 'burg' ? BUILDINGS.burg.levels[con.level].name : `${BUILDINGS[con.id].name} Stufe ${con.level}`}, fertig an Tag ${con.done}. Die Bauleute arbeiten schon auf dem Bauplatz.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>` : '';
   const cards = BUILDING_IDS.map((id) => {
     const info = buildInfo(id);
     const def = BUILDINGS[id];
@@ -324,6 +324,7 @@ function castleBuild() {
   return `${conText}
     <div class="summary">
       <div><span class="label">Tagesbilanz</span><b class="${inc - cost >= 0 ? 'pos' : 'neg'}">${inc - cost >= 0 ? '+' : ''}${inc - cost} Gold</b><span class="muted">${bal.income.map(([n, v]) => `${n} +${v}`).join(', ')}${bal.costs.length ? '; ' + bal.costs.map(([n, v]) => `${n} −${v}`).join(', ') : ''}</span></div>
+      <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach Ashcombe.` : 'Ashcombe ist ein blühender Ort.'}</span></div>
       <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">Täglich ${bal.prod.holz ? `+${bal.prod.holz} Holz` : 'kein Holz'}, ${bal.prod.stein ? `+${bal.prod.stein} Stein` : 'kein Stein'}. Baustoffe in deiner Ladung zählen mit.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
     </div>

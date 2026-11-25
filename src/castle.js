@@ -1,7 +1,7 @@
 // Die Burg Ashcombe: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
 import { G, log } from './state.js';
-import { BUILDINGS, CLASSES, GOOD_IDS, GOODS } from './data.js';
+import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
@@ -11,6 +11,18 @@ import { seasonIndex } from './sim.js';
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
 export function bLevel(id) { return id === 'burg' ? G.s.castle.level : G.s.castle.b[id] || 0; }
+
+// Baufortschritt 0..1 der laufenden Baustelle
+export function conProgress() {
+  const c = G.s.castle.construction;
+  if (!c) return 0;
+  const lv = c.id === 'burg' ? BUILDINGS.burg.levels[c.level] : BUILDINGS[c.id].levels[c.level];
+  const days = lv.days || 1;
+  return Math.max(0, Math.min(1, (G.s.day - (c.done - days) + G.s.time / DAY_LEN) / days));
+}
+
+// Häuser der Burgsiedlung je Burgstufe
+export function villageHouses() { return [0, 2, 5, 9][G.s.castle.level]; }
 
 export function levelName() { return BUILDINGS.burg.levels[G.s.castle.level].name; }
 
@@ -77,6 +89,7 @@ function finishConstruction() {
   }
   G.s.castle.construction = null;
   G.castleDirty = true;
+  G.celebrate = { id: c.id, level: c.level, t0: G.time };
 }
 
 // ---------------------------------------------------------------- Anwerben

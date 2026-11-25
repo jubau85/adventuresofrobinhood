@@ -29,7 +29,12 @@ node tools/build.mjs
 - **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf den Seen und Vogelschwärme.
 - **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Schnee im Winter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
 - **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
-- **Die Burg Ashcombe:** Ausbau von der Ruine über Holzburg und Steinburg zur Festung. Neun Gebäude mit je drei Stufen (Rittersaal, Unterkunft, Schmiede, Stallungen, Holzfäller, Steinbruch, Markt, Kapelle, Wachtürme). Jedes Gebäude ist auf der Karte zu sehen, während des Baus mit Gerüst.
+- **Die Burg Ashcombe:** Ausbau von der Ruine über Holzburg und Steinburg zur Festung. Neun Gebäude mit je drei Stufen (Rittersaal, Unterkunft, Schmiede, Stallungen, Holzfäller, Steinbruch, Markt, Kapelle, Wachtürme). Jeder Ausbau ist auf der Karte zu sehen:
+  - abgesteckte Bauplätze mit Schildern
+  - Baustellen mit wachsendem Rohbau, Gerüst und Bauleuten
+  - jede Stufe sichtbar anders, mit Arbeitern: Schmied mit Funken, Holzfäller, Steinmetze mit Kran, Pferde auf der Koppel, Soldaten auf dem Übungsplatz, Wachen auf den Türmen
+  - eine Burgsiedlung, die mit der Burgstufe wächst
+  - goldene Funken, wenn etwas fertig wird
 - **Gefolge:** Leute im Rittersaal anwerben, ausrüsten (Waffe, Rüstung, Schild, Pferd) und in Scharmützel führen. Dazu Befehle (folgen, Stellung halten, angreifen), Erfahrung und Stufen, Sold, Garnison und Verwundete.
 - **Handel:** Jeder Ort erzeugt und braucht andere Waren. Die Preise richten sich nach dem Vorrat. Holz, Stein und Eisen braucht man auch für den Burgbau.
 - **Politik:** Fünf Fraktionen (Sachsen, Normannen, Kirche, Gilde, Waldleute) mit Rivalitäten. Aufträge, Geschenke und Überfälle verschieben das Ansehen. Verbündete gewähren Vorteile, Feinde überfallen deine Burg.

@@ -12,7 +12,7 @@ import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction } from './politics.js';
 import { castleSite } from './castle.js';
 import { updateTime } from './sim.js';
-import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround } from './render.js';
+import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
@@ -321,6 +321,7 @@ function bindInput() {
     const r = viewCanvas.getBoundingClientRect();
     const u = unitAtScreen(e.clientX - r.left, e.clientY - r.top);
     G.hover = u;
+    G.hoverBuilding = u ? null : buildingAtScreen(e.clientX - r.left, e.clientY - r.top);
     canvas.style.cursor = u && u.group ? 'crosshair' : 'pointer';
   });
   viewCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
