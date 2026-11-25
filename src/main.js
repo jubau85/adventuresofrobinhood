@@ -61,7 +61,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.view.w < 720 ? 0.75 : 1;
+  G.cam.zoom = G.pixel ? (G.view.w < 720 ? 1.0 : 1.3) : (G.view.w < 720 ? 0.75 : 1);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -222,12 +222,13 @@ function toggleFast() {
   G.fast = !G.fast;
 }
 
-function setPixel(on) {
+function setRetro(on, quiet = false) {
   G.pixel = on;
-  try { localStorage.setItem('ritter-pixel', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
-  log(on ? 'Pixel-Look an.' : 'Pixel-Look aus.');
+  try { localStorage.setItem('ritter-retro', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
+  if (on) G.cam.zoom = Math.max(G.cam.zoom, 1.25);
+  if (!quiet) log(on ? 'Retro-Look (Amiga-Stil) an.' : 'Retro-Look aus: klare Grafik.');
 }
-G.togglePixel = () => setPixel(!G.pixel);
+G.togglePixel = () => setRetro(!G.pixel);
 
 function zoom(f) { G.cam.zoom = Math.max(0.55, Math.min(1.8, G.cam.zoom * f)); }
 
@@ -408,7 +409,7 @@ function boot(hotData) {
   viewCanvas = byId('view');
   mini = byId('minimap');
   initRender(viewCanvas);
-  try { G.pixel = localStorage.getItem('ritter-pixel') === '1'; } catch (e) { G.pixel = false; }
+  try { const v = localStorage.getItem('ritter-retro'); G.pixel = v === null ? true : v === '1'; } catch (e) { G.pixel = true; }
   initUI();
   bindInput();
   resize();

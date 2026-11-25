@@ -1,5 +1,5 @@
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
-// Schatten, Tiere, Vögel, Tag/Nacht, Pixel-Modus und Minikarte.
+// Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
 
 import { G } from './state.js';
 import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS } from './data.js';
@@ -1510,7 +1510,7 @@ function drawWaterShimmer(c, minX, maxX, minY, maxY) {
 const HORSES = { klepper: '#7a5232', zelter: '#b8b0a2', schlachtross: '#2e2925' };
 
 function drawHorse(c, col, t, moving, look) {
-  const s = moving ? Math.sin(t * 13) * 3 : 0;
+  const s = moving ? Math.sin(t * 9) * 3 : 0;
   c.strokeStyle = shade(col, 0.7); c.lineWidth = 2.4; c.lineCap = 'round';
   c.beginPath();
   c.moveTo(-7, -7); c.lineTo(-7 + s, 0);
@@ -1600,12 +1600,12 @@ function drawFigure(c, u, x, y) {
   let by = 0;
   if (m) { drawHorse(c, HORSES[u.eq.pferd] || '#7a5232', u.anim, u.moving, u.eq.pferd === 'schlachtross' ? L : null); by = -12; }
   else {
-    const s = u.moving ? Math.sin(u.anim * 11) * 2.4 : 0;
+    const s = u.moving ? Math.sin(u.anim * 7) * 2.4 : 0;
     c.strokeStyle = '#3b2e24'; c.lineWidth = 2.3;
     c.beginPath(); c.moveTo(-1.5, -7); c.lineTo(-1.5 + s, 0); c.moveTo(1.5, -7); c.lineTo(1.5 - s, 0); c.stroke();
     c.fillStyle = '#2a2018'; c.fillRect(-2.6 + s, -1, 2.4, 1.4); c.fillRect(0.4 - s, -1, 2.4, 1.4);
   }
-  const bob = u.moving && !m ? Math.abs(Math.sin(u.anim * 11)) * 1.1 : 0;
+  const bob = u.moving && !m ? Math.abs(Math.sin(u.anim * 7)) * 1.1 : 0;
   const yb = by - bob;
   const tunic = u.tunic || L.tunic;
   c.strokeStyle = OUTLINE; c.lineWidth = 0.9;
@@ -1670,7 +1670,7 @@ function drawAnimal(c, a, x, y) {
   c.translate(x, y);
   if (a.kind !== 'ente') { c.fillStyle = 'rgba(20,30,10,0.22)'; c.beginPath(); c.ellipse(2, 0, a.kind === 'huhn' ? 3.5 : 8, a.kind === 'huhn' ? 1.5 : 2.8, 0, 0, Math.PI * 2); c.fill(); }
   c.scale(a.facing, 1);
-  const step = a.moving ? Math.sin(a.anim * 14) * 1.6 : 0;
+  const step = a.moving ? Math.sin(a.anim * 10) * 1.6 : 0;
   const graze = !a.moving && Math.sin(G.time * 0.8 + a.v * 12) > 0.2;
   c.strokeStyle = OUTLINE; c.lineWidth = 0.8;
   switch (a.kind) {
@@ -1804,6 +1804,125 @@ function drawBirds(c, w, h, dt) {
   }
 }
 
+// ---------------------------------------------------------------- Retro-Modus
+// Eigene 32-Farben-Palette im Stil der Amiga-Ära, dazu geordnetes Dithering.
+const RETRO_PAL = [
+  '#0c0a08', '#2a1c14', '#4a3222', '#6e4c30', '#946a44', '#b88e5e', '#d8b483', '#f0dcb0',
+  '#1e2e14', '#2e4a1c', '#426626', '#5a8230', '#78a03c', '#9cbc52', '#c4d878',
+  '#14203c', '#24406a', '#3a6496', '#5a8cbc', '#8cb8d8',
+  '#4a4844', '#6e6a62', '#948e82', '#bab4a6', '#e2ddd0', '#ffffff',
+  '#6a1e16', '#a8342a', '#d85c34', '#f0a048', '#e8c440', '#2a2440',
+];
+const BAYER_RAW = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const BAYER4 = BAYER_RAW.map((v) => (v / 16 - 0.47) * 22);
+let retroLut = null, retroPal = null, nightIdx = null, warmIdx = null, lightMap = null;
+
+function nearestPal(r, g, b) {
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < retroPal.length; i++) {
+    const q = retroPal[i];
+    const dr = r - q[0], dg = g - q[1], db = b - q[2];
+    const d = dr * dr * 2 + dg * dg * 4 + db * db * 3;
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+
+function buildRetroLut() {
+  retroPal = RETRO_PAL.map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  retroLut = new Uint8Array(32768);
+  for (let r = 0; r < 32; r++) for (let g = 0; g < 32; g++) for (let b = 0; b < 32; b++) {
+    const R = r * 8 + 4, Gc = g * 8 + 4, B = b * 8 + 4;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < retroPal.length; i++) {
+      const q = retroPal[i];
+      const dr = R - q[0], dg = Gc - q[1], db = B - q[2];
+      const d = dr * dr * 2 + dg * dg * 4 + db * db * 3;
+      if (d < bd) { bd = d; best = i; }
+    }
+    retroLut[(r << 10) | (g << 5) | b] = best;
+  }
+  // Palettentausch: Nachtfarbe (dunkel, bläulich) und Fackelschein (warm) je Farbe
+  nightIdx = retroPal.map(([r, g, b]) => nearestPal(r * 0.3 + 12 * 0.7 * 0.6, g * 0.3 + 15 * 0.7 * 0.6, b * 0.3 + 40 * 0.7 * 0.9));
+  warmIdx = retroPal.map(([r, g, b]) => nearestPal(Math.min(255, r * 0.95 + 48), g * 0.68 + 10, b * 0.38));
+}
+
+// Lichtkarte in Pufferpixeln für die Nacht im Retro-Modus
+function buildLightMap(w, h, k, cam, z, p) {
+  if (!lightMap || lightMap.length !== w * h) lightMap = new Float32Array(w * h);
+  else lightMap.fill(0);
+  const add = (cx, cy, r, s) => {
+    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(w - 1, Math.ceil(cx + r));
+    const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(h - 1, Math.ceil(cy + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, (y - cy) * 1.4) / r;
+      if (d < 1) lightMap[y * w + x] += (1 - d) * (1 - d) * s;
+    }
+  };
+  const { w: vw, h: vh } = G.view;
+  for (const L of lights) {
+    const sx = ((isoX(L.x, L.y) - cam.x) * z + vw / 2) / k, sy = ((isoY(L.x, L.y) - L.z - cam.y) * z + vh / 2) / k;
+    const r = (L.r * z * 1.5) / k;
+    if (sx < -r || sy < -r || sx > w + r || sy > h + r) continue;
+    add(sx, sy, r, L.s * 1.2);
+  }
+  const ps = toScreen(p.x, p.y);
+  add(ps.x / k, (ps.y - 10) / k, (110 * z) / k, 0.9);
+}
+
+function quantizeRetro(c, w, h, nightT) {
+  if (!retroLut) buildRetroLut();
+  const img = c.getImageData(0, 0, w, h), d = img.data;
+  for (let y = 0; y < h; y++) {
+    const by = (y & 3) * 4;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4, bi = by + (x & 3), o = BAYER4[bi];
+      let r = d[i] + o, g = d[i + 1] + o, b = d[i + 2] + o;
+      r = r < 0 ? 0 : r > 255 ? 255 : r; g = g < 0 ? 0 : g > 255 ? 255 : g; b = b < 0 ? 0 : b > 255 ? 255 : b;
+      let idx = retroLut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
+      if (nightT > 0) {
+        const l = Math.min(1, lightMap[y * w + x]);
+        const thr = (BAYER_RAW[bi] + 0.5) / 16;
+        if (thr < l * 1.1) idx = warmIdx[idx];
+        else if (thr < nightT) idx = nightIdx[idx];
+      }
+      const q = retroPal[idx];
+      d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2];
+    }
+  }
+  c.putImageData(img, 0, 0);
+}
+
+// Pixelgröße im Retro-Modus: rund 300 Bildzeilen
+export function retroScale() { return Math.max(2, Math.round(G.view.h / 300)); }
+
+// Tag und Nacht in Bildschirmkoordinaten (CSS-Pixel)
+function drawDayNight(c, w, h, p, cam, z) {
+  const dark = darkness();
+  const warm = warmth();
+  if (warm > 0) { c.fillStyle = `rgba(255,140,60,${warm * 0.14})`; c.fillRect(0, 0, w, h); }
+  if (dark <= 0.01) return;
+  c.fillStyle = `rgba(14,20,52,${dark})`;
+  c.fillRect(0, 0, w, h);
+  c.globalCompositeOperation = 'lighter';
+  for (const L of lights) {
+    const sx = (isoX(L.x, L.y) - cam.x) * z + w / 2, sy = (isoY(L.x, L.y) - L.z - cam.y) * z + h / 2;
+    if (sx < -100 || sy < -100 || sx > w + 100 || sy > h + 100) continue;
+    const r = L.r * z * (1 + Math.sin(G.time * 9 + L.x) * 0.04);
+    const g = c.createRadialGradient(sx, sy, 0, sx, sy, r * 2);
+    g.addColorStop(0, `rgba(255,190,100,${0.55 * L.s * dark / 0.62})`);
+    g.addColorStop(1, 'rgba(255,150,60,0)');
+    c.fillStyle = g;
+    c.fillRect(sx - r * 2, sy - r * 2, r * 4, r * 4);
+  }
+  const ps = toScreen(p.x, p.y);
+  const g = c.createRadialGradient(ps.x, ps.y - 10, 0, ps.x, ps.y - 10, 120 * z);
+  g.addColorStop(0, `rgba(255,200,120,${0.35 * dark / 0.62})`);
+  g.addColorStop(1, 'rgba(255,160,80,0)');
+  c.fillStyle = g; c.fillRect(ps.x - 130 * z, ps.y - 140 * z, 260 * z, 260 * z);
+  c.globalCompositeOperation = 'source-over';
+}
+
 // ---------------------------------------------------------------- Hauptschleife
 export function initRender(cv) { canvas = cv; ctx = cv.getContext('2d'); }
 
@@ -1852,12 +1971,14 @@ export function render() {
   if (G.castleDirty) { castleParts = buildPlayerCastle(); G.castleDirty = false; }
   lights = [];
 
-  // Welt zeichnen (im Pixel-Modus in halber Auflösung)
+  // Welt zeichnen (im Retro-Modus in niedriger Auflösung)
   let wc = ctx, ws = dpr;
-  if (G.pixel) {
-    const pw = Math.max(1, Math.ceil(w / 3)), ph = Math.max(1, Math.ceil(h / 3));
-    if (!lowCv || lowCv.width !== pw || lowCv.height !== ph) { lowCv = makeCanvas(pw, ph); lowCtx = lowCv.getContext('2d'); }
-    wc = lowCtx; ws = 1 / 3;
+  const retro = G.pixel;
+  const rk = retro ? retroScale() : 1;
+  if (retro) {
+    const pw = Math.max(1, Math.ceil(w / rk)), ph = Math.max(1, Math.ceil(h / rk));
+    if (!lowCv || lowCv.width !== pw || lowCv.height !== ph) { lowCv = makeCanvas(pw, ph); lowCtx = lowCv.getContext('2d', { willReadFrequently: true }); }
+    wc = lowCtx; ws = 1 / rk;
     wc.setTransform(1, 0, 0, 1, 0, 0);
     wc.fillStyle = '#1a2018'; wc.fillRect(0, 0, pw, ph);
   }
@@ -1937,17 +2058,25 @@ export function render() {
     wc.beginPath(); wc.moveTo(sx - (dx / l) * 7, sy - (dy / l) * 7 + (k - 0.5) * 4); wc.lineTo(sx, sy); wc.stroke();
   }
 
-  // Pixel-Modus: niedrige Auflösung grob hochskalieren
-  if (G.pixel) {
+  // Retro-Modus: Vögel, Nacht und Schnee noch in die Pixelebene, dann Palette und Dithering
+  if (retro) {
+    wc.setTransform(ws, 0, 0, ws, 0, 0);
+    drawBirds(wc, w, h, dt);
+    const warm = warmth();
+    if (warm > 0) { wc.fillStyle = `rgba(255,140,60,${warm * 0.14})`; wc.fillRect(0, 0, w, h); }
+    drawSnow(wc, w, h, dt);
+    const nightT = Math.min(1, darkness() / 0.55);
+    if (nightT > 0) buildLightMap(lowCv.width, lowCv.height, rk, cam, z, p);
+    quantizeRetro(wc, lowCv.width, lowCv.height, nightT);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(lowCv, 0, 0, lowCv.width * 3 * dpr, lowCv.height * 3 * dpr);
+    ctx.drawImage(lowCv, 0, 0, lowCv.width * rk * dpr, lowCv.height * rk * dpr);
     ctx.imageSmoothingEnabled = true;
   }
 
   // Ab hier Bildschirmkoordinaten
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawBirds(ctx, w, h, dt);
+  if (!retro) drawBirds(ctx, w, h, dt);
 
   ctx.font = 'bold 13px "Alegreya Sans", sans-serif';
   ctx.textAlign = 'center';
@@ -1961,32 +2090,11 @@ export function render() {
   }
   ctx.globalAlpha = 1;
 
-  // Tag und Nacht
-  const dark = darkness();
-  const warm = warmth();
-  if (warm > 0) { ctx.fillStyle = `rgba(255,140,60,${warm * 0.14})`; ctx.fillRect(0, 0, w, h); }
-  if (dark > 0.01) {
-    ctx.fillStyle = `rgba(14,20,52,${dark})`;
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'lighter';
-    for (const L of lights) {
-      const sx = (isoX(L.x, L.y) - cam.x) * z + w / 2, sy = (isoY(L.x, L.y) - L.z - cam.y) * z + h / 2;
-      if (sx < -100 || sy < -100 || sx > w + 100 || sy > h + 100) continue;
-      const r = L.r * z * (1 + Math.sin(G.time * 9 + L.x) * 0.04);
-      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 2);
-      g.addColorStop(0, `rgba(255,190,100,${0.55 * L.s * dark / 0.62})`);
-      g.addColorStop(1, 'rgba(255,150,60,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(sx - r * 2, sy - r * 2, r * 4, r * 4);
-    }
-    const ps = toScreen(p.x, p.y);
-    const g = ctx.createRadialGradient(ps.x, ps.y - 10, 0, ps.x, ps.y - 10, 120 * z);
-    g.addColorStop(0, `rgba(255,200,120,${0.35 * dark / 0.62})`);
-    g.addColorStop(1, 'rgba(255,160,80,0)');
-    ctx.fillStyle = g; ctx.fillRect(ps.x - 130 * z, ps.y - 140 * z, 260 * z, 260 * z);
-    ctx.globalCompositeOperation = 'source-over';
+  // Tag und Nacht (im Retro-Modus schon in der Pixelebene)
+  if (!retro) {
+    drawDayNight(ctx, w, h, p, cam, z);
+    drawSnow(ctx, w, h, dt);
   }
-  drawSnow(ctx, w, h, dt);
 
   // Ortsnamen
   ctx.textAlign = 'center';

@@ -25,7 +25,8 @@ node tools/build.mjs
 ## Was schon drin ist
 
 - **Große, zufällig erzeugte Welt:** 160 × 160 Felder mit Fluss, Seen, Wäldern und Hügeln. Dazu 15 Orte (Städte, Dörfer, Burgen, Abteien, ein verstecktes Lager), die durch Straßen und Brücken verbunden sind.
-- **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren. Optionaler Pixel-Look mit Taste G.
+- **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren.
+- **Retro-Look im Amiga-Stil (Standard):** niedrige Auflösung, eigene Palette mit 32 Farben, geordnetes Dithering. Die Nacht entsteht durch Palettentausch mit warmem Fackelschein. Taste G schaltet auf klare Grafik um.
 - **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf den Seen und Vogelschwärme.
 - **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Schnee im Winter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
 - **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
@@ -53,7 +54,7 @@ node tools/build.mjs
 | T | Zeitraffer |
 | I J P M | Gefolge, Aufträge, Politik, Karte |
 | Mausrad | Zoom |
-| G | Pixel-Look an und aus |
+| G | Retro-Look (Amiga-Stil) oder klare Grafik |
 | Esc | Schließen und Menü |
 
 ## Aufbau des Codes
@@ -67,7 +68,7 @@ node tools/build.mjs
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |
 | `src/sim.js` | Uhrzeit, Jahreszeiten, Tageswechsel |
-| `src/render.js` | Isometrischer Canvas-Renderer mit Höhenrelief, Schatten, Pixel-Modus, Minikarte |
+| `src/render.js` | Isometrischer Canvas-Renderer mit Höhenrelief, Schatten, Retro-Modus (Palette, Dithering), Minikarte |
 | `src/animals.js` | Tiere (Schafe, Kühe, Hühner, Hirsche, Enten) |
 | `src/ui.js` | Kopfleiste und alle Tafeln |
 | `src/save.js` | Speichern und Laden |

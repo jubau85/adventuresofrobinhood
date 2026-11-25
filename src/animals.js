@@ -6,7 +6,7 @@ import { T } from './data.js';
 import { isWalkable, tileAt } from './world.js';
 import { rand } from './rng.js';
 
-const ANIMAL_SPEED = { schaf: 0.35, kuh: 0.28, huhn: 0.55, hirsch: 0.75, ente: 0.3 };
+const ANIMAL_SPEED = { schaf: 0.25, kuh: 0.2, huhn: 0.4, hirsch: 0.55, ente: 0.22 };
 
 function animalOk(kind, x, y) {
   const t = tileAt(G.world, x, y);

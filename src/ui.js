@@ -505,7 +505,7 @@ function menuPanel() {
       <button class="btn primary" data-act="resume">Weiterspielen</button>
       <button class="btn" data-act="save">Speichern</button>
       <button class="btn" data-act="loadgame" ${info ? '' : 'disabled'}>Spielstand laden</button>
-      <button class="btn" data-act="pixel">Pixel-Look ${G.pixel ? 'ausschalten' : 'einschalten'}</button>
+      <button class="btn" data-act="pixel">${G.pixel ? 'Klare Grafik' : 'Retro-Look (Amiga-Stil)'}</button>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -527,7 +527,7 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
-        <dt>G</dt><dd>Pixel-Look an und aus</dd>
+        <dt>G</dt><dd>Retro-Look (Amiga-Stil) oder klare Grafik</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">

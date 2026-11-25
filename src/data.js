@@ -104,15 +104,15 @@ export const SHOPS = {
 
 // ---------------------------------------------------------------- Einheiten
 export const CLASSES = {
-  ritter: { name: 'Ritter', hp: 70, atk: 6, def: 3, speed: 2.5 },
-  reisiger: { name: 'Reisiger', hp: 55, atk: 5, def: 3, speed: 2.4, cost: 140, wage: 7, start: { waffe: 'kurzschwert', ruestung: 'lederwams', schild: 'rundschild' } },
-  knecht: { name: 'Waffenknecht', hp: 48, atk: 4, def: 2, speed: 2.4, cost: 70, wage: 4, start: { waffe: 'speer', ruestung: 'gambeson', schild: 'holzschild' } },
-  schuetze: { name: 'Bogenschütze', hp: 36, atk: 3, def: 1, speed: 2.5, bow: 1.4, cost: 80, wage: 5, start: { waffe: 'kurzbogen', ruestung: 'gambeson' } },
-  waldlaeufer: { name: 'Langbogenschütze', hp: 40, atk: 4, def: 1, speed: 2.6, bow: 1.6, cost: 160, wage: 8, start: { waffe: 'langbogen', ruestung: 'lederwams' } },
-  bauer: { name: 'Bauernbursche', hp: 32, atk: 3, def: 1, speed: 2.4, cost: 25, wage: 2, start: { waffe: 'knueppel' } },
-  bandit: { name: 'Wegelagerer', hp: 30, atk: 3, def: 1, speed: 2.35 },
-  soldat: { name: 'Soldat', hp: 46, atk: 4, def: 2, speed: 2.3 },
-  zivil: { name: 'Zivilist', hp: 22, atk: 1, def: 0, speed: 2.0 },
+  ritter: { name: 'Ritter', hp: 70, atk: 6, def: 3, speed: 1.5 },
+  reisiger: { name: 'Reisiger', hp: 55, atk: 5, def: 3, speed: 1.45, cost: 140, wage: 7, start: { waffe: 'kurzschwert', ruestung: 'lederwams', schild: 'rundschild' } },
+  knecht: { name: 'Waffenknecht', hp: 48, atk: 4, def: 2, speed: 1.45, cost: 70, wage: 4, start: { waffe: 'speer', ruestung: 'gambeson', schild: 'holzschild' } },
+  schuetze: { name: 'Bogenschütze', hp: 36, atk: 3, def: 1, speed: 1.5, bow: 1.4, cost: 80, wage: 5, start: { waffe: 'kurzbogen', ruestung: 'gambeson' } },
+  waldlaeufer: { name: 'Langbogenschütze', hp: 40, atk: 4, def: 1, speed: 1.55, bow: 1.6, cost: 160, wage: 8, start: { waffe: 'langbogen', ruestung: 'lederwams' } },
+  bauer: { name: 'Bauernbursche', hp: 32, atk: 3, def: 1, speed: 1.45, cost: 25, wage: 2, start: { waffe: 'knueppel' } },
+  bandit: { name: 'Wegelagerer', hp: 30, atk: 3, def: 1, speed: 1.41 },
+  soldat: { name: 'Soldat', hp: 46, atk: 4, def: 2, speed: 1.38 },
+  zivil: { name: 'Zivilist', hp: 22, atk: 1, def: 0, speed: 1.2 },
 };
 
 // Vorlagen für Einheiten der KI-Gruppen
@@ -134,30 +134,30 @@ export const NPC_TYPES = {
 export const GROUP_TYPES = {
   banditen: {
     name: 'Wegelagerer', nom: 'Wegelagerer', acc: 'die Wegelagerer', pl: true, faction: null, hostile: true, members: [['bandit', 1, 3], ['bandit_bogen', 0, 1], ['bandit_boss', 0, 1]],
-    gold: [15, 45], itemChance: 0.25, renown: 1, count: 7, spawn: 'wild', speed: 1.9,
+    gold: [15, 45], itemChance: 0.25, renown: 1, count: 7, spawn: 'wild', speed: 1.18,
   },
   raubritter: {
     name: 'Raubritter', nom: 'Raubritter', acc: 'die Raubritter', pl: true, faction: null, hostile: true, members: [['raubritter', 1, 1], ['soeldner', 1, 2], ['armbrust', 0, 1]],
-    gold: [70, 150], itemChance: 0.6, renown: 4, count: 2, spawn: 'wild', speed: 2.0, minDay: 3,
+    gold: [70, 150], itemChance: 0.6, renown: 4, count: 2, spawn: 'wild', speed: 1.24, minDay: 3,
   },
   patrouille: {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
-    gold: [25, 50], itemChance: 0.3, renown: 2, count: 3, spawn: 'patrol', speed: 2.0,
+    gold: [25, 50], itemChance: 0.3, renown: 2, count: 3, spawn: 'patrol', speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
   },
   steuer: {
     name: 'Steuereintreiber', nom: 'Der Steuereintreiber und seine Wache', acc: 'den Steuereintreiber', pl: true, faction: 'normannen', members: [['vogt', 1, 1], ['soldat', 2, 3]],
-    gold: [140, 240], itemChance: 0.2, renown: 3, count: 2, spawn: 'route', speed: 1.8,
+    gold: [140, 240], itemChance: 0.2, renown: 3, count: 2, spawn: 'route', speed: 1.12,
     kill: { normannen: -18, sachsen: 8, waldleute: 10 },
   },
   haendler: {
     name: 'Händlerzug', nom: 'Der Händlerzug', acc: 'den Händlerzug', pl: false, faction: 'gilde', members: [['haendler', 1, 1], ['wache', 1, 2]],
-    gold: [50, 110], goods: true, renown: 0, count: 3, spawn: 'route', speed: 1.8,
+    gold: [50, 110], goods: true, renown: 0, count: 3, spawn: 'route', speed: 1.12,
     kill: { gilde: -20, waldleute: 5 },
   },
   waldleute: {
     name: 'Waldleute', nom: 'Waldleute', acc: 'die Waldleute', pl: true, faction: 'waldleute', members: [['waldmann', 2, 3]],
-    gold: [5, 25], renown: 2, count: 2, spawn: 'forest', speed: 2.1,
+    gold: [5, 25], renown: 2, count: 2, spawn: 'forest', speed: 1.3,
     kill: { waldleute: -15, normannen: 6 },
   },
 };
