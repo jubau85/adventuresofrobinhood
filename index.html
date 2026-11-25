@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ritter ohne Land</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,600;0,700;1,400&family=Alegreya+Sans:wght@400;500;700&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="view" aria-label="Spielwelt"></canvas>
+
+  <header id="hud">
+    <div class="hud-stats">
+      <span class="stat" title="Gold"><i class="ico coin" aria-hidden="true"></i><b id="hud-gold">0</b></span>
+      <span class="stat" title="Ruhm"><i class="ico star" aria-hidden="true"></i><b id="hud-renown">0</b></span>
+      <span class="stat" id="hud-hp-wrap" title="Lebenskraft"><i class="ico heart" aria-hidden="true"></i><b id="hud-hp">0</b></span>
+      <span class="stat" title="Gefolge im Feld"><i class="ico shield" aria-hidden="true"></i><b id="hud-party">0/0</b></span>
+      <span class="stat" title="Ladung"><i class="ico sack" aria-hidden="true"></i><b id="hud-cargo">0/0</b></span>
+    </div>
+    <div class="hud-time">
+      <span id="hud-date">Tag 1</span>
+      <span id="hud-clock">08:00</span>
+      <span id="hud-mode" hidden></span>
+    </div>
+  </header>
+
+  <canvas id="minimap" width="480" height="240" title="Karte öffnen (M)" aria-label="Minikarte"></canvas>
+  <div id="log" aria-live="polite"></div>
+  <div id="prompt" hidden></div>
+
+  <nav id="toolbar" aria-label="Befehle">
+    <button data-tool="party" title="Gefolge & Ausrüstung (I)"><span>Gefolge</span><kbd>I</kbd></button>
+    <button data-tool="quests" title="Aufträge (J)"><span>Aufträge</span><kbd>J</kbd></button>
+    <button data-tool="politics" title="Politik (P)"><span>Politik</span><kbd>P</kbd></button>
+    <button data-tool="map" title="Karte (M)"><span>Karte</span><kbd>M</kbd></button>
+    <button data-tool="ride" title="Auf- und absitzen (R)"><span>Reiten</span><kbd>R</kbd></button>
+    <button data-tool="order" title="Befehl an das Gefolge (F)"><span id="order-label">Folgen</span><kbd>F</kbd></button>
+    <button data-tool="fast" title="Zeitraffer (T)"><span>Zeitraffer</span><kbd>T</kbd></button>
+    <button data-tool="zoomin" class="narrow-only" title="Näher (+)"><span>+</span></button>
+    <button data-tool="zoomout" class="narrow-only" title="Weiter (−)"><span>−</span></button>
+    <button data-tool="menu" title="Menü (Esc)"><span>Menü</span><kbd>Esc</kbd></button>
+  </nav>
+
+  <section id="panel" hidden role="dialog" aria-modal="true" aria-labelledby="panel-title">
+    <header class="panel-head">
+      <div class="panel-titles"><h2 id="panel-title"></h2><p id="panel-sub"></p></div>
+      <button class="close" data-act="close" aria-label="Schließen">✕</button>
+    </header>
+    <nav class="tabs" id="panel-tabs"></nav>
+    <div class="panel-body" id="panel-body"></div>
+  </section>
+
+  <div id="dialog" hidden role="alertdialog" aria-labelledby="dialog-text">
+    <div class="dialog-card">
+      <p id="dialog-text"></p>
+      <div class="row"><button class="btn primary" id="dialog-yes">Ja</button><button class="btn" id="dialog-no">Abbrechen</button></div>
+    </div>
+  </div>
+
+  <section id="title">
+    <div class="title-card">
+      <p class="eyebrow">England, im Jahre des Herrn 1194</p>
+      <h1>Ritter ohne Land</h1>
+      <p class="intro">König Richard sitzt auf dem Heimweg vom Kreuzzug in Gefangenschaft. Prinz Johns normannische Barone pressen das Land aus, die alten sächsischen Familien murren, und in den Wäldern sammeln sich die Geächteten. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben: Ashcombe.</p>
+      <div class="field">
+        <label for="name-input">Dein Name</label>
+        <input id="name-input" maxlength="28" value="Aldric" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="row">
+        <button class="btn primary" id="btn-new">Neues Spiel</button>
+        <button class="btn" id="btn-continue" hidden>Weiterspielen</button>
+      </div>
+      <p class="hint" id="continue-info"></p>
+      <ul class="howto">
+        <li><b>Ashcombe ausbauen</b>: Holz, Stein und Gold machen aus der Ruine eine Festung.</li>
+        <li><b>Gefolge anführen</b>: Leute anwerben, ausrüsten und in Scharmützel führen.</li>
+        <li><b>Politik treiben</b>: Aufträge für Sachsen, Normannen, Kirche, Gilde oder Waldleute.</li>
+      </ul>
+      <p class="hint">Klick oder WASD: gehen · E: betreten · R: reiten · Leertaste: angreifen · H: Hilfe</p>
+    </div>
+  </section>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
