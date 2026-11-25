@@ -3,12 +3,12 @@
 // Aufruf: node tools/build.mjs [--fragment <pfad>]
 //   --fragment schreibt zusätzlich eine Fassung ohne <html>/<head>/<body>-Gerüst.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ORDER = ['data', 'geo', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'economy', 'politics', 'castle', 'sim', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
+const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'economy', 'politics', 'castle', 'sim', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
 function topLevelNames(src) {
@@ -47,6 +47,18 @@ for (const name of ORDER) {
   js += `\n// ===== ${name}.js =====\n${src}`;
 }
 if (js.includes('</script')) throw new Error('Der Code enthält „</script“ und kann nicht eingebettet werden');
+
+// Handgemalte Grafiken als data-URL einbetten, damit die Einzeldatei ohne Ordner auskommt
+const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+let artBytes = 0;
+js = js.replace(/'(assets\/[^']+\.(?:jpg|jpeg|png|webp))'/g, (m, p) => {
+  const file = join(ROOT, p);
+  if (!existsSync(file)) return m;
+  const buf = readFileSync(file);
+  artBytes += buf.length;
+  return `'data:${MIME[p.slice(p.lastIndexOf('.'))]};base64,${buf.toString('base64')}'`;
+});
+if (artBytes) console.log(`Grafiken eingebettet: ${(artBytes / 1024).toFixed(0)} KB`);
 
 const css = readFileSync(join(ROOT, 'style.css'), 'utf8');
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8');

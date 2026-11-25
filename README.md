@@ -49,6 +49,9 @@ node tools/build.mjs
 - **Gefolge:** Leute im Rittersaal anwerben, ausrüsten (Waffe, Rüstung, Schild, Pferd) und in Scharmützel führen. Dazu Befehle (folgen, Stellung halten, angreifen), Erfahrung und Stufen, Sold, Garnison und Verwundete.
 - **Jagd:** Mit Bogen oder Armbrust Hirsche und Enten jagen. Hirsche fliehen, Bogenschützen im Gefolge schießen mit. Fleisch und Felle lassen sich einlagern oder in Städten verkaufen. Wilderei kann den Normannen auffallen, fremdes Vieh zu schießen gilt als Diebstahl. Die Bestände wachsen täglich nach.
 - **Handel:** Jeder Ort erzeugt und braucht andere Waren. Die Preise richten sich nach dem Vorrat. Holz, Stein und Eisen braucht man auch für den Burgbau.
+- **Burg mit Hinterland:** Hospiz zum Heilen, Schafzucht mit eigener Herde, Felder mit Zehntscheune und Windmühle. Du und dein Gefolge braucht täglich Verpflegung aus Getreide oder Fleisch.
+- **Kampf um die Burg:** Innerhalb deiner Mauern kämpfst du je nach Burgstufe besser, die Wachtürme schießen auf Feinde in Reichweite.
+- **Fraktionen im Streit:** Banden überfallen Händler, Sachsen und Normannen und Franzosen bekämpfen einander. Befreundete Trupps kommen dir zu Hilfe, verfeindete schließen sich deinen Angreifern an.
 - **Politik:** Sechs Fraktionen (Sachsen, Normannen, Kirche, Gilde, Waldleute und die Krone Frankreichs) mit Rivalitäten. Als Freund der Franzosen fährst du umsonst über den Kanal und kannst Armbrustschützen anwerben. Aufträge, Geschenke und Überfälle verschieben das Ansehen. Verbündete gewähren Vorteile, Feinde überfallen deine Burg.
 - **Speichern:** Automatisch jeden Morgen im Browser, dazu manuell über das Menü.
 
@@ -83,13 +86,14 @@ node tools/build.mjs
 | `src/sim.js` | Uhrzeit, Jahreszeiten, Tageswechsel |
 | `src/render.js` | Isometrischer Canvas-Renderer mit Höhenrelief, Schatten, Retro-Modus (Palette, Dithering), Minikarte |
 | `src/animals.js` | Tiere und Jagd |
-| `src/titleart.js` | Gemaltes, animiertes Titelbild |
+| `src/titleart.js` | Titelbild: das gemalte Bild aus `assets/titel`, sonst im Code gemalt |
+| `src/assets.js` | Lädt handgemalte Grafiken aus `assets/`, fehlt eine, zeichnet das Spiel selbst |
 | `src/audio.js` | Musik mit Web Audio (Instrumente, Noten, Stimmungen) |
 | `src/ui.js` | Kopfleiste und alle Tafeln |
 | `src/save.js` | Speichern und Laden |
 | `src/main.js` | Start, Hauptschleife, Eingabe |
 | `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
 
-Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet.
+Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet. Nach und nach kommen handgemalte Bilder dazu (Titelbild, Wiese, Eiche), der Plan dafür steht in [assets/GRAFIK-BRIEF.md](assets/GRAFIK-BRIEF.md). Der Build bettet sie in die Einzeldatei ein.
 
 Wie es weitergehen kann, steht in [DESIGN.md](DESIGN.md).

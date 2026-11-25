@@ -3,6 +3,7 @@
 import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { drawTitleArt } from './titleart.js';
+import { loadArt } from './assets.js';
 import { startAudio, setMood, musicEnabled, setMusicEnabled, loadMusicPref } from './audio.js';
 import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
@@ -517,6 +518,7 @@ function drawTitleScreen() {
 
 // ---------------------------------------------------------------- Boot
 function boot(hotData) {
+  loadArt();
   viewCanvas = byId('view');
   mini = byId('minimap');
   initRender(viewCanvas);

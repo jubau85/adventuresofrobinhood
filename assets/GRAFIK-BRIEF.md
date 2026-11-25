@@ -22,7 +22,7 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
 - Keinen Schlagschatten auf den Boden malen, den zeichnet das Spiel selbst.
 
 **Freistellen:**
-- Unter dem Objekt kein Boden, kein Sockel, keine Grasplatte. Die Bodentexturen in Paket 2 sind die Ausnahme.
+- Unter dem Objekt kein Boden, kein Sockel, keine Grasplatte. Ausnahmen sind die Bodentexturen (Paket 2) und der weich auslaufende Bodenfuß der Gebäude (Paket 4 und 6). Mauerteile in Paket 5 bleiben ohne Boden, damit sie nahtlos aneinanderpassen.
 - Am besten ein transparenter Hintergrund (PNG mit Alpha).
 - Falls Oakgen das nicht kann, ein einfarbiger Hintergrund, den ich ausstanze:
   - Reingrün `#00FF00` für alles außer Pflanzen
@@ -73,6 +73,15 @@ text, letters, watermark, logo, frame, border, ground plane, grass base, pedesta
 Was noch fehlt, zeichnet das Spiel weiter selbst. Du kannst also stückweise liefern.
 
 ---
+
+## Stand der Probestücke
+
+| Datei | Urteil |
+| --- | --- |
+| `titel/titel_quer.jpg`, `titel_hoch.jpg` | Passt, ist eingebaut. |
+| `boden/wiese_sommer.png` | Passt, ist eingebaut. Die übrigen Bodentexturen bitte im selben Maßstab: Grashalme so groß wie hier. |
+| `natur/laub_1_sommer.png` | Passt, ist eingebaut. Weitere Bäume bitte genauso freigestellt, Stammfuß unten in der Mitte. |
+| `haus/stroh_1.png` | Schön gemalt, aber zu sehr Aufbauspiel und zu „aufgesetzt“. Bitte nach den neuen Regeln in Paket 4 neu erzeugen. |
 
 ## 3. Pakete in der Reihenfolge der Wirkung
 
@@ -185,39 +194,83 @@ Stil-Baustein + Motiv. Hintergrund transparent oder Magenta.
 
 ## Paket 4: Häuser, Kirchen, Dorfdinge
 
-Stil-Baustein + Motiv. **Grundfläche** in Feldern (eine Raute = 1 × 1). Die Häuser sollen alle aus derselben Welt wirken: Fachwerk, Lehm, Stroh, Holzschindeln, in den Städten auch Ziegel und Stein.
+### So sah England um 1194 aus
+
+Das Probehaus war schön gemalt, wirkte aber wie aus einem Aufbauspiel: hohe, kastige Wände, ein ordentlich gestutztes Dach, Blumenkasten und gemauerter Schornstein. Ein englisches Bauernhaus um 1194 sieht anders aus. Diese Merkmale machen es englisch:
+
+**Bitte so:**
+- **Das Dach ist das Haus.** Ein riesiges, dickes Strohdach (oder Reet), meist als Walmdach. Es reicht tief herunter, fast bis auf Kopfhöhe, und hat weit überstehende, weich gerundete Traufen. Das Stroh ist verwittert, grau-golden, mit Moosflecken und eingesackten Stellen.
+- **Niedrige Wände:** Flechtwerk mit Lehm, gekalkt in warmem Cremeweiß oder Ocker, unten mit Schmutzspritzern. Im Westen auch Cob (Stampflehm) mit runden Ecken, im Osten Feuerstein und Bruchstein.
+- **Cruck-Rahmen:** Am Giebel sieht man oft zwei gebogene Eichenbalken, die wie ein spitzer Bogen vom Boden bis zum First laufen. Das ist das typischste Merkmal überhaupt.
+- **Kein Schornstein.** Der Rauch zieht durch ein kleines Rauchloch oder eine Giebelöffnung oben im Stroh.
+- **Kleine Fensterluken ohne Glas** mit Holzläden, eine einfache Brettertür, oft niedrig.
+- **Langhaus:** Menschen und Vieh unter einem langen Dach, an einem Ende ein breites Stalltor.
+- **Drumherum:** Flechtzaun aus Weidenruten (Hürden), ein Kohlgarten, ein Misthaufen, ein Holzstoß, eine Bank an der Wand.
+- **In der Stadt:** normannische Steinhäuser mit Rundbogenfenstern im Obergeschoss (wie das „Jew's House“ in Lincoln). Dazu schlichte Fachwerkhäuser mit weit gesetzten, dunklen Eichenbalken ohne Zierfiguren.
+- **Farben gedämpft:** Stroh, Lehm, Kalk, Eiche, Moos. Nichts Bonbonfarbenes.
+
+**Bitte nicht:**
+- keine Blumenkästen
+- keine Schornsteine mit Tonaufsatz
+- keine Glasfenster
+- keine dekorativen Firstbalken oder Holzschnitzereien wie in den Alpen
+- keine hohen, geraden Kastenwände
+- keine sauberen, knalligen Farben
+- kein spielzeughafter, klobiger Comic-Look
+
+### Damit Häuser nicht „aufgesetzt“ wirken
+
+Abweichend von Regel 1 bekommen **Gebäude einen kleinen Bodenfuß**: eine unregelmäßige Fläche aus festgetretener Erde, etwas Gras und einer Pfütze vor der Tür. Sie läuft zum Rand hin **weich ins Transparente** aus. Dazu Gras und Brennnesseln, die an den Wänden hochwachsen, Moos an der Mauerkante und Schmutz unten an den Wänden. Den weichen Schatten unter dem Haus legt das Spiel zusätzlich darunter.
+
+Zusätzlich zum Stil-Baustein bitte diesen **Haus-Baustein** anhängen:
+
+```
+english vernacular architecture of the late 12th century, rooted in the ground, sitting on a small irregular patch of trampled earth, grass tufts and a puddle that fades softly into transparency at the edges, nettles and long grass growing against the walls, mud splashes at the wall base, weathered, mossy, muted earthy colours, low and wide proportions
+```
+
+Negativ-Prompt für Häuser ergänzen:
+
+```
+flower box, brick chimney, chimney pot, glass windows, decorative ridge beam, alpine style, bavarian style, tall straight box walls, clean bright colours, toy-like, chunky cartoon, floating, hard flat base edge
+```
+
+### Liste
+
+Die **Grundfläche** ist in Feldern angegeben, eine Raute entspricht 1 × 1.
 
 | Datei | Grundfläche | 1× | Motiv |
 | --- | --- | --- | --- |
-| `haus/stroh_1.png` | 1 × 1 | 80 × 88 | small timber-framed cottage, whitewashed wattle and daub walls, thick rounded sagging thatched roof, small wooden door, shuttered window, flower box |
-| `haus/stroh_2.png` | 1 × 1 | 80 × 88 | crooked peasant cottage, dark timber beams, mossy thatch, stone chimney |
-| `haus/stroh_3.png` | 1.4 × 1 | 96 × 90 | long farmhouse with byre, thatched roof, hay door |
-| `haus/stroh_4.png` | 1 × 1 | 72 × 80 | tiny round-cornered hut, clay walls, steep thatch |
-| `haus/ziegel_1.png` | 1 × 1 | 80 × 104 | two-storey town house, overhanging upper floor, timber frame, red clay tile roof |
-| `haus/ziegel_2.png` | 1 × 1.3 | 90 × 108 | merchant's house, stone ground floor, timber upper floor, tile roof, shop sign |
-| `haus/ziegel_3.png` | 1 × 1 | 80 × 100 | narrow tall town house, ochre plaster, tile roof, small balcony |
-| `haus/stein_1.png` | 1 × 1 | 80 × 96 | sturdy stone house, slate roof, small arched windows |
-| `haus/stein_2.png` | 1.3 × 1 | 92 × 96 | stone granary on short pillars, slate roof |
-| `haus/holz_1.png` | 1 × 1 | 76 × 84 | saxon wooden hut, vertical plank walls, wooden shingle roof with carved gable ends |
-| `haus/holz_2.png` | 1 × 1 | 76 × 84 | log storehouse, shingle roof |
-| `haus/langhalle.png` | 3.2 × 1.4 | 190 × 130 | great saxon mead hall, long low wooden hall, curved shingle roof like an upturned boat, carved dragon heads on the gables, smoke hole |
-| `haus/kirche_dorf.png` | 2 × 1 | 130 × 140 | small village church, rough stone walls, slate roof, little square bell tower |
-| `haus/kathedrale.png` | 3.2 × 1.4 | 200 × 210 | large romanesque cathedral church, round arches, tall central tower, apse, warm limestone |
-| `haus/kloster.png` | 2.2 × 1 | 140 × 110 | monastery building, stone, tile roof, small cloister arcade |
-| `haus/marktstand_1.png` | 0.8 × 0.6 | 56 × 60 | wooden market stall with striped awning in magenta, baskets of vegetables and bread |
-| `haus/marktstand_2.png` | 0.8 × 0.6 | 56 × 60 | wooden market stall with plain awning in magenta, cloth bales and pottery |
-| `haus/zelt_markt.png` | 0.9 × 0.9 | 60 × 64 | pointed medieval pavilion tent, canvas in magenta with cream trim, small pennant on top |
-| `haus/zelt_lager.png` | 0.9 × 0.9 | 60 × 56 | low patched outlaw tent, olive and brown canvas, ropes and stakes |
-| `haus/brunnen.png` | 0.6 × 0.6 | 44 × 52 | round stone village well with small wooden roof and bucket |
+| `haus/stroh_1.png` | 1.2 × 1 | 92 × 88 | small english peasant cottage with low limewashed wattle-and-daub walls, a huge thick weathered thatched hipped roof sweeping down almost to head height with deep rounded eaves, curved cruck timbers visible on the gable end, smoke hole at the top of the thatch, no chimney, small unglazed window with a wooden shutter, low plank door |
+| `haus/stroh_2.png` | 1 × 1 | 84 × 84 | tiny one-room cottage of ochre cob walls with rounded corners, steep shaggy thatch with moss, smoke drifting from a gablet at the top, woodpile against the wall |
+| `haus/stroh_3.png` | 2.2 × 1 | 140 × 96 | english medieval longhouse, people and cattle under one long low thatched roof, lower walls of rough rubble stone, upper walls of daub, small door for the family and a wide byre door at one end, a dung heap beside it |
+| `haus/stroh_4.png` | 1 × 1 | 80 × 76 | simple cottar's hut, very low walls almost hidden under a deep round thatch, wattle hurdle fence and a small cabbage patch beside it |
+| `haus/stein_1.png` | 1 × 1.2 | 88 × 104 | two-storey norman stone town house of warm limestone, round-arched romanesque window pairs on the upper floor, arched doorway below, shallow stone-slate roof, no chimney pot |
+| `haus/stein_2.png` | 1.3 × 1 | 92 × 92 | east anglian cottage of knapped flint and rubble with dressed limestone corners, reed thatch roof |
+| `haus/fachwerk_1.png` | 1 × 1.2 | 86 × 104 | two-storey merchant's house, plain widely spaced dark oak timber frame without decorative patterns, limewashed infill, steep oak-shingle roof, a wooden shop shutter folded down as a counter with wares on it |
+| `haus/fachwerk_2.png` | 1 × 1 | 80 × 96 | narrow town house, timber frame and daub, thatched roof, a hanging sign above the door |
+| `haus/holz_1.png` | 1 × 1 | 80 × 84 | saxon-style timber hall-hut, vertical split-oak plank walls, steep wooden shingle roof, smoke hole |
+| `haus/holz_2.png` | 1 × 1 | 76 × 80 | timber storehouse raised on staddle stones (mushroom-shaped stones), shingle roof |
+| `haus/langhalle.png` | 3.2 × 1.4 | 190 × 130 | great saxon thegn's hall, long aisled timber hall with a tall steep thatched roof, simple carved bargeboards, wide doors on the long side, smoke rising from the roof ridge |
+| `haus/kirche_dorf.png` | 2 × 1 | 130 × 140 | small norman parish church of flint and rubble with a sturdy square west tower, round-headed windows, stone-slate roof, a few grave crosses beside it |
+| `haus/kathedrale.png` | 3.2 × 1.4 | 200 × 210 | large norman cathedral of pale limestone, massive round arches, thick walls, a square crossing tower with a low pyramid roof, round apse |
+| `haus/kloster.png` | 2.2 × 1 | 140 × 110 | cistercian monastery range of grey stone, plain round-arched windows, stone-slate roof, a small cloister walk |
+| `haus/marktstand_1.png` | 0.8 × 0.6 | 56 × 60 | rough wooden market stall with a cloth awning in magenta, baskets of bread, cheese and eggs |
+| `haus/marktstand_2.png` | 0.8 × 0.6 | 56 × 60 | trestle stall with a magenta awning, bolts of wool cloth and pottery |
+| `haus/zelt_markt.png` | 0.9 × 0.9 | 60 × 64 | round medieval pavilion tent, canvas in magenta with cream trim, small pennant on top |
+| `haus/zelt_lager.png` | 0.9 × 0.9 | 60 × 56 | low patched outlaw shelter of hides and branches, olive and brown |
+| `haus/brunnen.png` | 0.6 × 0.6 | 44 × 52 | round rubble-stone village well with a small timber frame, rope and bucket |
 | `haus/feuerstelle.png` | 0.5 × 0.5 | 36 × 24 | ring of stones with charred logs, no flames (the game draws the fire) |
 | `haus/fass.png` | 0.3 | 20 × 24 | two wooden barrels |
-| `haus/heu.png` | 0.4 | 32 × 26 | rounded haystack |
+| `haus/heu.png` | 0.4 | 32 × 26 | round haystack with a small thatched cap |
 | `haus/holzstapel.png` | 0.5 | 36 × 24 | stacked firewood logs |
-| `haus/karren.png` | 0.6 | 40 × 30 | wooden two-wheeled hand cart |
-| `haus/beet.png` | 0.6 | 40 × 22 | small vegetable garden bed with cabbages, wattle edge |
-| `haus/kisten.png` | 0.4 | 28 × 26 | stacked wooden crates and a sack |
-| `haus/zaun_x.png` | 1 Feld | 68 × 40 | wattle fence segment running from upper left to lower right |
-| `haus/zaun_y.png` | 1 Feld | 68 × 40 | wattle fence segment running from upper right to lower left |
+| `haus/karren.png` | 0.6 | 40 × 30 | wooden two-wheeled cart with solid wheels |
+| `haus/beet.png` | 0.6 | 40 × 22 | kitchen garden bed with cabbages and leeks, wattle edge |
+| `haus/misthaufen.png` | 0.5 | 34 × 22 | steaming dung heap with straw |
+| `haus/kisten.png` | 0.4 | 28 × 26 | wooden crates and a sack |
+| `haus/zaun_x.png` | 1 Feld | 68 × 40 | woven wattle hurdle fence segment running from upper left to lower right |
+| `haus/zaun_y.png` | 1 Feld | 68 × 40 | woven wattle hurdle fence segment running from upper right to lower left |
+
+> Die Dateinamen haben sich geändert: Statt `ziegel_1..3` heißen die Stadthäuser jetzt `fachwerk_1..2` und `stein_1`. Rote Ziegeldächer gab es um 1194 in englischen Städten kaum.
 
 ---
 
@@ -263,7 +316,7 @@ Die Anschlüsse sollen nahtlos aneinanderpassen. Gleich hoch, gleiche Steine, ke
 
 Die Burg wächst in vier Stufen: Ruine, Holzburg, Steinburg, Festung. Die Mauern dafür kommen aus Paket 5. Hier folgen die neun Gebäude in je drei Stufen. Stufe 1 ist einfach und aus Holz, Stufe 2 solide, Stufe 3 prächtig aus Stein. Jede Stufe soll man auf einen Blick unterscheiden können.
 
-Arbeiter, Funken, Rauch und Pferde zeichnet das Spiel darüber. Bitte **keine Menschen und Tiere** in diese Bilder malen.
+Für alle Gebäude hier gelten der Haus-Baustein und die englischen Regeln aus Paket 4, mit Bodenfuß. Arbeiter, Funken, Rauch und Pferde zeichnet das Spiel darüber. Bitte **keine Menschen und Tiere** in diese Bilder malen.
 
 | Datei | Grundfläche | Stufe 1 | Stufe 2 | Stufe 3 |
 | --- | --- | --- | --- | --- |

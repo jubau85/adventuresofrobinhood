@@ -1,6 +1,8 @@
 // Titelbild, im Code gemalt: Sonnenuntergang über den Hügeln, eine Burg auf dem Hügel
 // und ein Ritter zu Pferd im Gegenlicht. Banner und Wimpel tragen die gewählte Wappenfarbe.
 
+import { ART } from './assets.js';
+
 function hexRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function rgba(hex, a, k = 1) { const [r, g, b] = hexRgb(hex); return `rgba(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)},${a})`; }
 
@@ -136,7 +138,35 @@ function drawKnight(c, x, y, s, color, t) {
 const titleMotes = [];
 const titleBirds = [];
 
+// Gemaltes Titelbild mit langsamem Kameraschwenk, links abgedunkelt für den Titel
+function drawPainting(c, w, h, t) {
+  const im = h > w * 1.1 && ART.titel_hoch ? ART.titel_hoch : ART.titel_quer || ART.titel_hoch;
+  if (!im) return false;
+  const zoom = 1.04 + Math.sin(t * 0.05) * 0.025;
+  const sc = Math.max(w / im.width, h / im.height) * zoom;
+  const dw = im.width * sc, dh = im.height * sc;
+  const px = (w - dw) * (0.5 + Math.sin(t * 0.037) * 0.25), py = (h - dh) * 0.5;
+  c.drawImage(im, px, py, dw, dh);
+  const shadeL = c.createLinearGradient(0, 0, w * 0.62, 0);
+  shadeL.addColorStop(0, 'rgba(14,10,24,0.62)'); shadeL.addColorStop(1, 'rgba(14,10,24,0)');
+  c.fillStyle = shadeL; c.fillRect(0, 0, w, h);
+  const shadeB = c.createLinearGradient(0, h * 0.55, 0, h);
+  shadeB.addColorStop(0, 'rgba(10,8,14,0)'); shadeB.addColorStop(1, 'rgba(10,8,14,0.45)');
+  c.fillStyle = shadeB; c.fillRect(0, 0, w, h);
+  // Schwebende Funken im Abendlicht
+  c.fillStyle = 'rgba(255,214,140,0.55)';
+  for (let k = 0; k < 26; k++) {
+    const x = ((k * 173.7 + t * (8 + (k % 5) * 3)) % (w + 40)) - 20;
+    const y = h * (0.35 + ((k * 0.137) % 0.6)) + Math.sin(t * 0.7 + k) * 12;
+    c.globalAlpha = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 1.3 + k * 2));
+    c.fillRect(x, y, 2, 2);
+  }
+  c.globalAlpha = 1;
+  return true;
+}
+
 export function drawTitleArt(c, w, h, t, color) {
+  if (drawPainting(c, w, h, t)) return;
   // Himmel
   const sky = c.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, '#141a36'); sky.addColorStop(0.3, '#3a2a58'); sky.addColorStop(0.52, '#a9505a');

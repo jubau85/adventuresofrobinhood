@@ -8,6 +8,7 @@ import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt } from './world.js';
 import { conProgress } from './castle.js';
 import { castlePasture } from './animals.js';
+import { ART, onArt } from './assets.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
 import { unitLook, heraldLook } from './units.js';
 import { questTarget } from './politics.js';
@@ -1483,12 +1484,24 @@ function makeRock(season, v) {
   return { cvs: cv, ax: 20, ay: 25 };
 }
 
+// Gemalte Laubbäume (Frühling und Sommer), drei Spielarten durch leichte Farbverschiebung
+const SEASON_FILE = ['sommer', 'sommer', 'herbst', 'winter'];
+function artTree(season, v) {
+  const im = ART[`laub_1_${season === 0 && ART.laub_1_fruehling ? 'fruehling' : SEASON_FILE[season]}`];
+  if (!im) return null;
+  const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
+  g.filter = ['saturate(1.35) hue-rotate(16deg) brightness(1.06)', 'saturate(1.3) hue-rotate(26deg) brightness(0.96)', 'saturate(1.3) hue-rotate(9deg) brightness(1.1)'][v];
+  g.drawImage(im, 0, 0);
+  const k = 0.55;
+  return { cvs: cv, ax: (im.width / 2) * k, ay: im.height * 0.893 * k, k };
+}
+
 function ensureSprites() {
   const s = seasonIndex();
   if (sprites && spriteSeason === s) return;
   spriteSeason = s;
   sprites = {
-    laub: [0, 1, 2].map((v) => makeDeciduous(s, v)),
+    laub: [0, 1, 2].map((v) => artTree(s, v) || makeDeciduous(s, v)),
     nadel: [0, 1, 2].map((v) => makeConifer(s, v)),
     fels: [0, 1, 2].map((v) => makeRock(s, v)),
     busch: [0, 1, 2].map((v) => makeBush(s, v)),
@@ -1500,7 +1513,7 @@ function drawTreeObj(c, o) {
   const sp = set[o.v % set.length];
   const z = groundZ(G.world, o.x, o.y);
   const x = isoX(o.x, o.y), y = isoY(o.x, o.y) - z;
-  const w = sp.cvs.width * o.s, h = sp.cvs.height * o.s;
+  const w = sp.cvs.width * o.s * (sp.k || 1), h = sp.cvs.height * o.s * (sp.k || 1);
   const big = o.kind === 'laub' || o.kind === 'nadel';
   c.fillStyle = 'rgba(20,35,12,0.2)';
   c.beginPath(); c.ellipse(x + (big ? 10 : 4) * o.s, y - 1, (big ? 16 : 10) * o.s, (big ? 5.5 : 3.5) * o.s, 0, 0, Math.PI * 2); c.fill();
@@ -1537,6 +1550,17 @@ function tileColor(t, pal, hv) {
 // Helligkeit eines Hangs: Licht kommt von links oben
 function slopeLight(dhdx, dhdy) { return 1 + Math.max(-0.32, Math.min(0.2, (dhdx - dhdy) / 34)); }
 
+// Wiesentextur als Muster: ein Bild deckt 4 × 4 Kacheln, schräg wie der Boden
+const GRASS_TILES = 4;
+function grassPattern(c, ox, oy) {
+  const im = ART.wiese_sommer;
+  if (!im) return null;
+  if (!c.__grass) c.__grass = c.createPattern(im, 'repeat');
+  const k = im.width / GRASS_TILES;
+  c.__grass.setTransform(new DOMMatrix([HW / k, HH / k, -HW / k, HH / k, ox, oy]));
+  return c.__grass;
+}
+
 function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   const M = W.M, vh = W.vh, N = W.N;
   const t = W.tiles[j * N + i];
@@ -1559,6 +1583,17 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   c.fillStyle = cL; c.fill(); c.strokeStyle = cL; c.stroke();
   c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath();
   c.fillStyle = cR; c.fill(); c.strokeStyle = cR; c.stroke();
+  // Gemalte Wiese: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
+  const grassArt = (t === T.GRASS || t === T.ROAD) && season < 3 ? grassPattern(c, ox, oy) : null;
+  if (grassArt) {
+    c.save();
+    c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
+    c.fillStyle = grassArt; c.fill();
+    c.globalAlpha = season === 2 ? 0.5 : 0.26;
+    c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
+    c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
+    c.restore();
+  }
 
   if (isWater) {
     const land = (a, b) => a >= 0 && b >= 0 && a < N && b < N && W.tiles[b * N + a] !== T.WATER && W.tiles[b * N + a] !== T.BRIDGE;
@@ -1582,7 +1617,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     }
   }
 
-  if (t === T.GRASS || t === T.FOREST || t === T.HILLS || t === T.SAND) {
+  if ((t === T.GRASS && !grassArt) || t === T.FOREST || t === T.HILLS || t === T.SAND) {
     c.strokeStyle = shade(base, 0.74); c.lineWidth = 1;
     c.beginPath();
     const n = t === T.FOREST ? 4 : t === T.SAND ? 1 : 3;
@@ -2183,6 +2218,12 @@ export function resetRender() {
 }
 
 export function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.castleDirty = true; }
+
+// Neue gemalte Grafik geladen: Bäume und Boden neu aufbauen
+onArt((id) => {
+  if (id.startsWith('laub')) sprites = null;
+  if (id.startsWith('wiese')) chunkCache.clear();
+});
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }
 
