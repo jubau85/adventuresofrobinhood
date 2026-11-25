@@ -52,7 +52,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - **Belagerungen:** Überfälle auf Ashcombe als echte Kämpfe vor den Mauern statt als Würfelwurf. Mauern und Tore blockieren dann den Weg.
 - **Gefährten mit Geschichte:** Benannte Figuren mit eigenen Quests und Loyalität, etwa ein Mönch, eine Bogenschützin oder ein abtrünniger Templer.
 - **Diplomatie-Tafel:** Gesandte schicken, Tribute zahlen, Bündnisse förmlich schließen oder brechen.
-- **Gebäudekollision:** Häuser und Mauern blockieren Wege. Die Wegfindung ist darauf vorbereitet.
+- **Gebäudekollision:** Auch Häuser sollen den Weg versperren. Mauern tun das bereits.
 
 ### Mittelfristig
 - **Gefangene und Lösegeld:** Raubritter gefangen nehmen statt erschlagen.

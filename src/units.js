@@ -5,7 +5,7 @@ import {
   CLASSES, ITEMS, NPC_TYPES, GROUP_TYPES, T, TERRAIN_SPEED, NAMES_M, NAMES_F, EPITHETS,
   GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS,
 } from './data.js';
-import { isWalkable, findPath, tileAt } from './world.js';
+import { isWalkable, findPath, tileAt, nearestWalkable } from './world.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed } from './politics.js';
 import { cargoFree, addCargo } from './economy.js';
@@ -161,6 +161,31 @@ function moveToward(u, tx, ty, dt, stop = 0.05, mult = 1) {
   if (Math.abs(sx) > 0.05) u.facing = sx >= 0 ? 1 : -1;
   u.moving = true;
   return d - step <= stop;
+}
+
+// Freie Linie zwischen zwei Punkten (keine Mauer, kein Wasser)?
+function lineClear(ax, ay, bx, by) {
+  const d = Math.hypot(bx - ax, by - ay);
+  const n = Math.ceil(d / 0.35);
+  for (let k = 1; k <= n; k++) {
+    const t = k / n;
+    if (!isWalkable(G.world, ax + (bx - ax) * t, ay + (by - ay) * t)) return false;
+  }
+  return true;
+}
+
+// Auf ein Ziel zugehen. Versperren Mauern oder Wasser den direkten Weg, wird ein Weg gesucht (z. B. durchs Tor).
+function chaseTo(u, tx, ty, dt, stop, mult = 1) {
+  if (Math.hypot(tx - u.x, ty - u.y) < 1.2 || lineClear(u.x, u.y, tx, ty)) { u.chase = null; return moveToward(u, tx, ty, dt, stop, mult); }
+  const c = u.chase;
+  if (!c || G.time - c.t > 1.5 || Math.hypot(c.tx - tx, c.ty - ty) > 2) {
+    u.chase = { path: findPath(G.world, u.x, u.y, tx, ty, 8000), i: 0, t: G.time, tx, ty };
+  }
+  const ch = u.chase;
+  if (!ch.path || ch.i >= ch.path.length) return moveToward(u, tx, ty, dt, stop, mult);
+  const wp = ch.path[ch.i];
+  if (moveToward(u, wp.x, wp.y, dt, 0.25, mult)) ch.i++;
+  return false;
 }
 
 function followPath(u, dt, mult = 1) {
@@ -388,6 +413,11 @@ export function updateUnits(dt) {
     if (u.flash > 0) u.flash -= dt;
     if (u.swing > 0) u.swing -= dt;
     if (u.combatT > 0) u.combatT -= dt;
+    // Wer auf einer neu gebauten Mauer steht, wird daneben gesetzt
+    if (!u.hidden && !isWalkable(G.world, u.x, u.y)) {
+      const n = nearestWalkable(G.world, Math.floor(u.x), Math.floor(u.y), 4);
+      if (n) { u.x = n.x + 0.5; u.y = n.y + 0.5; u.chase = null; }
+    }
   }
   if (G.s.safeTime > 0) G.s.safeTime -= dt;
 
@@ -399,7 +429,10 @@ export function updateUnits(dt) {
     for (let k = 0; k < g.members.length; k++) {
       const m = g.members[k];
       if (near || g.engaged) updateGroupMember(m, g, k, dt);
-      else { const o = memberOffset(k); m.x = g.x + o.x; m.y = g.y + o.y; }
+      else {
+        const o = memberOffset(k);
+        if (isWalkable(G.world, g.x + o.x, g.y + o.y)) { m.x = g.x + o.x; m.y = g.y + o.y; } else { m.x = g.x; m.y = g.y; }
+      }
     }
   }
   const isNight = hourOf() >= 21 || hourOf() < 5;
@@ -436,12 +469,12 @@ function updatePlayer(p, dt) {
     const a = p.huntTarget;
     const d = Math.hypot(a.x - p.x, a.y - p.y);
     if (d > 26) { p.huntTarget = null; log('Das Tier ist entkommen.'); }
-    else if (d > p.st.range * 0.92) moveToward(p, a.x, a.y, dt, p.st.range * 0.88);
+    else if (d > p.st.range * 0.92) chaseTo(p, a.x, a.y, dt, p.st.range * 0.88);
     else if (p.cd <= 0) shootAnimal(p, a);
   } else if (p.attackTarget) {
     const t = p.attackTarget;
     const d = Math.hypot(t.x - p.x, t.y - p.y);
-    if (d > p.st.range * 0.9) moveToward(p, t.x, t.y, dt, p.st.range * 0.85);
+    if (d > p.st.range * 0.9) chaseTo(p, t.x, t.y, dt, p.st.range * 0.85);
   } else if (p.path) {
     followPath(p, dt);
   } else {
@@ -464,7 +497,7 @@ function engage(u, enemy, dt) {
     // Schützen weichen zurück
     moveToward(u, u.x - (enemy.x - u.x), u.y - (enemy.y - u.y), dt, 0.05, 0.9);
   } else if (d > r * 0.95) {
-    moveToward(u, enemy.x, enemy.y, dt, r * 0.85);
+    chaseTo(u, enemy.x, enemy.y, dt, r * 0.85);
   }
   if (d <= r + 0.15 && u.cd <= 0) attack(u, enemy);
 }
@@ -480,11 +513,11 @@ function updateCompanion(u, k, dt) {
   // Bogenschützen im Gefolge schießen bei der Jagd mit
   const prey = p.huntTarget;
   if (prey && !prey.dead && u.st.ranged && u.cd <= 0 && Math.hypot(prey.x - u.x, prey.y - u.y) <= u.st.range) shootAnimal(u, prey);
-  if (order === 'halten' && u.holdPos) { moveToward(u, u.holdPos.x, u.holdPos.y, dt, 0.3); return; }
+  if (order === 'halten' && u.holdPos) { chaseTo(u, u.holdPos.x, u.holdPos.y, dt, 0.3); return; }
   const slot = formationSlot(k);
   const d = Math.hypot(slot.x - u.x, slot.y - u.y);
   if (d > 24) { placeNear(u, p.x, p.y, 1.5); return; }
-  if (d > 0.45) moveToward(u, slot.x, slot.y, dt, 0.3, d > 3 ? 1.4 : 1.05);
+  if (d > 0.45) chaseTo(u, slot.x, slot.y, dt, 0.3, d > 3 ? 1.4 : 1.05);
 }
 
 function memberOffset(k) {
@@ -501,7 +534,7 @@ function updateGroupMember(m, g, k, dt) {
   const tx = g.x + o.x, ty = g.y + o.y;
   const d = Math.hypot(tx - m.x, ty - m.y);
   if (d > 30) { m.x = tx; m.y = ty; return; }
-  if (d > 0.3) moveToward(m, tx, ty, dt, 0.2, d > 2 ? 1.5 : 1.1);
+  if (d > 0.3) chaseTo(m, tx, ty, dt, 0.2, d > 2 ? 1.5 : 1.1);
 }
 
 function updatePeasant(v, dt, night) {
@@ -513,8 +546,12 @@ function updatePeasant(v, dt, night) {
     const r = h.type === 'stadt' ? 5.5 : h.type === 'spieler' ? 4 : 4.2;
     v.goal = { x: h.x + rand(-r, r), y: h.y + rand(-r, r) };
     if (!isWalkable(G.world, v.goal.x, v.goal.y)) { v.goal = null; return; }
+    v.goalT = 0;
   }
-  if (moveToward(v, v.goal.x, v.goal.y, dt, 0.2, 0.55)) { v.goal = null; v.wait = rand(2, 7); }
+  v.goalT = (v.goalT || 0) + dt;
+  const arrived = moveToward(v, v.goal.x, v.goal.y, dt, 0.2, 0.55);
+  // Angekommen, an einer Mauer hängen geblieben oder zu lange unterwegs: neues Ziel
+  if (arrived || !v.moving || v.goalT > 14) { v.goal = null; v.wait = rand(2, 7); }
 }
 
 function separate() {

@@ -6,6 +6,7 @@ import { rand, randInt, pick } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
 import { cargoUsed } from './economy.js';
+import { setPlayerWalls } from './world.js';
 import { seasonIndex } from './sim.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
@@ -77,6 +78,7 @@ function finishConstruction() {
   if (!c || G.s.day < c.done) return;
   if (c.id === 'burg') {
     G.s.castle.level = c.level;
+    setPlayerWalls(G.world, c.level >= 1);
     log(`Ashcombe ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
     addRenown(5 * c.level);
     spawnPeasants();

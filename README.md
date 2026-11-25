@@ -39,6 +39,7 @@ node tools/build.mjs
   - jede Stufe sichtbar anders, mit Arbeitern: Schmied mit Funken, Holzfäller, Steinmetze mit Kran, Pferde auf der Koppel, Soldaten auf dem Übungsplatz, Wachen auf den Türmen
   - eine Burgsiedlung, die mit der Burgstufe wächst
   - goldene Funken, wenn etwas fertig wird
+- **Mauern halten auf:** Palisaden und Steinmauern (Ashcombe ab der Holzburg, die Burgen der Barone, die Halle von Rotherwood) sind für alle Figuren undurchlässig. Man kommt nur durchs Tor hinein. Angreifer, Gefolge und Gruppen suchen sich den Weg dorthin.
 - **Gefolge:** Leute im Rittersaal anwerben, ausrüsten (Waffe, Rüstung, Schild, Pferd) und in Scharmützel führen. Dazu Befehle (folgen, Stellung halten, angreifen), Erfahrung und Stufen, Sold, Garnison und Verwundete.
 - **Jagd:** Mit Bogen oder Armbrust Hirsche und Enten jagen. Hirsche fliehen, Bogenschützen im Gefolge schießen mit. Fleisch und Felle lassen sich einlagern oder in Städten verkaufen. Wilderei kann den Normannen auffallen, fremdes Vieh zu schießen gilt als Diebstahl. Die Bestände wachsen täglich nach.
 - **Handel:** Jeder Ort erzeugt und braucht andere Waren. Die Preise richten sich nach dem Vorrat. Holz, Stein und Eisen braucht man auch für den Burgbau.

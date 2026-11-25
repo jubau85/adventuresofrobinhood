@@ -117,7 +117,58 @@ export function groundZ(W, x, y) {
 
 export function isWalkable(W, x, y) {
   if (x < 0.3 || y < 0.3 || x > W.N - 0.3 || y > W.N - 0.3) return false;
-  return W.tiles[Math.floor(y) * W.N + Math.floor(x)] !== T.WATER;
+  const i = Math.floor(y) * W.N + Math.floor(x);
+  return W.tiles[i] !== T.WATER && !W.block[i];
+}
+
+// ---------------------------------------------------------------- Mauern
+// Burgmauern und Palisaden sperren ihre Felder. Straßenfelder bleiben offen: Dort ist das Tor.
+function wallRing(W, s, R) {
+  const out = [];
+  for (let k = -R; k <= R; k++) out.push([s.tx + k, s.ty - R], [s.tx + k, s.ty + R], [s.tx - R, s.ty + k], [s.tx + R, s.ty + k]);
+  return out;
+}
+
+function blockTiles(W, arr, list) {
+  const N = W.N;
+  for (const [x, y] of list) {
+    if (x < 0 || y < 0 || x >= N || y >= N) continue;
+    const i = y * N + x, t = W.tiles[i];
+    if (t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
+    arr[i] = 1;
+  }
+}
+
+function buildStaticWalls(W) {
+  const N = W.N;
+  W.blockStatic = new Uint8Array(N * N);
+  for (const s of W.sites) {
+    if (s.type === 'burg') blockTiles(W, W.blockStatic, wallRing(W, s, 4));
+    if (s.palisade) {
+      const list = [];
+      const r = s.palisade;
+      for (let y = s.ty - 6; y <= s.ty + 6; y++) for (let x = s.tx - 6; x <= s.tx + 6; x++) {
+        const d = Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y);
+        const a = Math.atan2(y + 0.5 - s.y, x + 0.5 - s.x);
+        if (d >= r - 0.55 && d <= r + 0.45 && Math.abs(a - Math.PI / 2) > 0.3) list.push([x, y]);
+      }
+      blockTiles(W, W.blockStatic, list);
+    }
+  }
+  W.block = new Uint8Array(W.blockStatic);
+}
+
+// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten
+export function setPlayerWalls(W, on) {
+  W.block = new Uint8Array(W.blockStatic);
+  if (!on) return;
+  const s = W.sites.find((x) => x.type === 'spieler');
+  blockTiles(W, W.block, wallRing(W, s, 4));
+}
+
+export function isBlockedTile(W, x, y) {
+  const i = Math.floor(y) * W.N + Math.floor(x);
+  return !!W.block[i];
 }
 
 export function nearestWalkable(W, tx, ty, maxR = 8) {
@@ -127,7 +178,7 @@ export function nearestWalkable(W, tx, ty, maxR = 8) {
       if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
       const x = tx + ox, y = ty + oy;
       if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1) continue;
-      if (W.tiles[y * N + x] !== T.WATER) return { x, y };
+      if (W.tiles[y * N + x] !== T.WATER && !(W.block && W.block[y * N + x])) return { x, y };
     }
   }
   return null;
@@ -138,19 +189,19 @@ export function findPath(W, fx, fy, tx, ty, maxIter = 40000) {
   const N = W.N;
   const cl = (v) => Math.max(0, Math.min(N - 1, Math.floor(v)));
   let sx = cl(fx), sy = cl(fy), gx = cl(tx), gy = cl(ty);
-  if (W.tiles[sy * N + sx] === T.WATER) {
+  if (W.tiles[sy * N + sx] === T.WATER || W.block[sy * N + sx]) {
     const a = nearestWalkable(W, sx, sy, 3);
     if (!a) return null;
     sx = a.x; sy = a.y;
   }
-  if (W.tiles[gy * N + gx] === T.WATER) {
+  if (W.tiles[gy * N + gx] === T.WATER || W.block[gy * N + gx]) {
     const a = nearestWalkable(W, gx, gy, 8);
     if (!a) return null;
     gx = a.x; gy = a.y; tx = gx + 0.5; ty = gy + 0.5;
   }
   if (sx === gx && sy === gy) return [{ x: tx, y: ty }];
-  const tiles = W.tiles, extra = W.extraCost;
-  const idx = astar(N, sx, sy, gx, gy, (i) => TERRAIN_COST[tiles[i]] + extra[i], { hMul: 0.6, maxIter });
+  const tiles = W.tiles, extra = W.extraCost, block = W.block;
+  const idx = astar(N, sx, sy, gx, gy, (i) => (block[i] ? 1e9 : TERRAIN_COST[tiles[i]] + extra[i]), { hMul: 0.6, maxIter });
   if (!idx) return null;
   const pts = [];
   let pdx = 0, pdy = 0;
@@ -203,6 +254,7 @@ export function generateWorld(seed) {
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
+  buildStaticWalls(W);
   return W;
 }
 

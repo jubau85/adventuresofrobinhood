@@ -2,7 +2,7 @@
 
 import { G, log } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS } from './data.js';
-import { generateWorld, groundZ } from './world.js';
+import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
@@ -58,6 +58,7 @@ function newGame(name) {
 }
 
 function startWorld() {
+  setPlayerWalls(G.world, G.s.castle.level >= 1);
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
@@ -463,3 +464,5 @@ else boot((hot && hot.data) || {});
 // Für die Entwicklung in der Konsole erreichbar
 window.__ritter = G;
 window.__ritterCastle = castleSite;
+window.__ritterPath = (x, y) => setPlayerPath(x, y);
+window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
