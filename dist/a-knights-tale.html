@@ -609,6 +609,8 @@ const NPC_TYPES = {
   haendler: { cls: 'zivil', name: 'Händler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'haendler' },
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
+  freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
+  sachs_bogen: { cls: 'soldat', name: 'Sächsischer Bogner', eq: { waffe: 'kurzbogen', ruestung: 'lederwams' }, lv: [1, 2], look: 'sachsen' },
   sergent: { cls: 'soldat', name: 'Sergent', eq: { waffe: 'speer', ruestung: 'kettenhemd', schild: 'drachenschild' }, lv: [1, 3], look: 'franken' },
   arbaletrier: { cls: 'soldat', name: 'Arbalétrier', eq: { waffe: 'armbrust', ruestung: 'gambeson' }, lv: [1, 3], look: 'franken' },
   chevalier: { cls: 'ritter', name: 'Chevalier', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'wappenschild', pferd: 'zelter' }, lv: [2, 4], look: 'franken' },
@@ -643,6 +645,11 @@ const GROUP_TYPES = {
     name: 'Waldleute', nom: 'Waldleute', acc: 'die Waldleute', pl: true, faction: 'waldleute', members: [['waldmann', 2, 3]],
     gold: [5, 25], renown: 2, count: 5, spawn: 'forest', speed: 1.3,
     kill: { waldleute: -15, normannen: 6 },
+  },
+  sachsen: {
+    name: 'Sächsische Freisassen', nom: 'Sächsische Freisassen', acc: 'die sächsischen Freisassen', pl: true, faction: 'sachsen', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
+    gold: [20, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.24, realms: ['en', 'wa'], siteFaction: 'sachsen',
+    kill: { sachsen: -14, normannen: 5 },
   },
   franzosen: {
     name: 'Französische Streife', nom: 'Eine französische Streife', acc: 'die französische Streife', pl: false, faction: 'franken', members: [['sergent', 2, 3], ['arbaletrier', 1, 1], ['chevalier', 0, 1]],
@@ -710,6 +717,22 @@ const BUILDINGS = {
       { cost: { gold: 800, holz: 40, eisen: 10 }, days: 2, eff: '+12 Stein am Tag' },
     ],
   },
+  felder: {
+    name: 'Felder', desc: 'Äcker rund um die Burg. Sie ernähren dich, dein Gefolge und die Garnison.', levels: [
+      null,
+      { cost: { gold: 90, holz: 10 }, days: 1, eff: '+6 Getreide am Tag (im Frühling weniger, im Herbst mehr, im Winter nichts)' },
+      { cost: { gold: 260, holz: 25 }, days: 1, eff: '+12 Getreide am Tag, eine Zehntscheune' },
+      { cost: { gold: 600, holz: 30, stein: 30 }, days: 2, eff: '+18 Getreide am Tag, Windmühle: +10 Gold Mahlgeld' },
+    ],
+  },
+  schafzucht: {
+    name: 'Schafzucht', desc: 'Schafe auf eigener Weide. Wolle verkauft sich gut, dazu gibt es Fleisch.', levels: [
+      null,
+      { cost: { gold: 100, holz: 20 }, days: 1, eff: '6 Schafe, +4 Wolle am Tag' },
+      { cost: { gold: 280, holz: 30 }, days: 1, eff: '10 Schafe, +8 Wolle und +2 Fleisch am Tag' },
+      { cost: { gold: 620, holz: 30, stein: 20 }, days: 2, eff: '14 Schafe, +12 Wolle, +4 Fleisch und +1 Fell am Tag' },
+    ],
+  },
   markt: {
     name: 'Markt', desc: 'Händler kommen zu dir. Bringt Marktgeld und erlaubt Handel in der Burg.', levels: [
       null,
@@ -721,17 +744,25 @@ const BUILDINGS = {
   kapelle: {
     name: 'Kapelle', desc: 'Ein Ort für Gebet und Heilung.', levels: [
       null,
-      { cost: { gold: 160, holz: 20, stein: 10 }, days: 1, eff: 'Verwundete heilen schneller, +1 Ruhm alle 3 Tage' },
+      { cost: { gold: 160, holz: 20, stein: 10 }, days: 1, eff: '+1 Ruhm alle 3 Tage' },
       { cost: { gold: 420, stein: 40 }, days: 2, eff: '+1 Kirche-Ansehen alle 2 Tage' },
       { cost: { gold: 900, stein: 70, wein: 10 }, days: 3, eff: '+1 Ruhm am Tag' },
+    ],
+  },
+  hospiz: {
+    name: 'Hospiz', desc: 'Kräuter, Betten und Pflege. Verwundete kommen schneller wieder auf die Beine.', levels: [
+      null,
+      { cost: { gold: 120, holz: 20 }, days: 1, eff: 'Verwundete heilen doppelt so schnell. In der Burg kommst du rasch wieder zu Kräften.' },
+      { cost: { gold: 340, holz: 20, stein: 25, wolle: 10 }, days: 2, eff: 'Verwundete heilen dreimal so schnell. Ein Feldscher reist mit: unterwegs heilt ihr um die Hälfte schneller.' },
+      { cost: { gold: 780, stein: 50, wein: 10 }, days: 3, eff: 'Spital: Verwundete heilen viermal so schnell, unterwegs heilt ihr doppelt so schnell.' },
     ],
   },
   wehr: {
     name: 'Wachtürme', desc: 'Türme und Wachen schützen deine Burg vor Überfällen.', levels: [
       null,
-      { cost: { gold: 120, holz: 30 }, days: 1, eff: '+15 Verteidigung' },
-      { cost: { gold: 350, stein: 40 }, days: 2, eff: '+35 Verteidigung' },
-      { cost: { gold: 800, stein: 80, eisen: 20 }, days: 3, eff: '+60 Verteidigung' },
+      { cost: { gold: 120, holz: 30 }, days: 1, eff: '+15 Verteidigung, ein Turm mit Bogenschützen' },
+      { cost: { gold: 350, stein: 40 }, days: 2, eff: '+35 Verteidigung, zwei Türme schießen schärfer' },
+      { cost: { gold: 800, stein: 80, eisen: 20 }, days: 3, eff: '+60 Verteidigung, drei Türme mit Armbrüsten' },
     ],
   },
 };
@@ -748,7 +779,17 @@ const CASTLE_LAYOUT = {
   holzfaeller: { dx: -7.6, dy: 1.0 },
   steinbruch: { dx: 3.4, dy: -7.6 },
   wehr: { dx: 6.4, dy: 6.4 },
+  hospiz: { dx: -7.6, dy: -3.4 },
+  schafzucht: { dx: -6.8, dy: 6.0 },
+  felder: { dx: -3.4, dy: 8.9 },
 };
+// Wachtürme der eigenen Burg (relativ zur Burgmitte), in der Reihenfolge des Ausbaus
+const CASTLE_TOWERS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
+// Kampfbonus innerhalb der eigenen Mauern je Burgstufe (Anteil an Angriff und Abwehr)
+const CASTLE_BONUS = [{ atk: 0, def: 0.1 }, { atk: 0.1, def: 0.25 }, { atk: 0.2, def: 0.5 }, { atk: 0.3, def: 0.8 }];
+// Verpflegung: Waren, die als Nahrung zählen, und Preis für Zukauf je Ration
+const FOOD_GOODS = ['getreide', 'fleisch'];
+const FOOD_PRICE = 3;
 
 // ---------------------------------------------------------------- Siedlungen
 const SETTLEMENTS = [
@@ -874,6 +915,7 @@ const LOOKS = {
   wache: { tunic: '#556b7d', trim: '#c9c2b0' },
   wald: { tunic: '#3f6b2f', trim: '#2c4a20', hood: '#355a28' },
   franken: { tunic: '#3a56a8', trim: '#e8cf5a' },
+  sachsen: { tunic: '#5b8a3c', trim: '#d8c070' },
   bauer: { tunic: '#9a8461', trim: '#6e5c40' },
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
@@ -2315,8 +2357,11 @@ function groupHostile(g) {
 function isEnemy(a, b) {
   if (b.dead || a.dead) return false;
   if (a.team === 'player') return !!(b.group && b.group.engaged);
-  if (a.group && a.group.engaged) return b.team === 'player';
-  return false;
+  const ga = a.group;
+  if (!ga) return false;
+  if (ga.engaged && b.team === 'player') return true;
+  const gb = b.group;
+  return !!(gb && gb !== ga && (ga.feud === gb || gb.feud === ga));
 }
 
 function nearestEnemy(u, radius, from = u) {
@@ -2338,6 +2383,8 @@ function calcDamage(a, t) {
   let atk = a.st.atk, def = t.st.def;
   if (a.mounted && a.st.horse) atk += a.st.horse.atk;
   if (t.mounted && t.st.horse) def += t.st.horse.def;
+  if (a.team === 'player') { const b = castleBonusAt(a.x, a.y); if (b) atk *= 1 + b.atk; }
+  if (t.team === 'player') { const b = castleBonusAt(t.x, t.y); if (b) def = def * (1 + b.def) + G.s.castle.level; }
   let dmg = (atk * atk) / (atk + def * 1.5) * rand(0.8, 1.2);
   let crit = false;
   if (Math.random() < 0.08) { dmg *= 1.6; crit = true; }
@@ -2402,7 +2449,7 @@ function updateProjectiles(dt) {
 }
 
 function grantXp(u, amount) {
-  if (!u || u.dead || u.kind === 'npc' || u.kind === 'peasant') return;
+  if (!u || u.dead || (u.kind !== 'player' && u.kind !== 'companion')) return;
   u.xp += amount;
   while (u.xp >= xpNeeded(u.level) && u.level < 12) {
     u.xp -= xpNeeded(u.level);
@@ -2420,7 +2467,7 @@ function unitDown(t, killer) {
   if (t.kind === 'player') { playerDefeated(); return; }
   if (t.kind === 'companion') {
     t.status = 'verwundet';
-    t.woundedDays = 2;
+    t.woundedDays = 4;
     t.hp = 1;
     t.path = null;
     log(`${t.name} ist schwer verwundet und wird nach ${homeName()} gebracht.`, 'bad');
@@ -2429,14 +2476,20 @@ function unitDown(t, killer) {
   }
   G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25 });
   const g = t.group;
-  const xp = 6 + t.level * 6;
-  grantXp(killer, xp);
-  for (const c of partyMembers()) if (c !== killer) grantXp(c, Math.round(xp / 3));
-  if (killer !== G.s.player) grantXp(G.s.player, Math.round(xp / 3));
+  // Erfahrung nur für Kämpfe, an denen du beteiligt bist
+  if ((killer && killer.team === 'player') || (g && g.engaged)) {
+    const xp = 6 + t.level * 6;
+    grantXp(killer, xp);
+    for (const c of partyMembers()) if (c !== killer) grantXp(c, Math.round(xp / 3));
+    if (killer !== G.s.player) grantXp(G.s.player, Math.round(xp / 3));
+  }
   if (g) {
     g.members = g.members.filter((m) => m !== t);
     g.fallen.push(t);
-    if (g.members.length === 0) groupDestroyed(g);
+    if (g.members.length === 0) {
+      if (g.engaged) groupDestroyed(g);
+      else feudLost(g);
+    }
   }
 }
 
@@ -2526,7 +2579,7 @@ function updateUnits(dt) {
     const near = Math.hypot(g.x - p.x, g.y - p.y) < 55;
     for (let k = 0; k < g.members.length; k++) {
       const m = g.members[k];
-      if (near || g.engaged) updateGroupMember(m, g, k, dt);
+      if (near || g.engaged || g.feud) updateGroupMember(m, g, k, dt);
       else {
         const o = memberOffset(k);
         if (isWalkable(G.world, g.x + o.x, g.y + o.y)) { m.x = g.x + o.x; m.y = g.y + o.y; } else { m.x = g.x; m.y = g.y; }
@@ -2538,9 +2591,14 @@ function updateUnits(dt) {
     if (Math.abs(v.x - p.x) + Math.abs(v.y - p.y) < 60) updatePeasant(v, dt, isNight);
   }
   separate();
-  // Regeneration außerhalb des Kampfes
+  updateTowers(dt);
+  // Regeneration außerhalb des Kampfes: mit Feldscher unterwegs schneller, im Hospiz der Burg rasch
+  const hz = bLevel('hospiz'), home = castleSite();
+  const field = [1, 1, 1.5, 2][hz];
   const regen = (u) => {
-    if (u.combatT <= 0 && u.hp < u.st.maxHp) u.hp = Math.min(u.st.maxHp, u.hp + u.st.maxHp * 0.015 * dt);
+    if (u.combatT > 0 || u.hp >= u.st.maxHp) return;
+    const atHome = hz && home && Math.hypot(u.x - home.x, u.y - home.y) < 10;
+    u.hp = Math.min(u.st.maxHp, u.hp + u.st.maxHp * 0.015 * dt * field * (atHome ? 5 : 1));
   };
   regen(p);
   party.forEach(regen);
@@ -2624,7 +2682,7 @@ function memberOffset(k) {
 }
 
 function updateGroupMember(m, g, k, dt) {
-  if (g.engaged) {
+  if (g.engaged || g.feud) {
     const e = nearestEnemy(m, 22);
     if (e) { engage(m, e, dt); return; }
   }
@@ -2707,7 +2765,7 @@ function sitesFor(type) {
   const gt = GROUP_TYPES[type];
   if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && (s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle'));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && (!gt.realms || gt.realms.includes(s.realm)));
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction));
   return S;
 }
 
@@ -2823,10 +2881,19 @@ function chooseDest(g) {
 function updateGroups(dt) {
   const p = G.s.player;
   G.pathBudget = 2;
+  G.feudT = (G.feudT || 0) - dt;
+  if (G.feudT <= 0) { G.feudT = 0.5; checkFeuds(); }
   for (const g of G.groups) {
     if (!g.members.length) continue;
     const gt = GROUP_TYPES[g.type];
     const lead = g.members[0];
+    if (g.feud) {
+      const f = g.feud;
+      g.x = lead.x; g.y = lead.y;
+      if (!f.members.length || !G.groups.includes(f) || Math.hypot(f.x - g.x, f.y - g.y) > 26) endFeud(g);
+      else if (!g.engaged && Math.hypot(g.x - p.x, g.y - p.y) > 70) resolveFeud(g, f);
+      if (!g.engaged) continue;
+    }
     if (g.engaged) {
       let minD = Infinity;
       for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
@@ -2871,7 +2938,7 @@ function maintainGroups(initial = false) {
     if (gt.minDay && initial) continue;
     const want = gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
-    const n = initial ? want : Math.min(2, want - have);
+    const n = initial ? want : Math.min(3, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });
   }
 }
@@ -2930,9 +2997,151 @@ function sail(fromId, toId) {
   return true;
 }
 
+// ---------------------------------------------------------------- Fehden zwischen Trupps
+// Rivalisierende Fraktionen gehen aufeinander los, Banden überfallen Händler und Vögte, Streifen jagen Banden.
+const OUTLAWS = { banditen: 1, raubritter: 1 };
+const PREY = { haendler: 1, steuer: 1, patrouille: 1, franzosen: 1, sachsen: 1 };
+
+function groupsFeud(a, b) {
+  if (a === b || a.questId || b.questId) return false;
+  if (OUTLAWS[a.type] || OUTLAWS[b.type]) {
+    if (OUTLAWS[a.type] && OUTLAWS[b.type]) return false;
+    return !!PREY[(OUTLAWS[a.type] ? b : a).type];
+  }
+  const fa = a.faction, fb = b.faction;
+  if (!fa || !fb || fa === fb) return false;
+  return FACTIONS[fa].rivals.includes(fb) || FACTIONS[fb].rivals.includes(fa);
+}
+
+function strength(g) {
+  return g.members.reduce((a, m) => a + m.st.atk * 2 + m.st.def + m.hp / 8, 0) * rand(0.75, 1.25);
+}
+
+function nearPlayer(g, d) { const p = G.s.player; return Math.hypot(g.x - p.x, g.y - p.y) < d; }
+
+function checkFeuds() {
+  const gs = G.groups;
+  const p = G.s.player;
+  for (let i = 0; i < gs.length; i++) {
+    const a = gs[i];
+    if (!a.members.length || a.feud || a.engaged || (a.peace || 0) > G.time) continue;
+    for (let j = i + 1; j < gs.length; j++) {
+      const b = gs[j];
+      if (!b.members.length || b.feud || b.engaged || (b.peace || 0) > G.time) continue;
+      if (Math.abs(a.x - b.x) > 6 || Math.abs(a.y - b.y) > 6 || Math.hypot(a.x - b.x, a.y - b.y) > 6) continue;
+      if (!groupsFeud(a, b)) continue;
+      // Der Angreifer: Banden greifen an, sonst der stärkere Trupp
+      const att = OUTLAWS[a.type] ? a : OUTLAWS[b.type] ? b : a.members.length >= b.members.length ? a : b;
+      const def = att === a ? b : a;
+      // Fern vom Spieler: Meist ziehen sie mit bösen Blicken aneinander vorbei, manchmal kommt es zum Kampf
+      if (!nearPlayer(a, 50) && !nearPlayer(b, 50)) {
+        if (Math.random() < 0.3) resolveFeud(att, def);
+        else { a.peace = G.time + 60; b.peace = G.time + 60; }
+        break;
+      }
+      a.feud = b; b.feud = a;
+      a.path = null; b.path = null;
+      if (nearPlayer(att, 32)) {
+        const ta = GROUP_TYPES[att.type], td = GROUP_TYPES[def.type];
+        log(`${ta.nom} ${ta.pl ? 'greifen' : 'greift'} ${td.acc} an!`);
+      }
+      break;
+    }
+  }
+  // Helfer: Freunde in der Nähe greifen deine Angreifer an, Feinde schließen sich ihnen an
+  if (!inCombat() || p.dead) return;
+  for (const h of gs) {
+    if (!h.members.length || h.engaged || h.feud || h.questId) continue;
+    const d = Math.hypot(h.x - p.x, h.y - p.y);
+    if (d > 28) continue;
+    const ht = GROUP_TYPES[h.type];
+    if (groupHostile(h)) {
+      if (d < 14 && !(G.s.safeTime > 0)) { h.engaged = true; log(`${ht.nom} ${ht.pl ? 'schließen' : 'schließt'} sich dem Angriff an!`, 'bad'); }
+      continue;
+    }
+    const rep = h.faction ? G.s.rep[h.faction] : -99;
+    if (rep < 25 || d > (rep >= 50 ? 28 : 16)) continue;
+    const foe = G.groups.find((e) => e.engaged && e.members.length && e.faction !== h.faction && Math.hypot(e.x - h.x, e.y - h.y) < 30);
+    if (!foe) continue;
+    h.feud = foe; h.path = null;
+    // Mehrere Helfer derselben Art: nur eine Meldung
+    const key = `hilfe-${h.type}`;
+    if (!G.helpLog || G.helpLog[key] === undefined || G.time - G.helpLog[key] > 20) {
+      (G.helpLog = G.helpLog || {})[key] = G.time;
+      log(`${ht.nom} ${ht.pl ? 'kommen' : 'kommt'} dir zu Hilfe!`, 'good');
+    }
+  }
+}
+
+function endFeud(g) {
+  const f = g.feud;
+  g.feud = null; g.path = null; g.wait = rand(2, 5); g.peace = G.time + 90;
+  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = rand(2, 5); f.peace = G.time + 90; }
+}
+
+// Fern vom Spieler wird eine Fehde einfach ausgewürfelt
+function resolveFeud(a, b) {
+  const win = strength(a) >= strength(b) ? a : b, lose = win === a ? b : a;
+  endFeud(a);
+  removeGroup(lose);
+  const n = Math.floor(win.members.length * rand(0.1, 0.45));
+  for (let k = 0; k < n && win.members.length > 1; k++) { const m = win.members.pop(); m.dead = true; }
+  win.peace = G.time + 60;
+  rebuildUnits();
+}
+
+// Ein Trupp wurde ohne dein Zutun aufgerieben
+function feudLost(g) {
+  const f = G.groups.find((o) => o.feud === g);
+  if (f && nearPlayer(g, 32)) {
+    const tw = GROUP_TYPES[f.type], tl = GROUP_TYPES[g.type];
+    log(`${tw.nom} ${tw.pl ? 'haben' : 'hat'} ${tl.acc} besiegt.`);
+  }
+  if (f) endFeud(f);
+  removeGroup(g);
+}
+
+function removeGroup(g) {
+  for (const m of g.members) m.dead = true;
+  g.members = [];
+  for (const o of G.groups) if (o.feud === g) { o.feud = null; o.peace = G.time + 45; }
+  const i = G.groups.indexOf(g);
+  if (i >= 0) G.groups.splice(i, 1);
+}
+
+// ---------------------------------------------------------------- Wachtürme der eigenen Burg
+// Die Bogenschützen auf den Türmen schießen auf alles, was dir feindlich ist und in Reichweite kommt.
+function updateTowers(dt) {
+  const L = bLevel('wehr');
+  if (!L) return;
+  const s = castleSite();
+  if (!G.towerCd) G.towerCd = [0, 0, 0];
+  for (let k = 0; k < L; k++) {
+    G.towerCd[k] -= dt;
+    if (G.towerCd[k] > 0) continue;
+    const tx = s.x + CASTLE_TOWERS[k][0], ty = s.y + CASTLE_TOWERS[k][1];
+    let best = null, bd = 7 + L;
+    for (const g of G.groups) {
+      if (!(g.engaged || groupHostile(g))) continue;
+      for (const m of g.members) {
+        if (m.dead) continue;
+        const d = Math.hypot(m.x - tx, m.y - ty);
+        if (d < bd) { bd = d; best = m; }
+      }
+    }
+    if (!best) { G.towerCd[k] = 0.5; continue; }
+    const g = best.group;
+    if (!g.engaged && !(G.s.safeTime > 0)) { g.engaged = true; log(`Die Wachen auf den Türmen von ${homeName()} schießen auf ${GROUP_TYPES[g.type].acc}!`, 'bad'); }
+    const archer = { kind: 'tower', team: 'player', x: tx, y: ty, st: { atk: 3 + L * 3, def: 0 }, mounted: false };
+    G.projectiles.push({ x: tx, y: ty, tx: best.x, ty: best.y, target: best, att: archer, t: 0, dur: Math.max(0.25, bd / 14), bolt: L >= 3, z0: 46 });
+    G.towerCd[k] = 2.8 - L * 0.45;
+  }
+}
+
 // ===== animals.js =====
 // Tiere: Schafe und Kühe auf den Weiden, Hühner bei den Häusern, Hirsche im Wald, Enten auf dem Wasser.
 // Mit dem Bogen lassen sie sich jagen. Die Bestände werden nicht gespeichert, sie wachsen täglich nach.
+
 
 
 
@@ -2983,9 +3192,18 @@ function addHerd(kind, home, n, r, site = null, farFromPlayer = 0) {
   }
 }
 
+// Weide der eigenen Schafzucht (passt zum Zaun, den der Renderer zeichnet)
+function castlePasture(s) {
+  const L = bLevel('schafzucht');
+  if (!L || !s) return null;
+  const o = CASTLE_LAYOUT.schafzucht;
+  return { x: s.x + o.dx + 0.5, y: s.y + o.dy + 0.3, w: [0, 1.9, 2.5, 2.9][L], h: [0, 1.7, 2.1, 2.5][L], r: [0, 0.55, 0.75, 0.95][L], n: [0, 6, 10, 14][L] };
+}
+
 function farmHerds(s) {
+  const pa = s.type === 'spieler' ? castlePasture(s) : null;
   return {
-    schaf: { n: { dorf: 5, halle: 4, abtei: 6, spieler: 4, markt: 3, burg: 2 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
+    schaf: pa ? { n: pa.n, home: { x: pa.x, y: pa.y }, r: pa.r } : { n: { dorf: 5, halle: 4, abtei: 6, spieler: 3, markt: 3, burg: 2 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
     kuh: { n: { dorf: 2, halle: 3, spieler: 2 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
     huhn: { n: { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2 }[s.type] || 0, home: { x: s.x + 0.5, y: s.y + 0.8 }, r: 2.8 },
   };
@@ -3020,6 +3238,15 @@ function spawnAnimals() {
 }
 
 // Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
+// Nach dem Ausbau der Schafzucht: die Herde zieht auf die neue Weide
+function refreshCastleHerd() {
+  const s = G.world.sites.find((x) => x.type === 'spieler');
+  const pa = castlePasture(s);
+  if (!pa) return;
+  G.animals = G.animals.filter((a) => !(a.kind === 'schaf' && a.site === s.id));
+  addHerd('schaf', { x: pa.x, y: pa.y }, pa.n, pa.r, s.id);
+}
+
 function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
   if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 6, 25);
@@ -3029,7 +3256,7 @@ function replenishAnimals() {
       if (!h.n) continue;
       const have = G.animals.filter((a) => a.kind === kind && a.site === s.id);
       if (have.length >= h.n) continue;
-      const home = have.length ? have[0].home : h.home || spotNear(s.x, s.y, h.rMin, h.rMax, kind);
+      const home = h.home || (have.length ? have[0].home : spotNear(s.x, s.y, h.rMin, h.rMax, kind));
       if (home) addHerd(kind, home, 1, h.r, s.id, 12);
     }
   }
@@ -3496,6 +3723,7 @@ function giveGift(site) {
 
 
 
+
 function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
 function bLevel(id) { return id === 'burg' ? G.s.castle.level : G.s.castle.b[id] || 0; }
@@ -3575,6 +3803,7 @@ function finishConstruction() {
     log(`Fertiggestellt: ${BUILDINGS[c.id].name} Stufe ${c.level}.`, 'gold');
     addRenown(1);
     if (c.id === 'halle' && !G.s.castle.recruits.length) refreshRecruits();
+    if (c.id === 'schafzucht') refreshCastleHerd();
   }
   G.s.castle.construction = null;
   G.castleDirty = true;
@@ -3633,6 +3862,20 @@ function dismiss(u) {
   rebuildUnits();
 }
 
+// ---------------------------------------------------------------- Kampfbonus und Verpflegung
+// Innerhalb der eigenen Mauern (und am Tor) kämpfen du und dein Gefolge besser
+function castleBonusAt(x, y) {
+  const s = castleSite();
+  if (!s || Math.hypot(x - s.x, y - s.y) > 6.5) return null;
+  return CASTLE_BONUS[G.s.castle.level];
+}
+
+// Jeder Mund am Tisch braucht eine Ration am Tag: du und alle Gefährten
+function foodNeed() { return 1 + G.s.companions.length; }
+function foodStock() { return FOOD_GOODS.reduce((a, g) => a + (G.s.castle.storage[g] || 0), 0); }
+
+const FIELD_SEASON = [0.5, 1, 1.5, 0];
+
 // ---------------------------------------------------------------- Werte
 function castleDefense() {
   let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')];
@@ -3648,16 +3891,27 @@ function dailyBalance() {
     ['Marktgeld', [0, 15, 35, 60][bLevel('markt')]],
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
+  if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
   if (!isAlly('normannen')) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  const season = seasonIndex(), sz = bLevel('schafzucht');
   const prod = {
     holz: [0, 6, 12, 18][bLevel('holzfaeller')],
     stein: [0, 4, 8, 12][bLevel('steinbruch')],
+    getreide: Math.round([0, 6, 12, 18][bLevel('felder')] * FIELD_SEASON[season]),
+    wolle: [0, 4, 8, 12][sz],
+    fleisch: [0, 0, 2, 4][sz],
+    felle: [0, 0, 0, 1][sz],
   };
-  if (seasonIndex() === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); }
-  return { income, costs, prod };
+  if (season === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); prod.wolle = Math.floor(prod.wolle / 2); }
+  // Verpflegung: was fehlt, kaufen die Knechte teuer zu
+  const need = foodNeed();
+  const avail = foodStock() + prod.getreide + prod.fleisch;
+  const short = Math.max(0, need - avail);
+  if (short) costs.push(['Zukauf von Nahrung', short * FOOD_PRICE]);
+  return { income, costs, prod, food: { need, avail, short } };
 }
 
 // ---------------------------------------------------------------- Tageswechsel
@@ -3666,8 +3920,8 @@ function dailyCastle() {
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0);
   G.s.gold += inc;
-  let wages = 0, tax = 0;
-  for (const [n, v] of bal.costs) { if (n === 'Sold') wages = v; else tax = v; }
+  const costOf = (name) => (bal.costs.find(([n]) => n === name) || [0, 0])[1];
+  const wages = costOf('Sold'), tax = costOf('Abgaben an den Vogt');
   if (tax) {
     if (G.s.gold >= tax) G.s.gold -= tax;
     else { G.s.gold = 0; log('Du kannst die Abgaben nicht zahlen. Der Vogt ist verärgert.', 'bad'); changeRep('normannen', -4); }
@@ -3688,8 +3942,26 @@ function dailyCastle() {
   }
   for (const [k, v] of Object.entries(bal.prod)) if (v) G.s.castle.storage[k] = (G.s.castle.storage[k] || 0) + v;
 
-  // Verwundete heilen
-  const heal = (bLevel('kapelle') ? 2 : 1) * (isAlly('kirche') ? 2 : 1);
+  // Verpflegung aus dem Burglager: erst Getreide, dann Fleisch, der Rest wird zugekauft
+  let hungry = bal.food.need, eaten = 0;
+  for (const g of FOOD_GOODS) {
+    const k = Math.min(hungry, G.s.castle.storage[g] || 0);
+    G.s.castle.storage[g] = (G.s.castle.storage[g] || 0) - k;
+    hungry -= k; eaten += k;
+  }
+  let bought = 0;
+  if (hungry > 0) {
+    const cost = hungry * FOOD_PRICE;
+    if (G.s.gold >= cost) { G.s.gold -= cost; bought = hungry; }
+    else {
+      G.s.gold = 0;
+      log('Hunger in deinem Gefolge! Es fehlt an Brot und Fleisch. Alle sind geschwächt.', 'bad');
+      for (const u of [G.s.player, ...partyMembers()]) u.hp = Math.max(1, Math.round(u.hp * 0.75));
+    }
+  }
+
+  // Verwundete heilen: im Hospiz schneller
+  const heal = (1 + bLevel('hospiz')) * (isAlly('kirche') ? 2 : 1);
   for (const c of G.s.companions) {
     if (c.status !== 'verwundet') continue;
     c.woundedDays -= heal;
@@ -3718,8 +3990,8 @@ function dailyCastle() {
   const parts = [`+${inc} Gold`];
   if (tax) parts.push(`−${tax} Abgaben`);
   if (wages) parts.push(`−${wages} Sold`);
-  if (bal.prod.holz) parts.push(`+${bal.prod.holz} Holz`);
-  if (bal.prod.stein) parts.push(`+${bal.prod.stein} Stein`);
+  for (const [k, v] of Object.entries(bal.prod)) if (v) parts.push(`+${v} ${GOODS[k].name}`);
+  parts.push(`${eaten + bought} Rationen gegessen${bought ? ` (${bought} zugekauft)` : ''}`);
   log(`Tag ${G.s.day} in ${homeName()}: ${parts.join(', ')}.`);
 }
 
@@ -3841,6 +4113,7 @@ function newDay() {
 // ===== render.js =====
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
+
 
 
 
@@ -4514,10 +4787,10 @@ function buildStaticParts() {
 }
 
 // ---------------------------------------------------------------- Eigene Burg: sichtbarer Ausbau
-const BUILD_ICON = { halle: 'krone', kaserne: 'schwerter', schmiede: 'amboss', stall: 'hufeisen', holzfaeller: 'axt', steinbruch: 'hacke', markt: 'muenze', kapelle: 'kreuz', wehr: 'turm' };
-const PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0] };
-const TOWER_SPOTS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
-const STONE_BUILDINGS = { halle: 1, kapelle: 1, schmiede: 1, steinbruch: 1, wehr: 1 };
+const BUILD_ICON = { halle: 'krone', kaserne: 'schwerter', schmiede: 'amboss', stall: 'hufeisen', holzfaeller: 'axt', steinbruch: 'hacke', markt: 'muenze', kapelle: 'kreuz', wehr: 'turm', hospiz: 'kraut', schafzucht: 'schaf', felder: 'aehre' };
+const PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0], hospiz: [2.0, 2.4], schafzucht: [3.0, 2.6], felder: [1.8, 1.6] };
+const TOWER_SPOTS = CASTLE_TOWERS;
+const STONE_BUILDINGS = { halle: 1, kapelle: 1, schmiede: 1, steinbruch: 1, wehr: 1, hospiz: 1 };
 let castleAnchors = [];
 let sparkles = [];
 
@@ -4534,6 +4807,9 @@ function drawIcon(c, icon, x, y, col) {
     case 'muenze': c.arc(x, y, 3.3, 0, Math.PI * 2); c.fill(); c.fillStyle = '#c9a66b'; c.fillRect(x - 0.6, y - 2, 1.2, 4); break;
     case 'kreuz': c.fillRect(x - 0.8, y - 4, 1.6, 8); c.fillRect(x - 3, y - 2, 6, 1.6); break;
     case 'turm': c.fillRect(x - 2.5, y - 2, 5, 6); c.fillRect(x - 3.5, y - 4, 1.6, 2); c.fillRect(x - 0.8, y - 4, 1.6, 2); c.fillRect(x + 1.9, y - 4, 1.6, 2); break;
+    case 'kraut': c.moveTo(x, y + 4); c.lineTo(x, y - 1); c.stroke(); c.beginPath(); c.ellipse(x - 2.2, y - 1.5, 2.4, 1.3, -0.5, 0, Math.PI * 2); c.ellipse(x + 2.2, y - 1.5, 2.4, 1.3, 0.5, 0, Math.PI * 2); c.ellipse(x, y - 3.6, 1.3, 2.2, 0, 0, Math.PI * 2); c.fill(); break;
+    case 'schaf': c.ellipse(x - 0.5, y, 4, 2.6, 0, 0, Math.PI * 2); c.fill(); c.beginPath(); c.arc(x + 3.6, y - 1.2, 1.6, 0, Math.PI * 2); c.fill(); c.fillRect(x - 3, y + 1.5, 1, 2.5); c.fillRect(x + 1, y + 1.5, 1, 2.5); break;
+    case 'aehre': c.moveTo(x, y + 4.5); c.lineTo(x, y - 4); c.stroke(); for (let k = 0; k < 3; k++) { c.beginPath(); c.ellipse(x - 1.5, y - 2.6 + k * 2, 1.5, 0.9, -0.6, 0, Math.PI * 2); c.ellipse(x + 1.5, y - 2.6 + k * 2, 1.5, 0.9, 0.6, 0, Math.PI * 2); c.fill(); } break;
     default: break;
   }
 }
@@ -4827,6 +5103,178 @@ function addCastleBuilding(add, id, L, p, s) {
   }
 }
 
+// Acker als flache Fläche: Furchen und Feldfrucht je nach Jahreszeit
+function drawCropField(c, f) {
+  const se = seasonIndex();
+  const x0 = f.x - f.wx / 2, x1 = f.x + f.wx / 2, y0 = f.y - f.wy / 2, y1 = f.y + f.wy / 2;
+  poly(c, [P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)], se === 3 ? '#e4e9e8' : '#7a5a38');
+  const crop = [['#8fc256', 2.0], ['#c8b648', 2.8], ['#dcae3e', 3.2], ['#b9c0bf', 1.2]][se];
+  c.strokeStyle = crop[0]; c.lineWidth = crop[1];
+  const along = f.wx >= f.wy;
+  const n = Math.round((along ? f.wy : f.wx) / 0.22);
+  c.beginPath();
+  for (let k = 0; k <= n; k++) {
+    const t = (k + 0.5) / (n + 1);
+    const a = along ? P(x0 + 0.06, y0 + t * f.wy) : P(x0 + t * f.wx, y0 + 0.06);
+    const b = along ? P(x1 - 0.06, y0 + t * f.wy) : P(x0 + t * f.wx, y1 - 0.06);
+    c.moveTo(a[0], a[1] - (se === 2 ? 1.5 : 0.5)); c.lineTo(b[0], b[1] - (se === 2 ? 1.5 : 0.5));
+  }
+  c.stroke();
+  // Im Herbst stehen Garben auf dem Feld
+  if (se === 2) {
+    const r = mulberry32(Math.round(f.x * 31 + f.y * 17));
+    for (let k = 0; k < 3; k++) {
+      const p = P(x0 + 0.3 + r() * (f.wx - 0.6), y0 + 0.3 + r() * (f.wy - 0.6));
+      c.fillStyle = '#e8c15a'; c.strokeStyle = '#9a7a2a'; c.lineWidth = 0.8;
+      c.beginPath(); c.moveTo(p[0] - 3.5, p[1]); c.lineTo(p[0], p[1] - 9); c.lineTo(p[0] + 3.5, p[1]); c.closePath(); c.fill(); c.stroke();
+    }
+  }
+}
+
+function drawScarecrow(c, x, y) {
+  const [px, py] = P(x, y);
+  c.strokeStyle = '#5a4030'; c.lineWidth = 1.6;
+  c.beginPath(); c.moveTo(px, py); c.lineTo(px, py - 20); c.moveTo(px - 7, py - 14); c.lineTo(px + 7, py - 14); c.stroke();
+  c.fillStyle = '#8a5a3a'; c.fillRect(px - 3.5, py - 15, 7, 7);
+  c.fillStyle = '#d8c48a'; c.beginPath(); c.arc(px, py - 19, 2.8, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#5a4a2a'; c.beginPath(); c.moveTo(px - 5, py - 20); c.lineTo(px + 5, py - 20); c.lineTo(px, py - 25); c.closePath(); c.fill();
+}
+
+// Bockwindmühle mit drehenden Flügeln
+function drawWindmill(c, x, y) {
+  drawShadow(c, x, y, 0.8, 0.8, 50);
+  drawBox(c, x, y, 0.22, 0.22, 12, '#5a4030');
+  drawBox(c, x, y, 0.75, 0.62, 22, '#a07a50', 12, 'plank');
+  drawGableRoof(c, x, y, 0.75, 0.62, 34, 10, ROOFS.wood, '#8a6440', true);
+  const hub = P(x + 0.4, y + 0.05, 26);
+  const a0 = G.time * 0.9;
+  for (let k = 0; k < 4; k++) {
+    const a = a0 + k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+    const px = -sa, py = ca;
+    const q = (r, w) => [hub[0] + ca * r + px * w, hub[1] + sa * r * 0.9 + py * w];
+    poly(c, [q(5, 0), q(24, 0), q(24, 5), q(5, 5)], 'rgba(236,226,200,0.92)');
+    c.strokeStyle = '#4a3322'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(hub[0], hub[1]); const e = q(25, 0); c.lineTo(e[0], e[1]); c.stroke();
+  }
+  c.fillStyle = '#3a2a1a'; c.beginPath(); c.arc(hub[0], hub[1], 2, 0, Math.PI * 2); c.fill();
+}
+
+// Zaun als hintere und vordere Hälfte, damit Tiere dazwischen stehen können
+function drawFenceHalf(c, x, y, wx, wy, front) {
+  const x0 = x - wx / 2, x1 = x + wx / 2, y0 = y - wy / 2, y1 = y + wy / 2;
+  c.strokeStyle = '#7a5a3a'; c.lineWidth = 1.4;
+  const post = (px, py) => { const p = P(px, py); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p[0], p[1] - 8); c.stroke(); };
+  const side = (ax, ay, bx, by) => {
+    for (const z of [3.5, 6.5]) { const a = P(ax, ay, z), b = P(bx, by, z); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 0.5));
+    for (let k = 0; k <= n; k++) post(ax + (bx - ax) * k / n, ay + (by - ay) * k / n);
+  };
+  if (front) { side(x1, y0, x1, y1); side(x0, y1, x1, y1); }
+  else { side(x0, y0, x1, y0); side(x0, y0, x0, y1); }
+}
+
+function drawWoolBales(c, x, y, n) {
+  for (let k = 0; k < n; k++) {
+    const p = P(x + (k % 2) * 0.28, y + Math.floor(k / 2) * 0.22, Math.floor(k / 4) * 6);
+    c.fillStyle = '#efe8d6'; c.strokeStyle = 'rgba(90,70,50,0.6)'; c.lineWidth = 0.8;
+    c.beginPath(); c.ellipse(p[0], p[1] - 3.5, 6, 4, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.strokeStyle = '#a08860'; c.beginPath(); c.moveTo(p[0] - 1, p[1] - 7.5); c.lineTo(p[0] - 1, p[1] + 0.5); c.stroke();
+  }
+}
+
+// Feste Lage der Äcker um die Burg: nicht auf Straßen, Wasser, Häusern oder Bauplätzen
+function fieldSpots(s) {
+  if (s.fieldSpots) return s.fieldSpots;
+  const W = G.world;
+  const r = mulberry32(W.seed + 4711);
+  const fp = { x: s.x + CASTLE_LAYOUT.felder.dx, y: s.y + CASTLE_LAYOUT.felder.dy };
+  const avoid = Object.entries(CASTLE_LAYOUT).filter(([id]) => id !== 'felder').map(([id, o]) => ({ x: s.x + o.dx, y: s.y + o.dy, r: Math.max(...PLOT[id]) / 2 + 1.4 }));
+  avoid.push({ x: fp.x, y: fp.y, r: 1.6 });
+  for (const b of villageSpots(s)) avoid.push({ x: b.x, y: b.y, r: 1.5 });
+  for (const [dx, dy] of TOWER_SPOTS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.6 });
+  const cand = [];
+  for (let k = 0; k < 900; k++) {
+    const a = r() * Math.PI * 2, d = 6.5 + r() * 5;
+    const wide = r() < 0.5;
+    const f = { x: s.x + Math.cos(a) * d, y: s.y + Math.sin(a) * d, wx: wide ? 2.1 : 1.4, wy: wide ? 1.4 : 2.1 };
+    if (Math.hypot(f.x - s.x, f.y - s.y) < 6) continue;
+    let ok = true;
+    for (let ty = Math.floor(f.y - f.wy / 2); ty <= Math.floor(f.y + f.wy / 2) && ok; ty++) for (let tx = Math.floor(f.x - f.wx / 2); tx <= Math.floor(f.x + f.wx / 2); tx++) {
+      const t = tileAt(W, tx + 0.5, ty + 0.5);
+      if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (avoid.some((o) => Math.abs(o.x - f.x) < o.r + f.wx / 2 && Math.abs(o.y - f.y) < o.r + f.wy / 2)) continue;
+    cand.push(f);
+  }
+  cand.sort((p, q) => Math.hypot(p.x - fp.x, p.y - fp.y) - Math.hypot(q.x - fp.x, q.y - fp.y));
+  const spots = [];
+  for (const f of cand) {
+    if (spots.some((o) => Math.abs(o.x - f.x) < (o.wx + f.wx) / 2 + 0.35 && Math.abs(o.y - f.y) < (o.wy + f.wy) / 2 + 0.35)) continue;
+    spots.push(f);
+    if (spots.length >= 6) break;
+  }
+  s.fieldSpots = spots;
+  return spots;
+}
+
+function addNewCastleBuilding(add, addFlat, id, L, p, s) {
+  switch (id) {
+    case 'hospiz': {
+      const house = [null,
+        { x: p.x + 0.2, y: p.y - 0.3, wx: 1.3, wy: 1.1, h: 13, rh: 10, wall: 'timber', roof: 'thatch', lit: true, chimney: true, v: 0.35 },
+        { x: p.x + 0.3, y: p.y - 0.2, wx: 1.2, wy: 2.0, h: 16, rh: 12, wall: 'plaster', roof: 'tile', lit: true, chimney: true, v: 0.15 },
+        { x: p.x + 0.3, y: p.y - 0.2, wx: 1.4, wy: 2.3, h: 22, rh: 13, wall: 'stone', roof: 'slate', lit: true, chimney: true, v: 0.2 }][L];
+      add(house.x, house.y, (c) => {
+        drawHouse(c, house);
+        if (L === 3) { const tx = house.x, ty = house.y - house.wy / 2 + 0.25; drawBox(c, tx, ty, 0.36, 0.36, 12, '#b2ab9c', house.h + 8, 'stone'); drawPyramid(c, tx, ty, 0.36, 0.36, house.h + 20, 9, ROOFS.slate); }
+      });
+      const beds = [0, 2, 3, 4][L];
+      for (let k = 0; k < beds; k++) {
+        const bx = p.x - 0.75 + (k % 2) * 0.7, by = p.y + 0.55 + Math.floor(k / 2) * 0.55;
+        add(bx, by, (c) => drawProp(c, { prop: 'beet', x: bx, y: by, v: 0.2 + k * 0.2 }));
+      }
+      if (L >= 2) add(p.x - 0.75, p.y - 0.9, (c) => drawWell(c, { x: p.x - 0.75, y: p.y - 0.9 }));
+      add(p.x - 0.4, p.y + 1.15, (c) => drawWorker(c, p.x - 0.4, p.y + 1.15, null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2 }));
+      if (L === 3) add(p.x + 0.4, p.y + 1.2, (c) => drawWorker(c, p.x + 0.4, p.y + 1.2, null, 2.4, { col: '#e8e0cc', hat: '#e8e0cc', speed: 1, flip: true }));
+      break;
+    }
+    case 'schafzucht': {
+      const pa = castlePasture(s);
+      if (pa) {
+        addFlat(pa.x - pa.w / 2, pa.y - pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, false));
+        add(pa.x + pa.w / 2, pa.y + pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, true));
+      }
+      const hut = L === 3
+        ? { x: p.x - 1.2, y: p.y - 1.0, wx: 1.0, wy: 0.9, h: 12, rh: 9, wall: 'stone', roof: 'slate', lit: true, v: 0.6 }
+        : { x: p.x - 1.2, y: p.y - 1.0, wx: 0.85, wy: 0.75, h: 10, rh: 9, wall: 'wood', roof: 'thatch', lit: true, v: 0.6 };
+      add(hut.x, hut.y, (c) => drawHouse(c, hut));
+      if (L >= 2) add(p.x + 1.5, p.y - 1.1, (c) => {
+        // Scherschuppen: offenes Dach auf Pfosten
+        for (const [dx, dy] of [[-0.35, -0.3], [0.35, -0.3], [-0.35, 0.3], [0.35, 0.3]]) drawBox(c, p.x + 1.5 + dx, p.y - 1.1 + dy, 0.08, 0.08, 12, '#6b4a2e');
+        drawGableRoof(c, p.x + 1.5, p.y - 1.1, 0.9, 0.8, 12, 7, ROOFS.thatch, '#8a6a40', true);
+      });
+      if (L >= 2) add(p.x + 1.7, p.y - 0.35, (c) => drawWoolBales(c, p.x + 1.7, p.y - 0.35, L === 3 ? 6 : 3));
+      add(p.x - 1.3, p.y + 0.4, (c) => drawWorker(c, p.x - 1.3, p.y + 0.4, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8 }));
+      break;
+    }
+    case 'felder': {
+      const spots = fieldSpots(s).slice(0, [0, 2, 4, 6][L]);
+      spots.forEach((f, k) => {
+        addFlat(f.x - f.wx / 2, f.y - f.wy / 2, (c) => drawCropField(c, f));
+        if (k % 2 === 0 && seasonIndex() < 3) add(f.x + 0.2, f.y + 0.2, (c) => drawWorker(c, f.x + 0.2, f.y + 0.2, 'hacke', k * 1.3, { col: '#8a7a55', hat: '#c9b06a', speed: 2.2, flip: k % 4 === 0 }));
+      });
+      if (spots[0]) add(spots[0].x - 0.4, spots[0].y - 0.3, (c) => drawScarecrow(c, spots[0].x - 0.4, spots[0].y - 0.3));
+      if (L === 1) add(p.x, p.y, (c) => { drawHouse(c, { x: p.x, y: p.y, wx: 0.8, wy: 0.7, h: 9, rh: 8, wall: 'wood', roof: 'thatch', lit: false, v: 0.4 }); });
+      if (L >= 2) add(p.x - 0.1, p.y - 0.1, (c) => drawHouse(c, { x: p.x - 0.1, y: p.y - 0.1, wx: 1.1, wy: 1.6, h: 14, rh: 14, wall: 'wood', roof: 'thatch', lit: false, v: 0.7 }));
+      if (L >= 2) add(p.x + 0.9, p.y + 0.6, (c) => drawProp(c, { prop: 'heu', x: p.x + 0.9, y: p.y + 0.6, v: 0.4 }));
+      if (L === 3) add(p.x + 1.3, p.y - 0.9, (c) => drawWindmill(c, p.x + 1.3, p.y - 0.9));
+      break;
+    }
+    default: break;
+  }
+}
+
 function addTower(add, s, k, L) {
   const x = s.x + TOWER_SPOTS[k][0], y = s.y + TOWER_SPOTS[k][1];
   const stone = L >= 2;
@@ -4848,12 +5296,14 @@ function buildPlayerCastle() {
   const parts = castlePieces(s, C.level, playerColor());
   const z0 = groundZ(G.world, s.x, s.y);
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
+  // Flache Dinge (Äcker, hintere Zäune) liegen unter allem, was auf ihnen steht
+  const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
   const lv = (id) => C.b[id] || 0;
   const pos = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
   const con = C.construction;
   castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
 
-  for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle']) {
+  for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle', 'hospiz', 'schafzucht', 'felder']) {
     const L = lv(id), p = pos(id), building = con && con.id === id;
     const [pw, ph] = PLOT[id];
     const signAt = { x: p.x - pw / 2 - 0.25, y: p.y + ph / 2 + 0.15 };
@@ -4864,7 +5314,7 @@ function buildPlayerCastle() {
       castleAnchors.push({ x: p.x, y: p.y, h: 20, label: `Bauplatz: ${name}` });
       continue;
     }
-    if (L) addCastleBuilding(add, id, L, p, s);
+    if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
     if (building) addConstruction(add, id, p, L);
     add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], false));
     castleAnchors.push({ x: p.x, y: p.y, h: 40, label: `${name} · Stufe ${L}${building ? ` (Ausbau auf Stufe ${con.level} läuft)` : ''}` });
@@ -5845,7 +6295,7 @@ function resetRender() {
   birds = [];
 }
 
-function onSeasonChanged() { chunkCache.clear(); minimapBase = null; }
+function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.castleDirty = true; }
 
 function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }
 
@@ -5960,7 +6410,7 @@ function render() {
     const k = pr.t / pr.dur;
     const x = pr.x + (pr.tx - pr.x) * k, y = pr.y + (pr.ty - pr.y) * k;
     const d = Math.hypot(pr.tx - pr.x, pr.ty - pr.y);
-    const zz = 14 + Math.sin(k * Math.PI) * d * (pr.bolt ? 1.5 : 4) + zAt(x, y);
+    const zz = 14 + (pr.z0 || 0) * (1 - k) + Math.sin(k * Math.PI) * d * (pr.bolt ? 1.5 : 4) + zAt(x, y);
     const sx = isoX(x, y), sy = isoY(x, y) - zz;
     const dx = isoX(pr.tx, pr.ty) - isoX(pr.x, pr.y), dy = isoY(pr.tx, pr.ty) - isoY(pr.x, pr.y);
     const l = Math.hypot(dx, dy) || 1;
@@ -6991,7 +7441,8 @@ function castlePanel() {
     case 'markt': body = marketTable(site); break;
     default: body = castleBuild();
   }
-  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+  const cb = CASTLE_BONUS[G.s.castle.level];
+  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
 function castleBuild() {
@@ -7022,7 +7473,8 @@ function castleBuild() {
     <div class="summary">
       <div><span class="label">Tagesbilanz</span><b class="${inc - cost >= 0 ? 'pos' : 'neg'}">${inc - cost >= 0 ? '+' : ''}${inc - cost} Gold</b><span class="muted">${bal.income.map(([n, v]) => `${n} +${v}`).join(', ')}${bal.costs.length ? '; ' + bal.costs.map(([n, v]) => `${n} −${v}`).join(', ') : ''}</span></div>
       <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach ${esc(homeName())}.` : `${esc(homeName())} ist ein blühender Ort.`}</span></div>
-      <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">Täglich ${bal.prod.holz ? `+${bal.prod.holz} Holz` : 'kein Holz'}, ${bal.prod.stein ? `+${bal.prod.stein} Stein` : 'kein Stein'}. Baustoffe in deiner Ladung zählen mit.</span></div>
+      <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">${prodText(bal.prod)} Baustoffe in deiner Ladung zählen mit.</span></div>
+      <div><span class="label">Verpflegung</span><b class="${bal.food.short ? 'neg' : 'pos'}">${foodStock()} Rationen</b><span class="muted">${st.getreide || 0} Getreide, ${st.fleisch || 0} Fleisch im Lager. ${foodNeed()} ${foodNeed() === 1 ? 'Mund' : 'Münder'} am Tisch: Täglich ${foodNeed()} ${foodNeed() === 1 ? 'Ration' : 'Rationen'}.${bal.food.short ? ` Es fehlen ${bal.food.short}, die für je ${FOOD_PRICE} Gold zugekauft werden.` : ''} Felder, Schafzucht und Jagd füllen die Vorräte.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
     </div>
     <div class="bgrid">${cards}</div>`;
@@ -7046,6 +7498,11 @@ function castleHall() {
   return `<p class="meta">Im Feld ${partyMembers().length}/${partyCap()} · In der Garnison ${G.s.companions.filter((c) => c.status === 'garnison').length} · Neue Anwärter ${next ? `in ${next} ${next === 1 ? 'Tag' : 'Tagen'}` : 'morgen'}</p>
     ${cards ? `<div class="rgrid">${cards}</div>` : '<p class="muted">Heute hat sich niemand gemeldet.</p>'}
     <p class="hint">Wer nicht mehr ins Gefolge passt, bleibt in der Garnison und verteidigt ${esc(homeName())}.${isAlly('waldleute') ? '' : ' Langbogenschützen kommen nur, wenn die Waldleute dir vertrauen.'}</p>`;
+}
+
+function prodText(prod) {
+  const parts = Object.entries(prod).filter(([, v]) => v).map(([k, v]) => `+${v} ${GOODS[k].name}`);
+  return parts.length ? `Täglich ${parts.join(', ')}.` : 'Noch keine eigene Erzeugung.';
 }
 
 function castleStore() {
@@ -7294,7 +7751,9 @@ function helpPanel() {
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
         <li>Wer einer Fraktion hilft, verärgert ihre Rivalen. Ab +${ALLY_AT} wird eine Fraktion zum Verbündeten und gewährt Vorteile.</li>
         <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in ${esc(homeName())} ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
-        <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab.</li>
+        <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab. Die Türme schießen auf jeden Feind in Reichweite, und <b>innerhalb deiner Mauern</b> kämpfst du mit jeder Burgstufe besser.</li>
+        <li>Du und dein Gefolge braucht jeden Tag eine <b>Ration</b> pro Kopf aus dem Burglager: Getreide oder Fleisch. <b>Felder</b>, die <b>Schafzucht</b> und die Jagd füllen die Vorräte, sonst wird teuer zugekauft. Verwundete pflegt das <b>Hospiz</b>.</li>
+        <li>Die Fraktionen <b>bekämpfen einander</b>: Banden überfallen Händler, Sachsen und Normannen gehen aufeinander los. Trupps einer Fraktion, die dich mag, kommen dir im Kampf zu Hilfe, verfeindete schließen sich deinen Angreifern an.</li>
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
       </ol></div>
@@ -7509,7 +7968,7 @@ function newGame(opts) {
     seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
-    castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0 }, construction: null, recruits: [], recruitDay: 0 },
+    castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     towns: {}, quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
     player,
   };
@@ -7667,7 +8126,8 @@ function checkNearSite() {
     const blocked = s.faction && isHostileFaction(s.faction);
     showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
   } else if (inCombat()) {
-    showPrompt('<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>');
+    const cb = castleBonusAt(G.s.player.x, G.s.player.y);
+    showPrompt(`<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>${cb ? ` · Mauerschutz +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr` : ''}`);
   } else showPrompt(null);
 }
 
@@ -8016,6 +8476,7 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance };
 
 })();
 </script>

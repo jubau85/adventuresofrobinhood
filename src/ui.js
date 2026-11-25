@@ -3,7 +3,7 @@
 import { G, log, homeName } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS, REGIONS, KM_PER_TILE,
+  TYPE_NAME, SEASONS, REGIONS, KM_PER_TILE, CASTLE_BONUS, FOOD_PRICE,
 } from './data.js';
 import {
   buy, sell, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
@@ -14,7 +14,7 @@ import {
 } from './politics.js';
 import {
   bLevel, levelName, partyCap, cargoCap, buildInfo, startBuild, hire, setCompanionStatus, dismiss,
-  castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses,
+  castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses, foodNeed, foodStock,
 } from './castle.js';
 import { partyMembers, equip, unequip, previewEquip, xpNeeded, setPlayerPath, ferryRoutes, ferryCost, sail } from './units.js';
 import { seasonIndex, yearOf, clockText, passHours } from './sim.js';
@@ -306,7 +306,8 @@ function castlePanel() {
     case 'markt': body = marketTable(site); break;
     default: body = castleBuild();
   }
-  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+  const cb = CASTLE_BONUS[G.s.castle.level];
+  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
 function castleBuild() {
@@ -337,7 +338,8 @@ function castleBuild() {
     <div class="summary">
       <div><span class="label">Tagesbilanz</span><b class="${inc - cost >= 0 ? 'pos' : 'neg'}">${inc - cost >= 0 ? '+' : ''}${inc - cost} Gold</b><span class="muted">${bal.income.map(([n, v]) => `${n} +${v}`).join(', ')}${bal.costs.length ? '; ' + bal.costs.map(([n, v]) => `${n} −${v}`).join(', ') : ''}</span></div>
       <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach ${esc(homeName())}.` : `${esc(homeName())} ist ein blühender Ort.`}</span></div>
-      <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">Täglich ${bal.prod.holz ? `+${bal.prod.holz} Holz` : 'kein Holz'}, ${bal.prod.stein ? `+${bal.prod.stein} Stein` : 'kein Stein'}. Baustoffe in deiner Ladung zählen mit.</span></div>
+      <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">${prodText(bal.prod)} Baustoffe in deiner Ladung zählen mit.</span></div>
+      <div><span class="label">Verpflegung</span><b class="${bal.food.short ? 'neg' : 'pos'}">${foodStock()} Rationen</b><span class="muted">${st.getreide || 0} Getreide, ${st.fleisch || 0} Fleisch im Lager. ${foodNeed()} ${foodNeed() === 1 ? 'Mund' : 'Münder'} am Tisch: Täglich ${foodNeed()} ${foodNeed() === 1 ? 'Ration' : 'Rationen'}.${bal.food.short ? ` Es fehlen ${bal.food.short}, die für je ${FOOD_PRICE} Gold zugekauft werden.` : ''} Felder, Schafzucht und Jagd füllen die Vorräte.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
     </div>
     <div class="bgrid">${cards}</div>`;
@@ -361,6 +363,11 @@ function castleHall() {
   return `<p class="meta">Im Feld ${partyMembers().length}/${partyCap()} · In der Garnison ${G.s.companions.filter((c) => c.status === 'garnison').length} · Neue Anwärter ${next ? `in ${next} ${next === 1 ? 'Tag' : 'Tagen'}` : 'morgen'}</p>
     ${cards ? `<div class="rgrid">${cards}</div>` : '<p class="muted">Heute hat sich niemand gemeldet.</p>'}
     <p class="hint">Wer nicht mehr ins Gefolge passt, bleibt in der Garnison und verteidigt ${esc(homeName())}.${isAlly('waldleute') ? '' : ' Langbogenschützen kommen nur, wenn die Waldleute dir vertrauen.'}</p>`;
+}
+
+function prodText(prod) {
+  const parts = Object.entries(prod).filter(([, v]) => v).map(([k, v]) => `+${v} ${GOODS[k].name}`);
+  return parts.length ? `Täglich ${parts.join(', ')}.` : 'Noch keine eigene Erzeugung.';
 }
 
 function castleStore() {
@@ -609,7 +616,9 @@ function helpPanel() {
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
         <li>Wer einer Fraktion hilft, verärgert ihre Rivalen. Ab +${ALLY_AT} wird eine Fraktion zum Verbündeten und gewährt Vorteile.</li>
         <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in ${esc(homeName())} ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
-        <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab.</li>
+        <li>Feinde überfallen ${esc(homeName())}. Wachtürme und eine Garnison halten sie ab. Die Türme schießen auf jeden Feind in Reichweite, und <b>innerhalb deiner Mauern</b> kämpfst du mit jeder Burgstufe besser.</li>
+        <li>Du und dein Gefolge braucht jeden Tag eine <b>Ration</b> pro Kopf aus dem Burglager: Getreide oder Fleisch. <b>Felder</b>, die <b>Schafzucht</b> und die Jagd füllen die Vorräte, sonst wird teuer zugekauft. Verwundete pflegt das <b>Hospiz</b>.</li>
+        <li>Die Fraktionen <b>bekämpfen einander</b>: Banden überfallen Händler, Sachsen und Normannen gehen aufeinander los. Trupps einer Fraktion, die dich mag, kommen dir im Kampf zu Hilfe, verfeindete schließen sich deinen Angreifern an.</li>
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
       </ol></div>

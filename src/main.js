@@ -5,15 +5,15 @@ import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { drawTitleArt } from './titleart.js';
 import { startAudio, setMood, musicEnabled, setMusicEnabled, loadMusicPref } from './audio.js';
 import { generateWorld, groundZ, setPlayerWalls } from './world.js';
-import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO } from './animals.js';
+import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
   setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers,
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction } from './politics.js';
-import { castleSite } from './castle.js';
-import { updateTime } from './sim.js';
+import { castleSite, castleBonusAt, dailyBalance } from './castle.js';
+import { updateTime, passHours } from './sim.js';
 import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
@@ -41,7 +41,7 @@ function newGame(opts) {
     seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
-    castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0 }, construction: null, recruits: [], recruitDay: 0 },
+    castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     towns: {}, quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
     player,
   };
@@ -199,7 +199,8 @@ function checkNearSite() {
     const blocked = s.faction && isHostileFaction(s.faction);
     showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
   } else if (inCombat()) {
-    showPrompt('<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>');
+    const cb = castleBonusAt(G.s.player.x, G.s.player.y);
+    showPrompt(`<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>${cb ? ` · Mauerschutz +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr` : ''}`);
   } else showPrompt(null);
 }
 
@@ -548,3 +549,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance };

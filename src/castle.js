@@ -1,13 +1,14 @@
 // Die eigene Burg: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
 import { G, log, homeName } from './state.js';
-import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN } from './data.js';
+import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
 import { cargoUsed } from './economy.js';
 import { setPlayerWalls } from './world.js';
 import { seasonIndex } from './sim.js';
+import { refreshCastleHerd } from './animals.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
@@ -88,6 +89,7 @@ function finishConstruction() {
     log(`Fertiggestellt: ${BUILDINGS[c.id].name} Stufe ${c.level}.`, 'gold');
     addRenown(1);
     if (c.id === 'halle' && !G.s.castle.recruits.length) refreshRecruits();
+    if (c.id === 'schafzucht') refreshCastleHerd();
   }
   G.s.castle.construction = null;
   G.castleDirty = true;
@@ -146,6 +148,20 @@ export function dismiss(u) {
   rebuildUnits();
 }
 
+// ---------------------------------------------------------------- Kampfbonus und Verpflegung
+// Innerhalb der eigenen Mauern (und am Tor) kämpfen du und dein Gefolge besser
+export function castleBonusAt(x, y) {
+  const s = castleSite();
+  if (!s || Math.hypot(x - s.x, y - s.y) > 6.5) return null;
+  return CASTLE_BONUS[G.s.castle.level];
+}
+
+// Jeder Mund am Tisch braucht eine Ration am Tag: du und alle Gefährten
+export function foodNeed() { return 1 + G.s.companions.length; }
+export function foodStock() { return FOOD_GOODS.reduce((a, g) => a + (G.s.castle.storage[g] || 0), 0); }
+
+const FIELD_SEASON = [0.5, 1, 1.5, 0];
+
 // ---------------------------------------------------------------- Werte
 export function castleDefense() {
   let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')];
@@ -161,16 +177,27 @@ export function dailyBalance() {
     ['Marktgeld', [0, 15, 35, 60][bLevel('markt')]],
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
+  if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
   if (!isAlly('normannen')) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  const season = seasonIndex(), sz = bLevel('schafzucht');
   const prod = {
     holz: [0, 6, 12, 18][bLevel('holzfaeller')],
     stein: [0, 4, 8, 12][bLevel('steinbruch')],
+    getreide: Math.round([0, 6, 12, 18][bLevel('felder')] * FIELD_SEASON[season]),
+    wolle: [0, 4, 8, 12][sz],
+    fleisch: [0, 0, 2, 4][sz],
+    felle: [0, 0, 0, 1][sz],
   };
-  if (seasonIndex() === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); }
-  return { income, costs, prod };
+  if (season === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); prod.wolle = Math.floor(prod.wolle / 2); }
+  // Verpflegung: was fehlt, kaufen die Knechte teuer zu
+  const need = foodNeed();
+  const avail = foodStock() + prod.getreide + prod.fleisch;
+  const short = Math.max(0, need - avail);
+  if (short) costs.push(['Zukauf von Nahrung', short * FOOD_PRICE]);
+  return { income, costs, prod, food: { need, avail, short } };
 }
 
 // ---------------------------------------------------------------- Tageswechsel
@@ -179,8 +206,8 @@ export function dailyCastle() {
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0);
   G.s.gold += inc;
-  let wages = 0, tax = 0;
-  for (const [n, v] of bal.costs) { if (n === 'Sold') wages = v; else tax = v; }
+  const costOf = (name) => (bal.costs.find(([n]) => n === name) || [0, 0])[1];
+  const wages = costOf('Sold'), tax = costOf('Abgaben an den Vogt');
   if (tax) {
     if (G.s.gold >= tax) G.s.gold -= tax;
     else { G.s.gold = 0; log('Du kannst die Abgaben nicht zahlen. Der Vogt ist verärgert.', 'bad'); changeRep('normannen', -4); }
@@ -201,8 +228,26 @@ export function dailyCastle() {
   }
   for (const [k, v] of Object.entries(bal.prod)) if (v) G.s.castle.storage[k] = (G.s.castle.storage[k] || 0) + v;
 
-  // Verwundete heilen
-  const heal = (bLevel('kapelle') ? 2 : 1) * (isAlly('kirche') ? 2 : 1);
+  // Verpflegung aus dem Burglager: erst Getreide, dann Fleisch, der Rest wird zugekauft
+  let hungry = bal.food.need, eaten = 0;
+  for (const g of FOOD_GOODS) {
+    const k = Math.min(hungry, G.s.castle.storage[g] || 0);
+    G.s.castle.storage[g] = (G.s.castle.storage[g] || 0) - k;
+    hungry -= k; eaten += k;
+  }
+  let bought = 0;
+  if (hungry > 0) {
+    const cost = hungry * FOOD_PRICE;
+    if (G.s.gold >= cost) { G.s.gold -= cost; bought = hungry; }
+    else {
+      G.s.gold = 0;
+      log('Hunger in deinem Gefolge! Es fehlt an Brot und Fleisch. Alle sind geschwächt.', 'bad');
+      for (const u of [G.s.player, ...partyMembers()]) u.hp = Math.max(1, Math.round(u.hp * 0.75));
+    }
+  }
+
+  // Verwundete heilen: im Hospiz schneller
+  const heal = (1 + bLevel('hospiz')) * (isAlly('kirche') ? 2 : 1);
   for (const c of G.s.companions) {
     if (c.status !== 'verwundet') continue;
     c.woundedDays -= heal;
@@ -231,8 +276,8 @@ export function dailyCastle() {
   const parts = [`+${inc} Gold`];
   if (tax) parts.push(`−${tax} Abgaben`);
   if (wages) parts.push(`−${wages} Sold`);
-  if (bal.prod.holz) parts.push(`+${bal.prod.holz} Holz`);
-  if (bal.prod.stein) parts.push(`+${bal.prod.stein} Stein`);
+  for (const [k, v] of Object.entries(bal.prod)) if (v) parts.push(`+${v} ${GOODS[k].name}`);
+  parts.push(`${eaten + bought} Rationen gegessen${bought ? ` (${bought} zugekauft)` : ''}`);
   log(`Tag ${G.s.day} in ${homeName()}: ${parts.join(', ')}.`);
 }
 

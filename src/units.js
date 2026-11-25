@@ -3,14 +3,14 @@
 import { G, uid, log, homeName, playerColor } from './state.js';
 import {
   CLASSES, ITEMS, NPC_TYPES, GROUP_TYPES, T, TERRAIN_SPEED, NAMES_M, NAMES_F, EPITHETS,
-  GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS, FERRIES,
+  GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS, FERRIES, FACTIONS, CASTLE_TOWERS,
 } from './data.js';
 import { isWalkable, findPath, tileAt, nearestWalkable, landAt, groundZ } from './world.js';
 import { isoX, isoY } from './iso.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed } from './politics.js';
 import { cargoFree, addCargo, siteById } from './economy.js';
-import { castleSite } from './castle.js';
+import { castleSite, bLevel, castleBonusAt } from './castle.js';
 import { hourOf, passHours } from './sim.js';
 import { hitAnimal } from './animals.js';
 
@@ -235,8 +235,11 @@ export function groupHostile(g) {
 function isEnemy(a, b) {
   if (b.dead || a.dead) return false;
   if (a.team === 'player') return !!(b.group && b.group.engaged);
-  if (a.group && a.group.engaged) return b.team === 'player';
-  return false;
+  const ga = a.group;
+  if (!ga) return false;
+  if (ga.engaged && b.team === 'player') return true;
+  const gb = b.group;
+  return !!(gb && gb !== ga && (ga.feud === gb || gb.feud === ga));
 }
 
 function nearestEnemy(u, radius, from = u) {
@@ -258,6 +261,8 @@ function calcDamage(a, t) {
   let atk = a.st.atk, def = t.st.def;
   if (a.mounted && a.st.horse) atk += a.st.horse.atk;
   if (t.mounted && t.st.horse) def += t.st.horse.def;
+  if (a.team === 'player') { const b = castleBonusAt(a.x, a.y); if (b) atk *= 1 + b.atk; }
+  if (t.team === 'player') { const b = castleBonusAt(t.x, t.y); if (b) def = def * (1 + b.def) + G.s.castle.level; }
   let dmg = (atk * atk) / (atk + def * 1.5) * rand(0.8, 1.2);
   let crit = false;
   if (Math.random() < 0.08) { dmg *= 1.6; crit = true; }
@@ -322,7 +327,7 @@ export function updateProjectiles(dt) {
 }
 
 export function grantXp(u, amount) {
-  if (!u || u.dead || u.kind === 'npc' || u.kind === 'peasant') return;
+  if (!u || u.dead || (u.kind !== 'player' && u.kind !== 'companion')) return;
   u.xp += amount;
   while (u.xp >= xpNeeded(u.level) && u.level < 12) {
     u.xp -= xpNeeded(u.level);
@@ -340,7 +345,7 @@ function unitDown(t, killer) {
   if (t.kind === 'player') { playerDefeated(); return; }
   if (t.kind === 'companion') {
     t.status = 'verwundet';
-    t.woundedDays = 2;
+    t.woundedDays = 4;
     t.hp = 1;
     t.path = null;
     log(`${t.name} ist schwer verwundet und wird nach ${homeName()} gebracht.`, 'bad');
@@ -349,14 +354,20 @@ function unitDown(t, killer) {
   }
   G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25 });
   const g = t.group;
-  const xp = 6 + t.level * 6;
-  grantXp(killer, xp);
-  for (const c of partyMembers()) if (c !== killer) grantXp(c, Math.round(xp / 3));
-  if (killer !== G.s.player) grantXp(G.s.player, Math.round(xp / 3));
+  // Erfahrung nur für Kämpfe, an denen du beteiligt bist
+  if ((killer && killer.team === 'player') || (g && g.engaged)) {
+    const xp = 6 + t.level * 6;
+    grantXp(killer, xp);
+    for (const c of partyMembers()) if (c !== killer) grantXp(c, Math.round(xp / 3));
+    if (killer !== G.s.player) grantXp(G.s.player, Math.round(xp / 3));
+  }
   if (g) {
     g.members = g.members.filter((m) => m !== t);
     g.fallen.push(t);
-    if (g.members.length === 0) groupDestroyed(g);
+    if (g.members.length === 0) {
+      if (g.engaged) groupDestroyed(g);
+      else feudLost(g);
+    }
   }
 }
 
@@ -446,7 +457,7 @@ export function updateUnits(dt) {
     const near = Math.hypot(g.x - p.x, g.y - p.y) < 55;
     for (let k = 0; k < g.members.length; k++) {
       const m = g.members[k];
-      if (near || g.engaged) updateGroupMember(m, g, k, dt);
+      if (near || g.engaged || g.feud) updateGroupMember(m, g, k, dt);
       else {
         const o = memberOffset(k);
         if (isWalkable(G.world, g.x + o.x, g.y + o.y)) { m.x = g.x + o.x; m.y = g.y + o.y; } else { m.x = g.x; m.y = g.y; }
@@ -458,9 +469,14 @@ export function updateUnits(dt) {
     if (Math.abs(v.x - p.x) + Math.abs(v.y - p.y) < 60) updatePeasant(v, dt, isNight);
   }
   separate();
-  // Regeneration außerhalb des Kampfes
+  updateTowers(dt);
+  // Regeneration außerhalb des Kampfes: mit Feldscher unterwegs schneller, im Hospiz der Burg rasch
+  const hz = bLevel('hospiz'), home = castleSite();
+  const field = [1, 1, 1.5, 2][hz];
   const regen = (u) => {
-    if (u.combatT <= 0 && u.hp < u.st.maxHp) u.hp = Math.min(u.st.maxHp, u.hp + u.st.maxHp * 0.015 * dt);
+    if (u.combatT > 0 || u.hp >= u.st.maxHp) return;
+    const atHome = hz && home && Math.hypot(u.x - home.x, u.y - home.y) < 10;
+    u.hp = Math.min(u.st.maxHp, u.hp + u.st.maxHp * 0.015 * dt * field * (atHome ? 5 : 1));
   };
   regen(p);
   party.forEach(regen);
@@ -544,7 +560,7 @@ function memberOffset(k) {
 }
 
 function updateGroupMember(m, g, k, dt) {
-  if (g.engaged) {
+  if (g.engaged || g.feud) {
     const e = nearestEnemy(m, 22);
     if (e) { engage(m, e, dt); return; }
   }
@@ -627,7 +643,7 @@ function sitesFor(type) {
   const gt = GROUP_TYPES[type];
   if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && (s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle'));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && (!gt.realms || gt.realms.includes(s.realm)));
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction));
   return S;
 }
 
@@ -743,10 +759,19 @@ function chooseDest(g) {
 export function updateGroups(dt) {
   const p = G.s.player;
   G.pathBudget = 2;
+  G.feudT = (G.feudT || 0) - dt;
+  if (G.feudT <= 0) { G.feudT = 0.5; checkFeuds(); }
   for (const g of G.groups) {
     if (!g.members.length) continue;
     const gt = GROUP_TYPES[g.type];
     const lead = g.members[0];
+    if (g.feud) {
+      const f = g.feud;
+      g.x = lead.x; g.y = lead.y;
+      if (!f.members.length || !G.groups.includes(f) || Math.hypot(f.x - g.x, f.y - g.y) > 26) endFeud(g);
+      else if (!g.engaged && Math.hypot(g.x - p.x, g.y - p.y) > 70) resolveFeud(g, f);
+      if (!g.engaged) continue;
+    }
     if (g.engaged) {
       let minD = Infinity;
       for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
@@ -791,7 +816,7 @@ export function maintainGroups(initial = false) {
     if (gt.minDay && initial) continue;
     const want = gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
-    const n = initial ? want : Math.min(2, want - have);
+    const n = initial ? want : Math.min(3, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });
   }
 }
@@ -848,4 +873,145 @@ export function sail(fromId, toId) {
   G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y) - 12;
   log(`Nach ${route.hours} Stunden auf See legt ${route.ship === 'Kogge' ? 'die' : 'das'} ${route.ship} in ${to.name} an.${cost ? ` Fährlohn: ${cost} Gold.` : ' Die Franzosen verlangen von dir keinen Fährlohn.'}`, 'good');
   return true;
+}
+
+// ---------------------------------------------------------------- Fehden zwischen Trupps
+// Rivalisierende Fraktionen gehen aufeinander los, Banden überfallen Händler und Vögte, Streifen jagen Banden.
+const OUTLAWS = { banditen: 1, raubritter: 1 };
+const PREY = { haendler: 1, steuer: 1, patrouille: 1, franzosen: 1, sachsen: 1 };
+
+function groupsFeud(a, b) {
+  if (a === b || a.questId || b.questId) return false;
+  if (OUTLAWS[a.type] || OUTLAWS[b.type]) {
+    if (OUTLAWS[a.type] && OUTLAWS[b.type]) return false;
+    return !!PREY[(OUTLAWS[a.type] ? b : a).type];
+  }
+  const fa = a.faction, fb = b.faction;
+  if (!fa || !fb || fa === fb) return false;
+  return FACTIONS[fa].rivals.includes(fb) || FACTIONS[fb].rivals.includes(fa);
+}
+
+function strength(g) {
+  return g.members.reduce((a, m) => a + m.st.atk * 2 + m.st.def + m.hp / 8, 0) * rand(0.75, 1.25);
+}
+
+function nearPlayer(g, d) { const p = G.s.player; return Math.hypot(g.x - p.x, g.y - p.y) < d; }
+
+function checkFeuds() {
+  const gs = G.groups;
+  const p = G.s.player;
+  for (let i = 0; i < gs.length; i++) {
+    const a = gs[i];
+    if (!a.members.length || a.feud || a.engaged || (a.peace || 0) > G.time) continue;
+    for (let j = i + 1; j < gs.length; j++) {
+      const b = gs[j];
+      if (!b.members.length || b.feud || b.engaged || (b.peace || 0) > G.time) continue;
+      if (Math.abs(a.x - b.x) > 6 || Math.abs(a.y - b.y) > 6 || Math.hypot(a.x - b.x, a.y - b.y) > 6) continue;
+      if (!groupsFeud(a, b)) continue;
+      // Der Angreifer: Banden greifen an, sonst der stärkere Trupp
+      const att = OUTLAWS[a.type] ? a : OUTLAWS[b.type] ? b : a.members.length >= b.members.length ? a : b;
+      const def = att === a ? b : a;
+      // Fern vom Spieler: Meist ziehen sie mit bösen Blicken aneinander vorbei, manchmal kommt es zum Kampf
+      if (!nearPlayer(a, 50) && !nearPlayer(b, 50)) {
+        if (Math.random() < 0.3) resolveFeud(att, def);
+        else { a.peace = G.time + 60; b.peace = G.time + 60; }
+        break;
+      }
+      a.feud = b; b.feud = a;
+      a.path = null; b.path = null;
+      if (nearPlayer(att, 32)) {
+        const ta = GROUP_TYPES[att.type], td = GROUP_TYPES[def.type];
+        log(`${ta.nom} ${ta.pl ? 'greifen' : 'greift'} ${td.acc} an!`);
+      }
+      break;
+    }
+  }
+  // Helfer: Freunde in der Nähe greifen deine Angreifer an, Feinde schließen sich ihnen an
+  if (!inCombat() || p.dead) return;
+  for (const h of gs) {
+    if (!h.members.length || h.engaged || h.feud || h.questId) continue;
+    const d = Math.hypot(h.x - p.x, h.y - p.y);
+    if (d > 28) continue;
+    const ht = GROUP_TYPES[h.type];
+    if (groupHostile(h)) {
+      if (d < 14 && !(G.s.safeTime > 0)) { h.engaged = true; log(`${ht.nom} ${ht.pl ? 'schließen' : 'schließt'} sich dem Angriff an!`, 'bad'); }
+      continue;
+    }
+    const rep = h.faction ? G.s.rep[h.faction] : -99;
+    if (rep < 25 || d > (rep >= 50 ? 28 : 16)) continue;
+    const foe = G.groups.find((e) => e.engaged && e.members.length && e.faction !== h.faction && Math.hypot(e.x - h.x, e.y - h.y) < 30);
+    if (!foe) continue;
+    h.feud = foe; h.path = null;
+    // Mehrere Helfer derselben Art: nur eine Meldung
+    const key = `hilfe-${h.type}`;
+    if (!G.helpLog || G.helpLog[key] === undefined || G.time - G.helpLog[key] > 20) {
+      (G.helpLog = G.helpLog || {})[key] = G.time;
+      log(`${ht.nom} ${ht.pl ? 'kommen' : 'kommt'} dir zu Hilfe!`, 'good');
+    }
+  }
+}
+
+function endFeud(g) {
+  const f = g.feud;
+  g.feud = null; g.path = null; g.wait = rand(2, 5); g.peace = G.time + 90;
+  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = rand(2, 5); f.peace = G.time + 90; }
+}
+
+// Fern vom Spieler wird eine Fehde einfach ausgewürfelt
+function resolveFeud(a, b) {
+  const win = strength(a) >= strength(b) ? a : b, lose = win === a ? b : a;
+  endFeud(a);
+  removeGroup(lose);
+  const n = Math.floor(win.members.length * rand(0.1, 0.45));
+  for (let k = 0; k < n && win.members.length > 1; k++) { const m = win.members.pop(); m.dead = true; }
+  win.peace = G.time + 60;
+  rebuildUnits();
+}
+
+// Ein Trupp wurde ohne dein Zutun aufgerieben
+function feudLost(g) {
+  const f = G.groups.find((o) => o.feud === g);
+  if (f && nearPlayer(g, 32)) {
+    const tw = GROUP_TYPES[f.type], tl = GROUP_TYPES[g.type];
+    log(`${tw.nom} ${tw.pl ? 'haben' : 'hat'} ${tl.acc} besiegt.`);
+  }
+  if (f) endFeud(f);
+  removeGroup(g);
+}
+
+function removeGroup(g) {
+  for (const m of g.members) m.dead = true;
+  g.members = [];
+  for (const o of G.groups) if (o.feud === g) { o.feud = null; o.peace = G.time + 45; }
+  const i = G.groups.indexOf(g);
+  if (i >= 0) G.groups.splice(i, 1);
+}
+
+// ---------------------------------------------------------------- Wachtürme der eigenen Burg
+// Die Bogenschützen auf den Türmen schießen auf alles, was dir feindlich ist und in Reichweite kommt.
+function updateTowers(dt) {
+  const L = bLevel('wehr');
+  if (!L) return;
+  const s = castleSite();
+  if (!G.towerCd) G.towerCd = [0, 0, 0];
+  for (let k = 0; k < L; k++) {
+    G.towerCd[k] -= dt;
+    if (G.towerCd[k] > 0) continue;
+    const tx = s.x + CASTLE_TOWERS[k][0], ty = s.y + CASTLE_TOWERS[k][1];
+    let best = null, bd = 7 + L;
+    for (const g of G.groups) {
+      if (!(g.engaged || groupHostile(g))) continue;
+      for (const m of g.members) {
+        if (m.dead) continue;
+        const d = Math.hypot(m.x - tx, m.y - ty);
+        if (d < bd) { bd = d; best = m; }
+      }
+    }
+    if (!best) { G.towerCd[k] = 0.5; continue; }
+    const g = best.group;
+    if (!g.engaged && !(G.s.safeTime > 0)) { g.engaged = true; log(`Die Wachen auf den Türmen von ${homeName()} schießen auf ${GROUP_TYPES[g.type].acc}!`, 'bad'); }
+    const archer = { kind: 'tower', team: 'player', x: tx, y: ty, st: { atk: 3 + L * 3, def: 0 }, mounted: false };
+    G.projectiles.push({ x: tx, y: ty, tx: best.x, ty: best.y, target: best, att: archer, t: 0, dur: Math.max(0.25, bd / 14), bolt: L >= 3, z0: 46 });
+    G.towerCd[k] = 2.8 - L * 0.45;
+  }
 }

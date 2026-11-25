@@ -145,6 +145,8 @@ export const NPC_TYPES = {
   haendler: { cls: 'zivil', name: 'Händler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'haendler' },
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
+  freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
+  sachs_bogen: { cls: 'soldat', name: 'Sächsischer Bogner', eq: { waffe: 'kurzbogen', ruestung: 'lederwams' }, lv: [1, 2], look: 'sachsen' },
   sergent: { cls: 'soldat', name: 'Sergent', eq: { waffe: 'speer', ruestung: 'kettenhemd', schild: 'drachenschild' }, lv: [1, 3], look: 'franken' },
   arbaletrier: { cls: 'soldat', name: 'Arbalétrier', eq: { waffe: 'armbrust', ruestung: 'gambeson' }, lv: [1, 3], look: 'franken' },
   chevalier: { cls: 'ritter', name: 'Chevalier', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'wappenschild', pferd: 'zelter' }, lv: [2, 4], look: 'franken' },
@@ -179,6 +181,11 @@ export const GROUP_TYPES = {
     name: 'Waldleute', nom: 'Waldleute', acc: 'die Waldleute', pl: true, faction: 'waldleute', members: [['waldmann', 2, 3]],
     gold: [5, 25], renown: 2, count: 5, spawn: 'forest', speed: 1.3,
     kill: { waldleute: -15, normannen: 6 },
+  },
+  sachsen: {
+    name: 'Sächsische Freisassen', nom: 'Sächsische Freisassen', acc: 'die sächsischen Freisassen', pl: true, faction: 'sachsen', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
+    gold: [20, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.24, realms: ['en', 'wa'], siteFaction: 'sachsen',
+    kill: { sachsen: -14, normannen: 5 },
   },
   franzosen: {
     name: 'Französische Streife', nom: 'Eine französische Streife', acc: 'die französische Streife', pl: false, faction: 'franken', members: [['sergent', 2, 3], ['arbaletrier', 1, 1], ['chevalier', 0, 1]],
@@ -246,6 +253,22 @@ export const BUILDINGS = {
       { cost: { gold: 800, holz: 40, eisen: 10 }, days: 2, eff: '+12 Stein am Tag' },
     ],
   },
+  felder: {
+    name: 'Felder', desc: 'Äcker rund um die Burg. Sie ernähren dich, dein Gefolge und die Garnison.', levels: [
+      null,
+      { cost: { gold: 90, holz: 10 }, days: 1, eff: '+6 Getreide am Tag (im Frühling weniger, im Herbst mehr, im Winter nichts)' },
+      { cost: { gold: 260, holz: 25 }, days: 1, eff: '+12 Getreide am Tag, eine Zehntscheune' },
+      { cost: { gold: 600, holz: 30, stein: 30 }, days: 2, eff: '+18 Getreide am Tag, Windmühle: +10 Gold Mahlgeld' },
+    ],
+  },
+  schafzucht: {
+    name: 'Schafzucht', desc: 'Schafe auf eigener Weide. Wolle verkauft sich gut, dazu gibt es Fleisch.', levels: [
+      null,
+      { cost: { gold: 100, holz: 20 }, days: 1, eff: '6 Schafe, +4 Wolle am Tag' },
+      { cost: { gold: 280, holz: 30 }, days: 1, eff: '10 Schafe, +8 Wolle und +2 Fleisch am Tag' },
+      { cost: { gold: 620, holz: 30, stein: 20 }, days: 2, eff: '14 Schafe, +12 Wolle, +4 Fleisch und +1 Fell am Tag' },
+    ],
+  },
   markt: {
     name: 'Markt', desc: 'Händler kommen zu dir. Bringt Marktgeld und erlaubt Handel in der Burg.', levels: [
       null,
@@ -257,17 +280,25 @@ export const BUILDINGS = {
   kapelle: {
     name: 'Kapelle', desc: 'Ein Ort für Gebet und Heilung.', levels: [
       null,
-      { cost: { gold: 160, holz: 20, stein: 10 }, days: 1, eff: 'Verwundete heilen schneller, +1 Ruhm alle 3 Tage' },
+      { cost: { gold: 160, holz: 20, stein: 10 }, days: 1, eff: '+1 Ruhm alle 3 Tage' },
       { cost: { gold: 420, stein: 40 }, days: 2, eff: '+1 Kirche-Ansehen alle 2 Tage' },
       { cost: { gold: 900, stein: 70, wein: 10 }, days: 3, eff: '+1 Ruhm am Tag' },
+    ],
+  },
+  hospiz: {
+    name: 'Hospiz', desc: 'Kräuter, Betten und Pflege. Verwundete kommen schneller wieder auf die Beine.', levels: [
+      null,
+      { cost: { gold: 120, holz: 20 }, days: 1, eff: 'Verwundete heilen doppelt so schnell. In der Burg kommst du rasch wieder zu Kräften.' },
+      { cost: { gold: 340, holz: 20, stein: 25, wolle: 10 }, days: 2, eff: 'Verwundete heilen dreimal so schnell. Ein Feldscher reist mit: unterwegs heilt ihr um die Hälfte schneller.' },
+      { cost: { gold: 780, stein: 50, wein: 10 }, days: 3, eff: 'Spital: Verwundete heilen viermal so schnell, unterwegs heilt ihr doppelt so schnell.' },
     ],
   },
   wehr: {
     name: 'Wachtürme', desc: 'Türme und Wachen schützen deine Burg vor Überfällen.', levels: [
       null,
-      { cost: { gold: 120, holz: 30 }, days: 1, eff: '+15 Verteidigung' },
-      { cost: { gold: 350, stein: 40 }, days: 2, eff: '+35 Verteidigung' },
-      { cost: { gold: 800, stein: 80, eisen: 20 }, days: 3, eff: '+60 Verteidigung' },
+      { cost: { gold: 120, holz: 30 }, days: 1, eff: '+15 Verteidigung, ein Turm mit Bogenschützen' },
+      { cost: { gold: 350, stein: 40 }, days: 2, eff: '+35 Verteidigung, zwei Türme schießen schärfer' },
+      { cost: { gold: 800, stein: 80, eisen: 20 }, days: 3, eff: '+60 Verteidigung, drei Türme mit Armbrüsten' },
     ],
   },
 };
@@ -284,7 +315,17 @@ export const CASTLE_LAYOUT = {
   holzfaeller: { dx: -7.6, dy: 1.0 },
   steinbruch: { dx: 3.4, dy: -7.6 },
   wehr: { dx: 6.4, dy: 6.4 },
+  hospiz: { dx: -7.6, dy: -3.4 },
+  schafzucht: { dx: -6.8, dy: 6.0 },
+  felder: { dx: -3.4, dy: 8.9 },
 };
+// Wachtürme der eigenen Burg (relativ zur Burgmitte), in der Reihenfolge des Ausbaus
+export const CASTLE_TOWERS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
+// Kampfbonus innerhalb der eigenen Mauern je Burgstufe (Anteil an Angriff und Abwehr)
+export const CASTLE_BONUS = [{ atk: 0, def: 0.1 }, { atk: 0.1, def: 0.25 }, { atk: 0.2, def: 0.5 }, { atk: 0.3, def: 0.8 }];
+// Verpflegung: Waren, die als Nahrung zählen, und Preis für Zukauf je Ration
+export const FOOD_GOODS = ['getreide', 'fleisch'];
+export const FOOD_PRICE = 3;
 
 // ---------------------------------------------------------------- Siedlungen
 export const SETTLEMENTS = [
@@ -410,6 +451,7 @@ export const LOOKS = {
   wache: { tunic: '#556b7d', trim: '#c9c2b0' },
   wald: { tunic: '#3f6b2f', trim: '#2c4a20', hood: '#355a28' },
   franken: { tunic: '#3a56a8', trim: '#e8cf5a' },
+  sachsen: { tunic: '#5b8a3c', trim: '#d8c070' },
   bauer: { tunic: '#9a8461', trim: '#6e5c40' },
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };

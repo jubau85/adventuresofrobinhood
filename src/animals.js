@@ -2,7 +2,8 @@
 // Mit dem Bogen lassen sie sich jagen. Die Bestände werden nicht gespeichert, sie wachsen täglich nach.
 
 import { G, log } from './state.js';
-import { T, GOODS } from './data.js';
+import { T, GOODS, CASTLE_LAYOUT } from './data.js';
+import { bLevel } from './castle.js';
 import { isWalkable, tileAt } from './world.js';
 import { rand, randInt } from './rng.js';
 import { addCargo, cargoFree } from './economy.js';
@@ -50,9 +51,18 @@ function addHerd(kind, home, n, r, site = null, farFromPlayer = 0) {
   }
 }
 
+// Weide der eigenen Schafzucht (passt zum Zaun, den der Renderer zeichnet)
+export function castlePasture(s) {
+  const L = bLevel('schafzucht');
+  if (!L || !s) return null;
+  const o = CASTLE_LAYOUT.schafzucht;
+  return { x: s.x + o.dx + 0.5, y: s.y + o.dy + 0.3, w: [0, 1.9, 2.5, 2.9][L], h: [0, 1.7, 2.1, 2.5][L], r: [0, 0.55, 0.75, 0.95][L], n: [0, 6, 10, 14][L] };
+}
+
 function farmHerds(s) {
+  const pa = s.type === 'spieler' ? castlePasture(s) : null;
   return {
-    schaf: { n: { dorf: 5, halle: 4, abtei: 6, spieler: 4, markt: 3, burg: 2 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
+    schaf: pa ? { n: pa.n, home: { x: pa.x, y: pa.y }, r: pa.r } : { n: { dorf: 5, halle: 4, abtei: 6, spieler: 3, markt: 3, burg: 2 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
     kuh: { n: { dorf: 2, halle: 3, spieler: 2 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
     huhn: { n: { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2 }[s.type] || 0, home: { x: s.x + 0.5, y: s.y + 0.8 }, r: 2.8 },
   };
@@ -87,6 +97,15 @@ export function spawnAnimals() {
 }
 
 // Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
+// Nach dem Ausbau der Schafzucht: die Herde zieht auf die neue Weide
+export function refreshCastleHerd() {
+  const s = G.world.sites.find((x) => x.type === 'spieler');
+  const pa = castlePasture(s);
+  if (!pa) return;
+  G.animals = G.animals.filter((a) => !(a.kind === 'schaf' && a.site === s.id));
+  addHerd('schaf', { x: pa.x, y: pa.y }, pa.n, pa.r, s.id);
+}
+
 export function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
   if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 6, 25);
@@ -96,7 +115,7 @@ export function replenishAnimals() {
       if (!h.n) continue;
       const have = G.animals.filter((a) => a.kind === kind && a.site === s.id);
       if (have.length >= h.n) continue;
-      const home = have.length ? have[0].home : h.home || spotNear(s.x, s.y, h.rMin, h.rMax, kind);
+      const home = h.home || (have.length ? have[0].home : spotNear(s.x, s.y, h.rMin, h.rMax, kind));
       if (home) addHerd(kind, home, 1, h.r, s.id, 12);
     }
   }
