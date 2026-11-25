@@ -1814,19 +1814,9 @@ const RETRO_PAL = [
   '#6a1e16', '#a8342a', '#d85c34', '#f0a048', '#e8c440', '#2a2440',
 ];
 const BAYER_RAW = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-const BAYER4 = BAYER_RAW.map((v) => (v / 16 - 0.47) * 22);
-let retroLut = null, retroPal = null, nightIdx = null, warmIdx = null, lightMap = null;
+const BAYER4 = BAYER_RAW.map((v) => (v / 16 - 0.47) * 13);
+let retroLut = null, retroPal = null;
 
-function nearestPal(r, g, b) {
-  let best = 0, bd = Infinity;
-  for (let i = 0; i < retroPal.length; i++) {
-    const q = retroPal[i];
-    const dr = r - q[0], dg = g - q[1], db = b - q[2];
-    const d = dr * dr * 2 + dg * dg * 4 + db * db * 3;
-    if (d < bd) { bd = d; best = i; }
-  }
-  return best;
-}
 
 function buildRetroLut() {
   retroPal = RETRO_PAL.map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
@@ -1842,59 +1832,26 @@ function buildRetroLut() {
     }
     retroLut[(r << 10) | (g << 5) | b] = best;
   }
-  // Palettentausch: Nachtfarbe (dunkel, bläulich) und Fackelschein (warm) je Farbe
-  nightIdx = retroPal.map(([r, g, b]) => nearestPal(r * 0.3 + 12 * 0.7 * 0.6, g * 0.3 + 15 * 0.7 * 0.6, b * 0.3 + 40 * 0.7 * 0.9));
-  warmIdx = retroPal.map(([r, g, b]) => nearestPal(Math.min(255, r * 0.95 + 48), g * 0.68 + 10, b * 0.38));
 }
 
-// Lichtkarte in Pufferpixeln für die Nacht im Retro-Modus
-function buildLightMap(w, h, k, cam, z, p) {
-  if (!lightMap || lightMap.length !== w * h) lightMap = new Float32Array(w * h);
-  else lightMap.fill(0);
-  const add = (cx, cy, r, s) => {
-    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(w - 1, Math.ceil(cx + r));
-    const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(h - 1, Math.ceil(cy + r));
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const d = Math.hypot(x - cx, (y - cy) * 1.4) / r;
-      if (d < 1) lightMap[y * w + x] += (1 - d) * (1 - d) * s;
-    }
-  };
-  const { w: vw, h: vh } = G.view;
-  for (const L of lights) {
-    const sx = ((isoX(L.x, L.y) - cam.x) * z + vw / 2) / k, sy = ((isoY(L.x, L.y) - L.z - cam.y) * z + vh / 2) / k;
-    const r = (L.r * z * 1.5) / k;
-    if (sx < -r || sy < -r || sx > w + r || sy > h + r) continue;
-    add(sx, sy, r, L.s * 1.2);
-  }
-  const ps = toScreen(p.x, p.y);
-  add(ps.x / k, (ps.y - 10) / k, (110 * z) / k, 0.9);
-}
-
-function quantizeRetro(c, w, h, nightT) {
+function quantizeRetro(c, w, h) {
   if (!retroLut) buildRetroLut();
   const img = c.getImageData(0, 0, w, h), d = img.data;
   for (let y = 0; y < h; y++) {
     const by = (y & 3) * 4;
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4, bi = by + (x & 3), o = BAYER4[bi];
+      const i = (y * w + x) * 4, o = BAYER4[by + (x & 3)];
       let r = d[i] + o, g = d[i + 1] + o, b = d[i + 2] + o;
       r = r < 0 ? 0 : r > 255 ? 255 : r; g = g < 0 ? 0 : g > 255 ? 255 : g; b = b < 0 ? 0 : b > 255 ? 255 : b;
-      let idx = retroLut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
-      if (nightT > 0) {
-        const l = Math.min(1, lightMap[y * w + x]);
-        const thr = (BAYER_RAW[bi] + 0.5) / 16;
-        if (thr < l * 1.1) idx = warmIdx[idx];
-        else if (thr < nightT) idx = nightIdx[idx];
-      }
-      const q = retroPal[idx];
+      const q = retroPal[retroLut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)]];
       d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2];
     }
   }
   c.putImageData(img, 0, 0);
 }
 
-// Pixelgröße im Retro-Modus: rund 300 Bildzeilen
-export function retroScale() { return Math.max(2, Math.round(G.view.h / 300)); }
+// Pixelgröße im Pixel- und Retro-Modus (2 = halbe Auflösung)
+export function retroScale() { return 2; }
 
 // Tag und Nacht in Bildschirmkoordinaten (CSS-Pixel)
 function drawDayNight(c, w, h, p, cam, z) {
@@ -1971,11 +1928,12 @@ export function render() {
   if (G.castleDirty) { castleParts = buildPlayerCastle(); G.castleDirty = false; }
   lights = [];
 
-  // Welt zeichnen (im Retro-Modus in niedriger Auflösung)
+  // Welt zeichnen (im Pixel- und Retro-Modus in halber Auflösung)
   let wc = ctx, ws = dpr;
-  const retro = G.pixel;
-  const rk = retro ? retroScale() : 1;
-  if (retro) {
+  const mode = G.gfx || 'klar';
+  const low = mode !== 'klar', retro = mode === 'retro';
+  const rk = low ? retroScale() : 1;
+  if (low) {
     const pw = Math.max(1, Math.ceil(w / rk)), ph = Math.max(1, Math.ceil(h / rk));
     if (!lowCv || lowCv.width !== pw || lowCv.height !== ph) { lowCv = makeCanvas(pw, ph); lowCtx = lowCv.getContext('2d', { willReadFrequently: true }); }
     wc = lowCtx; ws = 1 / rk;
@@ -2062,12 +2020,9 @@ export function render() {
   if (retro) {
     wc.setTransform(ws, 0, 0, ws, 0, 0);
     drawBirds(wc, w, h, dt);
-    const warm = warmth();
-    if (warm > 0) { wc.fillStyle = `rgba(255,140,60,${warm * 0.14})`; wc.fillRect(0, 0, w, h); }
-    drawSnow(wc, w, h, dt);
-    const nightT = Math.min(1, darkness() / 0.55);
-    if (nightT > 0) buildLightMap(lowCv.width, lowCv.height, rk, cam, z, p);
-    quantizeRetro(wc, lowCv.width, lowCv.height, nightT);
+    quantizeRetro(wc, lowCv.width, lowCv.height);
+  }
+  if (low) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(lowCv, 0, 0, lowCv.width * rk * dpr, lowCv.height * rk * dpr);
@@ -2090,11 +2045,9 @@ export function render() {
   }
   ctx.globalAlpha = 1;
 
-  // Tag und Nacht (im Retro-Modus schon in der Pixelebene)
-  if (!retro) {
-    drawDayNight(ctx, w, h, p, cam, z);
-    drawSnow(ctx, w, h, dt);
-  }
+  // Tag und Nacht: sanft über das fertige Bild, in allen Grafikstufen gleich gut lesbar
+  drawDayNight(ctx, w, h, p, cam, z);
+  drawSnow(ctx, w, h, dt);
 
   // Ortsnamen
   ctx.textAlign = 'center';

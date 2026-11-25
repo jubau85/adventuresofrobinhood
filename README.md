@@ -26,7 +26,10 @@ node tools/build.mjs
 
 - **Große, zufällig erzeugte Welt:** 160 × 160 Felder mit Fluss, Seen, Wäldern und Hügeln. Dazu 15 Orte (Städte, Dörfer, Burgen, Abteien, ein verstecktes Lager), die durch Straßen und Brücken verbunden sind.
 - **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren.
-- **Retro-Look im Amiga-Stil (Standard):** niedrige Auflösung, eigene Palette mit 32 Farben, geordnetes Dithering. Die Nacht entsteht durch Palettentausch mit warmem Fackelschein. Taste G schaltet auf klare Grafik um.
+- **Drei Grafikstufen (Taste G oder Menü):**
+  - **Klar** (Standard)
+  - **Pixel:** halbe Auflösung, grobe Pixel
+  - **Retro:** Amiga-Stil mit eigener 32-Farben-Palette und feinem Dithering
 - **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf den Seen und Vogelschwärme.
 - **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Schnee im Winter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
 - **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
@@ -54,7 +57,7 @@ node tools/build.mjs
 | T | Zeitraffer |
 | I J P M | Gefolge, Aufträge, Politik, Karte |
 | Mausrad | Zoom |
-| G | Retro-Look (Amiga-Stil) oder klare Grafik |
+| G | Grafik wechseln: klar, Pixel, Retro |
 | Esc | Schließen und Menü |
 
 ## Aufbau des Codes

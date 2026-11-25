@@ -61,7 +61,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.pixel ? (G.view.w < 720 ? 1.0 : 1.3) : (G.view.w < 720 ? 0.75 : 1);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 0.75 : 1) : (G.view.w < 720 ? 0.9 : 1.15);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -222,13 +222,17 @@ function toggleFast() {
   G.fast = !G.fast;
 }
 
-function setRetro(on, quiet = false) {
-  G.pixel = on;
-  try { localStorage.setItem('ritter-retro', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
-  if (on) G.cam.zoom = Math.max(G.cam.zoom, 1.25);
-  if (!quiet) log(on ? 'Retro-Look (Amiga-Stil) an.' : 'Retro-Look aus: klare Grafik.');
+const GFX_MODES = ['klar', 'pixel', 'retro'];
+const GFX_NAME = { klar: 'Klare Grafik', pixel: 'Pixel-Look', retro: 'Retro-Look (Amiga-Stil)' };
+
+function setGfx(mode, quiet = false) {
+  G.gfx = GFX_MODES.includes(mode) ? mode : 'klar';
+  try { localStorage.setItem('ritter-grafik', G.gfx); } catch (e) { /* ohne Speicher */ }
+  if (G.gfx !== 'klar') G.cam.zoom = Math.max(G.cam.zoom, 1.1);
+  if (!quiet) log(`Grafik: ${GFX_NAME[G.gfx]}.`);
 }
-G.togglePixel = () => setRetro(!G.pixel);
+G.setGfx = setGfx;
+G.cycleGfx = () => setGfx(GFX_MODES[(GFX_MODES.indexOf(G.gfx) + 1) % GFX_MODES.length]);
 
 function zoom(f) { G.cam.zoom = Math.max(0.55, Math.min(1.8, G.cam.zoom * f)); }
 
@@ -283,7 +287,7 @@ function onKey(e) {
     case '2': setOrder('halten'); break;
     case '3': setOrder('angriff'); break;
     case 't': toggleFast(); break;
-    case 'g': G.togglePixel(); break;
+    case 'g': G.cycleGfx(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
     default: return;
@@ -409,7 +413,7 @@ function boot(hotData) {
   viewCanvas = byId('view');
   mini = byId('minimap');
   initRender(viewCanvas);
-  try { const v = localStorage.getItem('ritter-retro'); G.pixel = v === null ? true : v === '1'; } catch (e) { G.pixel = true; }
+  try { const v = localStorage.getItem('ritter-grafik'); G.gfx = GFX_MODES.includes(v) ? v : 'klar'; } catch (e) { G.gfx = 'klar'; }
   initUI();
   bindInput();
   resize();

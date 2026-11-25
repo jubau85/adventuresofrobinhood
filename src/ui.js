@@ -505,7 +505,10 @@ function menuPanel() {
       <button class="btn primary" data-act="resume">Weiterspielen</button>
       <button class="btn" data-act="save">Speichern</button>
       <button class="btn" data-act="loadgame" ${info ? '' : 'disabled'}>Spielstand laden</button>
-      <button class="btn" data-act="pixel">${G.pixel ? 'Klare Grafik' : 'Retro-Look (Amiga-Stil)'}</button>
+      <div class="gfx" role="group" aria-label="Grafik">
+        <span class="label">Grafik</span>
+        ${[['klar', 'Klar'], ['pixel', 'Pixel'], ['retro', 'Retro']].map(([m, n]) => `<button class="btn sm${G.gfx === m ? ' primary' : ''}" data-act="gfx" data-mode="${m}" aria-pressed="${G.gfx === m}">${n}</button>`).join('')}
+      </div>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -527,7 +530,7 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
-        <dt>G</dt><dd>Retro-Look (Amiga-Stil) oder klare Grafik</dd>
+        <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
@@ -602,7 +605,7 @@ const ACTIONS = {
   save: () => { if (G.saveGame) G.saveGame(false); },
   loadgame: () => { if (G.loadGame) confirmDialog('Den letzten Spielstand laden? Nicht gespeicherter Fortschritt geht verloren.', 'Laden', () => { G.loadGame(); closePanel(); }); },
   help: () => openPanel('help'),
-  pixel: () => { if (G.togglePixel) G.togglePixel(); },
+  gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
 };
 

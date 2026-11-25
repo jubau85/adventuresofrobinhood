@@ -7,7 +7,7 @@ export const G = {
   groups: [],         // KI-Gruppen auf der Karte
   peasants: [],       // Dorfbewohner (nur Atmosphäre)
   animals: [],        // Tiere (nur Atmosphäre)
-  pixel: false,       // Pixel-Look
+  gfx: 'klar',        // Grafik: klar, pixel oder retro
   projectiles: [],
   fx: [],
   cam: { x: 0, y: 0, zoom: 1 },

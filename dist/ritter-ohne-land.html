@@ -252,6 +252,8 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .legend .ring { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 50%; border: 2px solid #c9a21a; vertical-align: -1px; }
 .menu { display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
 .menu .btn { padding: 9px 14px; font-size: 15px; }
+.menu .gfx { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; }
+.menu .gfx .btn { padding: 5px 12px; font-size: 14px; }
 .keys { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; font-family: var(--font-ui); font-size: 14px; }
 .keys dt { font-weight: 700; }
 .keys dd { margin: 0; }
@@ -814,7 +816,7 @@ const G = {
   groups: [],         // KI-Gruppen auf der Karte
   peasants: [],       // Dorfbewohner (nur Atmosphäre)
   animals: [],        // Tiere (nur Atmosphäre)
-  pixel: false,       // Pixel-Look
+  gfx: 'klar',        // Grafik: klar, pixel oder retro
   projectiles: [],
   fx: [],
   cam: { x: 0, y: 0, zoom: 1 },
@@ -4739,19 +4741,9 @@ const RETRO_PAL = [
   '#6a1e16', '#a8342a', '#d85c34', '#f0a048', '#e8c440', '#2a2440',
 ];
 const BAYER_RAW = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-const BAYER4 = BAYER_RAW.map((v) => (v / 16 - 0.47) * 22);
-let retroLut = null, retroPal = null, nightIdx = null, warmIdx = null, lightMap = null;
+const BAYER4 = BAYER_RAW.map((v) => (v / 16 - 0.47) * 13);
+let retroLut = null, retroPal = null;
 
-function nearestPal(r, g, b) {
-  let best = 0, bd = Infinity;
-  for (let i = 0; i < retroPal.length; i++) {
-    const q = retroPal[i];
-    const dr = r - q[0], dg = g - q[1], db = b - q[2];
-    const d = dr * dr * 2 + dg * dg * 4 + db * db * 3;
-    if (d < bd) { bd = d; best = i; }
-  }
-  return best;
-}
 
 function buildRetroLut() {
   retroPal = RETRO_PAL.map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
@@ -4767,59 +4759,26 @@ function buildRetroLut() {
     }
     retroLut[(r << 10) | (g << 5) | b] = best;
   }
-  // Palettentausch: Nachtfarbe (dunkel, bläulich) und Fackelschein (warm) je Farbe
-  nightIdx = retroPal.map(([r, g, b]) => nearestPal(r * 0.3 + 12 * 0.7 * 0.6, g * 0.3 + 15 * 0.7 * 0.6, b * 0.3 + 40 * 0.7 * 0.9));
-  warmIdx = retroPal.map(([r, g, b]) => nearestPal(Math.min(255, r * 0.95 + 48), g * 0.68 + 10, b * 0.38));
 }
 
-// Lichtkarte in Pufferpixeln für die Nacht im Retro-Modus
-function buildLightMap(w, h, k, cam, z, p) {
-  if (!lightMap || lightMap.length !== w * h) lightMap = new Float32Array(w * h);
-  else lightMap.fill(0);
-  const add = (cx, cy, r, s) => {
-    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(w - 1, Math.ceil(cx + r));
-    const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(h - 1, Math.ceil(cy + r));
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const d = Math.hypot(x - cx, (y - cy) * 1.4) / r;
-      if (d < 1) lightMap[y * w + x] += (1 - d) * (1 - d) * s;
-    }
-  };
-  const { w: vw, h: vh } = G.view;
-  for (const L of lights) {
-    const sx = ((isoX(L.x, L.y) - cam.x) * z + vw / 2) / k, sy = ((isoY(L.x, L.y) - L.z - cam.y) * z + vh / 2) / k;
-    const r = (L.r * z * 1.5) / k;
-    if (sx < -r || sy < -r || sx > w + r || sy > h + r) continue;
-    add(sx, sy, r, L.s * 1.2);
-  }
-  const ps = toScreen(p.x, p.y);
-  add(ps.x / k, (ps.y - 10) / k, (110 * z) / k, 0.9);
-}
-
-function quantizeRetro(c, w, h, nightT) {
+function quantizeRetro(c, w, h) {
   if (!retroLut) buildRetroLut();
   const img = c.getImageData(0, 0, w, h), d = img.data;
   for (let y = 0; y < h; y++) {
     const by = (y & 3) * 4;
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4, bi = by + (x & 3), o = BAYER4[bi];
+      const i = (y * w + x) * 4, o = BAYER4[by + (x & 3)];
       let r = d[i] + o, g = d[i + 1] + o, b = d[i + 2] + o;
       r = r < 0 ? 0 : r > 255 ? 255 : r; g = g < 0 ? 0 : g > 255 ? 255 : g; b = b < 0 ? 0 : b > 255 ? 255 : b;
-      let idx = retroLut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
-      if (nightT > 0) {
-        const l = Math.min(1, lightMap[y * w + x]);
-        const thr = (BAYER_RAW[bi] + 0.5) / 16;
-        if (thr < l * 1.1) idx = warmIdx[idx];
-        else if (thr < nightT) idx = nightIdx[idx];
-      }
-      const q = retroPal[idx];
+      const q = retroPal[retroLut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)]];
       d[i] = q[0]; d[i + 1] = q[1]; d[i + 2] = q[2];
     }
   }
   c.putImageData(img, 0, 0);
 }
 
-// Pixelgröße im Retro-Modus: rund 300 Bildzeilen
-function retroScale() { return Math.max(2, Math.round(G.view.h / 300)); }
+// Pixelgröße im Pixel- und Retro-Modus (2 = halbe Auflösung)
+function retroScale() { return 2; }
 
 // Tag und Nacht in Bildschirmkoordinaten (CSS-Pixel)
 function drawDayNight(c, w, h, p, cam, z) {
@@ -4896,11 +4855,12 @@ function render() {
   if (G.castleDirty) { castleParts = buildPlayerCastle(); G.castleDirty = false; }
   lights = [];
 
-  // Welt zeichnen (im Retro-Modus in niedriger Auflösung)
+  // Welt zeichnen (im Pixel- und Retro-Modus in halber Auflösung)
   let wc = ctx, ws = dpr;
-  const retro = G.pixel;
-  const rk = retro ? retroScale() : 1;
-  if (retro) {
+  const mode = G.gfx || 'klar';
+  const low = mode !== 'klar', retro = mode === 'retro';
+  const rk = low ? retroScale() : 1;
+  if (low) {
     const pw = Math.max(1, Math.ceil(w / rk)), ph = Math.max(1, Math.ceil(h / rk));
     if (!lowCv || lowCv.width !== pw || lowCv.height !== ph) { lowCv = makeCanvas(pw, ph); lowCtx = lowCv.getContext('2d', { willReadFrequently: true }); }
     wc = lowCtx; ws = 1 / rk;
@@ -4987,12 +4947,9 @@ function render() {
   if (retro) {
     wc.setTransform(ws, 0, 0, ws, 0, 0);
     drawBirds(wc, w, h, dt);
-    const warm = warmth();
-    if (warm > 0) { wc.fillStyle = `rgba(255,140,60,${warm * 0.14})`; wc.fillRect(0, 0, w, h); }
-    drawSnow(wc, w, h, dt);
-    const nightT = Math.min(1, darkness() / 0.55);
-    if (nightT > 0) buildLightMap(lowCv.width, lowCv.height, rk, cam, z, p);
-    quantizeRetro(wc, lowCv.width, lowCv.height, nightT);
+    quantizeRetro(wc, lowCv.width, lowCv.height);
+  }
+  if (low) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(lowCv, 0, 0, lowCv.width * rk * dpr, lowCv.height * rk * dpr);
@@ -5015,11 +4972,9 @@ function render() {
   }
   ctx.globalAlpha = 1;
 
-  // Tag und Nacht (im Retro-Modus schon in der Pixelebene)
-  if (!retro) {
-    drawDayNight(ctx, w, h, p, cam, z);
-    drawSnow(ctx, w, h, dt);
-  }
+  // Tag und Nacht: sanft über das fertige Bild, in allen Grafikstufen gleich gut lesbar
+  drawDayNight(ctx, w, h, p, cam, z);
+  drawSnow(ctx, w, h, dt);
 
   // Ortsnamen
   ctx.textAlign = 'center';
@@ -5657,7 +5612,10 @@ function menuPanel() {
       <button class="btn primary" data-act="resume">Weiterspielen</button>
       <button class="btn" data-act="save">Speichern</button>
       <button class="btn" data-act="loadgame" ${info ? '' : 'disabled'}>Spielstand laden</button>
-      <button class="btn" data-act="pixel">${G.pixel ? 'Klare Grafik' : 'Retro-Look (Amiga-Stil)'}</button>
+      <div class="gfx" role="group" aria-label="Grafik">
+        <span class="label">Grafik</span>
+        ${[['klar', 'Klar'], ['pixel', 'Pixel'], ['retro', 'Retro']].map(([m, n]) => `<button class="btn sm${G.gfx === m ? ' primary' : ''}" data-act="gfx" data-mode="${m}" aria-pressed="${G.gfx === m}">${n}</button>`).join('')}
+      </div>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -5679,7 +5637,7 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
-        <dt>G</dt><dd>Retro-Look (Amiga-Stil) oder klare Grafik</dd>
+        <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
@@ -5754,7 +5712,7 @@ const ACTIONS = {
   save: () => { if (G.saveGame) G.saveGame(false); },
   loadgame: () => { if (G.loadGame) confirmDialog('Den letzten Spielstand laden? Nicht gespeicherter Fortschritt geht verloren.', 'Laden', () => { G.loadGame(); closePanel(); }); },
   help: () => openPanel('help'),
-  pixel: () => { if (G.togglePixel) G.togglePixel(); },
+  gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
 };
 
@@ -5912,7 +5870,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.pixel ? (G.view.w < 720 ? 1.0 : 1.3) : (G.view.w < 720 ? 0.75 : 1);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 0.75 : 1) : (G.view.w < 720 ? 0.9 : 1.15);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -6073,13 +6031,17 @@ function toggleFast() {
   G.fast = !G.fast;
 }
 
-function setRetro(on, quiet = false) {
-  G.pixel = on;
-  try { localStorage.setItem('ritter-retro', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
-  if (on) G.cam.zoom = Math.max(G.cam.zoom, 1.25);
-  if (!quiet) log(on ? 'Retro-Look (Amiga-Stil) an.' : 'Retro-Look aus: klare Grafik.');
+const GFX_MODES = ['klar', 'pixel', 'retro'];
+const GFX_NAME = { klar: 'Klare Grafik', pixel: 'Pixel-Look', retro: 'Retro-Look (Amiga-Stil)' };
+
+function setGfx(mode, quiet = false) {
+  G.gfx = GFX_MODES.includes(mode) ? mode : 'klar';
+  try { localStorage.setItem('ritter-grafik', G.gfx); } catch (e) { /* ohne Speicher */ }
+  if (G.gfx !== 'klar') G.cam.zoom = Math.max(G.cam.zoom, 1.1);
+  if (!quiet) log(`Grafik: ${GFX_NAME[G.gfx]}.`);
 }
-G.togglePixel = () => setRetro(!G.pixel);
+G.setGfx = setGfx;
+G.cycleGfx = () => setGfx(GFX_MODES[(GFX_MODES.indexOf(G.gfx) + 1) % GFX_MODES.length]);
 
 function zoom(f) { G.cam.zoom = Math.max(0.55, Math.min(1.8, G.cam.zoom * f)); }
 
@@ -6134,7 +6096,7 @@ function onKey(e) {
     case '2': setOrder('halten'); break;
     case '3': setOrder('angriff'); break;
     case 't': toggleFast(); break;
-    case 'g': G.togglePixel(); break;
+    case 'g': G.cycleGfx(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
     default: return;
@@ -6260,7 +6222,7 @@ function boot(hotData) {
   viewCanvas = byId('view');
   mini = byId('minimap');
   initRender(viewCanvas);
-  try { const v = localStorage.getItem('ritter-retro'); G.pixel = v === null ? true : v === '1'; } catch (e) { G.pixel = true; }
+  try { const v = localStorage.getItem('ritter-grafik'); G.gfx = GFX_MODES.includes(v) ? v : 'klar'; } catch (e) { G.gfx = 'klar'; }
   initUI();
   bindInput();
   resize();
