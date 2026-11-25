@@ -1,0 +1,489 @@
+# Grafik-Brief: A Knight's Tale
+
+Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrieben, dass du die Bilder mit Oakgen (oder einem anderen Bildgenerator) erzeugen kannst und ich sie danach ohne Nacharbeit einbauen kann.
+
+**Ziel:** weg vom Klötzchen-Look. Runde, weiche, handgemalte Formen, die nach Handwerk aussehen: durchhängende Strohdächer, krumme Fachwerkbalken, runde Baumkronen, Mauern aus unregelmäßigen Steinen.
+
+**Eigener Stil:** Das Spiel hat seinen eigenen Look. In den Prompts bitte keine Namen bestehender Spiele, Filme oder Künstler verwenden.
+
+---
+
+## 1. Regeln für alle Bilder
+
+**Perspektive: echte Isometrie im Verhältnis 2:1.**
+- Eine Bodenkachel ist eine Raute, doppelt so breit wie hoch.
+- Die Kamera schaut schräg von oben, etwa 30° über dem Boden, also nicht 45°, nicht von vorn und nicht von oben.
+- Von einem Haus sieht man das Dach, die linke Vorderwand und die rechte Vorderwand.
+- Die vordere Ecke der Grundfläche zeigt nach unten.
+
+**Licht:**
+- Es kommt von links oben.
+- Linke Wände sind hell, rechte Wände liegen im weichen Schatten.
+- Keinen Schlagschatten auf den Boden malen, den zeichnet das Spiel selbst.
+
+**Freistellen:**
+- Unter dem Objekt kein Boden, kein Sockel, keine Grasplatte. Die Bodentexturen in Paket 2 sind die Ausnahme.
+- Am besten ein transparenter Hintergrund (PNG mit Alpha).
+- Falls Oakgen das nicht kann, ein einfarbiger Hintergrund, den ich ausstanze:
+  - Reingrün `#00FF00` für alles außer Pflanzen
+  - Magenta `#FF00FF` für Bäume, Büsche und Gras
+
+**Wappenfarbe (wichtig):**
+- Der Spieler wählt seine Farbe selbst, die Fraktionen haben eigene Farben.
+- Alles, was diese Farbe tragen soll, bitte in kräftigem **Magenta** malen, mit ganz normaler Licht- und Schattenschattierung. Das betrifft:
+  - Waffenrock und Umhang
+  - Schabracke (Pferdedecke)
+  - Banner und Wimpel
+  - Markisen der Marktstände und Zeltbahnen auf dem Markt
+- Das Spiel färbt Magenta automatisch um. Deshalb sonst nirgends Pink oder Violett verwenden.
+
+**Größe:**
+- In den Tabellen steht die Größe im Spiel (1×). Bitte **viermal so groß** liefern (4×), gern auch größer, solange das Seitenverhältnis gleich bleibt. Beispiel: 1× = 64 × 84 heißt Lieferung 256 × 336.
+- Das Objekt steht mittig, ist ganz zu sehen und hat rundherum etwa 5 % Luft.
+- Der Fußpunkt (Mitte der Grundfläche) liegt unten in der Mitte.
+
+**Format:**
+- PNG in sRGB, Titelbilder als JPG oder WebP.
+- Dateinamen genau wie in den Tabellen: klein geschrieben, ohne Umlaute (ae, oe, ue).
+- Bitte **nicht spiegeln**, um Varianten zu sparen: Das Licht käme dann von rechts.
+
+---
+
+## 2. Stil-Baustein
+
+Diesen Text bitte **vor jeden Prompt** setzen. In den Tabellen steht danach nur noch das Motiv.
+
+```
+hand-painted isometric game asset, true 2:1 isometric projection, camera about 30 degrees above the ground, soft rounded organic shapes, slightly irregular hand-crafted edges, no hard boxy geometry, warm painterly texture with visible brush strokes, thin soft dark-brown outlines, natural earthy palette of moss green, ochre, oak brown, slate grey and warm cream with small gold accents, light from the upper left, left faces lit, right faces in soft shade, no cast shadow, no ground, no background, isolated single object, centered, fully visible, medieval England and Normandy around 1194
+```
+
+Negativ-Prompt, falls Oakgen das kann:
+
+```
+text, letters, watermark, logo, frame, border, ground plane, grass base, pedestal, drop shadow, top-down view, front view, side view, fisheye, perspective distortion, plastic 3D render, photo, blurry, cropped, pink, purple
+```
+
+> Bei Bildern mit Wappenfarbe das „pink, purple“ aus dem Negativ-Prompt streichen.
+
+**Vorgehen:**
+1. Pro Paket zuerst ein Probestück erzeugen (ein Haus, einen Baum, eine Figur) und mir schicken.
+2. Ich baue es ein und wir prüfen gemeinsam Größe, Winkel und Stil.
+3. Danach den Rest des Pakets.
+
+Was noch fehlt, zeichnet das Spiel weiter selbst. Du kannst also stückweise liefern.
+
+---
+
+## 3. Pakete in der Reihenfolge der Wirkung
+
+| Paket | Inhalt | ca. Bilder | Wirkung |
+| --- | --- | --- | --- |
+| 1 | Titelbild | 2 | sofort sichtbar |
+| 2 | Bodentexturen | 24 | ganze Landschaft |
+| 3 | Bäume, Büsche, Felsen | 37 | ganze Landschaft |
+| 4 | Häuser, Kirchen, Dorfdinge | 30 | alle Orte |
+| 5 | Burgen-Baukasten, Hafen | 22 | Burgen, Küste |
+| 6 | Eigene Burg im Ausbau | 33 | das Herz des Spiels |
+| 7 | Figuren | 26 Bögen | alle Menschen |
+| 8 | Tiere | 6 Bögen | Weiden, Wald |
+| 9 | Symbole und Porträts | 60 | Tafeln und Menüs |
+| 10 | Musik (optional) | 7 Stücke | Ton |
+
+Die Pakete 1 bis 4 verändern das Bild am stärksten, damit würde ich anfangen.
+
+---
+
+## Paket 1: Titelbild
+
+Hier gilt der Stil-Baustein **nicht**. Statt eines einzelnen Objekts ist es ein ganzes Gemälde.
+
+| Datei | Größe |
+| --- | --- |
+| `titel/titel_quer.jpg` | 2560 × 1440 |
+| `titel/titel_hoch.jpg` | 1440 × 2560 (für Handys) |
+
+```
+epic hand-painted fantasy-history illustration, painterly, cinematic, a lone knight in chainmail on a horse seen from behind at three-quarter angle, standing on a grassy hill at sunset, dark cloak blowing in the wind, a small white pennant on his lance, looking over a wide green valley with a winding river, a stone castle on a rocky crag in the middle distance, beyond it the sea with two medieval cog ships and faint white cliffs, warm golden light, dramatic glowing clouds, birds, atmospheric haze, medieval England 1194, rich warm colours, soft rounded painterly shapes, no text, no letters
+```
+
+**Bildaufbau:**
+- Oben links etwa ein Drittel ruhiger Himmel, dort steht der Titel.
+- Der Ritter steht im rechten unteren Drittel.
+- In der Hochformat-Fassung den Himmel oben lassen und den Ritter im unteren Drittel zeigen.
+
+---
+
+## Paket 2: Bodentexturen
+
+Hier gilt ebenfalls ein **anderer Baustein**: nahtlos kachelbar, von genau oben.
+
+```
+seamless tileable texture, orthographic top-down view, hand-painted, soft painterly brush strokes, even soft lighting, no shadows, no objects, no perspective, game terrain texture, medieval countryside
+```
+
+Größe 1× 256 × 256, Lieferung 1024 × 1024. Das Spiel legt die Textur selbst schräg auf die Rauten und auf die Hügel.
+
+| Datei | Motiv (an den Baustein anhängen) |
+| --- | --- |
+| `boden/wiese_sommer.png` | lush meadow grass, small clover patches |
+| `boden/wiese_fruehling.png` | fresh light-green meadow with tiny white and yellow flowers |
+| `boden/wiese_herbst.png` | late-autumn meadow, yellowed and olive grass, a few fallen leaves |
+| `boden/wiese_winter.png` | thin snow cover with grass tufts showing through |
+| `boden/waldboden_sommer.png` | forest floor, moss, ferns, dark soil, twigs |
+| `boden/waldboden_herbst.png` | forest floor covered in orange and brown fallen leaves |
+| `boden/waldboden_winter.png` | forest floor with patchy snow, needles and dark leaves |
+| `boden/heide_sommer.png` | upland moor, heather, short grass, small grey stones |
+| `boden/heide_herbst.png` | upland moor, purple-brown heather, bracken |
+| `boden/heide_winter.png` | snowy upland moor, rocks and dry heather peeking out |
+| `boden/acker_jung.png` | ploughed field with straight rows of young green crops, rows run horizontally |
+| `boden/acker_reif.png` | ripe golden wheat field, rows run horizontally |
+| `boden/acker_brach.png` | freshly ploughed brown furrows, rows run horizontally |
+| `boden/acker_winter.png` | snowy furrows, rows run horizontally |
+| `boden/weg.png` | packed dirt road, wheel ruts, small pebbles, worn grass edges |
+| `boden/weg_winter.png` | muddy road with slush and snow |
+| `boden/sand.png` | sandy shore, a few pebbles and shell fragments |
+| `boden/kies.png` | pebble beach, rounded grey stones |
+| `boden/wasser_fluss.png` | clear shallow river water, soft ripples, greenish blue |
+| `boden/wasser_meer.png` | deep sea water, gentle wave pattern, blue-green |
+| `boden/wasser_winter.png` | dark cold water with thin ice floes |
+| `boden/fels.png` | bare grey rock surface with cracks and lichen |
+| `boden/pflaster.png` | rough cobblestone town square |
+| `boden/schlamm.png` | wet mud with puddles (for camps and building sites) |
+
+---
+
+## Paket 3: Bäume, Büsche, Felsen
+
+Stil-Baustein + Motiv. Hintergrund transparent oder Magenta.
+
+| Datei | 1× | Motiv |
+| --- | --- | --- |
+| `natur/laub_1_sommer.png` | 64 × 84 | broad old oak tree, round lush crown, thick gnarled trunk |
+| `natur/laub_2_sommer.png` | 64 × 84 | beech tree, rounded crown, smooth grey trunk |
+| `natur/laub_3_sommer.png` | 56 × 84 | slender birch tree, white bark, airy crown |
+| `natur/laub_4_sommer.png` | 56 × 64 | small apple tree with red apples |
+| `natur/laub_1_herbst.png` … `laub_4_herbst.png` | wie oben | same trees in autumn colours, orange, rust and gold leaves |
+| `natur/laub_1_winter.png` … `laub_4_winter.png` | wie oben | same trees bare in winter, snow on the branches |
+| `natur/laub_1_fruehling.png` … `laub_4_fruehling.png` | wie oben | same trees in spring, fresh light green, white blossoms on the apple tree |
+| `natur/nadel_1.png` | 44 × 92 | tall pine tree, rounded layered branches, reddish trunk |
+| `natur/nadel_2.png` | 44 × 92 | dark spruce, soft drooping branches |
+| `natur/nadel_3.png` | 40 × 70 | young fir tree |
+| `natur/nadel_1_winter.png` … `nadel_3_winter.png` | wie oben | same trees with heavy snow on the branches |
+| `natur/busch_1_sommer.png` | 40 × 32 | round hazel bush |
+| `natur/busch_2_sommer.png` | 40 × 30 | flowering hawthorn bush |
+| `natur/busch_3_sommer.png` | 36 × 28 | bramble bush with berries |
+| `natur/busch_1_herbst.png` … `busch_3_herbst.png` | wie oben | same bushes in autumn colours |
+| `natur/busch_1_winter.png` … `busch_3_winter.png` | wie oben | same bushes bare with snow |
+| `natur/fels_1.png` | 48 × 36 | rounded mossy boulder |
+| `natur/fels_2.png` | 52 × 34 | cluster of three weathered grey rocks |
+| `natur/fels_3.png` | 40 × 40 | tall standing stone, lichen |
+| `natur/fels_1_winter.png` … `fels_3_winter.png` | wie oben | same rocks with snow caps |
+| `natur/schilf.png` | 40 × 36 | clump of reeds and bulrushes (for riverbanks) |
+| `natur/baumstumpf.png` | 28 × 22 | old tree stump with a small axe mark |
+
+---
+
+## Paket 4: Häuser, Kirchen, Dorfdinge
+
+Stil-Baustein + Motiv. **Grundfläche** in Feldern (eine Raute = 1 × 1). Die Häuser sollen alle aus derselben Welt wirken: Fachwerk, Lehm, Stroh, Holzschindeln, in den Städten auch Ziegel und Stein.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `haus/stroh_1.png` | 1 × 1 | 80 × 88 | small timber-framed cottage, whitewashed wattle and daub walls, thick rounded sagging thatched roof, small wooden door, shuttered window, flower box |
+| `haus/stroh_2.png` | 1 × 1 | 80 × 88 | crooked peasant cottage, dark timber beams, mossy thatch, stone chimney |
+| `haus/stroh_3.png` | 1.4 × 1 | 96 × 90 | long farmhouse with byre, thatched roof, hay door |
+| `haus/stroh_4.png` | 1 × 1 | 72 × 80 | tiny round-cornered hut, clay walls, steep thatch |
+| `haus/ziegel_1.png` | 1 × 1 | 80 × 104 | two-storey town house, overhanging upper floor, timber frame, red clay tile roof |
+| `haus/ziegel_2.png` | 1 × 1.3 | 90 × 108 | merchant's house, stone ground floor, timber upper floor, tile roof, shop sign |
+| `haus/ziegel_3.png` | 1 × 1 | 80 × 100 | narrow tall town house, ochre plaster, tile roof, small balcony |
+| `haus/stein_1.png` | 1 × 1 | 80 × 96 | sturdy stone house, slate roof, small arched windows |
+| `haus/stein_2.png` | 1.3 × 1 | 92 × 96 | stone granary on short pillars, slate roof |
+| `haus/holz_1.png` | 1 × 1 | 76 × 84 | saxon wooden hut, vertical plank walls, wooden shingle roof with carved gable ends |
+| `haus/holz_2.png` | 1 × 1 | 76 × 84 | log storehouse, shingle roof |
+| `haus/langhalle.png` | 3.2 × 1.4 | 190 × 130 | great saxon mead hall, long low wooden hall, curved shingle roof like an upturned boat, carved dragon heads on the gables, smoke hole |
+| `haus/kirche_dorf.png` | 2 × 1 | 130 × 140 | small village church, rough stone walls, slate roof, little square bell tower |
+| `haus/kathedrale.png` | 3.2 × 1.4 | 200 × 210 | large romanesque cathedral church, round arches, tall central tower, apse, warm limestone |
+| `haus/kloster.png` | 2.2 × 1 | 140 × 110 | monastery building, stone, tile roof, small cloister arcade |
+| `haus/marktstand_1.png` | 0.8 × 0.6 | 56 × 60 | wooden market stall with striped awning in magenta, baskets of vegetables and bread |
+| `haus/marktstand_2.png` | 0.8 × 0.6 | 56 × 60 | wooden market stall with plain awning in magenta, cloth bales and pottery |
+| `haus/zelt_markt.png` | 0.9 × 0.9 | 60 × 64 | pointed medieval pavilion tent, canvas in magenta with cream trim, small pennant on top |
+| `haus/zelt_lager.png` | 0.9 × 0.9 | 60 × 56 | low patched outlaw tent, olive and brown canvas, ropes and stakes |
+| `haus/brunnen.png` | 0.6 × 0.6 | 44 × 52 | round stone village well with small wooden roof and bucket |
+| `haus/feuerstelle.png` | 0.5 × 0.5 | 36 × 24 | ring of stones with charred logs, no flames (the game draws the fire) |
+| `haus/fass.png` | 0.3 | 20 × 24 | two wooden barrels |
+| `haus/heu.png` | 0.4 | 32 × 26 | rounded haystack |
+| `haus/holzstapel.png` | 0.5 | 36 × 24 | stacked firewood logs |
+| `haus/karren.png` | 0.6 | 40 × 30 | wooden two-wheeled hand cart |
+| `haus/beet.png` | 0.6 | 40 × 22 | small vegetable garden bed with cabbages, wattle edge |
+| `haus/kisten.png` | 0.4 | 28 × 26 | stacked wooden crates and a sack |
+| `haus/zaun_x.png` | 1 Feld | 68 × 40 | wattle fence segment running from upper left to lower right |
+| `haus/zaun_y.png` | 1 Feld | 68 × 40 | wattle fence segment running from upper right to lower left |
+
+---
+
+## Paket 5: Burgen-Baukasten und Hafen
+
+Burgmauern werden im Spiel aus Teilen zusammengesetzt. Jedes Mauerteil ist **genau ein Feld lang**.
+
+**Richtungen:**
+- „x“ heißt: Die Mauer läuft von **links oben nach rechts unten**.
+- „y“ heißt: Sie läuft von **rechts oben nach links unten**.
+- Das Tor sitzt in einer x-Mauer, die Öffnung zeigt zum Betrachter nach links unten.
+
+Die Anschlüsse sollen nahtlos aneinanderpassen. Gleich hoch, gleiche Steine, keine Abschlüsse an den Enden.
+
+| Datei | 1× | Motiv |
+| --- | --- | --- |
+| `burg/stein_mauer_x.png` | 68 × 84 | one straight segment of a medieval stone curtain wall with crenellations and a wall-walk, irregular warm grey stones, wall runs from upper left to lower right, open ends so segments tile seamlessly |
+| `burg/stein_mauer_y.png` | 68 × 84 | same wall segment running from upper right to lower left |
+| `burg/stein_turm.png` | 72 × 128 | round stone corner tower with crenellated top and arrow slits |
+| `burg/stein_tor.png` | 80 × 120 | stone gatehouse with two round towers, open wooden gate and raised portcullis, gate opening facing the viewer to the lower left |
+| `burg/bergfried.png` | 2 × 2 Felder, 140 × 210 | square norman stone keep, three storeys, flat crenellated roof, small arched windows, a flagpole with a magenta banner |
+| `burg/bergfried_gross.png` | 2.5 × 2.5 Felder, 170 × 250 | massive fortress keep with four corner turrets, buttresses and a magenta banner |
+| `burg/palas.png` | 2 × 1 Felder, 140 × 130 | stone great hall with tall windows and a steep slate roof |
+| `burg/palisade_x.png` | 68 × 70 | wooden palisade segment of sharpened logs with a walkway behind, runs from upper left to lower right |
+| `burg/palisade_y.png` | 68 × 70 | same palisade segment, runs from upper right to lower left |
+| `burg/holzturm.png` | 64 × 120 | wooden watchtower on stilts, plank platform, small shingle roof, ladder |
+| `burg/holztor.png` | 80 × 100 | wooden palisade gate with a covered walkway on top, gate facing lower left |
+| `burg/holzhalle.png` | 2 × 1 Felder, 130 × 110 | wooden hall with shingle roof, inside a palisade |
+| `burg/ruine_mauer_1.png` | 68 × 50 | crumbled stub of an old stone wall, ivy, fallen stones |
+| `burg/ruine_mauer_2.png` | 68 × 40 | low ruined wall with a broken arch |
+| `burg/ruine_turm.png` | 72 × 90 | ruined tower stump, broken top, ivy |
+| `burg/schutt.png` | 56 × 30 | pile of rubble and fallen dressed stones |
+| `hafen/kogge_x.png` | 150 × 140 | medieval cog ship, round wooden hull, single mast, big square sail with red and cream stripes, small castles fore and aft, ship lies along the line from upper left to lower right, calm water line, no water around it |
+| `hafen/kogge_y.png` | 150 × 140 | same cog, lying along the line from upper right to lower left |
+| `hafen/boot.png` | 60 × 40 | small wooden fishing boat with nets |
+| `hafen/steg_x.png` | 68 × 40 | wooden pier segment on posts, runs from upper left to lower right |
+| `hafen/steg_y.png` | 68 × 40 | same pier, runs from upper right to lower left |
+| `hafen/kran.png` | 60 × 110 | medieval wooden treadwheel harbour crane |
+
+---
+
+## Paket 6: Deine eigene Burg im Ausbau
+
+Die Burg wächst in vier Stufen: Ruine, Holzburg, Steinburg, Festung. Die Mauern dafür kommen aus Paket 5. Hier folgen die neun Gebäude in je drei Stufen. Stufe 1 ist einfach und aus Holz, Stufe 2 solide, Stufe 3 prächtig aus Stein. Jede Stufe soll man auf einen Blick unterscheiden können.
+
+Arbeiter, Funken, Rauch und Pferde zeichnet das Spiel darüber. Bitte **keine Menschen und Tiere** in diese Bilder malen.
+
+| Datei | Grundfläche | Stufe 1 | Stufe 2 | Stufe 3 |
+| --- | --- | --- | --- | --- |
+| `eigen/rittersaal_1..3.png` | 1.5 × 3 | wooden hall with thatch | timber hall on stone base, shingle roof, banner | stone great hall, tall windows, two magenta banners |
+| `eigen/unterkunft_1..3.png` | 2.6 × 1.2 | two tents and a lean-to | wooden barracks | stone barracks with tile roof and weapon racks |
+| `eigen/schmiede_1..3.png` | 1.4 × 1.2 | open forge shed, anvil under roof | timber smithy with chimney | stone smithy, two chimneys, big bellows |
+| `eigen/stall_1..3.png` | 1.2 × 2.4 | simple open horse shelter | wooden stable with hay loft | long stone stable with tile roof |
+| `eigen/holzfaeller_1..3.png` | 1.2 × 1 | woodcutter's hut with chopping block | hut and saw pit | two huts, saw pit, big log piles |
+| `eigen/steinbruch_1..3.png` | 2 × 1.6 | small rocky outcrop with tools | open quarry pit with cut blocks | deep quarry with wooden crane and ramps |
+| `eigen/markt_1..3.png` | 2.8 × 2.4 | two stalls on a trampled square | four stalls and a well | paved market square, market cross, covered market hall |
+| `eigen/kapelle_1..3.png` | 2.6 × 1.3 | wooden wayside cross with a tiny roof | small wooden chapel | stone chapel with bell tower |
+| `eigen/wachturm_1..3.png` | 1 × 1 | wooden lookout platform | wooden tower with roof | tall round stone tower with crenellations |
+| `eigen/baustelle_klein.png` | 1 × 1 | wooden scaffolding around a half-built wall, stacked timber, ropes, a ladder | | |
+| `eigen/baustelle_mittel.png` | 2 × 1.5 | larger building site, scaffolding, half-built stone walls, wooden crane | | |
+| `eigen/baustelle_gross.png` | 3 × 2 | big building site for a keep, scaffolding on several levels, treadwheel crane, material piles | | |
+| `eigen/bauplatz_schild.png` | 0.3 | small wooden sign post with a blank hanging board (the game paints the icon on it) | | |
+| `eigen/materialhaufen.png` | 0.6 | pile of cut stones, planks and a few barrels | | |
+
+1×-Größe: etwa 64 Pixel Breite je Feld Grundfläche, die Höhe nach Bedarf.
+
+---
+
+## Paket 7: Figuren
+
+Alle Menschen kommen als **Bogen** (Sprite-Sheet) mit festem Raster:
+- **8 Spalten**, von links nach rechts:
+  1. Stehen
+  2. bis 5. Gehen (4 Phasen eines Schritts)
+  6. Angriff ausholen
+  7. Angriff (Schlag, Stoß oder Schuss)
+  8. Am Boden liegend (besiegt)
+- **2 Zeilen:**
+  - Zeile 1: Die Figur geht **schräg auf den Betrachter zu, nach links unten**.
+  - Zeile 2: Sie geht **schräg vom Betrachter weg, nach rechts oben** (Rücken zu sehen).
+  - Die übrigen Richtungen erzeugt das Spiel daraus.
+- **Zellgröße:**
+  - Zu Fuß 1× 40 × 40, die Figur ist etwa 28 Pixel hoch. Lieferung 4×, also 160 × 160 je Zelle und **1280 × 320** je Bogen.
+  - Beritten 1× 64 × 56, Lieferung 256 × 224 je Zelle und **2048 × 448** je Bogen.
+- Die Füße stehen in jeder Zelle auf derselben Höhe, der Fußpunkt liegt mittig im unteren Fünftel.
+- Gleiche Figur, gleiche Farben und gleiche Größe in allen Zellen.
+
+**Stil:** Die Figuren sollen rund und freundlich wirken: etwas größerer Kopf, weiche Formen, gut lesbar auf kleiner Größe. Bitte nicht spitz und nicht kantig.
+
+Für die Figuren gilt ein eigener Baustein, **vor das Motiv** gesetzt:
+
+```
+hand-painted isometric character sprite sheet, 8 columns and 2 rows on a strict grid, same character in every cell, row 1 walking diagonally toward the viewer to the lower left, row 2 walking diagonally away to the upper right showing the back, columns: idle, walk 1, walk 2, walk 3, walk 4, attack windup, attack strike, lying defeated on the ground, cute slightly chunky proportions, soft rounded shapes, painterly, thin soft outlines, light from upper left, no cast shadow, no ground, transparent background, medieval 1194
+```
+
+Falls Oakgen keine sauberen Bögen schafft, reichen auch Einzelbilder, etwa `ritter_vorn_gehen2.png`. Das Minimum je Figur: Stehen, Gehen in 2 Phasen, Angriff und Liegend, jeweils von vorn. Die Rückansicht ergänze ich dann aus der Vorderansicht.
+
+**Dein Ritter und dein Gefolge** (Wappenfarbe in Magenta):
+
+| Datei | Motiv |
+| --- | --- |
+| `figuren/ritter.png` | knight in chainmail with a magenta surcoat, simple helmet, sword and kite shield with a magenta field |
+| `figuren/ritterin.png` | female knight, same armour, long braid, magenta surcoat, sword and shield |
+| `figuren/ritter_beritten.png` | the same knight riding a brown warhorse with a magenta caparison, lance upright, couched lance in the attack frames |
+| `figuren/ritterin_beritten.png` | the female knight riding a grey warhorse with a magenta caparison |
+| `figuren/knecht.png` | man-at-arms in a padded gambeson with magenta tabard, spear and round shield |
+| `figuren/reisiger.png` | mounted-style soldier on foot, leather jerkin with magenta sash, short sword and round shield |
+| `figuren/schuetze.png` | archer with a short bow, gambeson with magenta hood |
+| `figuren/langbogen.png` | longbowman, tall yew longbow, leather jerkin, magenta hood |
+| `figuren/armbrust.png` | crossbowman, crossbow, padded coat with magenta tabard, steel cap |
+| `figuren/bauernbursche.png` | farm lad with a wooden club, simple tunic with magenta patch |
+
+**Gegner und Leute im Land:**
+
+| Datei | Motiv |
+| --- | --- |
+| `figuren/wegelagerer.png` | ragged highway robber, brown hood, wooden club |
+| `figuren/wilddieb.png` | poacher, green-brown hood, short bow |
+| `figuren/bandenfuehrer.png` | bandit leader, leather armour, short sword, wooden shield |
+| `figuren/raubritter_beritten.png` | robber knight on a black horse, blackened chainmail, dark surcoat with red trim, long sword |
+| `figuren/soeldner.png` | mercenary with a battle axe, leather armour, scarred |
+| `figuren/soldat.png` | soldier in chainmail, spear, long kite shield, magenta surcoat (the game colours it red for the Normans, blue for the French) |
+| `figuren/armbrust_soldat.png` | soldier with crossbow, gambeson, magenta surcoat |
+| `figuren/chevalier_beritten.png` | french knight on a horse, chainmail, magenta surcoat and caparison, long sword |
+| `figuren/steuereintreiber_beritten.png` | fat tax collector on a horse, rich dark-red robe, money chest on the saddle |
+| `figuren/haendler_beritten.png` | merchant on a horse with saddle bags, blue cloak, fur hat |
+| `figuren/wache.png` | hired caravan guard, gambeson, spear, round shield |
+| `figuren/waldmann.png` | outlaw of the forest in green, longbow, hood |
+| `figuren/bauer.png` | peasant man in a brown tunic, straw hat, carrying a hoe |
+| `figuren/baeuerin.png` | peasant woman, long dress, headscarf, basket |
+| `figuren/moench.png` | monk in a brown habit with a rope belt, hood |
+| `figuren/kind.png` | village child, simple tunic (only idle and walking needed) |
+
+---
+
+## Paket 8: Tiere
+
+Bögen wie bei den Figuren, aber mit **6 Spalten**:
+1. Stehen
+2. und 3. Gehen
+4. Grasen oder Picken
+5. Rennen (nur Hirsch und Pferd, sonst wie Gehen)
+6. Erlegt am Boden
+
+Dazu 2 Zeilen wie bei den Figuren.
+
+| Datei | Zelle 1× | Motiv |
+| --- | --- | --- |
+| `tiere/schaf.png` | 32 × 28 | fluffy cream sheep, black face |
+| `tiere/kuh.png` | 44 × 36 | brown and white cow |
+| `tiere/huhn.png` | 18 × 18 | small brown hen |
+| `tiere/hirsch.png` | 44 × 44 | red deer stag with antlers |
+| `tiere/ente.png` | 20 × 16 | mallard duck swimming (no water drawn) |
+| `tiere/pferd.png` | 56 × 48 | riderless chestnut horse with saddle |
+
+---
+
+## Paket 9: Symbole und Porträts
+
+Hier gilt ein eigener Baustein:
+
+```
+hand-painted game icon, front view, soft rounded shapes, painterly, thin soft outline, centered, transparent background, gentle light from upper left, readable at small size, medieval
+```
+
+Größe 1× 64 × 64, Lieferung 256 × 256.
+
+**Waren** (`icons/ware_<name>.png`):
+
+| Name | Motiv |
+| --- | --- |
+| getreide | sheaf of wheat |
+| holz | logs |
+| stein | cut stone blocks |
+| eisen | iron bars |
+| wolle | bundle of raw wool |
+| bier | wooden tankard of ale |
+| salz | sack of salt |
+| wein | wine barrel with a jug |
+| fleisch | joint of meat |
+| felle | stack of furs |
+
+**Ausrüstung** (`icons/item_<name>.png`):
+
+| Gruppe | Namen |
+| --- | --- |
+| Waffen | knueppel, kurzschwert, speer, kurzbogen, langschwert, streitaxt, langbogen, armbrust, ritterschwert, kriegshammer, eibenbogen |
+| Rüstungen | gambeson, lederwams, kettenhemd, schuppenpanzer, kettenruestung |
+| Schilde | holzschild, rundschild, drachenschild (normannischer Langschild), wappenschild (mit Magenta-Feld) |
+| Pferde | klepper (shaggy pony), zelter (elegant palfrey), schlachtross (armoured warhorse) |
+
+**Leiste oben** (`icons/hud_<name>.png`): gold (Münzen), ruhm (Stern), leben (Herz), gefolge (Schild), ladung (Sack).
+
+**Gebäude** (`icons/bau_<name>.png`):
+
+| Name | Motiv |
+| --- | --- |
+| halle | Krone |
+| kaserne | gekreuzte Schwerter |
+| schmiede | Amboss |
+| stall | Hufeisen |
+| holzfaeller | Axt |
+| steinbruch | Spitzhacke |
+| markt | Münze |
+| kapelle | Kreuz |
+| wehr | Turm |
+
+**Fraktionswappen** (`icons/wappen_<name>.png`), als Wappenschild:
+
+| Name | Wappen |
+| --- | --- |
+| sachsen | weißer Drache auf Grün |
+| normannen | zwei goldene Löwen auf Rot |
+| kirche | goldenes Kreuz auf Weiß |
+| gilde | Waage und Wollsack auf Blau |
+| waldleute | Eichenblatt und Pfeil auf Braungrün |
+| franken | goldene Lilien auf Blau |
+
+**Porträts** (für Startmenü und Gefolge-Tafel), 1× 128 × 160, Lieferung 512 × 640. Brustbild mit leichtem Dreiviertel-Profil, Waffenrock in Magenta, gemalter Hintergrund in warmem, unscharfem Braun:
+
+| Datei | Motiv |
+| --- | --- |
+| `portraits/ritter.png` | Ritter |
+| `portraits/ritterin.png` | Ritterin |
+| `portraits/knecht.png`, `schuetze.png`, `langbogen.png`, `armbrust.png`, `reisiger.png`, `bauernbursche.png` | je eines für die Gefolge-Klassen |
+
+**Oberflächen** (nahtlos, Baustein aus Paket 2), Lieferung 1024 × 1024:
+- `ui/pergament.png`: Pergament
+- `ui/eiche.png`: dunkles Eichenholz für die Leisten
+
+---
+
+## Paket 10: Musik (optional)
+
+Falls Oakgen auch Musik kann. Bitte als OGG oder MP3 mit 160 kbit/s, nahtlos wiederholbar (Anfang und Ende passen zusammen).
+
+**Grundton:** mittelalterlich, warm, episch, aber nicht bombastisch, in Moll und dorischer Tonart.
+
+**Instrumente:** Laute, Blockflöte, Drehleier, Fiedel, Rahmentrommel, Naturhorn und ein leiser Chor. Keine bekannten Melodien nachspielen.
+
+| Datei | Länge | Stimmung |
+| --- | --- | --- |
+| `musik/titel.ogg` | 1,5 bis 2 min | episches Titelthema, langsamer Aufbau, Hörner und Chor |
+| `musik/reise.ogg` | 2 bis 3 min | Reisemusik am Tag, Dreiertakt, Laute und Flöte, leicht und hoffnungsvoll |
+| `musik/nacht.ogg` | 2 min | ruhig, Drehleier und Flöte, viel Hall |
+| `musik/kampf.ogg` | 1 min | treibende Trommeln, Fiedel, Hörner |
+| `musik/sieg.ogg` | 5 s | kurze Fanfare |
+| `musik/niederlage.ogg` | 5 s | kurzes, trauriges Motiv |
+| `musik/bau_fertig.ogg` | 3 s | festliches Glockenspiel |
+
+---
+
+## 4. Lieferung
+
+**Ordner:** alles unter `assets/` mit diesen Unterordnern:
+`titel`, `boden`, `natur`, `haus`, `burg`, `hafen`, `eigen`, `figuren`, `tiere`, `icons`, `portraits`, `ui`, `musik`
+
+**Übergabe:**
+- Hier im Chat anhängen oder direkt in den Ordner legen.
+- Gern paketweise, Hauptsache mit den Dateinamen aus diesem Brief.
+
+**Umfang:** Im Spiel verkleinere und komprimiere ich alles. Die Online-Fassung soll trotzdem schnell laden. Gib mir also lieber zu große als zu kleine Bilder, aber keine über 4096 Pixel.
+
+**Was ich damit mache:**
+- Ein Lader nimmt jedes vorhandene Bild und fällt sonst auf die heutige Grafik zurück.
+- Magenta wird in die Wappen- und Fraktionsfarben umgefärbt.
+- Bodentexturen werden auf die schrägen Rauten und Hügel gelegt.
+- Die Mauerteile werden zu den Burgringen zusammengesetzt.
+- Fußpunkte und Größen gleiche ich pro Bild ab.
