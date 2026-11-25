@@ -1747,7 +1747,40 @@ function drawAnimal(c, a, x, y) {
     }
     default: break;
   }
+  if (a.flash > 0) {
+    c.globalAlpha = Math.min(1, a.flash * 5);
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.ellipse(0, -6, 7, 5, 0, 0, Math.PI * 2); c.fill();
+    c.globalAlpha = 1;
+  }
   c.restore();
+}
+
+// Erlegtes Tier, liegt eine Weile im Gras
+function drawCarcass(c, f, x, y) {
+  const col = { hirsch: '#8a5a34', schaf: '#efe9dc', kuh: '#9a6a42', huhn: '#f2eee6', ente: '#8a6a45' }[f.animal] || '#8a5a34';
+  const big = f.animal === 'hirsch' || f.animal === 'kuh' ? 1 : f.animal === 'schaf' ? 0.8 : 0.45;
+  c.globalAlpha = Math.min(1, (f.dur - f.t) / 4);
+  c.fillStyle = 'rgba(0,0,0,0.2)'; c.beginPath(); c.ellipse(x, y, 10 * big, 3.5 * big, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = col; c.strokeStyle = OUTLINE; c.lineWidth = 0.8;
+  c.beginPath(); c.ellipse(x, y - 2 * big, 7.5 * big, 3 * big, 0.08 * (f.facing || 1), 0, Math.PI * 2); c.fill(); c.stroke();
+  c.beginPath(); c.ellipse(x + 7 * big * (f.facing || 1), y - 1.5 * big, 2.4 * big, 1.6 * big, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.strokeStyle = shade(col, 0.6); c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(x - 3 * big, y - 1); c.lineTo(x - 6 * big, y + 1.5); c.moveTo(x + 2 * big, y - 1); c.lineTo(x + 4 * big, y + 2); c.stroke();
+  c.globalAlpha = 1;
+}
+
+// Tier unter dem Mauszeiger (für die Jagd)
+export function animalAtScreen(px, py) {
+  let best = null, bd = 16 * G.cam.zoom + 6;
+  for (const a of G.animals || []) {
+    if (a.dead) continue;
+    if (a.kind === 'huhn' && darkness() > 0.4) continue;
+    const sp = toScreen(a.x, a.y);
+    const d = Math.hypot(sp.x - px, sp.y - 6 * G.cam.zoom - py);
+    if (d < bd) { bd = d; best = a; }
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------- Rauch, Schnee, Vögel
@@ -1993,8 +2026,9 @@ export function render() {
   const night = darkness() > 0.4;
   for (const a of G.animals || []) {
     if (!inView(a.x, a.y) || (night && a.kind === 'huhn')) continue;
-    objs.push({ d: a.x + a.y, z: 0, f: (c) => drawAnimal(c, a, isoX(a.x, a.y), isoY(a.x, a.y) - zAt(a.x, a.y)) });
+    objs.push({ d: a.x + a.y, z: 0, f: (c) => { const ax = isoX(a.x, a.y), ay = isoY(a.x, a.y) - zAt(a.x, a.y); if (G.s.player.huntTarget === a) { c.strokeStyle = 'rgba(255,120,80,0.9)'; c.lineWidth = 1.4; c.beginPath(); c.ellipse(ax, ay, 11, 4.5, 0, 0, Math.PI * 2); c.stroke(); } drawAnimal(c, a, ax, ay); } });
   }
+  for (const f of G.fx) if (f.kind === 'kadaver' && inView(f.x, f.y)) objs.push({ d: f.x + f.y - 0.3, z: 0, f: (c) => drawCarcass(c, f, isoX(f.x, f.y), isoY(f.x, f.y) - zAt(f.x, f.y)) });
   for (const f of G.fx) if (f.kind === 'corpse' && inView(f.x, f.y)) objs.push({ d: f.x + f.y - 0.3, z: 0, f: (c) => drawCorpse(c, f, isoX(f.x, f.y), isoY(f.x, f.y) - zAt(f.x, f.y)) });
   objs.sort((a, b) => a.d - b.d);
   for (const o of objs) { baseZ = o.z || 0; o.f(wc); }
@@ -2037,9 +2071,10 @@ export function render() {
   ctx.textAlign = 'center';
   for (const f of G.fx) {
     if (f.kind !== 'text') continue;
+    if (f.t < 0) continue;
     const sp = toScreen(f.x, f.y);
     const y = sp.y - (34 + f.t * 26) * z;
-    ctx.globalAlpha = 1 - f.t / f.dur;
+    ctx.globalAlpha = Math.max(0, 1 - f.t / f.dur);
     ctx.strokeStyle = 'rgba(20,10,5,0.85)'; ctx.lineWidth = 3; ctx.strokeText(f.text, sp.x, y);
     ctx.fillStyle = f.color; ctx.fillText(f.text, sp.x, y);
   }
@@ -2075,6 +2110,15 @@ export function render() {
     ctx.fillStyle = 'rgba(28,20,14,0.82)'; ctx.fillRect(sp.x - tw / 2 - 6, yy - 12, tw + 12, 17);
     ctx.fillStyle = u.group && (u.group.engaged || u.group.provoked) ? '#ff9a80' : '#f3ead2';
     ctx.fillText(label, sp.x, yy);
+  } else if (G.hoverAnimal && !G.hoverAnimal.dead) {
+    const a = G.hoverAnimal;
+    const sp = toScreen(a.x, a.y);
+    ctx.font = '600 12px "Alegreya Sans", sans-serif';
+    const label = G.animalTitle ? G.animalTitle(a) : a.kind;
+    const tw = ctx.measureText(label).width;
+    const yy = sp.y - 26 * z;
+    ctx.fillStyle = 'rgba(28,20,14,0.84)'; ctx.fillRect(sp.x - tw / 2 - 6, yy - 12, tw + 12, 17);
+    ctx.fillStyle = '#f3ead2'; ctx.fillText(label, sp.x, yy);
   } else if (G.hoverBuilding) {
     const a = G.hoverBuilding;
     const sp = toScreen(a.x, a.y);

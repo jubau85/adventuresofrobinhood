@@ -3,7 +3,7 @@
 import { G, log } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS } from './data.js';
 import { generateWorld, groundZ } from './world.js';
-import { spawnAnimals, updateAnimals } from './animals.js';
+import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
   setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers,
@@ -12,7 +12,7 @@ import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction } from './politics.js';
 import { castleSite } from './castle.js';
 import { updateTime } from './sim.js';
-import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen } from './render.js';
+import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
@@ -108,6 +108,7 @@ G.showTitle = showTitle;
 G.onSeason = onSeasonChanged;
 G.onNewDay = () => { G.saveGame(true); };
 G.onVictory = () => openPanel('victory');
+G.animalTitle = animalTitle;
 
 // ---------------------------------------------------------------- Interaktion
 function interactRadius(s) { return s.type === 'spieler' ? 6.5 : s.type === 'burg' || s.type === 'stadt' ? 5 : 4; }
@@ -179,13 +180,35 @@ function clickUnit(u) {
   return true;
 }
 
+// Jagd mit dem Bogen
+function startHunt(a) {
+  const p = G.s.player;
+  if (!p.st.ranged) {
+    log('Zum Jagen brauchst du einen Bogen oder eine Armbrust. Leg einen unter „Gefolge“ an (Taste I).', 'bad');
+    return;
+  }
+  const info = ANIMAL_INFO[a.kind];
+  const go = () => { p.huntTarget = a; p.attackTarget = null; p.path = null; G.pendingSite = null; log(`Du legst auf ${info.name === 'Ente' ? 'die' : info.name === 'Kuh' ? 'die' : 'den'} ${info.name} an.`); };
+  if (info.farm) {
+    const s = G.world.sites.find((x) => x.id === a.site);
+    if (s && s.type === 'spieler') { go(); return; }
+    const who = s && s.faction ? `${s.name} (${FACTIONS[s.faction].short})` : 'einem Hof';
+    confirmDialog(`Das Tier gehört ${who}. Viehdiebstahl kostet Ansehen (−6). Trotzdem schießen?`, 'Schießen', go);
+    return;
+  }
+  go();
+}
+
 function clickWorld(px, py) {
   if (!G.started || panelOpen() || dialogOpen()) return;
   const u = unitAtScreen(px, py);
   if (u && clickUnit(u)) return;
+  const an = animalAtScreen(px, py);
+  if (an) { startHunt(an); return; }
   const wp = screenToGround(px, py);
   const p = G.s.player;
   p.attackTarget = null;
+  p.huntTarget = null;
   let site = null;
   for (const s of G.world.sites) if (Math.hypot(s.x - wp.x, s.y - wp.y) < (s.type === 'spieler' ? 4.5 : 2.5)) site = s;
   let tx = wp.x, ty = wp.y;
@@ -326,8 +349,10 @@ function bindInput() {
     const r = viewCanvas.getBoundingClientRect();
     const u = unitAtScreen(e.clientX - r.left, e.clientY - r.top);
     G.hover = u;
-    G.hoverBuilding = u ? null : buildingAtScreen(e.clientX - r.left, e.clientY - r.top);
-    canvas.style.cursor = u && u.group ? 'crosshair' : 'pointer';
+    const an = u ? null : animalAtScreen(e.clientX - r.left, e.clientY - r.top);
+    G.hoverAnimal = an;
+    G.hoverBuilding = u || an ? null : buildingAtScreen(e.clientX - r.left, e.clientY - r.top);
+    viewCanvas.style.cursor = (u && u.group) || an ? 'crosshair' : 'pointer';
   });
   viewCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
   viewCanvas.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });

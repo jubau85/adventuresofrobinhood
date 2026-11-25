@@ -40,6 +40,7 @@ node tools/build.mjs
   - eine Burgsiedlung, die mit der Burgstufe wächst
   - goldene Funken, wenn etwas fertig wird
 - **Gefolge:** Leute im Rittersaal anwerben, ausrüsten (Waffe, Rüstung, Schild, Pferd) und in Scharmützel führen. Dazu Befehle (folgen, Stellung halten, angreifen), Erfahrung und Stufen, Sold, Garnison und Verwundete.
+- **Jagd:** Mit Bogen oder Armbrust Hirsche und Enten jagen. Hirsche fliehen, Bogenschützen im Gefolge schießen mit. Fleisch und Felle lassen sich einlagern oder in Städten verkaufen. Wilderei kann den Normannen auffallen, fremdes Vieh zu schießen gilt als Diebstahl. Die Bestände wachsen täglich nach.
 - **Handel:** Jeder Ort erzeugt und braucht andere Waren. Die Preise richten sich nach dem Vorrat. Holz, Stein und Eisen braucht man auch für den Burgbau.
 - **Politik:** Fünf Fraktionen (Sachsen, Normannen, Kirche, Gilde, Waldleute) mit Rivalitäten. Aufträge, Geschenke und Überfälle verschieben das Ansehen. Verbündete gewähren Vorteile, Feinde überfallen deine Burg.
 - **Speichern:** Automatisch jeden Morgen im Browser, dazu manuell über das Menü.

@@ -526,6 +526,7 @@ function helpPanel() {
         <dt>E</dt><dd>Siedlung oder Burg betreten</dd>
         <dt>R</dt><dd>Auf- und absitzen</dd>
         <dt>Leertaste</dt><dd>Nächsten Feind angreifen</dd>
+        <dt>Klick auf Tier</dt><dd>Mit dem Bogen jagen: Fleisch und Felle</dd>
         <dt>F oder 1 2 3</dt><dd>Gefolge: folgen, Stellung halten, angreifen</dd>
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
@@ -539,6 +540,7 @@ function helpPanel() {
         <li><b>Handel</b> lohnt sich: Was ein Ort erzeugt, ist dort billig und anderswo gefragt. Stein und Eisen brauchst du für den Burgbau.</li>
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
         <li>Wer einer Fraktion hilft, verärgert ihre Rivalen. Ab +${ALLY_AT} wird eine Fraktion zum Verbündeten und gewährt Vorteile.</li>
+        <li>Mit einem Bogen kannst du <b>Hirsche und Enten jagen</b>. Fleisch und Felle lagerst du in Ashcombe ein oder verkaufst sie in Städten, die danach fragen. Wilderei sehen die Normannen nicht gern, und Vieh gehört den Dörfern.</li>
         <li>Feinde überfallen Ashcombe. Wachtürme und eine Garnison halten sie ab.</li>
       </ol></div>
     </div>`,

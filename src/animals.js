@@ -1,12 +1,25 @@
 // Tiere: Schafe und Kühe auf den Weiden, Hühner bei den Häusern, Hirsche im Wald, Enten auf dem Wasser.
-// Reine Atmosphäre, sie werden nicht gespeichert.
+// Mit dem Bogen lassen sie sich jagen. Die Bestände werden nicht gespeichert, sie wachsen täglich nach.
 
-import { G } from './state.js';
-import { T } from './data.js';
+import { G, log } from './state.js';
+import { T, GOODS } from './data.js';
 import { isWalkable, tileAt } from './world.js';
-import { rand } from './rng.js';
+import { rand, randInt } from './rng.js';
+import { addCargo, cargoFree } from './economy.js';
+import { changeRep, isAlly } from './politics.js';
 
 const ANIMAL_SPEED = { schaf: 0.25, kuh: 0.2, huhn: 0.4, hirsch: 0.55, ente: 0.22 };
+
+// Jagdbeute: Fleisch und Felle, Hof-Tiere gehören einem Ort
+export const ANIMAL_INFO = {
+  hirsch: { name: 'Hirsch', hp: 12, fleisch: [6, 9], felle: [1, 2] },
+  ente: { name: 'Ente', hp: 4, fleisch: [1, 2] },
+  schaf: { name: 'Schaf', hp: 10, fleisch: [3, 5], felle: [1, 1], farm: true },
+  kuh: { name: 'Kuh', hp: 20, fleisch: [8, 12], felle: [1, 2], farm: true },
+  huhn: { name: 'Huhn', hp: 3, fleisch: [1, 1], farm: true },
+};
+
+const DEER_TARGET = 36, DUCK_TARGET = 24;
 
 function animalOk(kind, x, y) {
   const t = tileAt(G.world, x, y);
@@ -23,50 +36,135 @@ function spotNear(cx, cy, rMin, rMax, kind) {
   return null;
 }
 
-export function spawnAnimals() {
-  const W = G.world, N = W.N;
-  const out = [];
-  const herd = (kind, home, n, r) => {
-    for (let k = 0; k < n; k++) {
-      const p = spotNear(home.x, home.y, 0, r, kind);
-      if (p) out.push({ kind, x: p.x, y: p.y, home: { x: home.x, y: home.y }, r, goal: null, wait: rand(0, 6), facing: Math.random() < 0.5 ? 1 : -1, anim: rand(0, 10), moving: false, v: Math.random(), flee: 0 });
-    }
-  };
-  for (const s of W.sites) {
-    const sheep = { dorf: 5, halle: 4, abtei: 6, spieler: 4, markt: 3, burg: 2 }[s.type] || 0;
-    const cows = { dorf: 2, halle: 3, spieler: 2 }[s.type] || 0;
-    const hens = { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2 }[s.type] || 0;
-    if (sheep) { const c = spotNear(s.x, s.y, s.clear - 1, s.clear + 4, 'schaf'); if (c) herd('schaf', c, sheep, 2.5); }
-    if (cows) { const c = spotNear(s.x, s.y, s.clear - 2, s.clear + 3, 'kuh'); if (c) herd('kuh', c, cows, 2.2); }
-    if (hens) herd('huhn', { x: s.x + 0.5, y: s.y + 0.8 }, hens, 2.8);
+function addHerd(kind, home, n, r, site = null, farFromPlayer = 0) {
+  const p0 = G.s && G.s.player;
+  for (let k = 0; k < n; k++) {
+    const p = spotNear(home.x, home.y, 0, r, kind);
+    if (!p) continue;
+    if (farFromPlayer && p0 && Math.hypot(p.x - p0.x, p.y - p0.y) < farFromPlayer) continue;
+    G.animals.push({
+      kind, x: p.x, y: p.y, home: { x: home.x, y: home.y }, r, site, hp: ANIMAL_INFO[kind].hp,
+      goal: null, wait: rand(0, 6), facing: Math.random() < 0.5 ? 1 : -1, anim: rand(0, 10),
+      moving: false, v: Math.random(), flee: 0, flash: 0, dead: false,
+    });
   }
-  for (let h = 0; h < 16; h++) {
-    for (let k = 0; k < 200; k++) {
-      const x = 4 + Math.random() * (N - 8), y = 4 + Math.random() * (N - 8);
-      if (tileAt(W, x, y) !== T.FOREST) continue;
-      herd('hirsch', { x, y }, 2 + Math.floor(Math.random() * 2), 6);
-      break;
-    }
-  }
-  for (let h = 0; h < 12; h++) {
-    for (let k = 0; k < 300; k++) {
-      const x = 2 + Math.random() * (N - 4), y = 2 + Math.random() * (N - 4);
-      if (tileAt(W, x, y) !== T.WATER) continue;
-      herd('ente', { x, y }, 2, 2.5);
-      break;
-    }
-  }
-  G.animals = out;
 }
 
+function farmHerds(s) {
+  return {
+    schaf: { n: { dorf: 5, halle: 4, abtei: 6, spieler: 4, markt: 3, burg: 2 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
+    kuh: { n: { dorf: 2, halle: 3, spieler: 2 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
+    huhn: { n: { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2 }[s.type] || 0, home: { x: s.x + 0.5, y: s.y + 0.8 }, r: 2.8 },
+  };
+}
+
+function spawnWild(kind, count, far) {
+  const W = G.world, N = W.N;
+  const want = kind === 'hirsch' ? T.FOREST : T.WATER;
+  for (let h = 0; h < count; h++) {
+    for (let k = 0; k < 300; k++) {
+      const x = 3 + Math.random() * (N - 6), y = 3 + Math.random() * (N - 6);
+      if (tileAt(W, x, y) !== want) continue;
+      if (far && Math.hypot(x - G.s.player.x, y - G.s.player.y) < far) continue;
+      addHerd(kind, { x, y }, kind === 'hirsch' ? 2 + Math.floor(Math.random() * 2) : 2, kind === 'hirsch' ? 6 : 2.5);
+      break;
+    }
+  }
+}
+
+export function spawnAnimals() {
+  G.animals = [];
+  for (const s of G.world.sites) {
+    for (const [kind, h] of Object.entries(farmHerds(s))) {
+      if (!h.n) continue;
+      const home = h.home || spotNear(s.x, s.y, h.rMin, h.rMax, kind);
+      if (home) addHerd(kind, home, h.n, h.r, s.id);
+    }
+  }
+  spawnWild('hirsch', 16);
+  spawnWild('ente', 12);
+}
+
+// Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
+export function replenishAnimals() {
+  const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
+  if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 2, 25);
+  if (count('ente') < DUCK_TARGET) spawnWild('ente', 1, 20);
+  for (const s of G.world.sites) {
+    for (const [kind, h] of Object.entries(farmHerds(s))) {
+      if (!h.n) continue;
+      const have = G.animals.filter((a) => a.kind === kind && a.site === s.id);
+      if (have.length >= h.n) continue;
+      const home = have.length ? have[0].home : h.home || spotNear(s.x, s.y, h.rMin, h.rMax, kind);
+      if (home) addHerd(kind, home, 1, h.r, s.id, 12);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Jagd
+export function animalTitle(a) {
+  const info = ANIMAL_INFO[a.kind];
+  if (!info.farm) return `${info.name} · mit dem Bogen jagen`;
+  const s = G.world.sites.find((x) => x.id === a.site);
+  if (s && s.type === 'spieler') return `${info.name} · dein Vieh`;
+  return `${info.name} · gehört ${s ? s.name : 'einem Hof'}`;
+}
+
+export function hitAnimal(a, dmg, shooter) {
+  if (a.dead) return;
+  a.hp -= dmg;
+  a.flash = 0.2;
+  G.fx.push({ kind: 'text', x: a.x, y: a.y, text: String(dmg), color: '#fff4d8', t: 0, dur: 0.8 });
+  if (a.kind === 'hirsch' || a.kind === 'ente' || a.kind === 'huhn') {
+    const d = Math.hypot(a.x - shooter.x, a.y - shooter.y) || 0.01;
+    a.goal = { x: a.x + ((a.x - shooter.x) / d) * 8, y: a.y + ((a.y - shooter.y) / d) * 8 };
+    a.flee = 3; a.wait = 0;
+  }
+  if (a.hp <= 0) killAnimal(a);
+}
+
+function killAnimal(a) {
+  const info = ANIMAL_INFO[a.kind];
+  a.dead = true;
+  G.animals = G.animals.filter((x) => x !== a);
+  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, t: 0, dur: 30 });
+  const loot = [];
+  let lost = 0;
+  for (const good of ['fleisch', 'felle']) {
+    if (!info[good]) continue;
+    const n = randInt(info[good][0], info[good][1]);
+    const k = Math.min(n, cargoFree());
+    if (k > 0) { addCargo(good, k); loot.push(`${k} ${good === 'felle' && k === 1 ? 'Fell' : GOODS[good].name}`); }
+    lost += n - k;
+  }
+  loot.forEach((l, i) => G.fx.push({ kind: 'text', x: a.x, y: a.y - 0.3, text: `+${l}`, color: '#bfe39a', t: -0.5 * i, dur: 1.8 }));
+  const msg = loot.length ? `${info.name} erlegt: ${loot.join(', ')}.` : `${info.name} erlegt, aber du kannst nichts mehr tragen.`;
+  log(`${msg}${lost && loot.length ? ` ${lost} bleiben liegen, die Ladung ist voll.` : ''}`, loot.length ? 'good' : 'bad');
+  // Folgen
+  if (info.farm) {
+    const s = G.world.sites.find((x) => x.id === a.site);
+    if (s && s.faction) {
+      log(`Viehdiebstahl! ${s.name} wird das nicht vergessen.`, 'bad');
+      changeRep(s.faction, -6);
+    }
+  } else if (a.kind === 'hirsch' && !isAlly('normannen') && Math.random() < 0.35) {
+    log('Ein Förster hat dich beim Wildern gesehen. Das Rotwild gehört nach dem Forstrecht dem König.', 'bad');
+    changeRep('normannen', -2);
+    if (Math.random() < 0.5) changeRep('waldleute', 1);
+  }
+  if (G.s.player.huntTarget === a) G.s.player.huntTarget = null;
+}
+
+// Wie Wild auf Störung reagiert: Hirsche fliehen, wenn du zu nahe kommst
 export function updateAnimals(dt) {
   const p = G.s.player;
   for (const a of G.animals) {
     a.moving = false;
+    if (a.flash > 0) a.flash -= dt;
     if (Math.abs(a.x - p.x) + Math.abs(a.y - p.y) > 55) continue;
     if (a.kind === 'hirsch') {
       const d = Math.hypot(a.x - p.x, a.y - p.y) || 0.01;
-      if (d < (p.mounted ? 7 : 5) && a.flee <= 0) {
+      if (d < (p.mounted ? 7 : 4.5) && a.flee <= 0) {
         a.goal = { x: a.x + ((a.x - p.x) / d) * 7, y: a.y + ((a.y - p.y) / d) * 7 };
         a.flee = 2.5; a.wait = 0;
       }
@@ -78,7 +176,7 @@ export function updateAnimals(dt) {
       if (!animalOk(a.kind, a.goal.x, a.goal.y)) { a.goal = null; a.wait = 1; continue; }
     }
     const dx = a.goal.x - a.x, dy = a.goal.y - a.y, d = Math.hypot(dx, dy);
-    const v = ANIMAL_SPEED[a.kind] * (a.flee > 0 ? 5 : 1) * dt;
+    const v = ANIMAL_SPEED[a.kind] * (a.flee > 0 ? 4.5 : 1) * dt;
     if (d < 0.08 + v) { a.goal = null; a.wait = rand(2, 9); continue; }
     const nx = a.x + (dx / d) * v, ny = a.y + (dy / d) * v;
     if (animalOk(a.kind, nx, ny)) {
@@ -88,3 +186,4 @@ export function updateAnimals(dt) {
     } else { a.goal = null; a.wait = 1; }
   }
 }
+

@@ -23,6 +23,15 @@ export function initTowns() {
   }
 }
 
+// Fehlende Waren (z. B. nach einem Update) im Bestand ergänzen
+export function ensureTownStock() {
+  for (const s of G.world.sites) {
+    const town = G.s.towns[s.id];
+    if (!town) continue;
+    for (const g of GOOD_IDS) if (town.stock[g] == null) town.stock[g] = targetStock(s, g);
+  }
+}
+
 export function price(site, good) {
   const base = GOODS[good].base;
   const f = site.produces.includes(good) ? 0.65 : site.demands.includes(good) ? 1.55 : 1.0;

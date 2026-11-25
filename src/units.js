@@ -11,6 +11,7 @@ import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed }
 import { cargoFree, addCargo } from './economy.js';
 import { castleSite } from './castle.js';
 import { hourOf } from './sim.js';
+import { hitAnimal } from './animals.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -245,13 +246,33 @@ function applyHit(a, t) {
   if (t.hp <= 0) unitDown(t, a);
 }
 
+// Pfeil auf ein Tier (Jagd). Ein Pfeil zielt etwas vor ein laufendes Tier.
+export function shootAnimal(u, a) {
+  const d = Math.hypot(a.x - u.x, a.y - u.y);
+  u.cd = u.st.cd * rand(0.92, 1.08);
+  u.swing = 0.3;
+  const sx = (a.x - u.x) - (a.y - u.y);
+  if (Math.abs(sx) > 0.05) u.facing = sx >= 0 ? 1 : -1;
+  const dur = Math.max(0.18, d / 15);
+  let tx = a.x, ty = a.y;
+  if (a.moving && a.goal) {
+    const gd = Math.hypot(a.goal.x - a.x, a.goal.y - a.y) || 1;
+    const v = (a.flee > 0 ? 2.4 : 0.5) * dur * 0.6;
+    tx += ((a.goal.x - a.x) / gd) * v; ty += ((a.goal.y - a.y) / gd) * v;
+  }
+  const dmg = Math.max(1, Math.round(u.st.atk * rand(0.8, 1.2)));
+  G.projectiles.push({ x: u.x, y: u.y, tx, ty, target: a, att: u, t: 0, dur, animal: true, dmg, bolt: ITEMS[u.eq.waffe].kind === 'armbrust' });
+}
+
 export function updateProjectiles(dt) {
   for (let i = G.projectiles.length - 1; i >= 0; i--) {
     const p = G.projectiles[i];
     p.t += dt;
     if (p.t >= p.dur) {
       const tg = p.target;
-      if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg);
+      if (p.animal) {
+        if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) hitAnimal(tg, p.dmg, p.att);
+      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg);
       G.projectiles.splice(i, 1);
     }
   }
@@ -406,9 +427,17 @@ function updatePlayer(p, dt) {
   if (p.dead) return;
   const inp = G.input;
   if (p.attackTarget && (p.attackTarget.dead || !p.attackTarget.group || !p.attackTarget.group.engaged)) p.attackTarget = null;
+  if (p.huntTarget && (p.huntTarget.dead || !p.st.ranged)) p.huntTarget = null;
   if (inp.dx || inp.dy) {
-    p.path = null; p.attackTarget = null; G.pendingSite = null;
+    p.path = null; p.attackTarget = null; p.huntTarget = null; G.pendingSite = null;
     moveToward(p, p.x + inp.dx * 2, p.y + inp.dy * 2, dt, 0.01);
+  } else if (p.huntTarget && !p.attackTarget && !inCombat()) {
+    // Jagd: auf Schussweite heran, dann schießen
+    const a = p.huntTarget;
+    const d = Math.hypot(a.x - p.x, a.y - p.y);
+    if (d > 26) { p.huntTarget = null; log('Das Tier ist entkommen.'); }
+    else if (d > p.st.range * 0.92) moveToward(p, a.x, a.y, dt, p.st.range * 0.88);
+    else if (p.cd <= 0) shootAnimal(p, a);
   } else if (p.attackTarget) {
     const t = p.attackTarget;
     const d = Math.hypot(t.x - p.x, t.y - p.y);
@@ -448,6 +477,9 @@ function updateCompanion(u, k, dt) {
   if (order === 'halten') enemy = nearestEnemy(u, u.st.range + 1.5);
   else enemy = nearestEnemy(u, order === 'angriff' ? 16 : 9, p) || nearestEnemy(u, u.st.range + 0.5);
   if (enemy) { engage(u, enemy, dt); return; }
+  // Bogenschützen im Gefolge schießen bei der Jagd mit
+  const prey = p.huntTarget;
+  if (prey && !prey.dead && u.st.ranged && u.cd <= 0 && Math.hypot(prey.x - u.x, prey.y - u.y) <= u.st.range) shootAnimal(u, prey);
   if (order === 'halten' && u.holdPos) { moveToward(u, u.holdPos.x, u.holdPos.y, dt, 0.3); return; }
   const slot = formationSlot(k);
   const d = Math.hypot(slot.x - u.x, slot.y - u.y);

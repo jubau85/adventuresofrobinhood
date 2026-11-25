@@ -4,6 +4,7 @@ import { G } from './state.js';
 import { SAVE_KEY, SAVE_VERSION } from './data.js';
 import { generateWorld } from './world.js';
 import { makeUnit, spawnGroup, rebuildUnits, spawnPeasants } from './units.js';
+import { ensureTownStock } from './economy.js';
 
 function unitData(u) {
   return {
@@ -46,6 +47,7 @@ export function deserialize(json) {
     if (g) { g.id = gd.id; g.home = gd.home; g.provoked = gd.provoked; }
   }
   G.nextId = Math.max(G.nextId, data.nextId);
+  ensureTownStock();
   spawnPeasants();
   rebuildUnits();
 }
