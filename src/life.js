@@ -7,7 +7,7 @@ import { changeRep, addRenown } from './politics.js';
 import { T, PEASANT_TUNICS, HAIR, GOODS, FACTIONS } from './data.js';
 import { isWalkable, doorOf, freeNear } from './world.js';
 import { rand, pick } from './rng.js';
-import { makeUnit, placeNear, chaseTo, rebuildUnits } from './units.js';
+import { makeUnit, placeNear, chaseTo, rebuildUnits, faceDir } from './units.js';
 import { hourOf, seasonIndex } from './sim.js';
 import { standing, underConstruction, isBlighted, isAbandoned, burningIn, douse, siteHouses, workOn } from './dynamics.js';
 import { takeAnimal } from './animals.js';
@@ -469,7 +469,7 @@ export function updateVillager(v, dt) {
       t.kind = 'work'; t.t = 0;
       if (t.act === 'heim') { v.hidden = true; v.inside = true; v.hideUntil = t.hideFor ? G.time + t.hideFor : 0; v.task = null; return; }
       // Blickrichtung zum Arbeitsplatz
-      if (t.act === 'verkaufen') v.facing = -1;
+      if (t.act === 'verkaufen') faceDir(v, 0, 1);
     }
     return;
   }
@@ -517,8 +517,7 @@ function campNight(v, dt) {
   const a = (v.id % 5) / 5 * Math.PI * 2, x = sp.fire.x + Math.cos(a) * 0.8, y = sp.fire.y + Math.sin(a) * 0.55;
   if (Math.hypot(x - v.x, y - v.y) > 0.2) { v.act = null; chaseTo(v, x, y, dt, 0.1, 0.6); return; }
   v.task = null; v.act = 'sitzen';
-  const sx = (sp.fire.x - v.x) - (sp.fire.y - v.y);
-  if (Math.abs(sx) > 0.05) v.facing = sx > 0 ? 1 : -1;
+  faceDir(v, sp.fire.x - v.x, sp.fire.y - v.y);
 }
 
 // Jäger: Liegt ein Hirsch in Schussweite, fliegt ein Pfeil. Sonst gibt es vielleicht einen Hasen aus der Schlinge.
@@ -530,8 +529,7 @@ function huntShot(v, t) {
     if (d < bd) { bd = d; deer = a; }
   }
   if (!deer || Math.random() < 0.35) { if (Math.random() < 0.4) t.then = 'hase'; return false; }
-  const sx = (deer.x - v.x) - (deer.y - v.y);
-  v.facing = sx >= 0 ? 1 : -1;
+  faceDir(v, deer.x - v.x, deer.y - v.y);
   G.projectiles.push({ x: v.x, y: v.y, tx: deer.x, ty: deer.y, target: deer, att: v, t: 0, dur: Math.max(0.2, bd / 15), animal: true, npcHunt: true, dmg: 99 });
   v.task = { kind: 'walk', x: deer.x + 0.3, y: deer.y + 0.2, act: 'sammeln', dur: 2, then: 'wild', t: 0, speed: 0.9 };
   v.say = { text: pick(['Getroffen!', 'Der Braten für Sonntag!', 'Leise jetzt …']), t: 0, dur: 2.6 };

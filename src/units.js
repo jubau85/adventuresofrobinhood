@@ -304,12 +304,20 @@ function calcDamage(a, t) {
   return { dmg: Math.max(1, Math.round(dmg)), crit };
 }
 
+// Blickrichtung setzen: dirX/dirY für die 3D-Figuren, facing (links/rechts) für die gezeichneten
+export function faceDir(u, dx, dy) {
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-6) return;
+  u.dirX = dx / d; u.dirY = dy / d;
+  const sx = dx - dy;
+  if (Math.abs(sx) > 0.05 * d) u.facing = sx >= 0 ? 1 : -1;
+}
+
 function attack(u, t) {
   const d = Math.hypot(t.x - u.x, t.y - u.y);
   u.cd = u.st.cd * rand(0.92, 1.08);
   u.swing = 0.3;
-  const sx = (t.x - u.x) - (t.y - u.y);
-  if (Math.abs(sx) > 0.05) u.facing = sx >= 0 ? 1 : -1;
+  faceDir(u, t.x - u.x, t.y - u.y);
   u.combatT = 5; t.combatT = 5;
   if (u.st.ranged) {
     sfxAt(ITEMS[u.eq.waffe].kind === 'armbrust' ? 'armbrust' : 'bogen', u.x, u.y, 0.8);
@@ -340,8 +348,7 @@ export function shootAnimal(u, a) {
   const d = Math.hypot(a.x - u.x, a.y - u.y);
   u.cd = u.st.cd * rand(0.92, 1.08);
   u.swing = 0.3;
-  const sx = (a.x - u.x) - (a.y - u.y);
-  if (Math.abs(sx) > 0.05) u.facing = sx >= 0 ? 1 : -1;
+  faceDir(u, a.x - u.x, a.y - u.y);
   const dur = Math.max(0.18, d / 15);
   let tx = a.x, ty = a.y;
   if (a.moving && a.goal) {

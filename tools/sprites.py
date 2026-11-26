@@ -16,6 +16,8 @@
 #   --reitpose           zusätzliche Haltung „reiten“: Beine gespreizt nach vorn, Hände halten die Zügel
 #   --helm <glb>         Helm (Ursprung unten, Gesicht nach -Y) passend über den Kopf setzen, fest am Kopfknochen
 #   --punkt <a,b,...>    auch mehrere Knochen, je Name eine Liste
+#   --bereich name=a:b,… nur diesen Teil der Bewegung (Anteile 0…1), z. B. die Endhaltung eines Hinsetzens (0.97:1)
+#   --stelle <name,...>  diese Bewegungen auf der Stelle halten (Hüfte waagerecht zum Ursprung), auch ohne „walk“ im Namen
 #   --meter <m>          Körpergröße, an der sich der Maßstab misst (Standard: Höhe des Modells); mit --figur
 #                        zusammen bleibt der Maßstab über Modelle hinweg gleich (Mensch 1,75 m = 120 px)
 #
@@ -44,6 +46,10 @@ for part in (opt.get('bilder') or '').split(','):
     if '=' in part: n, v = part.split('='); FRAMES[n.strip()] = int(v)
 ONLY = set(x.strip() for x in opt['nur'].split(',')) if opt.get('nur') else None
 LOOPS = set(x.strip() for x in opt['schleife'].split(',')) if opt.get('schleife') else set()
+STELLE = set(x.strip() for x in opt['stelle'].split(',')) if opt.get('stelle') else set()
+RANGE = {}
+for part in (opt.get('bereich') or '').split(','):
+    if '=' in part: n, v = part.split('='); a, b = v.split(':'); RANGE[n.strip()] = (float(a), float(b))
 os.makedirs(out, exist_ok=True)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -255,9 +261,10 @@ for act in acts:
         arm.animation_data_create(); arm.animation_data.action = act
         if hasattr(arm.animation_data, 'action_slot') and act.slots: arm.animation_data.action_slot = act.slots[0]
         f0, f1 = act.frame_range
+        if name in RANGE: a, b = RANGE[name]; f0, f1 = f0 + (f1 - f0) * a, f0 + (f1 - f0) * b
     else:
         f0, f1 = 0, 0
-    walk = 'walk' in name.lower() or 'run' in name.lower() or name in LOOPS
+    walk = 'walk' in name.lower() or 'run' in name.lower() or name in LOOPS or name in STELLE
     n = 1 if opt.get('probe') or not act else FRAMES.get(name, 8 if walk else 6)
     frames = [f0 + (f1 - f0) * i / (n if walk else max(1, n - 1)) for i in range(n)]
     dirs = [0] if opt.get('probe') else list(range(DIRS))
@@ -269,7 +276,7 @@ for act in acts:
             sc.frame_set(int(f), subframe=f - int(f))
             # Gehen auf der Stelle: Hüfte waagerecht auf den Ursprung zurückziehen
             root.location.x = root.location.y = 0
-            if walk and hips and name not in LOOPS:
+            if walk and hips and (name not in LOOPS or name in STELLE):
                 bpy.context.view_layer.update()
                 hw = arm.matrix_world @ arm.pose.bones[hips].head
                 root.location.x -= hw.x; root.location.y -= hw.y

@@ -5,7 +5,7 @@
 import { G, log, homeName, playerColor } from './state.js';
 import { FACTIONS, T, CHUNK } from './data.js';
 import { rand, randInt, pick, clamp } from './rng.js';
-import { makeUnit, rebuildUnits, partyMembers } from './units.js';
+import { makeUnit, rebuildUnits, partyMembers, faceDir } from './units.js';
 import { isoX, isoY } from './iso.js';
 import { isWalkable, landAt, setTempObstacles } from './world.js';
 import { gallowsFor } from './justice.js';
@@ -220,7 +220,7 @@ function setupTour(tr) {
       u.mounted = true; u.noSep = true; u.tourney = true;
     }
     const tent = tentSpot(t, i);
-    if (!k.player) { u.x = tent.x; u.y = tent.y; u.facing = tent.x < t.lx ? 1 : -1; }
+    if (!k.player) { u.x = tent.x; u.y = tent.y; faceDir(u, t.lx - tent.x, 0); }
     t.knights.push({ ...k, u, out: false, tent });
   });
   G.extras = t.knights.filter((k) => !k.player).map((k) => k.u);
@@ -536,10 +536,9 @@ function crown(t, k) {
 function updateSpectator(v, t, dt) {
   const s = v.spectator;
   const d = Math.hypot(s.x - v.x, s.y - v.y);
-  if (d > 0.2) { const dx = s.x - v.x, dy = s.y - v.y; v.x += (dx / d) * Math.min(d, 1.4 * dt); v.y += (dy / d) * Math.min(d, 1.4 * dt); v.moving = true; v.anim += dt; v.act = null; return; }
+  if (d > 0.2) { const dx = s.x - v.x, dy = s.y - v.y; v.x += (dx / d) * Math.min(d, 1.4 * dt); v.y += (dy / d) * Math.min(d, 1.4 * dt); faceDir(v, dx, dy); v.moving = true; v.anim += dt; v.act = null; return; }
   v.moving = false;
-  const sx = (t.lx - v.x) - (t.ly - v.y);
-  v.facing = sx >= 0 ? 1 : -1;
+  faceDir(v, t.lx - v.x, t.ly - v.y);
   v.act = t.cheer > 0 && (v.id % 3 !== 0 || t.cheer > 3) ? 'jubeln' : (v.id % 4 === 0 ? 'reden' : 'stehen');
 }
 

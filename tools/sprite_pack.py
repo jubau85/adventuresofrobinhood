@@ -1,5 +1,6 @@
 # Packt gerenderte Sprite-Bögen (tools/sprites.py) für das Spiel:
 #   python3 tools/sprite_pack.py <ordner> <ziel-ordner> <name> [--zelle 112] [--namen alt=neu,...] [--zuschnitt 1]
+#     [--qualitaet 90] [--maske-qualitaet 85] [--alpha 100]
 # --zuschnitt 1 schneidet den leeren Rand ab, der in allen Bildern aller Bewegungen frei bleibt; die Zellen sind dann
 # breite × hoehe statt zelle × zelle (spart Speicher, wenn in voller Größe gepackt wird).
 # Je Bewegung zwei WebP-Bilder (bei --zelle 112 und 224er-Renderings in halber Größe):
@@ -17,6 +18,8 @@ CELL = int(opt.get('zelle', 112))
 # Farbe, die das Spiel umfärbt: Farbton (Grad), Spielraum, Helligkeit, ab der die Maske voll ist
 HUE, HUE_W, HELL = float(opt.get('farbton', 182)), float(opt.get('breite', 26)), float(opt.get('hell', 0.82))
 QUAL = int(opt.get('qualitaet', 90))
+# Deckkraft verlustbehaftet speichern (--alpha 50 spart fast die Hälfte; 100 = verlustfrei)
+ALPHA = int(opt.get('alpha', 100))
 RENAME = dict(p.split('=') for p in opt.get('namen', '').split(',') if '=' in p)
 os.makedirs(dst, exist_ok=True)
 meta = json.load(open(os.path.join(src, 'sprites.json')))
@@ -69,10 +72,10 @@ for old, info in meta['bewegungen'].items():
     mask = np.zeros_like(a)
     for c in range(3): mask[..., c] = np.clip(val / HELL, 0, 1)
     mask[..., 3] = wgt * a[..., 3]
-    Image.fromarray((base * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}.webp'), quality=QUAL, method=6)
+    Image.fromarray((base * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}.webp'), quality=QUAL, alpha_quality=ALPHA, method=6)
     # Ohne umzufärbende Fläche keine Maske (spart Platz)
     if mask[..., 3].max() > 0.05 and 'ohne-maske' not in opt:
-        Image.fromarray((mask * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}_maske.webp'), quality=85, method=6)
+        Image.fromarray((mask * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}_maske.webp'), quality=int(opt.get('maske-qualitaet', 85)), alpha_quality=ALPHA, method=6)
     out['bewegungen'][new] = {'bilder': info['bilder'], 'schleife': info['schleife'], 'dauer': info['dauer']}
     # Punkte (z. B. Sattel) je Richtung und Bild, in Zellen-Pixeln der kleinen Fassung
     for key, arr in meta.get('punkte', {}).items():

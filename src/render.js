@@ -8,9 +8,9 @@ import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt } from './world.js';
 import { conProgress, villageSpots } from './castle.js';
 import { castlePasture } from './animals.js';
-import { ART, onArt } from './assets.js';
+import { ART, onArt, wantArt, wantArtPrefix } from './assets.js';
 import { HORSE3D } from './pferde.js';
-import { HERO3D } from './figuren.js';
+import { HERO3D, FIG3D } from './figuren.js';
 import { graveSlot, graveCount, funeralProps } from './life.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
 import { unitLook, heraldLook } from './units.js';
@@ -3115,14 +3115,13 @@ function drawFigure(c, u, x, y) {
     c.lineWidth = 1.4;
     c.beginPath(); c.ellipse(0, 0, m ? 16 : 10, m ? 6 : 4.4, 0, 0, Math.PI * 2); c.stroke();
   }
-  const sc = u.small ? 0.8 : 1.14;
+  const key = modelFor(u, m);
+  const sc = u.small && !key ? 0.8 : 1.14;
   c.scale((u.facing || 1) * sc, sc);
   // Handgemalte Figur, wo es eine gibt (bisher dein Ritter zu Fuß), sonst gezeichnet
   // Der Held als 3D-Figur nach seiner Rüstung (Frauen und Gefolge folgen), sonst das gemalte oder gezeichnete Bild
-  const hero = u.kind === 'player' && !u.female && heroReady(heroVariant(u));
-  const spr = !hero && !m && u.kind === 'player' && !u.female ? figSprite('fig_ritter', playerColor()) : null;
-  const f3 = hero || spr ? null : fig3dFor(u, m);
-  const yb = (hero ? drawHero3d(c, u, L, m) : null) ?? (f3 ? drawFig3d(c, u, f3, L) : spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m));
+  const spr = !key && !m && u.kind === 'player' && !u.female ? figSprite('fig_ritter', playerColor()) : null;
+  const yb = (key ? drawModel3d(c, u, L, m, key) : null) ?? (spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m));
   if (u.flash > 0) {
     c.globalAlpha = Math.min(1, u.flash * 5);
     c.fillStyle = '#ffffff';
@@ -3211,65 +3210,121 @@ function drawFigureBody(c, u, L, m) {
 // ---------------------------------------------------------------- 3D-Figuren (Meshy + Blender: tools/sprites.py, tools/sprite_pack.py)
 // Bögen: Zeilen = 8 Richtungen, Spalten = Bilder. Richtung 0 schaut nach links unten (+y in Feldern), jede weitere
 // dreht sich um 45° gegen den Uhrzeigersinn (von oben gesehen): Richtung d schaut nach (sin d·45°, cos d·45°).
-// Die Hauptkleidung liegt in Grau im Körperbild; die Maske sagt, wo sie ist, und das Spiel färbt sie je Figur ein.
-const FIG3D = {
-  bauer: {
-    zelle: 112, fusspunkt: [56, 83], figur_px: 60,
-    bewegungen: { gehen: { bilder: 8, dauer: 1.033 }, stehen: { bilder: 4, dauer: 4 }, aufheben: { bilder: 6, dauer: 7.167 } },
-  },
-};
-// Wer schon als 3D-Figur unterwegs ist (Männer; Frauen und Kinder folgen mit eigenen Modellen)
-const FIG3D_ROLES = { buerger: 'bauer', reisender: 'bauer' };
-const FIG3D_ACT = { sammeln: 'aufheben', saeen: 'aufheben', jaeten: 'aufheben' };
-const FIG3D_SKIP = { moench: 1, priester: 1, einsiedler: 1, wache: 1, kind: 1 };
+// Die Hauptkleidung ist grau gemalt; die Maske sagt, wo sie ist, und das Spiel färbt sie je Figur ein.
+// Modelle: der Held (HERO3D, Bilder held_<stufe>_…) und alle übrigen Figuren (FIG3D, Bilder fig3d_<modell>_…).
 const fig3dCache = new Map();
 let fig3dTmp = null;
-
-function fig3dFor(u, m) {
-  if (m || u.kind !== 'peasant' || u.female || u.small || u.hidden) return null;
-  const mod = FIG3D_ROLES[u.role] || (G.fig3dAll && !FIG3D_SKIP[u.role] ? 'bauer' : null);   // fig3dAll: nur zum Ausprobieren
-  return mod && ART[`fig3d_${mod}_stehen`] && ART[`fig3d_${mod}_gehen`] && ART[`fig3d_${mod}_stehen_maske`] ? mod : null;
+function model3d(key) {
+  if (key.startsWith('held_')) return { M: HERO3D[key.slice(5)], art: key };
+  return { M: FIG3D[key], art: `fig3d_${key}` };
 }
-
-function fig3dCell(model, anim, dir, frame, color) {
-  const key = `${model}|${anim}|${dir}|${frame}|${color}`;
-  let cv = fig3dCache.get(key);
-  if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
-  const base = ART[`fig3d_${model}_${anim}`], mask = ART[`fig3d_${model}_${anim}_maske`];
-  if (!base || !mask) return null;
-  const C = FIG3D[model].zelle, sx = frame * C, sy = dir * C;
-  if (!fig3dTmp) fig3dTmp = makeCanvas(C, C);
-  const tg = fig3dTmp.getContext('2d');
-  tg.globalCompositeOperation = 'source-over'; tg.clearRect(0, 0, C, C);
-  tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
-  tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, C, C);
-  tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
-  tg.globalCompositeOperation = 'source-over';
-  cv = makeCanvas(C, C);
+function modelHas(key, anim) { const md = model3d(key); return !!(md.M && md.M.bewegungen[anim] && ART[`${md.art}_${anim}`]); }
+// Bögen eines Modells beim ersten Bedarf laden (alle Bewegungen samt Masken)
+const modelAsked = new Set();
+function modelReady(key) {
+  if (!modelAsked.has(key)) {
+    modelAsked.add(key);
+    const md = model3d(key);
+    if (md.M) for (const a in md.M.bewegungen) { wantArt(`${md.art}_${a}`); wantArt(`${md.art}_${a}_maske`); }
+  }
+  return modelHas(key, 'stehen') && modelHas(key, 'gehen');
+}
+function modelCell(key, anim, dir, frame, color) {
+  const ck = `${key}|${anim}|${dir}|${frame}|${color}`;
+  let cv = fig3dCache.get(ck);
+  if (cv) { fig3dCache.delete(ck); fig3dCache.set(ck, cv); return cv; }
+  const { M, art } = model3d(key);
+  const base = ART[`${art}_${anim}`], mask = ART[`${art}_${anim}_maske`];
+  if (!base) return null;
+  const CW = M.breite || M.zelle, CH = M.hoehe || M.zelle, sx = frame * CW, sy = dir * CH;
+  cv = makeCanvas(CW, CH);
   const g = cv.getContext('2d');
-  g.drawImage(base, sx, sy, C, C, 0, 0, C, C);
-  g.drawImage(fig3dTmp, 0, 0);
-  fig3dCache.set(key, cv);
-  while (fig3dCache.size > 400) fig3dCache.delete(fig3dCache.keys().next().value);
+  g.drawImage(base, sx, sy, CW, CH, 0, 0, CW, CH);
+  if (mask) {
+    if (!fig3dTmp || fig3dTmp.width !== CW || fig3dTmp.height !== CH) fig3dTmp = makeCanvas(CW, CH);
+    const tg = fig3dTmp.getContext('2d');
+    tg.globalCompositeOperation = 'source-over'; tg.clearRect(0, 0, CW, CH);
+    tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
+    tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, CW, CH);
+    tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
+    tg.globalCompositeOperation = 'source-over';
+    g.drawImage(fig3dTmp, 0, 0);
+  }
+  fig3dCache.set(ck, cv);
+  while (fig3dCache.size > 1400) fig3dCache.delete(fig3dCache.keys().next().value);
   return cv;
 }
 
-function drawFig3d(c, u, model, L) {
-  const M = FIG3D[model];
-  let anim = u.moving ? 'gehen' : FIG3D_ACT[u.act] || 'stehen';
-  if (!ART[`fig3d_${model}_${anim}`]) anim = 'stehen';
-  const A = M.bewegungen[anim];
-  const dir = ((Math.round(Math.atan2(u.dirX ?? 0, u.dirY ?? 1) / (Math.PI / 4)) % 8) + 8) % 8;
-  const dur = A.dauer * (anim === 'gehen' ? 1.3 : 1);
-  const frame = Math.floor((((G.time + (u.id % 13) * 0.37) / dur) * A.bilder)) % A.bilder;
-  const cell = fig3dCell(model, anim, dir, frame, u.tunic || L.tunic || '#8a6e4b');
-  if (!cell) return drawFigureBody(c, u, L, false);
-  const k = FIG3D_H / M.figur_px;
-  c.save();
-  c.scale(u.facing || 1, 1);   // die Richtung steckt im Bild, nicht spiegeln
-  c.drawImage(lodOf(cell, c, k), -M.fusspunkt[0] * k, -M.fusspunkt[1] * k, M.zelle * k, M.zelle * k);
-  c.restore();
-  return 0;
+// Welches Modell eine Figur trägt: Held nach Rüstung, Ritterin für Frauen in Waffen, Fußsoldat nach Rüstung,
+// Ritter mit Topfhelm, Wegelagerer und Waldläufer als Jäger mit Kapuze, Dorf- und Stadtvolk nach Beruf
+const HERO_VARIANT = { gambeson: 'gambeson', lederwams: 'leder', kettenhemd: 'kette', schuppenpanzer: 'schuppe', kettenruestung: 'ritter' };
+function heroVariant(u) { return HERO_VARIANT[u.eq.ruestung] || 'edel'; }
+const RITTERIN = { gambeson: 'ritterin_gambeson', lederwams: 'ritterin_leder', kettenhemd: 'ritterin_kette', schuppenpanzer: 'ritterin_schuppe', kettenruestung: 'ritterin_ritter' };
+const SOLDAT = { gambeson: 'soldat', lederwams: 'soldat_leder', kettenhemd: 'soldat_kette', schuppenpanzer: 'soldat_schuppe' };
+const ROLLE3D = {
+  bauer: 'bauer', fischer: 'bauer', hirte: 'bauer', knecht: 'bauer', baeuerin: 'frau', magd: 'frau', kind: 'kind',
+  buerger: 'buerger', haendler: 'buerger', reisender: 'buerger', vogt: 'buerger', wirt: 'handwerker', handwerker: 'handwerker',
+  bergmann: 'handwerker', schmied: 'handwerker', moench: 'geistlicher', priester: 'geistlicher', einsiedler: 'geistlicher',
+  wache: 'soldat', bettler: 'bettler', jaeger: 'jaeger',
+};
+function modelFor(u, m) {
+  if (u.hidden) return null;
+  const r = u.eq && u.eq.ruestung;
+  let key;
+  if (u.kind === 'player' || u.kind === 'preview') key = u.female ? RITTERIN[r] || 'ritterin' : `held_${heroVariant(u)}`;
+  else if (u.kind === 'peasant') key = u.small || u.role === 'kind' ? 'kind' : u.female ? 'frau' : ROLLE3D[u.role] || 'bauer';
+  else if (u.female) key = RITTERIN[r] || 'ritterin';
+  else if (r === 'kettenruestung' || u.cls === 'ritter') key = 'held_ritter';
+  else if (u.cls === 'bandit' || u.cls === 'waldlaeufer' || u.look === 'bandit' || u.look === 'wald') key = r === 'kettenhemd' || r === 'schuppenpanzer' ? SOLDAT[r] : 'jaeger';
+  else if (u.cls === 'zivil' || u.look === 'haendler' || u.look === 'vogt') key = 'buerger';
+  else if (SOLDAT[r]) key = SOLDAT[r];
+  else key = u.cls === 'soldat' || u.look === 'soldat' || u.look === 'wache' || u.look === 'franken' || u.look === 'sachsen' ? 'soldat' : 'bauer';
+  if (!modelReady(key) || (m && !modelHas(key, 'reiten'))) return null;
+  return key;
+}
+
+// Tätigkeit -> Bewegung (die erste, die das Modell hat); Sitzen und Knien sind feste Haltungen
+const ACT3D = {
+  axt: ['hacken', 'haemmern'], hammer: ['haemmern', 'hacken'], hacke: ['haemmern', 'hacken', 'aufheben'], gabel: ['haemmern', 'aufheben'],
+  sichel: ['aufheben'], saeen: ['aufheben'], sammeln: ['aufheben'], jaeten: ['jaeten', 'aufheben'], abladen: ['aufheben'],
+  schoepfen: ['aufheben'], loeschen: ['aufheben'], eimer: ['aufheben'], verkaufen: ['reden'], reden: ['reden'], kaufen: ['reden'],
+  trinken: ['trinken'], sitzen: ['sitzen'], betteln: ['sitzen'], jubeln: ['jubeln', 'springen'], spielen: ['springen', 'jubeln'],
+  beten: ['knien'], kreuz: ['knien'], segnen: ['segnen', 'reden'],
+};
+const HOLD3D = { sitzen: 1, knien: 1 };
+function modelAnim(u, key, m) {
+  const M = model3d(key).M.bewegungen, has = (a) => modelHas(key, a);
+  const pick = (a, p) => { const A = M[a]; return { anim: a, frame: Math.min(A.bilder - 1, Math.max(0, Math.floor(p * A.bilder))) }; };
+  const loop = (a, t) => { const A = M[a]; if (HOLD3D[a]) return { anim: a, frame: A.bilder - 1 }; return { anim: a, frame: ((Math.floor(t * A.bilder) % A.bilder) + A.bilder) % A.bilder }; };
+  if (m) return { anim: 'reiten', frame: 0 };
+  const it = ITEMS[u.eq && u.eq.waffe];
+  if (u.swing > 0) {
+    if (it && it.ranged && has('bogen')) return pick('bogen', 1 - u.swing / 0.3);
+    if (has('schlag') && !(it && it.ranged)) return pick('schlag', 1 - u.swing / 0.3);
+  }
+  if (u.flash > 0.04 && has('getroffen')) return pick('getroffen', 1 - u.flash / 0.18);
+  const dt = Math.max(0, Math.min(0.25, G.time - (u._ht ?? G.time)));
+  const d = u._hx === undefined ? 0 : Math.hypot(u.x - u._hx, u.y - u._hy);
+  if (dt > 0) u._hv = (u._hv || 0) * 0.8 + Math.min(d / dt, 8) * 0.2;
+  u._hx = u.x; u._hy = u.y; u._ht = G.time;
+  if (u.moving) {
+    let a = (u._hv || 0) > 1.15 && has('laufen') ? 'laufen' : 'gehen';
+    if (a === 'gehen' && u.carry === 'eimer' && has('eimer')) a = 'eimer';
+    if (u.act === 'pirschen' && has('schleichen')) a = 'schleichen';
+    if (u.act === 'spielen' && has('huepfen')) a = 'huepfen';
+    u._wp = (u._wp || 0) + dt * Math.max(0.6, (u._hv || 1) / (a === 'laufen' ? 1.7 : 1.0)) / M[a].dauer;
+    return loop(a, u._wp);
+  }
+  const ph = ((u.id || 0) % 13) * 0.37;
+  for (const a of ACT3D[u.act] || []) if (has(a)) return loop(a, (G.time * Math.min(1.6, Math.max(0.7, (ACT_SPEED[u.act] || 2.5) / 2.5)) + ph) / M[a].dauer);
+  return loop('stehen', (G.time + ph) / M.stehen.dauer);
+}
+function modelPoint(key, anim, dir, frame, which) {
+  const M = model3d(key).M, A = M.bewegungen[anim], arr = M.punkte && M.punkte[`${anim}|${which}`];
+  if (!A || !arr) return null;
+  const i = (dir * A.bilder + frame) * 2, k = heroK(M);
+  if (arr[i] === undefined) return null;
+  return { x: arr[i] * k, y: arr[i + 1] * k };
 }
 
 // ---------------------------------------------------------------- 3D-Pferde (tools/pferd.py)
@@ -3295,7 +3350,7 @@ function lodOf(cv, c, k) {
   }
   return src;
 }
-function horseReady(kind) { return !!(ART[`pferd3d_${kind}_stehen`] && ART[`pferd3d_${kind}_schritt`] && ART[`pferd3d_${kind}_galopp_maske`]); }
+function horseReady(kind) { wantArtPrefix(`pferd3d_${kind}_`); return !!(ART[`pferd3d_${kind}_stehen`] && ART[`pferd3d_${kind}_schritt`] && ART[`pferd3d_${kind}_galopp_maske`]); }
 function horseCell(kind, anim, dir, frame, color) {
   const key = `${kind}|${anim}|${dir}|${frame}|${color}`;
   let cv = fig3dCache.get(key);
@@ -3360,7 +3415,7 @@ function horseGait(u) {
   const v = u.moving ? Math.max(u._hv || 0, 0.4) : 0;
   const anim = v < 0.15 ? 'stehen' : v < 1.35 ? 'schritt' : 'galopp';
   const rate = anim === 'stehen' ? 1 / 4 : anim === 'schritt' ? Math.max(0.7, v / 0.9) : Math.max(1.3, Math.min(2.6, v * 0.85));
-  u._hp = (u._hp || (u.id % 7) * 0.13) + dt * rate;
+  u._hp = (u._hp || ((u.id || 0) % 7) * 0.13) + dt * rate;
   return { anim, phase: u._hp };
 }
 // Pferd eines Reiters: Sattelpunkt (im gespiegelten Raum der Figur) und eine Malfunktion.
@@ -3381,70 +3436,21 @@ function horse3dFor(u, L) {
   };
 }
 
-// ---------------------------------------------------------------- Held als 3D-Figur (Meshy + tools/sprites.py)
-// Ohne Rüstung ein Edelmann in schwarzem Wams; jede Rüstung ist dieselbe Figur in anderer Bemalung, die
-// Kettenrüstung dazu mit Topfhelm und einem Waffenrock in der Wappenfarbe. Waffe und Schild malt das Spiel
+// ---------------------------------------------------------------- 3D-Figur malen (Held, Gefolge, Volk, Gegner)
+// Der Held: ohne Rüstung ein Edelmann in schwarzem Wams; jede Rüstung ist dieselbe Figur in anderer Bemalung, die
+// Kettenrüstung dazu mit Topfhelm und einem Waffenrock in der Wappenfarbe. Waffe, Schild und Werkzeug malt das Spiel
 // an die gerenderten Handpunkte, zu Pferd sitzt die Hüfte auf dem Sattelpunkt.
-const HERO_VARIANT = { gambeson: 'gambeson', lederwams: 'leder', kettenhemd: 'kette', schuppenpanzer: 'schuppe', kettenruestung: 'ritter' };
-function heroVariant(u) { return HERO_VARIANT[u.eq.ruestung] || 'edel'; }
-function heroReady(v) { return !!(HERO3D[v] && ART[`held_${v}_stehen`] && ART[`held_${v}_gehen`] && ART[`held_${v}_reiten`]); }
-function heroCell(v, anim, dir, frame, color) {
-  const key = `held|${v}|${anim}|${dir}|${frame}|${color}`;
-  let cv = fig3dCache.get(key);
-  if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
-  const base = ART[`held_${v}_${anim}`], mask = ART[`held_${v}_${anim}_maske`];
-  if (!base) return null;
-  const M = HERO3D[v], CW = M.breite || M.zelle, CH = M.hoehe || M.zelle, sx = frame * CW, sy = dir * CH;
-  cv = makeCanvas(CW, CH);
-  const g = cv.getContext('2d');
-  g.drawImage(base, sx, sy, CW, CH, 0, 0, CW, CH);
-  if (mask) {
-    const tmp = makeCanvas(CW, CH), tg = tmp.getContext('2d');
-    tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
-    tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, CW, CH);
-    tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
-    g.drawImage(tmp, 0, 0);
-  }
-  fig3dCache.set(key, cv);
-  while (fig3dCache.size > 600) fig3dCache.delete(fig3dCache.keys().next().value);
-  return cv;
-}
-// Bewegung und Bild: Hieb, getroffen, laufen oder gehen nach dem Tempo, sonst stehen
-function heroAnim(u, v, m) {
-  const M = HERO3D[v].bewegungen;
-  const pick = (a, p) => { const A = M[a]; return { anim: a, frame: Math.min(A.bilder - 1, Math.max(0, Math.floor(p * A.bilder))) }; };
-  const loop = (a, t) => { const A = M[a]; return { anim: a, frame: ((Math.floor(t * A.bilder) % A.bilder) + A.bilder) % A.bilder }; };
-  if (m) return { anim: 'reiten', frame: 0 };
-  const it = ITEMS[u.eq.waffe];
-  if (u.swing > 0 && M.schlag && !(it && it.ranged)) return pick('schlag', 1 - u.swing / 0.3);
-  if (u.flash > 0.04 && M.getroffen) return pick('getroffen', 1 - u.flash / 0.18);
-  const dt = Math.max(0, Math.min(0.25, G.time - (u._ht ?? G.time)));
-  const d = u._hx === undefined ? 0 : Math.hypot(u.x - u._hx, u.y - u._hy);
-  if (dt > 0) u._hv = (u._hv || 0) * 0.8 + Math.min(d / dt, 8) * 0.2;
-  u._hx = u.x; u._hy = u.y; u._ht = G.time;
-  if (u.moving) {
-    const run = (u._hv || 0) > 1.15 && M.laufen;
-    const a = run ? 'laufen' : 'gehen';
-    u._wp = (u._wp || 0) + dt * Math.max(0.6, (u._hv || 1) / (run ? 1.7 : 1.0)) / M[a].dauer;
-    return loop(a, u._wp);
-  }
-  return loop('stehen', (G.time + (u.id % 13) * 0.37) / M.stehen.dauer);
-}
-function heroPoint(v, anim, dir, frame, which) {
-  const M = HERO3D[v], A = M.bewegungen[anim], arr = M.punkte[`${anim}|${which}`];
-  if (!arr) return null;
-  const i = (dir * A.bilder + frame) * 2, k = heroK(M);
-  return { x: arr[i] * k, y: arr[i + 1] * k };
-}
 const heroK = (M) => FIG3D_H / (M.figur_px || 60);
-function drawHero3d(c, u, L, m) {
-  const v = heroVariant(u);
-  const M = HERO3D[v];
-  const { anim, frame } = heroAnim(u, v, m);
+const TOOL3D = { hacke: 'hacke', sichel: 'sichel', axt: 'axt', hammer: 'hammer', gabel: 'gabel', besen: 'besen' };
+function drawModel3d(c, u, L, m, key) {
+  const { M } = model3d(key);
+  const { anim, frame } = modelAnim(u, key, m);
   const dir = dirIndex(u.dirX ?? 0, u.dirY ?? 1);
-  const cell = heroCell(v, anim, dir, frame, u.tunic || playerColor());
+  const color = u.tunic || L.tunic || (u.kind === 'player' || u.kind === 'preview' ? playerColor() : '#8a6e4b');
+  const cell = modelCell(key, anim, dir, frame, color);
   if (!cell) return null;
   const f = u.facing || 1, k = heroK(M), CW = M.breite || M.zelle, CH = M.hoehe || M.zelle;
+  const pt = (which) => modelPoint(key, anim, dir, frame, which);
   c.save();
   c.scale(f, 1);   // die Richtung steckt im Bild, nicht spiegeln
   // Zu Pferd: Pferd malen, Reiter mit der Hüfte auf den Sattel
@@ -3453,33 +3459,66 @@ function drawHero3d(c, u, L, m) {
     const kind = u.eq.pferd === 'schlachtross' ? 'ross' : 'pferd';
     if (horseReady(kind)) {
       const { anim: ha, phase } = horseGait(u);
-      const color = kind === 'ross' ? (u.tunic || L.tunic || playerColor()) : HORSES[u.eq.pferd] || '#7a5232';
-      horse = horseFrame(kind, ha, dir, phase, color);
+      const hc = kind === 'ross' ? (u.tunic || L.tunic || playerColor()) : HORSES[u.eq.pferd] || '#7a5232';
+      horse = horseFrame(kind, ha, dir, phase, hc);
     }
     if (horse) {
-      const hip = heroPoint(v, 'reiten', dir, 0, 'Hips') || { x: 0, y: -22 };
+      const hip = pt('Hips') || { x: 0, y: -22 };
       // Das Hüftgelenk liegt rund 9 cm über der Sitzfläche
       ox = horse.sx - hip.x; oy = horse.sy - hip.y - 0.09 * FIG3D_H / 1.8;
       paintHorse(c, horse);
     }
   }
-  // Waffe und Schild: von hinten gesehen hinter dem Körper, sonst davor
+  // Waffe, Schild und Werkzeug: von hinten gesehen hinter dem Körper, sonst davor
   const back = dir >= 4 && dir <= 6;
   const gear = () => {
     const sgn = (u.dirX ?? 0) - (u.dirY ?? 1) >= 0 ? 1 : -1;
-    const rh = heroPoint(v, anim, dir, frame, 'RightHand'), lh = heroPoint(v, anim, dir, frame, 'LeftHand');
-    if (u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x, oy + lh.y, sgn);
-    if (rh && (u.eq.waffe || u.lance)) {
+    const rh = pt('RightHand'), lh = pt('LeftHand');
+    if (u.eq && u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x, oy + lh.y, sgn);
+    if (rh && ((u.eq && u.eq.waffe) || u.lance)) {
       c.save(); c.translate(ox + rh.x, oy + rh.y); c.scale(sgn, 1); c.translate(-4, 12); drawWeapon(c, u, 0); c.restore();
     }
+    if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim);
   };
   if (back) gear();
   c.drawImage(lodOf(cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
   if (!back) gear();
   if (horse) paintHorseHead(c, horse);
   c.restore();
-  const head = heroPoint(v, anim, dir, frame, 'Hips');
+  const head = pt('Hips');
   return (head ? oy + head.y : -10) - 2;
+}
+// Werkzeug in der rechten Hand, Bogen, Eimer, Korb oder Stab bei den Dorfleuten
+function drawHandGear(c, u, rh, lh, sgn, anim) {
+  const tool = TOOL3D[u.act];
+  c.strokeStyle = OUTLINE; c.lineWidth = 0.9;
+  if (tool === 'hammer' || tool === 'axt' || tool === 'hacke') emitWork(u.x, u.y, tool === 'hammer' && u.task && u.task.anvil ? 'amboss' : tool, ACT_SPEED[u.act] || 1, u.id % 7);
+  if (tool && rh) {
+    c.save(); c.translate(rh.x, rh.y); c.scale(sgn, 1);
+    // Stiel von der Hand nach oben vorn; bei Schlagbewegungen folgt er der Hand
+    c.rotate(anim === 'stehen' ? -1.2 : -1.9);
+    c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.5;
+    const L2 = tool === 'besen' || tool === 'gabel' ? 11 : 8;
+    c.beginPath(); c.moveTo(-2, 0); c.lineTo(L2, 0); c.stroke();
+    c.fillStyle = '#9aa0a6'; c.strokeStyle = '#9aa0a6'; c.lineWidth = 1.3;
+    if (tool === 'hammer') c.fillRect(L2 - 1.5, -2, 2.6, 4);
+    else if (tool === 'axt') { c.beginPath(); c.moveTo(L2 - 1, -0.5); c.lineTo(L2 + 2, -3.4); c.lineTo(L2 + 2, 2.2); c.closePath(); c.fill(); }
+    else if (tool === 'hacke') { c.beginPath(); c.moveTo(L2, -0.5); c.lineTo(L2, 3.5); c.stroke(); }
+    else if (tool === 'sichel') { c.beginPath(); c.arc(L2 + 1, -1.8, 2.6, -Math.PI * 0.6, Math.PI * 0.7); c.stroke(); }
+    else if (tool === 'gabel') { c.beginPath(); c.moveTo(L2, -1.3); c.lineTo(L2 + 3, -1.3); c.moveTo(L2, 1.3); c.lineTo(L2 + 3, 1.3); c.moveTo(L2, -1.3); c.lineTo(L2, 1.3); c.stroke(); }
+    else if (tool === 'besen') { c.fillStyle = '#b89a5a'; c.beginPath(); c.moveTo(L2, -2.2); c.lineTo(L2 + 3.5, -3); c.lineTo(L2 + 3.5, 3); c.lineTo(L2, 2.2); c.closePath(); c.fill(); }
+    c.restore();
+  }
+  const bucket = (p) => { c.fillStyle = '#7a6a55'; c.fillRect(p.x - 1.6, p.y, 3.2, 3.4); c.fillStyle = '#5f86a0'; c.fillRect(p.x - 1.2, p.y, 2.4, 0.9); c.strokeStyle = '#c9b48a'; c.lineWidth = 0.6; c.beginPath(); c.arc(p.x, p.y, 1.6, Math.PI, 0); c.stroke(); };
+  if ((u.carry === 'eimer' && anim !== 'eimer') || u.act === 'eimer' || u.act === 'schoepfen' || u.act === 'loeschen') { if (rh) bucket(rh); }
+  if (u.carry === 'korb' && lh) { c.fillStyle = '#a07a44'; c.beginPath(); c.ellipse(lh.x, lh.y + 1.5, 2.6, 1.8, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  if (u.bow && lh && anim !== 'bogen') { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.2; c.beginPath(); c.arc(lh.x - 1, lh.y, 7, -Math.PI * 0.45, Math.PI * 0.45); c.stroke(); }
+  if (u.staff && rh && anim !== 'sitzen' && anim !== 'knien') { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(rh.x + 1, rh.y + 13); c.lineTo(rh.x + 1, rh.y - 10); c.stroke(); }
+  if (anim === 'trinken' && rh) { c.fillStyle = '#8a6a44'; c.fillRect(rh.x - 1.1, rh.y - 2.2, 2.2, 2.8); c.strokeRect(rh.x - 1.1, rh.y - 2.2, 2.2, 2.8); }
+  if (u.act === 'betteln' && rh) { c.fillStyle = '#8a6a44'; c.beginPath(); c.ellipse(rh.x + 1, rh.y, 2.4, 1.1, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  if (u.act === 'angeln' && rh) { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1; c.beginPath(); c.moveTo(rh.x, rh.y); c.lineTo(rh.x + 14 * sgn, rh.y - 10); c.stroke(); c.strokeStyle = 'rgba(230,230,220,0.7)'; c.lineWidth = 0.5; c.beginPath(); c.moveTo(rh.x + 14 * sgn, rh.y - 10); c.lineTo(rh.x + 16 * sgn, rh.y + 8); c.stroke(); }
+  if (u.act === 'saeen' && rh && Math.sin(G.time * 3.3 + u.id) > 0.5) { c.fillStyle = '#d8c48a'; for (let q = 0; q < 4; q++) c.fillRect(rh.x + 2 + q * 1.8, rh.y + 1 + q * 1.4 + ((G.time * 9 + q) % 3), 1, 1); }
+  if (u.act === 'gefesselt' && rh) { c.strokeStyle = '#b8a070'; c.lineWidth = 1; c.beginPath(); c.moveTo(rh.x - 2, rh.y); c.lineTo(rh.x + 2, rh.y); c.stroke(); }
 }
 function drawHeroShield(c, u, L, x, y, sgn) {
   const it = ITEMS[u.eq.schild];
