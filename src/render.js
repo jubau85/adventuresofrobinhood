@@ -888,21 +888,13 @@ function drawCathedral(c, b) {
     faceQuad(c, nx, y, nl, w, 'L', 0, 1, h - 4, h, '#3a3430');
     if (Math.random() < 0.06) { const p = P(nx, y, h); smokeEmit(p[0], p[1], 1); }
   }
-  // Querhaus, vorderer Arm
-  drawBox(c, xc, y + ta, 1.2, 1.05, h, stone, 0, 'stone');
-  faceQuad(c, xc, y + ta, 1.2, 1.05, 'L', 0.32, 0.68, h * 0.45, h * 0.88, GLASS());
-  if (roof) drawGableRoof(c, xc, y + ta, 1.2, 1.05, h, 19, roof, stone, false);
-  // Apsis im Osten
-  drawBox(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, stone, 0, 'stone');
-  faceQuad(c, x1 - 0.38, y, 0.76, w * 0.8, 'R', 0.35, 0.65, h * 0.35, h * 0.7, GLASS());
-  if (roof) drawPyramid(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, 12, roof);
-  // Vierungsturm
+  // Vierungsturm: steht auf der Vierung, sichtbar erst über dem Dach, hinter dem vorderen Querhaus
   if (b.central === 'reiter') {
     drawBox(c, xc, y, 0.36, 0.36, 18, '#8a6a40', h + 18);
     drawPyramid(c, xc, y, 0.36, 0.36, h + 36, 32, ROOFS.slate);
   } else if (b.central) {
     const ch = h + (b.central === 'stumpf' ? 14 : 42), cw = 1.3;
-    drawBox(c, xc, y, cw, cw, ch, stone, 0, 'stone');
+    drawBox(c, xc, y, cw, cw, ch - h, stone, h, 'stone');
     for (const f of ['L', 'R']) { faceQuad(c, xc, y, cw, cw, f, 0.16, 0.36, ch * 0.72, ch * 0.92, dark); faceQuad(c, xc, y, cw, cw, f, 0.64, 0.84, ch * 0.72, ch * 0.92, dark); }
     if (b.central === 'spitze') drawPyramid(c, xc, y, cw, cw, ch, 66, ROOFS.slate);
     else if (b.spire) drawPyramid(c, xc, y, cw, cw, ch, 84, ROOFS.slate);
@@ -911,9 +903,17 @@ function drawCathedral(c, b) {
     c.strokeStyle = '#d6ad4c'; c.lineWidth = 1.5;
     c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax, ay - 9); c.moveTo(ax - 3, ay - 6); c.lineTo(ax + 3, ay - 6); c.stroke();
   } else if (b.spire) {
-    drawBox(c, xc, y, 1.1, 1.1, h + 30, stone, 0, 'stone');
+    drawBox(c, xc, y, 1.1, 1.1, 30, stone, h, 'stone');
     drawPyramid(c, xc, y, 1.1, 1.1, h + 30, 90, ROOFS.slate);
   }
+  // Querhaus, vorderer Arm
+  drawBox(c, xc, y + ta, 1.2, 1.05, h, stone, 0, 'stone');
+  faceQuad(c, xc, y + ta, 1.2, 1.05, 'L', 0.32, 0.68, h * 0.45, h * 0.88, GLASS());
+  if (roof) drawGableRoof(c, xc, y + ta, 1.2, 1.05, h, 19, roof, stone, false);
+  // Apsis im Osten
+  drawBox(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, stone, 0, 'stone');
+  faceQuad(c, x1 - 0.38, y, 0.76, w * 0.8, 'R', 0.35, 0.65, h * 0.35, h * 0.7, GLASS());
+  if (roof) drawPyramid(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, 12, roof);
   // Baustelle: Gerüst und Kran
   if (b.scaffold) {
     drawScaffold(c, b.unfinished ? x0 + 0.4 : x1 - 0.4, y, 1.0, 1.4, h + 26);
@@ -1470,6 +1470,55 @@ function palisadeRing(site, r) {
   return parts;
 }
 
+const BOXED_KINDS = { house: 1, church: 1, longhall: 1, landmark: 1, klause: 1, stollen: 1, halde: 1, mystic: 1, tent: 1, stall: 1, well: 1 };
+
+// Tiefensortierung: erst grob nach x + y, dann für Gebäude genau. Was vollständig hinter einem
+// Gebäude steht (westlich oder nördlich davon), wird vorher gezeichnet, was davor steht, danach.
+// Lange Bauten wie Kathedralen verdecken so keine Häuser mehr, die eigentlich vor ihnen stehen.
+const SORT_CELL = 4;
+function sortObjects(objs) {
+  objs.sort((a, b) => a.d - b.d);
+  const grid = new Map();
+  let bigs = 0;
+  for (let i = 0; i < objs.length; i++) {
+    const o = objs[i];
+    if (!o.box) continue;
+    o.pre = null; o.mark = 0; o.ord = i;
+    const k = Math.floor((o.box[0] + o.box[1]) / 2 / SORT_CELL) * 8192 + Math.floor((o.box[2] + o.box[3]) / 2 / SORT_CELL);
+    let l = grid.get(k);
+    if (!l) grid.set(k, l = []);
+    l.push(o);
+    if (o.big) bigs++;
+  }
+  if (!bigs) return objs;
+  const E = 0.02;
+  const behind = (a, b) => (a.box[1] <= b.box[0] + E && a.box[2] < b.box[3] - E) || (a.box[3] <= b.box[2] + E && a.box[0] < b.box[1] - E);
+  for (const a of objs) {
+    if (!a.big || !a.box) continue;
+    const cx = Math.floor((a.box[0] + a.box[1]) / 2 / SORT_CELL), cy = Math.floor((a.box[2] + a.box[3]) / 2 / SORT_CELL);
+    const reach = 1 + Math.floor(Math.max(a.box[1] - a.box[0], a.box[3] - a.box[2]) / SORT_CELL);
+    for (let gx = cx - reach; gx <= cx + reach; gx++) for (let gy = cy - reach; gy <= cy + reach; gy++) {
+      const l = grid.get(gx * 8192 + gy);
+      if (!l) continue;
+      for (const b of l) {
+        if (b === a || (b.big && b.ord < a.ord)) continue;
+        if (behind(b, a)) (a.pre || (a.pre = [])).push(b);
+        else if (behind(a, b)) (b.pre || (b.pre = [])).push(a);
+      }
+    }
+  }
+  const out = [];
+  const visit = (o) => {
+    if (o.mark) return;
+    o.mark = 1;
+    if (o.pre) for (const p of o.pre) visit(p);
+    o.mark = 2;
+    out.push(o);
+  };
+  for (const o of objs) { if (o.box) visit(o); else out.push(o); }
+  return out;
+}
+
 function buildStaticParts() {
   const W = G.world;
   const parts = [];
@@ -1481,7 +1530,11 @@ function buildStaticParts() {
       stollen: drawStollen, halde: drawHalde, klause: drawKlause, mystic: drawMystic,
     }[b.kind];
     if (b.kind === 'friedhof') continue;
-    if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
+    if (!f) continue;
+    // Grundfläche für die Zeichenreihenfolge: Gebäude als Rechteck, Kleinkram als Punkt
+    const big = b.wx >= 0.5 && BOXED_KINDS[b.kind];
+    const r = 0.2, box = big ? [b.x - b.wx / 2, b.x + b.wx / 2, b.y - b.wy / 2, b.y + b.wy / 2] : [b.x - r, b.x + r, b.y - r, b.y + r];
+    parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b, box, big });
   }
   for (const s of W.sites) {
     if (s.cityWall) {
@@ -1492,7 +1545,8 @@ function buildStaticParts() {
         const prev = ring[(k - 1 + ring.length) % ring.length], next = ring[(k + 1) % ring.length];
         const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
         const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
-        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o)) });
+        const hw = o.tower ? 0.62 : 0.5;
+        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o)), box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
       });
     }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
@@ -3467,7 +3521,7 @@ export function render() {
       if (lists && Math.abs(o.x - lists.lx) < 10 && Math.abs(o.y - lists.ly) < 4.6) continue;
       if (gallows.length && gallows.some((g) => Math.abs(o.x - g.x) < 2 && Math.abs(o.y - g.y) < 2.2)) continue;
       if (o.kind === 'mauer') objs.push({ d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => drawWallRuin(c, o) });
-      else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o) });
+      else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o), box: o.box || (o.box = [o.x - 0.25, o.x + 0.25, o.y - 0.25, o.y + 0.25]) });
     }
   }
   for (const part of staticParts) if (inView(part.x, part.y)) objs.push(part);
@@ -3491,17 +3545,16 @@ export function render() {
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
-    objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)) });
+    objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)), box: [u.x - 0.15, u.x + 0.15, u.y - 0.15, u.y + 0.15] });
   }
   const night = darkness() > 0.4;
   for (const a of G.animals || []) {
     if (!inView(a.x, a.y) || (night && a.kind === 'huhn')) continue;
-    objs.push({ d: a.x + a.y, z: 0, f: (c) => { const ax = isoX(a.x, a.y), ay = isoY(a.x, a.y) - zAt(a.x, a.y); if (G.s.player.huntTarget === a) { c.strokeStyle = 'rgba(255,120,80,0.9)'; c.lineWidth = 1.4; c.beginPath(); c.ellipse(ax, ay, 11, 4.5, 0, 0, Math.PI * 2); c.stroke(); } drawAnimal(c, a, ax, ay); } });
+    objs.push({ d: a.x + a.y, z: 0, box: [a.x - 0.2, a.x + 0.2, a.y - 0.2, a.y + 0.2], f: (c) => { const ax = isoX(a.x, a.y), ay = isoY(a.x, a.y) - zAt(a.x, a.y); if (G.s.player.huntTarget === a) { c.strokeStyle = 'rgba(255,120,80,0.9)'; c.lineWidth = 1.4; c.beginPath(); c.ellipse(ax, ay, 11, 4.5, 0, 0, Math.PI * 2); c.stroke(); } drawAnimal(c, a, ax, ay); } });
   }
   for (const f of G.fx) if (f.kind === 'kadaver' && inView(f.x, f.y)) objs.push({ d: f.x + f.y - 0.3, z: 0, f: (c) => drawCarcass(c, f, isoX(f.x, f.y), isoY(f.x, f.y) - zAt(f.x, f.y)) });
   for (const f of G.fx) if (f.kind === 'corpse' && inView(f.x, f.y)) objs.push({ d: f.x + f.y - 0.3, z: 0, f: (c) => drawCorpse(c, f, isoX(f.x, f.y), isoY(f.x, f.y) - zAt(f.x, f.y)) });
-  objs.sort((a, b) => a.d - b.d);
-  for (const o of objs) { baseZ = o.z || 0; o.f(wc); }
+  for (const o of sortObjects(objs)) { baseZ = o.z || 0; o.f(wc); }
   baseZ = 0;
 
   for (const part of staticParts) if (part.b && part.b.smoke && inView(part.x, part.y)) smokeEmit(part.b.smoke[0], part.b.smoke[1], 0.04);

@@ -1655,7 +1655,7 @@ function generateWorld(seed) {
     tiles[i] = e > 0.665 ? T.HILLS : m > 0.62 ? T.FOREST : T.GRASS;
   }
 
-  const W = { N, seed, tiles, elev, extraCost, sea, sites: [], buildings: [], chunkObjs: [], CN: N / CHUNK, roads: [] };
+  const W = { N, seed, tiles, elev, extraCost, sea, sites: [], buildings: [], chunkObjs: [], CN: N / CHUNK, roads: [], solid: new Uint8Array(N * N) };
   carveRivers(W, nR);
   W.landId = labelLand(W);
 
@@ -2299,6 +2299,7 @@ function freeSpot(W, x, y, minGap) {
   if (x < 2 || y < 2 || x > N - 2 || y > N - 2) return false;
   const t = W.tiles[i];
   if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FIELD) return false;
+  if (solidNear(W, x, y, Math.min(0.95, minGap), Math.min(0.95, minGap))) return false;
   for (const b of W.buildings) {
     const gx = Math.max(minGap, (b.wx || 0) / 2 + 0.9), gy = Math.max(minGap, (b.wy || 0) / 2 + 0.9);
     if (Math.abs(b.x - x) < gx && Math.abs(b.y - y) < gy) return false;
@@ -2307,8 +2308,24 @@ function freeSpot(W, x, y, minGap) {
 }
 
 // Ist eine Grundfläche frei von Wasser, Straßen und anderen Gebäuden?
+// Feste Felder (Stadtmauer, Friedhof) in einem Rechteck um (x, y)?
+function solidNear(W, x, y, rx, ry) {
+  const N = W.N;
+  for (let ty = Math.floor(y - ry); ty <= Math.floor(y + ry); ty++) for (let tx = Math.floor(x - rx); tx <= Math.floor(x + rx); tx++) {
+    if (tx >= 0 && ty >= 0 && tx < N && ty < N && W.solid[ty * N + tx]) return true;
+  }
+  return false;
+}
+function markSolid(W, x, y, wx, wy) {
+  const N = W.N;
+  for (let ty = Math.floor(y - wy / 2); ty <= Math.floor(y + wy / 2); ty++) for (let tx = Math.floor(x - wx / 2); tx <= Math.floor(x + wx / 2); tx++) {
+    if (tx >= 0 && ty >= 0 && tx < N && ty < N) W.solid[ty * N + tx] = 1;
+  }
+}
+
 function footprintFree(W, x, y, wx, wy, margin = 0.4) {
   const N = W.N;
+  if (solidNear(W, x, y, wx / 2 + margin, wy / 2 + margin)) return false;
   for (let ty = Math.floor(y - wy / 2 - margin); ty <= Math.floor(y + wy / 2 + margin); ty++) {
     for (let tx = Math.floor(x - wx / 2 - margin); tx <= Math.floor(x + wx / 2 + margin); tx++) {
       if (tx < 2 || ty < 2 || tx >= N - 2 || ty >= N - 2) return false;
@@ -2337,6 +2354,7 @@ function placeCemetery(W, s) {
       const a = (k / n) * Math.PI * 2, x = pref.x + Math.cos(a) * r, y = pref.y + Math.sin(a) * r;
       if (!footprintFree(W, x, y, wx, wy, 0.3)) continue;
       s.cemetery = { x, y, wx, wy, old: 2 + Math.floor(hash2(Math.round(x), Math.round(y), 5) * 6) };
+      markSolid(W, x, y, wx, wy);
       W.buildings.push({ kind: 'friedhof', x, y, wx, wy, site: s.id, noCost: true, label: `Friedhof von ${s.name}` });
       return;
     }
@@ -2389,14 +2407,21 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
       seen.add(i);
       if (W.tiles[i] === T.WATER) continue;
       s.cityWall.push([x, y]);
+      W.solid[i] = 1;
     }
   }
   // Wahrzeichen und Kirchen
-  if (!hasCathedral) add({ kind: 'church', x: cx - 3.2, y: cy - 3.4, wx: 2.6, wy: 1.2, h: 30, big: true });
+  if (!hasCathedral) {
+    const spot = freeArea(W, cx - 3.2, cy - 3.4, 2.6, 1.2, 0.3, 6);
+    if (spot) add({ kind: 'church', x: spot.x, y: spot.y, wx: 2.6, wy: 1.2, h: 30, big: true });
+  }
   // Marktstände rund um den Platz, Brunnen in der Mitte
   for (let k = 0; k < 6 + Math.floor(R / 4); k++) {
     const a = (k / (6 + Math.floor(R / 4))) * Math.PI * 2 + 0.3, r = 1.6 + (k % 2) * 0.6;
-    add({ kind: 'stall', x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#7d2a52', '#e8e0cc']), noCost: true, wx: 0.8, wy: 0.6 });
+    const col = rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#7d2a52', '#e8e0cc']);
+    const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    if (!clearOfBuildings(W, x, y, 0.8, 0.6, 0.1)) continue;
+    add({ kind: 'stall', x, y, color: col, noCost: true, wx: 0.8, wy: 0.6 });
   }
   add({ kind: 'well', x: cx + 0.15, y: cy - 0.25, wx: 0.6, wy: 0.6, noCost: true });
   // Pfarrkirchen in den Vierteln
@@ -2446,11 +2471,34 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
   }
 }
 
-const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [2.4, 2.2], motte: [3.2, 3.2], rundturm: [2.4, 2.4], tuchhalle: [3.4, 1.6], tor: [5.5, 5.5] };
+// Grundfläche so groß, wie das Wahrzeichen gezeichnet wird (Ringmauer, Querhaus, Baukran)
+const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [3.7, 3.4], motte: [3.2, 3.2], rundturm: [2.6, 2.6], tuchhalle: [3.4, 1.8], tor: [5.5, 5.5] };
+
+// Freie Stelle für eine Grundfläche in der Nähe eines Wunschortes suchen
+function freeArea(W, px, py, wx, wy, margin, maxR) {
+  for (let r = 0; r <= maxR; r += 0.5) {
+    const n = Math.max(1, Math.round(r * 8));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2, x = px + Math.cos(a) * r, y = py + Math.sin(a) * r;
+      if (footprintFree(W, x, y, wx, wy, margin)) return { x, y };
+    }
+  }
+  return null;
+}
+
+// Nur Gebäude und feste Felder prüfen (Stände und Zelte dürfen auf Straßen und Plätzen stehen)
+function clearOfBuildings(W, x, y, wx, wy, margin) {
+  if (solidNear(W, x, y, wx / 2 + margin, wy / 2 + margin)) return false;
+  for (const b of W.buildings) {
+    if (!b.wx || b.kind === 'prop') continue;
+    if (Math.abs(b.x - x) < (b.wx + wx) / 2 + margin && Math.abs(b.y - y) < (b.wy + wy) / 2 + margin) return false;
+  }
+  return true;
+}
 
 // Wahrzeichen zuerst setzen, die Häuser ordnen sich darum herum
 function placeLandmark(W, s, lm) {
-  const [wx, wy] = lm.kind === 'kathedrale' ? [(lm.len || 4) * 1.3, 3.4] : LANDMARK_SIZE[lm.kind];
+  const [wx, wy] = lm.kind === 'kathedrale' ? [(lm.len || 4) * 1.3 + (lm.scaffold ? 1.6 : 0.2), 3.9] : LANDMARK_SIZE[lm.kind];
   let pref;
   if (lm.near === 'dock' && s.dock) {
     const dx = s.dock.x - s.x, dy = s.dock.y - s.y, d = Math.hypot(dx, dy) || 1;
@@ -2510,6 +2558,16 @@ function genBuildings(W, s, rng) {
       placed++;
     }
   };
+  // Was später gezeichnet wird, aber nicht in der Gebäudeliste steht, als feste Felder vormerken:
+  // die Burgmauer (8 × 8 Felder mit Ecktürmen), die Palisade der Halle, der Ring der Stadtmauer
+  if (s.type === 'burg') markSolid(W, s.x, s.y, 9.6, 9.6);
+  if (s.type === 'halle') {
+    for (let a = 0; a < Math.PI * 2; a += 0.12) markSolid(W, s.x + Math.cos(a) * 4.5, s.y + Math.sin(a) * 4.5, 0.4, 0.4);
+  }
+  if (s.type === 'stadt' && s.clear - 1 >= 12) {
+    const R = s.clear - 1;
+    for (let a = 0; a < Math.PI * 2; a += 0.3 / R) { const x = Math.floor(s.x + Math.cos(a) * R), y = Math.floor(s.y + Math.sin(a) * R); if (x > 0 && y > 0 && x < W.N && y < W.N) W.solid[y * W.N + x] = 1; }
+  }
   const lms = s.landmarks || [];
   const hasCathedral = lms.some((l) => l.kind === 'kathedrale');
   for (const lm of lms) placeLandmark(W, s, lm);
@@ -2540,41 +2598,58 @@ function genBuildings(W, s, rng) {
       return;
     }
   };
-  if (s.type !== 'stadt') tavern();
+  if (s.type !== 'stadt' && s.type !== 'halle') tavern();
   switch (s.type) {
     case 'stadt':
       genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral);
       break;
-    case 'markt':
+    case 'markt': {
+      // Marktzelte, Pferch und Stände zuerst, damit die Häuser sich darum herum ordnen
+      let tents = 0;
+      for (let k = 0; k < 5; k++) {
+        const col = rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#e8e0cc', '#5b8a3c']);
+        const x = s.x + 3 + k * 1.15, y = s.y - 3.6;
+        if (!clearOfBuildings(W, x, y, 0.9, 0.9, 0.15)) continue;
+        add({ kind: 'tent', x, y, wx: 0.9, wy: 0.9, color: col, noCost: true });
+        tents++;
+      }
+      if (tents >= 3 && clearOfBuildings(W, s.x + 5.3, s.y - 2.2, 5.8, 0.4, 0.1)) add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, wx: 5.8, wy: 0.3, noCost: true });
+      for (const [dx, dy, col] of [[1.2, 1.1, '#a33b32'], [-1.3, 0.9, '#d6ad4c']]) {
+        if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
+      }
       smithy();
       ring(9, 6, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
       ring(7, 2.5, 5.5, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
-      for (let k = 0; k < 5; k++) add({ kind: 'tent', x: s.x + 3 + k * 1.15, y: s.y - 3.6, wx: 0.9, wy: 0.9, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#e8e0cc', '#5b8a3c']), noCost: true });
-      add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, noCost: true });
-      add({ kind: 'stall', x: s.x + 1.2, y: s.y + 1.1, color: '#a33b32', noCost: true, wx: 0.8, wy: 0.6 });
-      add({ kind: 'stall', x: s.x - 1.3, y: s.y + 0.9, color: '#d6ad4c', noCost: true, wx: 0.8, wy: 0.6 });
       break;
+    }
     case 'dorf':
       ring(8 + Math.floor(rng() * 4), 1.8, s.clear - 0.8, (x, y) => house(x, y));
       smithy();
-      add({ kind: 'well', x: s.x + 0.9, y: s.y + 0.7, wx: 0.6, wy: 0.6, noCost: true });
+      { const wl = freeArea(W, s.x + 0.9, s.y + 0.7, 0.6, 0.6, 0.2, 3); if (wl) add({ kind: 'well', x: wl.x, y: wl.y, wx: 0.6, wy: 0.6, noCost: true }); }
       break;
-    case 'halle':
-      add({ kind: 'longhall', x: s.x - 0.4, y: s.y - 1.6, wx: 3.2, wy: 1.4, h: 20 });
+    case 'halle': {
+      const lh = freeArea(W, s.x - 0.4, s.y - 1.6, 3.2, 1.4, 0.3, 2.5) || { x: s.x - 0.4, y: s.y - 1.6 };
+      add({ kind: 'longhall', x: lh.x, y: lh.y, wx: 3.2, wy: 1.4, h: 20 });
+      tavern(2.4, 1.2);
+      if (!s.tavern) tavern(5.6, 2.5);
       ring(3, 2.2, 3.4, (x, y) => house(x, y, { wall: 'wood' }));
       s.palisade = 4.5;
       break;
+    }
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
       ring(12, 6.2, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;
     case 'abtei':
-      if (!hasCathedral) add({ kind: 'church', x: s.x - 0.5, y: s.y - 1.8, wx: 3.2, wy: 1.3, h: 34, big: true, abbey: true });
-      add({ kind: 'house', x: s.x + 2.2, y: s.y - 1.2, wx: 1.0, wy: 2.2, h: 18, rh: 12, wall: 'stone', roof: 'tile', lit: true });
-      add({ kind: 'house', x: s.x - 2.6, y: s.y + 1.4, wx: 2.0, wy: 1.0, h: 16, rh: 10, wall: 'stone', roof: 'tile', lit: true });
+      if (!hasCathedral) { const ch = freeArea(W, s.x - 0.5, s.y - 1.8, 3.2, 1.3, 0.3, 3); if (ch) add({ kind: 'church', x: ch.x, y: ch.y, wx: 3.2, wy: 1.3, h: 34, big: true, abbey: true }); }
+      // Klostergebäude: Dormitorium und Refektorium, wo neben der Kirche Platz ist
+      for (const [dx, dy, wx, wy, h, rh] of [[2.2, -1.2, 1.0, 2.2, 18, 12], [-2.6, 1.4, 2.0, 1.0, 16, 10]]) {
+        const sp = freeArea(W, s.x + dx, s.y + dy, wx, wy, 0.3, 3.5);
+        if (sp) add({ kind: 'house', x: sp.x, y: sp.y, wx, wy, h, rh, wall: 'stone', roof: 'tile', lit: true });
+      }
       ring(7, 3.5, s.clear - 0.5, (x, y) => house(x, y));
-      add({ kind: 'well', x: s.x + 0.4, y: s.y + 1.1, wx: 0.6, wy: 0.6, noCost: true });
+      { const wl = freeArea(W, s.x + 0.4, s.y + 1.1, 0.6, 0.6, 0.2, 2.5); if (wl) add({ kind: 'well', x: wl.x, y: wl.y, wx: 0.6, wy: 0.6, noCost: true }); }
       break;
     case 'mine':
       // Stollen im Hang, Abraumhalde, Erzhaufen, Karren und die Hütten der Bergleute
@@ -5338,7 +5413,7 @@ function findLists(s) {
     const xi = Math.floor(x), yi = Math.floor(y);
     if (xi < 2 || yi < 2 || xi >= N - 2 || yi >= N - 2) return false;
     const t = W.tiles[yi * N + xi];
-    return isWalkable(W, x, y) && t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && landAt(W, x, y) === s.land;
+    return isWalkable(W, x, y) && t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && landAt(W, x, y) === s.land && !(W.solid && W.solid[yi * N + xi]);
   };
   const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 40 && Math.abs(b.y - s.y) < 40 && b.kind !== 'prop');
   for (let k = 0; k < 160; k++) {
@@ -5836,7 +5911,7 @@ function gallowsFor(s) {
   const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 32 && Math.abs(b.y - s.y) < 32);
   const bad = (x, y) => {
     const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
-    return !isWalkable(W, x, y) || t === T.FOREST || t === T.WATER || t === T.BRIDGE || t === T.ROAD || landAt(W, x, y) !== s.land;
+    return !isWalkable(W, x, y) || t === T.FOREST || t === T.WATER || t === T.BRIDGE || t === T.ROAD || landAt(W, x, y) !== s.land || (W.solid && W.solid[Math.floor(y) * N + Math.floor(x)]);
   };
   let best = null;
   for (let k = 0; k < 140 && !best; k++) {
@@ -8027,21 +8102,13 @@ function drawCathedral(c, b) {
     faceQuad(c, nx, y, nl, w, 'L', 0, 1, h - 4, h, '#3a3430');
     if (Math.random() < 0.06) { const p = P(nx, y, h); smokeEmit(p[0], p[1], 1); }
   }
-  // Querhaus, vorderer Arm
-  drawBox(c, xc, y + ta, 1.2, 1.05, h, stone, 0, 'stone');
-  faceQuad(c, xc, y + ta, 1.2, 1.05, 'L', 0.32, 0.68, h * 0.45, h * 0.88, GLASS());
-  if (roof) drawGableRoof(c, xc, y + ta, 1.2, 1.05, h, 19, roof, stone, false);
-  // Apsis im Osten
-  drawBox(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, stone, 0, 'stone');
-  faceQuad(c, x1 - 0.38, y, 0.76, w * 0.8, 'R', 0.35, 0.65, h * 0.35, h * 0.7, GLASS());
-  if (roof) drawPyramid(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, 12, roof);
-  // Vierungsturm
+  // Vierungsturm: steht auf der Vierung, sichtbar erst über dem Dach, hinter dem vorderen Querhaus
   if (b.central === 'reiter') {
     drawBox(c, xc, y, 0.36, 0.36, 18, '#8a6a40', h + 18);
     drawPyramid(c, xc, y, 0.36, 0.36, h + 36, 32, ROOFS.slate);
   } else if (b.central) {
     const ch = h + (b.central === 'stumpf' ? 14 : 42), cw = 1.3;
-    drawBox(c, xc, y, cw, cw, ch, stone, 0, 'stone');
+    drawBox(c, xc, y, cw, cw, ch - h, stone, h, 'stone');
     for (const f of ['L', 'R']) { faceQuad(c, xc, y, cw, cw, f, 0.16, 0.36, ch * 0.72, ch * 0.92, dark); faceQuad(c, xc, y, cw, cw, f, 0.64, 0.84, ch * 0.72, ch * 0.92, dark); }
     if (b.central === 'spitze') drawPyramid(c, xc, y, cw, cw, ch, 66, ROOFS.slate);
     else if (b.spire) drawPyramid(c, xc, y, cw, cw, ch, 84, ROOFS.slate);
@@ -8050,9 +8117,17 @@ function drawCathedral(c, b) {
     c.strokeStyle = '#d6ad4c'; c.lineWidth = 1.5;
     c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax, ay - 9); c.moveTo(ax - 3, ay - 6); c.lineTo(ax + 3, ay - 6); c.stroke();
   } else if (b.spire) {
-    drawBox(c, xc, y, 1.1, 1.1, h + 30, stone, 0, 'stone');
+    drawBox(c, xc, y, 1.1, 1.1, 30, stone, h, 'stone');
     drawPyramid(c, xc, y, 1.1, 1.1, h + 30, 90, ROOFS.slate);
   }
+  // Querhaus, vorderer Arm
+  drawBox(c, xc, y + ta, 1.2, 1.05, h, stone, 0, 'stone');
+  faceQuad(c, xc, y + ta, 1.2, 1.05, 'L', 0.32, 0.68, h * 0.45, h * 0.88, GLASS());
+  if (roof) drawGableRoof(c, xc, y + ta, 1.2, 1.05, h, 19, roof, stone, false);
+  // Apsis im Osten
+  drawBox(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, stone, 0, 'stone');
+  faceQuad(c, x1 - 0.38, y, 0.76, w * 0.8, 'R', 0.35, 0.65, h * 0.35, h * 0.7, GLASS());
+  if (roof) drawPyramid(c, x1 - 0.38, y, 0.76, w * 0.8, h * 0.82, 12, roof);
   // Baustelle: Gerüst und Kran
   if (b.scaffold) {
     drawScaffold(c, b.unfinished ? x0 + 0.4 : x1 - 0.4, y, 1.0, 1.4, h + 26);
@@ -8609,6 +8684,55 @@ function palisadeRing(site, r) {
   return parts;
 }
 
+const BOXED_KINDS = { house: 1, church: 1, longhall: 1, landmark: 1, klause: 1, stollen: 1, halde: 1, mystic: 1, tent: 1, stall: 1, well: 1 };
+
+// Tiefensortierung: erst grob nach x + y, dann für Gebäude genau. Was vollständig hinter einem
+// Gebäude steht (westlich oder nördlich davon), wird vorher gezeichnet, was davor steht, danach.
+// Lange Bauten wie Kathedralen verdecken so keine Häuser mehr, die eigentlich vor ihnen stehen.
+const SORT_CELL = 4;
+function sortObjects(objs) {
+  objs.sort((a, b) => a.d - b.d);
+  const grid = new Map();
+  let bigs = 0;
+  for (let i = 0; i < objs.length; i++) {
+    const o = objs[i];
+    if (!o.box) continue;
+    o.pre = null; o.mark = 0; o.ord = i;
+    const k = Math.floor((o.box[0] + o.box[1]) / 2 / SORT_CELL) * 8192 + Math.floor((o.box[2] + o.box[3]) / 2 / SORT_CELL);
+    let l = grid.get(k);
+    if (!l) grid.set(k, l = []);
+    l.push(o);
+    if (o.big) bigs++;
+  }
+  if (!bigs) return objs;
+  const E = 0.02;
+  const behind = (a, b) => (a.box[1] <= b.box[0] + E && a.box[2] < b.box[3] - E) || (a.box[3] <= b.box[2] + E && a.box[0] < b.box[1] - E);
+  for (const a of objs) {
+    if (!a.big || !a.box) continue;
+    const cx = Math.floor((a.box[0] + a.box[1]) / 2 / SORT_CELL), cy = Math.floor((a.box[2] + a.box[3]) / 2 / SORT_CELL);
+    const reach = 1 + Math.floor(Math.max(a.box[1] - a.box[0], a.box[3] - a.box[2]) / SORT_CELL);
+    for (let gx = cx - reach; gx <= cx + reach; gx++) for (let gy = cy - reach; gy <= cy + reach; gy++) {
+      const l = grid.get(gx * 8192 + gy);
+      if (!l) continue;
+      for (const b of l) {
+        if (b === a || (b.big && b.ord < a.ord)) continue;
+        if (behind(b, a)) (a.pre || (a.pre = [])).push(b);
+        else if (behind(a, b)) (b.pre || (b.pre = [])).push(a);
+      }
+    }
+  }
+  const out = [];
+  const visit = (o) => {
+    if (o.mark) return;
+    o.mark = 1;
+    if (o.pre) for (const p of o.pre) visit(p);
+    o.mark = 2;
+    out.push(o);
+  };
+  for (const o of objs) { if (o.box) visit(o); else out.push(o); }
+  return out;
+}
+
 function buildStaticParts() {
   const W = G.world;
   const parts = [];
@@ -8620,7 +8744,11 @@ function buildStaticParts() {
       stollen: drawStollen, halde: drawHalde, klause: drawKlause, mystic: drawMystic,
     }[b.kind];
     if (b.kind === 'friedhof') continue;
-    if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
+    if (!f) continue;
+    // Grundfläche für die Zeichenreihenfolge: Gebäude als Rechteck, Kleinkram als Punkt
+    const big = b.wx >= 0.5 && BOXED_KINDS[b.kind];
+    const r = 0.2, box = big ? [b.x - b.wx / 2, b.x + b.wx / 2, b.y - b.wy / 2, b.y + b.wy / 2] : [b.x - r, b.x + r, b.y - r, b.y + r];
+    parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b, box, big });
   }
   for (const s of W.sites) {
     if (s.cityWall) {
@@ -8631,7 +8759,8 @@ function buildStaticParts() {
         const prev = ring[(k - 1 + ring.length) % ring.length], next = ring[(k + 1) % ring.length];
         const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
         const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
-        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o)) });
+        const hw = o.tower ? 0.62 : 0.5;
+        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o)), box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
       });
     }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
@@ -10606,7 +10735,7 @@ function render() {
       if (lists && Math.abs(o.x - lists.lx) < 10 && Math.abs(o.y - lists.ly) < 4.6) continue;
       if (gallows.length && gallows.some((g) => Math.abs(o.x - g.x) < 2 && Math.abs(o.y - g.y) < 2.2)) continue;
       if (o.kind === 'mauer') objs.push({ d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => drawWallRuin(c, o) });
-      else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o) });
+      else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o), box: o.box || (o.box = [o.x - 0.25, o.x + 0.25, o.y - 0.25, o.y + 0.25]) });
     }
   }
   for (const part of staticParts) if (inView(part.x, part.y)) objs.push(part);
@@ -10630,17 +10759,16 @@ function render() {
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
-    objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)) });
+    objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)), box: [u.x - 0.15, u.x + 0.15, u.y - 0.15, u.y + 0.15] });
   }
   const night = darkness() > 0.4;
   for (const a of G.animals || []) {
     if (!inView(a.x, a.y) || (night && a.kind === 'huhn')) continue;
-    objs.push({ d: a.x + a.y, z: 0, f: (c) => { const ax = isoX(a.x, a.y), ay = isoY(a.x, a.y) - zAt(a.x, a.y); if (G.s.player.huntTarget === a) { c.strokeStyle = 'rgba(255,120,80,0.9)'; c.lineWidth = 1.4; c.beginPath(); c.ellipse(ax, ay, 11, 4.5, 0, 0, Math.PI * 2); c.stroke(); } drawAnimal(c, a, ax, ay); } });
+    objs.push({ d: a.x + a.y, z: 0, box: [a.x - 0.2, a.x + 0.2, a.y - 0.2, a.y + 0.2], f: (c) => { const ax = isoX(a.x, a.y), ay = isoY(a.x, a.y) - zAt(a.x, a.y); if (G.s.player.huntTarget === a) { c.strokeStyle = 'rgba(255,120,80,0.9)'; c.lineWidth = 1.4; c.beginPath(); c.ellipse(ax, ay, 11, 4.5, 0, 0, Math.PI * 2); c.stroke(); } drawAnimal(c, a, ax, ay); } });
   }
   for (const f of G.fx) if (f.kind === 'kadaver' && inView(f.x, f.y)) objs.push({ d: f.x + f.y - 0.3, z: 0, f: (c) => drawCarcass(c, f, isoX(f.x, f.y), isoY(f.x, f.y) - zAt(f.x, f.y)) });
   for (const f of G.fx) if (f.kind === 'corpse' && inView(f.x, f.y)) objs.push({ d: f.x + f.y - 0.3, z: 0, f: (c) => drawCorpse(c, f, isoX(f.x, f.y), isoY(f.x, f.y) - zAt(f.x, f.y)) });
-  objs.sort((a, b) => a.d - b.d);
-  for (const o of objs) { baseZ = o.z || 0; o.f(wc); }
+  for (const o of sortObjects(objs)) { baseZ = o.z || 0; o.f(wc); }
   baseZ = 0;
 
   for (const part of staticParts) if (part.b && part.b.smoke && inView(part.x, part.y)) smokeEmit(part.b.smoke[0], part.b.smoke[1], 0.04);

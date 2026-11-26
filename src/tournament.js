@@ -34,7 +34,7 @@ function findLists(s) {
     const xi = Math.floor(x), yi = Math.floor(y);
     if (xi < 2 || yi < 2 || xi >= N - 2 || yi >= N - 2) return false;
     const t = W.tiles[yi * N + xi];
-    return isWalkable(W, x, y) && t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && landAt(W, x, y) === s.land;
+    return isWalkable(W, x, y) && t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && landAt(W, x, y) === s.land && !(W.solid && W.solid[yi * N + xi]);
   };
   const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 40 && Math.abs(b.y - s.y) < 40 && b.kind !== 'prop');
   for (let k = 0; k < 160; k++) {

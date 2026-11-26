@@ -31,7 +31,7 @@ export function gallowsFor(s) {
   const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 32 && Math.abs(b.y - s.y) < 32);
   const bad = (x, y) => {
     const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
-    return !isWalkable(W, x, y) || t === T.FOREST || t === T.WATER || t === T.BRIDGE || t === T.ROAD || landAt(W, x, y) !== s.land;
+    return !isWalkable(W, x, y) || t === T.FOREST || t === T.WATER || t === T.BRIDGE || t === T.ROAD || landAt(W, x, y) !== s.land || (W.solid && W.solid[Math.floor(y) * N + Math.floor(x)]);
   };
   let best = null;
   for (let k = 0; k < 140 && !best; k++) {

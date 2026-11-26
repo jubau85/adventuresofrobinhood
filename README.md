@@ -125,6 +125,7 @@ node tools/build.mjs
 | `src/save.js` | Speichern und Laden |
 | `src/main.js` | Start, Hauptschleife, Eingabe |
 | `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
+| `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |
 
 Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet. Nach und nach kommen handgemalte Bilder dazu (Titelbild, Wiese, Eiche), der Plan dafür steht in [assets/GRAFIK-BRIEF.md](assets/GRAFIK-BRIEF.md). Der Build bettet sie in die Einzeldatei ein.
 
