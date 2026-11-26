@@ -81,7 +81,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.3 : 1.9) : (G.view.w < 720 ? 1.3 : 1.6);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.7 : 2.4) : (G.view.w < 720 ? 1.7 : 2.0);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -380,7 +380,7 @@ G.setGfx = setGfx;
 G.cycleGfx = () => setGfx(GFX_MODES[(GFX_MODES.indexOf(G.gfx) + 1) % GFX_MODES.length]);
 
 // Zoom von der Übersicht (0,45) bis ganz nah (4): Figuren füllen dann gut ein Zehntel der Bildhöhe
-function zoom(f) { G.cam.zoom = Math.max(0.45, Math.min(4, G.cam.zoom * f)); }
+function zoom(f) { G.cam.zoom = Math.max(0.45, Math.min(5, G.cam.zoom * f)); }
 
 function togglePanel(kind) {
   if (G.ui.panel === kind) closePanel();

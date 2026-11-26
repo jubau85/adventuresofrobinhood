@@ -282,6 +282,7 @@ export function generateWorld(seed) {
   W.buildings.forEach((b, i) => { b.idx = i; });
   assignPlots(W);
   scaleBuildings(W);
+  placeCamps(W);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
@@ -303,6 +304,41 @@ function assignPlots(W) {
     const rng = mulberry32((W.seed ^ (s.x * 7919 + s.y * 104729)) >>> 0);
     const n = Math.max(1, Math.min(14, Math.round(hs.length * 0.09)));
     for (let k = 0; k < n && outer.length; k++) outer.splice(Math.floor(rng() * outer.length), 1)[0].plot = true;
+  }
+}
+
+// Lagerfeuer im Land: Köhler, Jäger, Reisende und Pilger rasten an Waldrändern und abseits der Wege.
+// Eigener Zufall, und die Feuer kommen ans Ende der Gebäudeliste, damit Spielstände passen.
+const CAMP_KINDS = [
+  { kind: 'koehler', name: 'Köhlerlager', roles: ['holzer', 'waldmann'] },
+  { kind: 'reisende', name: 'Rastplatz', roles: ['reisender', 'pilger', 'reisender'] },
+  { kind: 'jaeger', name: 'Jägerfeuer', roles: ['jaeger', 'waldmann'] },
+  { kind: 'hirten', name: 'Hirtenfeuer', roles: ['hirte', 'reisender'] },
+];
+function placeCamps(W) {
+  const N = W.N, rng = mulberry32((W.seed ^ 0xC0FFEE) >>> 0);
+  W.camps = [];
+  const settled = new Set(W.sites.map((s) => s.land));
+  for (let tries = 0; tries < 30000 && W.camps.length < 60; tries++) {
+    const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
+    const i = y * N + x;
+    if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
+    const forest = countAround(W, x, y, 3, T.FOREST);
+    if (forest < 6 || countAround(W, x, y, 2, T.WATER) || countAround(W, x, y, 1, T.ROAD)) continue;
+    if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < s.clear + 9)) continue;
+    if (W.farms.some((f) => Math.hypot(f.tx - x, f.ty - y) < 7)) continue;
+    if (W.camps.some((c) => Math.hypot(c.tx - x, c.ty - y) < 22)) continue;
+    const kind = CAMP_KINDS[Math.floor(rng() * CAMP_KINDS.length)];
+    const c = { id: `feuer${W.camps.length}`, type: 'lagerfeuer', camp: kind.kind, roles: kind.roles, name: kind.name, tx: x, ty: y, x: x + 0.5, y: y + 0.5, clear: 2, land: W.landId[i] };
+    W.camps.push(c);
+    W.tiles[i] = T.GRASS;
+    const push = (b) => { b.site = c.id; b.idx = W.buildings.length; W.buildings.push(b); };
+    push({ kind: 'fire', x: c.x, y: c.y, noCost: true, camp: true });
+    push({ kind: 'prop', prop: 'sitzstamm', x: c.x - 0.9, y: c.y + 0.3, v: rng() });
+    push({ kind: 'prop', prop: 'sitzstamm', x: c.x + 0.4, y: c.y + 0.95, v: rng() });
+    if (kind.kind === 'koehler') push({ kind: 'prop', prop: 'meiler', x: c.x + 1.6, y: c.y - 1.0, v: rng() });
+    else if (rng() < 0.7) push({ kind: 'tent', x: c.x - 0.6, y: c.y - 1.3, wx: 0.9, wy: 0.9, color: ['#6d6a4a', '#7a6a4a', '#8a7a5a'][Math.floor(rng() * 3)], noCost: true });
+    if (kind.kind === 'jaeger') push({ kind: 'prop', prop: 'wildbret', x: c.x + 1.0, y: c.y - 0.4, v: rng() });
   }
 }
 
@@ -488,6 +524,40 @@ function computeHeights(W) {
     const bumps = (fbm(nD, x / 5.5, y / 5.5, 3) - 0.5) * 58 * hill;
     vh[k] = Math.min(HMAX + 16, Math.max(1, Math.pow(t, 1.4) * HMAX * 0.8 + bumps + 2 + (hash2(x, y, 4242) - 0.5) * 0.8));
   }
+  // Kleine Hügel im Flachland: sanfte Kuppen abseits von Orten, Höfen und Gebäuden
+  const busy = new Uint8Array(N * N);
+  const markBusy = (cx, cy, r) => {
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if (x >= 0 && y >= 0 && x < N && y < N) busy[y * N + x] = 1;
+  };
+  for (const s of W.sites) markBusy(s.x, s.y, s.clear + 5);
+  for (const f of W.farms) markBusy(f.x, f.y, 4);
+  for (const c of W.camps || []) markBusy(c.x, c.y, 2.5);
+  for (const b of W.buildings) markBusy(b.x, b.y, Math.max(b.wx || 0.6, b.wy || 0.6) / 2 + 1.2);
+  const rk = mulberry32((W.seed ^ 0x51ED) >>> 0);
+  let knolls = 0;
+  for (let k = 0; k < 4000 && knolls < 320; k++) {
+    const x = 4 + Math.floor(rk() * (N - 8)), y = 4 + Math.floor(rk() * (N - 8));
+    const t0 = W.tiles[y * N + x];
+    if ((t0 !== T.GRASS && t0 !== T.FOREST && t0 !== T.FIELD) || W.elev[y * N + x] > 0.55) continue;
+    const r = 2 + rk() * 2.6, hh = 13 + rk() * 16;
+    let free = true;
+    for (let yy = Math.floor(y - r); yy <= y + r && free; yy++) for (let xx = Math.floor(x - r); xx <= x + r; xx++) {
+      const ii = yy * N + xx;
+      if (busy[ii] || W.tiles[ii] === T.WATER || W.tiles[ii] === T.BRIDGE) { free = false; break; }
+    }
+    if (!free) continue;
+    knolls++;
+    if (!W.knollAt) W.knollAt = { x: x + 0.5, y: y + 0.5 };
+    if (!W.knollAt2 && t0 === T.GRASS) W.knollAt2 = { x: x + 0.5, y: y + 0.5 };
+    for (let vy = Math.floor(y - r); vy <= y + r + 1; vy++) for (let vx = Math.floor(x - r); vx <= x + r + 1; vx++) {
+      if (vx < 0 || vy < 0 || vx >= M || vy >= M) continue;
+      const kk = vy * M + vx;
+      if (vwater[kk]) continue;
+      const d = Math.hypot(vx - x - 0.5, vy - y - 0.5) / r;
+      if (d < 1) vh[kk] += hh * (0.5 + 0.5 * Math.cos(d * Math.PI));
+    }
+  }
+  W.knolls = knolls;
   // Ufer abflachen: je näher am Wasser, desto niedriger (keine senkrechten Uferwände)
   const dist = new Int16Array(M * M).fill(-1);
   const queue = [];
@@ -596,6 +666,10 @@ function placeSettlements(W, rng) {
             const f = countAround(W, x, y, 5, T.FOREST);
             if (strict && f < 24) continue;
             score += (70 - f) * 0.15;
+          } else if (def.type === 'mine') {
+            score -= countAround(W, x, y, 4, T.HILLS) * 0.35;
+          } else if (def.type === 'einsiedelei') {
+            score -= (countAround(W, x, y, 4, T.FOREST) + countAround(W, x, y, 4, T.HILLS)) * 0.12;
           } else {
             if (W.tiles[i] === T.HILLS) score += 3;
             score += countAround(W, x, y, 3, T.HILLS) * 0.3;
@@ -635,7 +709,7 @@ function clearAround(W, s) {
       if (d < 3) W.tiles[i] = T.GRASS;    // Kern immer trocken
       continue;
     }
-    if (s.type === 'lager') { if (d <= 2.5) W.tiles[i] = T.GRASS; continue; }
+    if (s.type === 'lager' || s.type === 'einsiedelei') { if (d <= 2.5) W.tiles[i] = T.GRASS; continue; }
     if (t === T.FOREST || t === T.HILLS || t === T.SAND) W.tiles[i] = T.GRASS;
   }
 }
@@ -861,7 +935,7 @@ const TAVERN_NAMES = ['Zum Goldenen Krug', 'Zur Krone', 'Zum Weißen Hirsch', 'Z
 
 // Friedhof neben der Kirche (oder am Ortsrand), umzäunt, mit Steinkreuz
 function placeCemetery(W, s) {
-  if (s.type === 'lager' || s.type === 'spieler') return;
+  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei') return;
   const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
   const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
   const wx = 2.6, wy = 2.0;
@@ -1110,6 +1184,22 @@ function genBuildings(W, s, rng) {
       ring(7, 3.5, s.clear - 0.5, (x, y) => house(x, y));
       add({ kind: 'well', x: s.x + 0.4, y: s.y + 1.1, wx: 0.6, wy: 0.6, noCost: true });
       break;
+    case 'mine':
+      // Stollen im Hang, Abraumhalde, Erzhaufen, Karren und die Hütten der Bergleute
+      add({ kind: 'stollen', x: s.x - 0.6, y: s.y - 1.8, wx: 2.4, wy: 1.5, ore: s.ore, noCost: true });
+      add({ kind: 'halde', x: s.x + 2.3, y: s.y - 1.5, wx: 2.2, wy: 1.8, ore: s.ore, noCost: true });
+      W.buildings.push({ kind: 'prop', prop: 'erzhaufen', ore: s.ore, x: s.x + 0.7, y: s.y + 0.1, v: rng(), site: s.id });
+      W.buildings.push({ kind: 'prop', prop: 'karren', x: s.x - 0.5, y: s.y + 0.5, v: rng(), site: s.id });
+      W.buildings.push({ kind: 'prop', prop: 'holzstapel', x: s.x - 2.2, y: s.y + 0.4, v: rng(), site: s.id });
+      ring(3, 2.6, s.clear + 0.5, (x, y) => house(x, y, { wall: rng() < 0.5 ? 'wood' : 'stone', roof: 'thatch', wx: 1.0, wy: 0.85 }));
+      break;
+    case 'einsiedelei':
+      // Klause des Einsiedlers und der heilige Ort daneben
+      add({ kind: 'klause', x: s.x - 0.9, y: s.y - 0.7, wx: 1.2, wy: 1.2, h: 15, noCost: true });
+      add({ kind: 'mystic', x: s.x + 1.3, y: s.y + 0.2, feature: s.feature, wx: 2.2, wy: 2.0, noCost: true });
+      W.buildings.push({ kind: 'prop', prop: 'beet', x: s.x - 1.0, y: s.y + 0.9, v: rng(), site: s.id });
+      W.buildings.push({ kind: 'prop', prop: 'holzstapel', x: s.x - 2.0, y: s.y - 0.2, v: rng(), site: s.id });
+      break;
     case 'lager':
       for (let k = 0; k < 5; k++) {
         const a = k / 5 * Math.PI * 2 + rng() * 0.4;
@@ -1223,6 +1313,7 @@ function placeTrees(W, rng) {
   };
   for (const s of W.sites) mark(s.x, s.y, s.type === 'lager' ? 2.8 : s.clear + 1);
   for (const f of W.farms) mark(f.x, f.y, 3.6);
+  for (const c of W.camps || []) mark(c.x, c.y, 2.2);
   for (const b of W.buildings) {
     const rx = (b.wx || 0.6) / 2 + 0.7, ry = (b.wy || 0.6) / 2 + 0.7;
     for (let y = Math.floor(b.y - ry); y <= Math.floor(b.y + ry); y++) for (let x = Math.floor(b.x - rx); x <= Math.floor(b.x + rx); x++) {

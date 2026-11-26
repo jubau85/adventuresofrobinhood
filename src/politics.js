@@ -107,7 +107,7 @@ function makeQuest(site) {
 
 export function refreshTownQuests(site) {
   const town = G.s.towns[site.id];
-  if (!site.faction || town.questDay > G.s.day) return;
+  if (!site.faction || site.type === 'einsiedelei' || town.questDay > G.s.day) return;
   town.quests = town.quests.filter((q) => q.state === 'offen' && G.s.day - q.created < 4);
   while (town.quests.length < 3) town.quests.push(makeQuest(site));
   town.questDay = G.s.day + 3;

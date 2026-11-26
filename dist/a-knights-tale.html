@@ -547,6 +547,9 @@ const GOODS = {
   wein: { name: 'Wein', base: 30 },
   fleisch: { name: 'Fleisch', base: 12 },
   felle: { name: 'Felle', base: 20 },
+  blei: { name: 'Blei', base: 16 },
+  zinn: { name: 'Zinn', base: 22 },
+  silber: { name: 'Silber', base: 60 },
 };
 const GOOD_IDS = Object.keys(GOODS);
 
@@ -839,26 +842,20 @@ const SETTLEMENTS = [
   // ---------------- England (in Yorkshire etwas auseinandergezogen, damit jeder Ort Platz hat)
   { id: 'ashcombe', name: 'Ashcombe', type: 'spieler', faction: null, clear: 11, realm: 'en', lon: -1.81, lat: 53.62, produces: [], demands: [],
     desc: 'Dein Erbe: ein verfallener Burgstall am Rand der Pennines. Der Vogt hat dir nur die Steine gelassen.' },
-  { id: 'york', name: 'York', type: 'stadt', cityR: 15, faction: 'gilde', clear: 8, realm: 'en', lon: -0.95, lat: 54.05, landmarks: [{ kind: 'kathedrale', name: 'York Minster', len: 4.2, westTowers: 2, central: 'turm' }, { kind: 'motte', name: 'Burghügel von York', wooden: true }], produces: ['wolle', 'bier', 'salz'], demands: ['eisen', 'holz', 'wein', 'fleisch', 'felle'],
+  { id: 'york', name: 'York', type: 'stadt', cityR: 15, faction: 'gilde', clear: 8, realm: 'en', lon: -0.95, lat: 54.05, landmarks: [{ kind: 'kathedrale', name: 'York Minster', len: 4.2, westTowers: 2, central: 'turm' }, { kind: 'motte', name: 'Burghügel von York', wooden: true }], produces: ['wolle', 'bier', 'salz'], demands: ['eisen', 'holz', 'wein', 'fleisch', 'felle', 'blei'],
     desc: 'Die größte Stadt des Nordens. Flämische Wollhändler, Zünfte und ein Erzbischof, der überall mitredet.' },
-  { id: 'london', name: 'London', type: 'stadt', cityR: 22, faction: 'gilde', clear: 9, realm: 'en', lon: -0.10, lat: 51.51, port: true, landmarks: [{ kind: 'tower', name: 'Tower von London', near: 'dock' }, { kind: 'kathedrale', name: 'St Paul\'s', len: 4.6, spire: true }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'fleisch', 'felle', 'holz'],
+  { id: 'london', name: 'London', type: 'stadt', cityR: 22, faction: 'gilde', clear: 9, realm: 'en', lon: -0.10, lat: 51.51, port: true, landmarks: [{ kind: 'tower', name: 'Tower von London', near: 'dock' }, { kind: 'kathedrale', name: 'St Paul\'s', len: 4.6, spire: true }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'fleisch', 'felle', 'holz', 'zinn'],
     desc: 'Die reichste Stadt des Reiches, mit dem Tower und dem Hafen an der Themse. Von hier segeln die Wollschiffe nach Brügge.' },
   { id: 'nottingham', name: 'Nottingham', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -1.18, lat: 52.91, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
     desc: 'Die Burg des Sheriffs auf dem Sandsteinfelsen. Prinz Johns Leute halten sie noch immer.' },
-  { id: 'coningsburgh', name: 'Coningsburgh', type: 'burg', faction: 'sachsen', clear: 8, realm: 'en', lon: -1.22, lat: 53.42, produces: ['stein', 'holz'], demands: ['wein', 'getreide', 'eisen'],
-    desc: 'Mächtige Burg eines sächsischen Geschlechts, das noch immer von der alten Krone träumt.' },
   { id: 'torquilstone', name: 'Torquilstone', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -0.38, lat: 53.86, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
     desc: 'Die Feste eines gefürchteten normannischen Barons. Ihre Kerker sind berüchtigt.' },
   { id: 'rotherwood', name: 'Rotherwood', type: 'halle', faction: 'sachsen', clear: 7, realm: 'en', lon: -1.95, lat: 53.05, produces: ['getreide', 'bier'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
     desc: 'Die Halle eines alten sächsischen Thans. Gastfreundlich gegenüber jedem, der keine normannischen Sporen trägt.' },
-  { id: 'barnsdale', name: 'Lager im Barnsdale', type: 'lager', faction: 'waldleute', clear: 3, realm: 'en', lon: -1.18, lat: 53.72, produces: ['wein', 'holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'eisen'],
-    desc: 'Ein verstecktes Lager tief im Wald. Wer hier sitzt, hat dem Gesetz der Barone abgeschworen.' },
   { id: 'newforest', name: 'Lager im New Forest', type: 'lager', faction: 'waldleute', clear: 3, realm: 'en', lon: -1.62, lat: 50.86, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
     desc: 'Tief im königlichen Forst, wo einst ein König vom Pfeil getroffen starb. Die Förster kommen nur zu zehnt hierher.' },
   { id: 'jorvaulx', name: 'Abtei Jorvaulx', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: -1.85, lat: 54.42, produces: ['wolle', 'bier', 'wein'], demands: ['salz', 'getreide', 'stein'],
     desc: 'Eine reiche Zisterzienserabtei. Der Prior liebt guten Wein und die Jagd.' },
-  { id: 'templestowe', name: 'Templestowe', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: -1.62, lat: 54.08, produces: ['wein', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
-    desc: 'Komturei eines Ritterordens. Streng, wohlhabend und politisch.' },
   { id: 'ashby', name: 'Ashby', type: 'markt', faction: 'gilde', clear: 8, realm: 'en', lon: -1.47, lat: 52.75, produces: ['wein', 'wolle'], demands: ['getreide', 'bier', 'holz', 'fleisch'],
     desc: 'Marktflecken mit Turnierwiese. Wer Rang und Namen hat, zeigt sich hier.' },
   // Mittel- und Ostengland
@@ -880,7 +877,39 @@ const SETTLEMENTS = [
     desc: 'Königliche Burg am Severn. Aus dem Forest of Dean kommen Eisen und Holz, und manchmal Wilderer.' },
   { id: 'dorchester', name: 'Dorchester', type: 'dorf', faction: 'sachsen', clear: 6, realm: 'en', lon: -2.44, lat: 50.72, produces: ['wolle', 'fleisch'], demands: ['salz', 'eisen', 'wein'],
     desc: 'Ein Dorf in den Hügeln von Dorset, unter den grasbewachsenen Wällen einer uralten Burg. Hier zählt man noch nach Schafen.' },
-  { id: 'lincoln', name: 'Lincoln', type: 'stadt', faction: 'kirche', clear: 8, realm: 'en', lon: -0.48, lat: 53.21, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Lincoln', len: 4.4, westTowers: 2, central: 'turm', scaffold: true }], produces: ['wolle', 'getreide', 'bier'], demands: ['wein', 'eisen', 'stein', 'felle'],
+  // Erzgruben: Erz direkt kaufen oder einen Anteil pachten
+  { id: 'dean', name: 'Eisengruben im Forest of Dean', type: 'mine', ore: 'eisen', faction: 'normannen', clear: 4, realm: 'en', lon: -2.55, lat: 51.80, produces: ['eisen', 'holz'], demands: ['getreide', 'bier', 'fleisch'],
+    desc: 'Im Königsforst graben freie Bergleute nach Eisenerz, wie ihre Väter seit Römerzeiten. Ihre Rechte verteidigen sie zäh.' },
+  { id: 'weald', name: 'Eisengruben im Weald', type: 'mine', ore: 'eisen', faction: 'sachsen', clear: 4, realm: 'en', lon: 0.20, lat: 51.03, produces: ['eisen', 'holz'], demands: ['getreide', 'bier', 'salz'],
+    desc: 'Rauch steigt aus den Rennöfen im Wald. Die Köhler und Erzgräber hier sprechen noch die alte Sprache.' },
+  { id: 'peak', name: 'Bleigruben im Peak', type: 'mine', ore: 'blei', faction: 'normannen', clear: 4, realm: 'en', lon: -1.78, lat: 53.33, produces: ['blei', 'stein'], demands: ['getreide', 'bier', 'holz'],
+    desc: 'Unter der Burg im Peak bricht man Bleiglanz. Das Blei deckt die Dächer der Kathedralen von Lincoln bis Canterbury.' },
+  { id: 'alston', name: 'Silbergruben von Alston', type: 'mine', ore: 'silber', faction: 'normannen', clear: 4, realm: 'en', lon: -2.44, lat: 54.81, produces: ['silber', 'blei'], demands: ['getreide', 'fleisch', 'bier', 'holz'],
+    desc: 'Die Silbergruben des Königs im kahlen Hochmoor. Aus ihrem Erz wird in Carlisle Münzgeld geschlagen.' },
+  { id: 'dartmoor', name: 'Zinngruben im Dartmoor', type: 'mine', ore: 'zinn', faction: 'normannen', clear: 4, realm: 'en', lon: -3.95, lat: 50.55, produces: ['zinn'], demands: ['getreide', 'bier', 'salz'],
+    desc: 'Zinnwäscher im Moor. Sie stehen unter eigenem Recht und zahlen ihren Zoll direkt an den König.' },
+  { id: 'ferriere', name: 'Eisengruben von Ferrière', type: 'mine', ore: 'eisen', faction: 'normannen', clear: 4, realm: 'nd', lon: 0.80, lat: 48.95, produces: ['eisen'], demands: ['getreide', 'wein', 'holz'],
+    desc: 'Das Eisen der Normandie: Schmiede aus der ganzen Gegend kaufen hier ihr Luppeneisen.' },
+  // Mystische Orte: Einsiedler an heiligen Quellen, alten Steinen und Höhlen
+  { id: 'knaresborough', name: 'Höhle des heiligen Robert', type: 'einsiedelei', feature: 'hoehle', faction: 'kirche', clear: 3, realm: 'en', lon: -1.46, lat: 54.00, produces: [], demands: [],
+    desc: 'Ein frommer Einsiedler lebt in einer Felshöhle am Fluss. Die Armen kommen zu ihm, die Reichen fürchten seine Worte.' },
+  { id: 'cratcliffe', name: 'Einsiedlerhöhle am Cratcliffe', type: 'einsiedelei', feature: 'hoehle', faction: 'kirche', clear: 3, realm: 'en', lon: -1.66, lat: 53.16, produces: [], demands: [],
+    desc: 'Unter einer Felswand hat ein Eremit ein Kreuz in den Stein gehauen. Wanderer bringen ihm Brot und erbitten seinen Segen.' },
+  { id: 'wayland', name: 'Wielands Schmiede', type: 'einsiedelei', feature: 'grab', faction: 'kirche', clear: 3, realm: 'en', lon: -1.60, lat: 51.57, produces: [], demands: [],
+    desc: 'Ein uraltes Hügelgrab am Ridgeway. Wer sein Pferd hier über Nacht lässt und eine Münze dazulegt, findet es am Morgen beschlagen, sagt man.' },
+  { id: 'avebury', name: 'Steinkreis von Avebury', type: 'einsiedelei', feature: 'steine', faction: 'kirche', clear: 3, realm: 'en', lon: -1.85, lat: 51.41, produces: [], demands: [],
+    desc: 'Ein riesiger Kreis aus grauen Steinen, älter als jede Kirche. Ein alter Mann wacht über ihn und weiß Dinge, die er nicht wissen dürfte.' },
+  { id: 'longmeg', name: 'Long Meg und ihre Töchter', type: 'einsiedelei', feature: 'steine', faction: 'kirche', clear: 3, realm: 'en', lon: -2.67, lat: 54.73, produces: [], demands: [],
+    desc: 'Eine Hexe und ihr Hexenzirkel, zu Stein verwandelt, so erzählt man im Tal. Zählt man die Steine zweimal, kommt nie dieselbe Zahl heraus.' },
+  { id: 'holywell', name: 'Quelle der heiligen Winefride', type: 'einsiedelei', feature: 'quelle', faction: 'kirche', clear: 3, realm: 'wa', lon: -3.22, lat: 53.27, produces: [], demands: [],
+    desc: 'Wo das Haupt der Heiligen fiel, sprang eine Quelle auf. Pilger baden darin und hoffen auf Heilung.' },
+  { id: 'grimes', name: 'Teufelslöcher von Grimes', type: 'einsiedelei', feature: 'grab', faction: 'kirche', clear: 3, realm: 'en', lon: 0.67, lat: 52.48, produces: [], demands: [],
+    desc: 'Hunderte alte Gruben in der Heide, von Riesen gegraben, sagen die Leute. Ein Einsiedler hält dort Wache gegen den Teufel.' },
+  { id: 'broceliande', name: 'Quelle von Barenton', type: 'einsiedelei', feature: 'quelle', faction: 'kirche', clear: 3, realm: 'fr', lon: -2.2, lat: 48.02, produces: [], demands: [],
+    desc: 'Tief im Wald von Brocéliande. Gießt man Wasser auf den Stein am Brunnen, so zieht ein Sturm auf. Hier soll Merlin geschlafen haben.' },
+  { id: 'fontainebleau', name: 'Klause im Wald von Bière', type: 'einsiedelei', feature: 'eibe', faction: 'kirche', clear: 3, realm: 'fr', lon: 2.70, lat: 48.40, produces: [], demands: [],
+    desc: 'Unter einer uralten Eibe zwischen Sandsteinfelsen lebt ein Einsiedler, der einst Ritter war. Er spricht nicht über seine Vergangenheit.' },
+  { id: 'lincoln', name: 'Lincoln', type: 'stadt', faction: 'kirche', clear: 8, realm: 'en', lon: -0.48, lat: 53.21, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Lincoln', len: 4.4, westTowers: 2, central: 'turm', scaffold: true }], produces: ['wolle', 'getreide', 'bier'], demands: ['wein', 'eisen', 'stein', 'felle', 'blei'],
     desc: 'Die Kathedrale über der Stadt ist das höchste Bauwerk der Christenheit. Der Bischof ist ein Freund des Königs.' },
   { id: 'durham', name: 'Durham', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: -1.57, lat: 54.78, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Durham', len: 4.0, westTowers: 2, central: 'turm' }], produces: ['stein', 'wolle'], demands: ['wein', 'getreide', 'salz'],
     desc: 'Dom und Burg des Fürstbischofs hoch über der Flussschleife. Wer hier Zuflucht sucht, ist sicher.' },
@@ -900,7 +929,7 @@ const SETTLEMENTS = [
     desc: 'Die alte Königsstadt mit dem Schatz der Krone. Hier wird Richard ein zweites Mal gekrönt.' },
   { id: 'portsmouth', name: 'Portsmouth', type: 'dorf', faction: 'normannen', clear: 6, realm: 'en', lon: -1.02, lat: 50.82, port: true, produces: ['salz', 'holz'], demands: ['getreide', 'bier', 'fleisch'],
     desc: 'Hafen am Solent. Von hier setzen die Heere nach Barfleur über.' },
-  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.72, lat: 51.27, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Canterbury', len: 4.4, westTowers: 2, central: 'turm' }], produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein'],
+  { id: 'canterbury', name: 'Canterbury', type: 'abtei', faction: 'kirche', clear: 7, realm: 'en', lon: 0.72, lat: 51.27, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Canterbury', len: 4.4, westTowers: 2, central: 'turm' }], produces: ['wein', 'bier'], demands: ['wolle', 'getreide', 'stein', 'blei'],
     desc: 'Pilger aus aller Welt kommen zum Grab des heiligen Thomas.' },
   { id: 'dover', name: 'Dover', type: 'burg', faction: 'normannen', clear: 7, realm: 'en', lon: 1.30, lat: 51.13, port: true, castleLevel: 3, produces: ['stein', 'salz'], demands: ['getreide', 'wein', 'fleisch'],
     desc: 'Die Burg über den Kreidefelsen wacht über die kürzeste Überfahrt nach Frankreich.' },
@@ -944,7 +973,7 @@ const SETTLEMENTS = [
     desc: 'Fischerhafen an der Spitze des Cotentin. Hier landen die Könige von England.' },
   { id: 'caen', name: 'Caen', type: 'burg', faction: 'normannen', clear: 8, realm: 'nd', lon: -0.36, lat: 49.18, produces: ['stein', 'getreide'], demands: ['wein', 'wolle', 'eisen'],
     desc: 'Die Burg des Eroberers. Der Kalkstein von Caen steckt in halb England.' },
-  { id: 'rouen', name: 'Rouen', type: 'stadt', cityR: 14, faction: 'normannen', clear: 8, realm: 'nd', lon: 1.10, lat: 49.44, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Rouen', len: 4.2, westTowers: 2, central: 'spitze' }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
+  { id: 'rouen', name: 'Rouen', type: 'stadt', cityR: 14, faction: 'normannen', clear: 8, realm: 'nd', lon: 1.10, lat: 49.44, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Rouen', len: 4.2, westTowers: 2, central: 'spitze' }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch', 'zinn'],
     desc: 'Hauptstadt der Normandie an der Seine. Richards Seneschall hält sie gegen König Philipp.' },
   { id: 'montstmichel', name: 'Mont-Saint-Michel', type: 'abtei', faction: 'kirche', clear: 6, realm: 'nd', lon: -1.48, lat: 48.60, landmarks: [{ kind: 'kathedrale', name: 'Abtei auf dem Felsen', len: 3.2, central: 'spitze', rock: true }], produces: ['salz', 'wolle'], demands: ['wein', 'getreide', 'holz'],
     desc: 'Die Abtei auf dem Felsen im Watt. Bei Flut ist sie eine Insel.' },
@@ -957,7 +986,7 @@ const SETTLEMENTS = [
   // ---------------- Frankreich und Flandern
   { id: 'calais', name: 'Calais', type: 'dorf', faction: 'gilde', clear: 6, realm: 'fl', lon: 1.86, lat: 50.93, port: true, produces: ['salz', 'fleisch'], demands: ['wolle', 'bier', 'holz'],
     desc: 'Ein Fischerort an der engsten Stelle des Kanals. Bei klarem Wetter sieht man die Felsen von Dover.' },
-  { id: 'brugge', name: 'Brügge', type: 'stadt', cityR: 14, faction: 'gilde', clear: 8, realm: 'fl', lon: 3.22, lat: 51.20, port: true, landmarks: [{ kind: 'tuchhalle', name: 'Tuchhalle mit Belfried', belfry: true }], produces: ['wein', 'eisen', 'salz'], demands: ['wolle', 'getreide', 'felle'],
+  { id: 'brugge', name: 'Brügge', type: 'stadt', cityR: 14, faction: 'gilde', clear: 8, realm: 'fl', lon: 3.22, lat: 51.20, port: true, landmarks: [{ kind: 'tuchhalle', name: 'Tuchhalle mit Belfried', belfry: true }], produces: ['wein', 'eisen', 'salz'], demands: ['wolle', 'getreide', 'felle', 'zinn'],
     desc: 'Die flämische Handelsstadt lebt von englischer Wolle. Die Tuchhallen sind voller Kaufleute aus aller Welt.' },
   { id: 'gent', name: 'Gent', type: 'markt', faction: 'gilde', clear: 7, realm: 'fl', lon: 3.72, lat: 51.05, landmarks: [{ kind: 'tower', name: 'Gravensteen', grey: true }], produces: ['wolle', 'bier'], demands: ['getreide', 'fleisch', 'holz'],
     desc: 'Die Weberstadt an der Schelde. Ihre Tuche gehen bis nach Konstantinopel.' },
@@ -965,13 +994,13 @@ const SETTLEMENTS = [
     desc: 'Marktstadt an der Somme. König Philipp hat sie erst vor wenigen Jahren an sich gezogen.' },
   { id: 'gisors', name: 'Gisors', type: 'burg', faction: 'franken', clear: 7, realm: 'fr', lon: 1.78, lat: 49.28, castleLevel: 3, produces: ['stein', 'eisen'], demands: ['getreide', 'wein', 'fleisch'],
     desc: 'Die umkämpfte Grenzburg im Vexin. Seit dem letzten Jahr wehen hier die Lilien.' },
-  { id: 'paris', name: 'Paris', type: 'stadt', cityR: 20, faction: 'franken', clear: 9, realm: 'fr', lon: 2.35, lat: 48.86, landmarks: [{ kind: 'kathedrale', name: 'Notre-Dame (im Bau)', len: 4.4, westTowers: 2, central: 'reiter', scaffold: true, unfinished: true }, { kind: 'rundturm', name: 'Der neue Louvre (im Bau)', scaffold: true }], produces: ['wein', 'getreide', 'eisen'], demands: ['wolle', 'holz', 'salz', 'fleisch', 'felle'],
+  { id: 'paris', name: 'Paris', type: 'stadt', cityR: 20, faction: 'franken', clear: 9, realm: 'fr', lon: 2.35, lat: 48.86, landmarks: [{ kind: 'kathedrale', name: 'Notre-Dame (im Bau)', len: 4.4, westTowers: 2, central: 'reiter', scaffold: true, unfinished: true }, { kind: 'rundturm', name: 'Der neue Louvre (im Bau)', scaffold: true }], produces: ['wein', 'getreide', 'eisen'], demands: ['wolle', 'holz', 'salz', 'fleisch', 'felle', 'silber'],
     desc: 'König Philipps Hauptstadt. An der Seine baut man eine neue Kathedrale und eine Mauer um die ganze Stadt.' },
   { id: 'chartres', name: 'Chartres', type: 'abtei', faction: 'kirche', clear: 7, realm: 'fr', lon: 1.49, lat: 48.45, landmarks: [{ kind: 'kathedrale', name: 'Dom von Chartres (abgebrannt)', len: 4.2, westTowers: 2, burned: true, scaffold: true }], produces: ['getreide', 'wein'], demands: ['stein', 'holz', 'eisen'],
     desc: 'Der Dom ist in diesem Jahr abgebrannt. Jetzt sucht der Bischof Steine, Holz und Spender.' },
   { id: 'reims', name: 'Reims', type: 'abtei', faction: 'kirche', clear: 7, realm: 'fr', lon: 4.03, lat: 49.26, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Reims', len: 4.2, westTowers: 2, central: 'turm' }], produces: ['wein', 'wolle'], demands: ['salz', 'fleisch', 'getreide'],
     desc: 'Hier werden die Könige Frankreichs gesalbt. Die Weinberge der Champagne reichen bis an die Stadt.' },
-  { id: 'troyes', name: 'Troyes', type: 'markt', faction: 'gilde', clear: 8, realm: 'fr', lon: 4.07, lat: 48.30, landmarks: [{ kind: 'tuchhalle', name: 'Messehallen der Champagne' }], produces: ['wein', 'salz', 'wolle'], demands: ['felle', 'eisen', 'fleisch', 'holz'],
+  { id: 'troyes', name: 'Troyes', type: 'markt', faction: 'gilde', clear: 8, realm: 'fr', lon: 4.07, lat: 48.30, landmarks: [{ kind: 'tuchhalle', name: 'Messehallen der Champagne' }], produces: ['wein', 'salz', 'wolle'], demands: ['felle', 'eisen', 'fleisch', 'holz', 'silber'],
     desc: 'Die Messestadt der Champagne. Zweimal im Jahr trifft sich hier halb Europa zum Handel.' },
   { id: 'rennes', name: 'Rennes', type: 'stadt', faction: 'gilde', clear: 8, realm: 'fr', lon: -1.68, lat: 48.13, produces: ['salz', 'wolle', 'getreide'], demands: ['wein', 'eisen', 'holz'],
     desc: 'Hauptstadt der Bretagne. Herzogin Konstanze sorgt sich um ihren kleinen Sohn Arthur, den manche schon als Erben Englands sehen.' },
@@ -1014,7 +1043,7 @@ const REGIONS = [
 
 const TYPE_NAME = {
   spieler: 'Dein Burgstall', stadt: 'Stadt', markt: 'Marktflecken', halle: 'Sächsische Halle', burg: 'Burg',
-  abtei: 'Abtei', lager: 'Lager', dorf: 'Dorf',
+  abtei: 'Abtei', lager: 'Lager', dorf: 'Dorf', mine: 'Erzgrube', einsiedelei: 'Mystischer Ort',
 };
 
 // ---------------------------------------------------------------- Aussehen
@@ -1645,6 +1674,7 @@ function generateWorld(seed) {
   W.buildings.forEach((b, i) => { b.idx = i; });
   assignPlots(W);
   scaleBuildings(W);
+  placeCamps(W);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
@@ -1666,6 +1696,41 @@ function assignPlots(W) {
     const rng = mulberry32((W.seed ^ (s.x * 7919 + s.y * 104729)) >>> 0);
     const n = Math.max(1, Math.min(14, Math.round(hs.length * 0.09)));
     for (let k = 0; k < n && outer.length; k++) outer.splice(Math.floor(rng() * outer.length), 1)[0].plot = true;
+  }
+}
+
+// Lagerfeuer im Land: Köhler, Jäger, Reisende und Pilger rasten an Waldrändern und abseits der Wege.
+// Eigener Zufall, und die Feuer kommen ans Ende der Gebäudeliste, damit Spielstände passen.
+const CAMP_KINDS = [
+  { kind: 'koehler', name: 'Köhlerlager', roles: ['holzer', 'waldmann'] },
+  { kind: 'reisende', name: 'Rastplatz', roles: ['reisender', 'pilger', 'reisender'] },
+  { kind: 'jaeger', name: 'Jägerfeuer', roles: ['jaeger', 'waldmann'] },
+  { kind: 'hirten', name: 'Hirtenfeuer', roles: ['hirte', 'reisender'] },
+];
+function placeCamps(W) {
+  const N = W.N, rng = mulberry32((W.seed ^ 0xC0FFEE) >>> 0);
+  W.camps = [];
+  const settled = new Set(W.sites.map((s) => s.land));
+  for (let tries = 0; tries < 30000 && W.camps.length < 60; tries++) {
+    const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
+    const i = y * N + x;
+    if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
+    const forest = countAround(W, x, y, 3, T.FOREST);
+    if (forest < 6 || countAround(W, x, y, 2, T.WATER) || countAround(W, x, y, 1, T.ROAD)) continue;
+    if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < s.clear + 9)) continue;
+    if (W.farms.some((f) => Math.hypot(f.tx - x, f.ty - y) < 7)) continue;
+    if (W.camps.some((c) => Math.hypot(c.tx - x, c.ty - y) < 22)) continue;
+    const kind = CAMP_KINDS[Math.floor(rng() * CAMP_KINDS.length)];
+    const c = { id: `feuer${W.camps.length}`, type: 'lagerfeuer', camp: kind.kind, roles: kind.roles, name: kind.name, tx: x, ty: y, x: x + 0.5, y: y + 0.5, clear: 2, land: W.landId[i] };
+    W.camps.push(c);
+    W.tiles[i] = T.GRASS;
+    const push = (b) => { b.site = c.id; b.idx = W.buildings.length; W.buildings.push(b); };
+    push({ kind: 'fire', x: c.x, y: c.y, noCost: true, camp: true });
+    push({ kind: 'prop', prop: 'sitzstamm', x: c.x - 0.9, y: c.y + 0.3, v: rng() });
+    push({ kind: 'prop', prop: 'sitzstamm', x: c.x + 0.4, y: c.y + 0.95, v: rng() });
+    if (kind.kind === 'koehler') push({ kind: 'prop', prop: 'meiler', x: c.x + 1.6, y: c.y - 1.0, v: rng() });
+    else if (rng() < 0.7) push({ kind: 'tent', x: c.x - 0.6, y: c.y - 1.3, wx: 0.9, wy: 0.9, color: ['#6d6a4a', '#7a6a4a', '#8a7a5a'][Math.floor(rng() * 3)], noCost: true });
+    if (kind.kind === 'jaeger') push({ kind: 'prop', prop: 'wildbret', x: c.x + 1.0, y: c.y - 0.4, v: rng() });
   }
 }
 
@@ -1851,6 +1916,40 @@ function computeHeights(W) {
     const bumps = (fbm(nD, x / 5.5, y / 5.5, 3) - 0.5) * 58 * hill;
     vh[k] = Math.min(HMAX + 16, Math.max(1, Math.pow(t, 1.4) * HMAX * 0.8 + bumps + 2 + (hash2(x, y, 4242) - 0.5) * 0.8));
   }
+  // Kleine Hügel im Flachland: sanfte Kuppen abseits von Orten, Höfen und Gebäuden
+  const busy = new Uint8Array(N * N);
+  const markBusy = (cx, cy, r) => {
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if (x >= 0 && y >= 0 && x < N && y < N) busy[y * N + x] = 1;
+  };
+  for (const s of W.sites) markBusy(s.x, s.y, s.clear + 5);
+  for (const f of W.farms) markBusy(f.x, f.y, 4);
+  for (const c of W.camps || []) markBusy(c.x, c.y, 2.5);
+  for (const b of W.buildings) markBusy(b.x, b.y, Math.max(b.wx || 0.6, b.wy || 0.6) / 2 + 1.2);
+  const rk = mulberry32((W.seed ^ 0x51ED) >>> 0);
+  let knolls = 0;
+  for (let k = 0; k < 4000 && knolls < 320; k++) {
+    const x = 4 + Math.floor(rk() * (N - 8)), y = 4 + Math.floor(rk() * (N - 8));
+    const t0 = W.tiles[y * N + x];
+    if ((t0 !== T.GRASS && t0 !== T.FOREST && t0 !== T.FIELD) || W.elev[y * N + x] > 0.55) continue;
+    const r = 2 + rk() * 2.6, hh = 13 + rk() * 16;
+    let free = true;
+    for (let yy = Math.floor(y - r); yy <= y + r && free; yy++) for (let xx = Math.floor(x - r); xx <= x + r; xx++) {
+      const ii = yy * N + xx;
+      if (busy[ii] || W.tiles[ii] === T.WATER || W.tiles[ii] === T.BRIDGE) { free = false; break; }
+    }
+    if (!free) continue;
+    knolls++;
+    if (!W.knollAt) W.knollAt = { x: x + 0.5, y: y + 0.5 };
+    if (!W.knollAt2 && t0 === T.GRASS) W.knollAt2 = { x: x + 0.5, y: y + 0.5 };
+    for (let vy = Math.floor(y - r); vy <= y + r + 1; vy++) for (let vx = Math.floor(x - r); vx <= x + r + 1; vx++) {
+      if (vx < 0 || vy < 0 || vx >= M || vy >= M) continue;
+      const kk = vy * M + vx;
+      if (vwater[kk]) continue;
+      const d = Math.hypot(vx - x - 0.5, vy - y - 0.5) / r;
+      if (d < 1) vh[kk] += hh * (0.5 + 0.5 * Math.cos(d * Math.PI));
+    }
+  }
+  W.knolls = knolls;
   // Ufer abflachen: je näher am Wasser, desto niedriger (keine senkrechten Uferwände)
   const dist = new Int16Array(M * M).fill(-1);
   const queue = [];
@@ -1959,6 +2058,10 @@ function placeSettlements(W, rng) {
             const f = countAround(W, x, y, 5, T.FOREST);
             if (strict && f < 24) continue;
             score += (70 - f) * 0.15;
+          } else if (def.type === 'mine') {
+            score -= countAround(W, x, y, 4, T.HILLS) * 0.35;
+          } else if (def.type === 'einsiedelei') {
+            score -= (countAround(W, x, y, 4, T.FOREST) + countAround(W, x, y, 4, T.HILLS)) * 0.12;
           } else {
             if (W.tiles[i] === T.HILLS) score += 3;
             score += countAround(W, x, y, 3, T.HILLS) * 0.3;
@@ -1998,7 +2101,7 @@ function clearAround(W, s) {
       if (d < 3) W.tiles[i] = T.GRASS;    // Kern immer trocken
       continue;
     }
-    if (s.type === 'lager') { if (d <= 2.5) W.tiles[i] = T.GRASS; continue; }
+    if (s.type === 'lager' || s.type === 'einsiedelei') { if (d <= 2.5) W.tiles[i] = T.GRASS; continue; }
     if (t === T.FOREST || t === T.HILLS || t === T.SAND) W.tiles[i] = T.GRASS;
   }
 }
@@ -2224,7 +2327,7 @@ const TAVERN_NAMES = ['Zum Goldenen Krug', 'Zur Krone', 'Zum Weißen Hirsch', 'Z
 
 // Friedhof neben der Kirche (oder am Ortsrand), umzäunt, mit Steinkreuz
 function placeCemetery(W, s) {
-  if (s.type === 'lager' || s.type === 'spieler') return;
+  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei') return;
   const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
   const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
   const wx = 2.6, wy = 2.0;
@@ -2473,6 +2576,22 @@ function genBuildings(W, s, rng) {
       ring(7, 3.5, s.clear - 0.5, (x, y) => house(x, y));
       add({ kind: 'well', x: s.x + 0.4, y: s.y + 1.1, wx: 0.6, wy: 0.6, noCost: true });
       break;
+    case 'mine':
+      // Stollen im Hang, Abraumhalde, Erzhaufen, Karren und die Hütten der Bergleute
+      add({ kind: 'stollen', x: s.x - 0.6, y: s.y - 1.8, wx: 2.4, wy: 1.5, ore: s.ore, noCost: true });
+      add({ kind: 'halde', x: s.x + 2.3, y: s.y - 1.5, wx: 2.2, wy: 1.8, ore: s.ore, noCost: true });
+      W.buildings.push({ kind: 'prop', prop: 'erzhaufen', ore: s.ore, x: s.x + 0.7, y: s.y + 0.1, v: rng(), site: s.id });
+      W.buildings.push({ kind: 'prop', prop: 'karren', x: s.x - 0.5, y: s.y + 0.5, v: rng(), site: s.id });
+      W.buildings.push({ kind: 'prop', prop: 'holzstapel', x: s.x - 2.2, y: s.y + 0.4, v: rng(), site: s.id });
+      ring(3, 2.6, s.clear + 0.5, (x, y) => house(x, y, { wall: rng() < 0.5 ? 'wood' : 'stone', roof: 'thatch', wx: 1.0, wy: 0.85 }));
+      break;
+    case 'einsiedelei':
+      // Klause des Einsiedlers und der heilige Ort daneben
+      add({ kind: 'klause', x: s.x - 0.9, y: s.y - 0.7, wx: 1.2, wy: 1.2, h: 15, noCost: true });
+      add({ kind: 'mystic', x: s.x + 1.3, y: s.y + 0.2, feature: s.feature, wx: 2.2, wy: 2.0, noCost: true });
+      W.buildings.push({ kind: 'prop', prop: 'beet', x: s.x - 1.0, y: s.y + 0.9, v: rng(), site: s.id });
+      W.buildings.push({ kind: 'prop', prop: 'holzstapel', x: s.x - 2.0, y: s.y - 0.2, v: rng(), site: s.id });
+      break;
     case 'lager':
       for (let k = 0; k < 5; k++) {
         const a = k / 5 * Math.PI * 2 + rng() * 0.4;
@@ -2586,6 +2705,7 @@ function placeTrees(W, rng) {
   };
   for (const s of W.sites) mark(s.x, s.y, s.type === 'lager' ? 2.8 : s.clear + 1);
   for (const f of W.farms) mark(f.x, f.y, 3.6);
+  for (const c of W.camps || []) mark(c.x, c.y, 2.2);
   for (const b of W.buildings) {
     const rx = (b.wx || 0.6) / 2 + 0.7, ry = (b.wy || 0.6) / 2 + 0.7;
     for (let y = Math.floor(b.y - ry); y <= Math.floor(b.y + ry); y++) for (let x = Math.floor(b.x - rx); x <= Math.floor(b.x + rx); x++) {
@@ -3263,8 +3383,8 @@ function sitesFor(type) {
   const gt = GROUP_TYPES[type];
   if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && (s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle'));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction));
-  return S;
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction));
+  return S.filter((s) => s.type !== 'einsiedelei');
 }
 
 // Ziele auf derselben Landmasse in sinnvoller Entfernung
@@ -3964,13 +4084,16 @@ const ROLES = {
   abtei: ['moench', 'moench', 'moench', 'moench', 'moench', 'bauer', 'magd', 'fischer'],
   burg: ['wache', 'wache', 'wache', 'handwerker', 'magd', 'bauer', 'bauer', 'priester', 'wirt', 'jaeger'],
   lager: ['waldmann', 'waldmann', 'holzer'],
+  mine: ['bergmann', 'bergmann', 'bergmann', 'bergmann', 'magd', 'wache', 'kind'],
+  einsiedelei: ['einsiedler'],
   hof: ['bauer', 'baeuerin'],
 };
 
 const NAMES = {
   haendler: 'Händler', magd: 'Magd', handwerker: 'Handwerker', buerger: 'Bürger', kind: 'Kind', moench: 'Mönch', wache: 'Wache',
   bauer: 'Bauer', baeuerin: 'Bäuerin', hirte: 'Hirte', waldmann: 'Waldmann', holzer: 'Holzfäller', priester: 'Priester', wirt: 'Wirt',
-  jaeger: 'Jäger', fischer: 'Fischer', bettler: 'Bettler',
+  jaeger: 'Jäger', fischer: 'Fischer', bettler: 'Bettler', bergmann: 'Bergmann', einsiedler: 'Einsiedler',
+  reisender: 'Reisender', pilger: 'Pilger',
 };
 
 const MERCHANT_COLS = ['#3d6fa3', '#a33b32', '#5e2f6e', '#3f6b2f', '#a8791f'];
@@ -3991,6 +4114,10 @@ function dress(role, site) {
     case 'waldmann': case 'holzer': o.look = 'wald'; o.tunic = null; break;
     case 'jaeger': o.tunic = pick(['#4a5a2a', '#5a5a32', '#4e4a2c']); o.cap = '#3e4a22'; o.bow = true; break;
     case 'fischer': o.tunic = pick(['#5a6a7a', '#6a6a5a', '#4a5a6a']); o.hat = '#8a7a5a'; break;
+    case 'bergmann': o.tunic = pick(['#5a5048', '#4e4a44', '#625646']); o.cap = '#3a3028'; break;
+    case 'einsiedler': o.look = 'moench'; o.tunic = '#6a5a44'; o.beard = true; break;
+    case 'reisender': o.tunic = pick(['#5a4a6a', '#4a5a4a', '#6a4a3a', '#3e4e6a']); o.hat = '#5a4a3a'; break;
+    case 'pilger': o.tunic = '#6e6252'; o.hat = '#4a3a2a'; o.staff = true; break;
     case 'bettler': o.tunic = pick(['#7a7062', '#6e6658', '#857a66']); o.patches = true; o.crutch = Math.random() < 0.4; o.female = Math.random() < 0.3; if (o.female) o.scarf = '#a89a80'; break;
     default: break;
   }
@@ -4011,12 +4138,16 @@ function siteSpots(s) {
     else if (b.kind === 'stall' || b.kind === 'tent') sp.stalls.push({ x: b.x, y: b.y, front: { x: b.x + 0.05, y: b.y + 0.62 }, back: { x: b.x, y: b.y - 0.5 } });
     else if (b.kind === 'well') sp.wells.push({ x: b.x + 0.45, y: b.y + 0.35 });
     else if (b.kind === 'fire') sp.fire = { x: b.x, y: b.y };
+    else if (b.kind === 'stollen') sp.adit = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
+    else if (b.kind === 'mystic') sp.mystic = { x: b.x - 0.2, y: b.y + b.wy / 2 + 0.2 };
+    else if (b.kind === 'klause') sp.houses.push({ x: b.x - 0.1, y: b.y + b.wy / 2 + 0.3 });
     else if (b.kind === 'church') sp.church = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
     else if (b.kind === 'landmark' && b.lm === 'kathedrale') sp.church = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
     else if (b.kind === 'landmark' && b.lm === 'tuchhalle') for (let k = 0; k < 3; k++) { const x = b.x - 1 + k, y = b.y + b.wy / 2 + 0.55; sp.stalls.push({ x, y, front: { x, y: y + 0.6 }, back: { x, y: y - 0.45 } }); }
     else if (b.kind === 'prop') {
       const p = { x: b.x + 0.35, y: b.y + 0.3 };
       if (b.prop === 'amboss') sp.anvils.push({ x: b.x - 0.05, y: b.y + 0.4 });
+      else if (b.prop === 'erzhaufen') sp.ore = { x: b.x + 0.5, y: b.y + 0.45 };
       else if (b.prop === 'holzstapel') sp.wood.push(p);
       else if (b.prop === 'heu') sp.hay.push(p);
       else if (b.prop === 'beet') sp.gardens.push({ x: b.x, y: b.y + 0.32 });
@@ -4075,12 +4206,13 @@ function spawnVillagers() {
   G.peasants = [];
   resetLife();
   const lvl = G.s.castle.level;
-  const homes = G.world.sites.concat(G.world.farms || []);
+  const homes = G.world.sites.concat(G.world.farms || [], G.world.camps || []);
   for (const site of homes) {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
     if (site.type === 'hof' && Math.random() < 0.25) roles = roles.concat('jaeger');
+    if (site.type === 'lagerfeuer') roles = site.roles.slice(0, 1 + Math.floor(Math.random() * site.roles.length));
     // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
     if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
       const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
@@ -4102,7 +4234,7 @@ function spawnVillagers() {
 function makeVillager(site, role, stall = 0) {
   const o = dress(role, site);
   const v = makeUnit(o);
-  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch']) if (o[k]) v[k] = o[k];
+  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch', 'beard', 'staff']) if (o[k]) v[k] = o[k];
   v.role = role; v.home = site; v.task = null;
   v.hair = pick(HAIR);
   v.stall = stall;
@@ -4168,6 +4300,28 @@ function chooseTask(v) {
     if (src && Math.hypot(src.x - fb.x, src.y - fb.y) < 25) { goTo(v, src, 'schoepfen', rand(0.8, 1.6), null, 1.6); v.task.fireB = fb; return; }
     v.carry = 'eimer';
     goTo(v, { x: fb.x + rand(-0.5, 0.5), y: fb.y + fb.wy / 2 + 0.5 }, 'loeschen', rand(1.2, 2), null, 1.6); v.task.douse = fb; return;
+  }
+  // Am Lagerfeuer: sitzen, reden, Holz nachlegen
+  if (s.type === 'lagerfeuer') {
+    if (sp.fire && Math.random() < 0.75) { const a = (v.id % 5) / 5 * Math.PI * 2; goTo(v, { x: sp.fire.x + Math.cos(a) * 0.8, y: sp.fire.y + Math.sin(a) * 0.55 }, Math.random() < 0.6 ? 'sitzen' : 'reden', rand(20, 50), null, 0.7); return; }
+    if (sp.trees.length && Math.random() < 0.5) { goTo(v, pick(sp.trees), 'sammeln', rand(8, 14), 'reisig'); return; }
+    goTo(v, wander(v, s, 3), 'stehen', rand(6, 12)); return;
+  }
+  // Der Einsiedler betet am heiligen Ort, pflegt seinen Garten oder sitzt vor der Klause
+  if (v.role === 'einsiedler') {
+    const r2 = Math.random();
+    if (sp.mystic && r2 < 0.45) { goTo(v, sp.mystic, 'beten', rand(20, 40), null, 0.6); return; }
+    if (sp.gardens.length && r2 < 0.7) { goTo(v, pick(sp.gardens), 'jaeten', rand(14, 26), null, 0.6); return; }
+    goTo(v, house(), 'sitzen', rand(15, 30), null, 0.6); return;
+  }
+  // Bergleute: im Stollen Erz brechen und es zum Haufen tragen
+  if (v.role === 'bergmann' && (ph === 'arbeit' || ph === 'morgen')) {
+    if (sp.adit && Math.random() < 0.75) {
+      goTo(v, { x: sp.adit.x + rand(-0.4, 0.4), y: sp.adit.y + rand(-0.1, 0.3) }, 'hacke', rand(14, 28));
+      if (sp.ore) v.task.next = { spot: sp.ore, act: 'abladen', dur: rand(2, 3), carry: 'erz', speed: 0.75, props: { dropAfter: true } };
+      return;
+    }
+    if (sp.wood.length) { goTo(v, pick(sp.wood), 'axt', rand(10, 18), 'holz'); return; }
   }
   // Bettler sitzen den ganzen Tag an ihrem Platz
   if (v.role === 'bettler') {
@@ -4304,7 +4458,10 @@ function chooseTask(v) {
 function updateVillager(v, dt) {
   if (v.funeral || v.spectator || v.execution) return;
   const h = hourOf(), ph = phase(h);
-  if (ph === 'nacht') { v.hidden = true; v.inside = true; v.task = null; v.act = null; v.carry = null; return; }
+  if (ph === 'nacht') {
+    if (v.home && v.home.type === 'lagerfeuer') { campNight(v, dt); return; }
+    v.hidden = true; v.inside = true; v.task = null; v.act = null; v.carry = null; return;
+  }
   if (v.inside) {
     if (ph === 'abend' && h >= 20) return;
     if ((v.hideUntil || 0) > G.time || (G.raid && G.raid.site === v.home)) return;
@@ -4361,6 +4518,18 @@ function updateVillager(v, dt) {
   }
 }
 
+// Nachts am Lagerfeuer: im Kreis um die Flammen sitzen
+function campNight(v, dt) {
+  const sp = siteSpots(v.home);
+  if (!sp.fire) { v.hidden = true; return; }
+  v.hidden = false; v.inside = false; v.carry = null;
+  const a = (v.id % 5) / 5 * Math.PI * 2, x = sp.fire.x + Math.cos(a) * 0.8, y = sp.fire.y + Math.sin(a) * 0.55;
+  if (Math.hypot(x - v.x, y - v.y) > 0.2) { v.act = null; chaseTo(v, x, y, dt, 0.1, 0.6); return; }
+  v.task = null; v.act = 'sitzen';
+  const sx = (sp.fire.x - v.x) - (sp.fire.y - v.y);
+  if (Math.abs(sx) > 0.05) v.facing = sx > 0 ? 1 : -1;
+}
+
 // Jäger: Liegt ein Hirsch in Schussweite, fliegt ein Pfeil. Sonst gibt es vielleicht einen Hasen aus der Schlinge.
 function huntShot(v, t) {
   let deer = null, bd = 10;
@@ -4391,6 +4560,10 @@ const SAYINGS = {
   hirte: ['Brav, brav.', 'Ein Lamm fehlt mir.', 'Der Wolf war wieder da.'],
   waldmann: ['Pst. Nicht so laut.', 'Der Sheriff soll kommen.', 'Wildbret schmeckt am besten, wenn es dem König gehört.'],
   holzer: ['Holz! Achtung!', 'Gutes Eichenholz.'],
+  bergmann: ['Glück auf!', 'Die Ader wird dünner.', 'Da unten hört man das Wasser rauschen.', 'Der Vogt will schon wieder seinen Zehnten.'],
+  einsiedler: ['Der Wald hört alles, mein Sohn.', 'Gottes Wege sind verschlungen wie Wurzeln.', 'Hier war schon lange vor den Kirchen ein heiliger Ort.', 'Setz dich. Du hast einen weiten Weg hinter dir.'],
+  reisender: ['Nach London sind es noch drei Tage.', 'Die Straßen sind unsicher geworden.', 'Ein Becher Wein am Feuer, mehr braucht es nicht.'],
+  pilger: ['Wir ziehen nach Canterbury, zum Grab des Märtyrers.', 'Gott schütze alle Pilger.', 'Meine Füße, meine Füße …'],
   jaeger: ['Pst! Da drüben im Unterholz …', 'Ein Hirsch, so groß wie ein Pferd, sag ich Euch.', 'Der Förster darf mich nicht sehen.'],
   fischer: ['Heute beißen sie gut.', 'Hecht zum Abendessen!', 'Ruhig, sonst verscheucht Ihr die Fische.'],
 };
@@ -5863,6 +6036,107 @@ function rescueCondemned(u) {
   return true;
 }
 
+// ===== mines.js =====
+// Erzgruben und Einsiedeleien.
+// An einer Grube kauft man Erz billig direkt am Stollen oder pachtet einen Anteil: Der liefert jeden
+// Morgen Erz in das Lager deiner Burg. Einsiedler an mystischen Orten geben Rat, Segen und Heilung.
+
+
+
+
+
+
+
+// ---------------------------------------------------------------- Gruben
+const MINE_YIELD = { eisen: 3, blei: 3, zinn: 2, silber: 1 };
+const LEASE = { eisen: 420, blei: 360, zinn: 400, silber: 650 };
+
+function leaseCost(s) { return LEASE[s.ore] || 420; }
+function ownsShare(s) { return !!(G.s.mines && G.s.mines[s.id]); }
+
+function leaseMine(s) {
+  const cost = leaseCost(s);
+  if (ownsShare(s) || G.s.gold < cost) return false;
+  G.s.gold -= cost;
+  if (!G.s.mines) G.s.mines = {};
+  G.s.mines[s.id] = G.s.day;
+  log(`Du pachtest einen Anteil an den ${s.name}. Jeden Morgen bringen Fuhrleute ${MINE_YIELD[s.ore]} ${GOODS[s.ore].name} nach ${homeName()}.`, 'gold');
+  if (s.faction) changeRep(s.faction, 3);
+  return true;
+}
+
+// Jeden Morgen: Lieferung aus allen Gruben, an denen du beteiligt bist
+function dailyMines() {
+  const out = {};
+  for (const id of Object.keys(G.s.mines || {})) {
+    const s = G.world.sites.find((x) => x.id === id);
+    if (!s) { delete G.s.mines[id]; continue; }
+    if (s.faction && isHostileFaction(s.faction)) continue;
+    const n = MINE_YIELD[s.ore] || 2;
+    G.s.castle.storage[s.ore] = (G.s.castle.storage[s.ore] || 0) + n;
+    out[s.ore] = (out[s.ore] || 0) + n;
+  }
+  const parts = Object.entries(out).map(([g, n]) => `${n} ${GOODS[g].name}`);
+  if (parts.length) log(`Aus deinen Gruben kommt Erz nach ${homeName()}: ${parts.join(', ')}.`, 'good');
+}
+
+// ---------------------------------------------------------------- Einsiedler
+const PROPHECY = [
+  'Ich sehe einen Löwen, der aus dem Käfig kommt, und Füchse, die sich verkriechen.',
+  'Wer im Wald Gerechtigkeit sucht, findet Freunde. Wer sie in der Burg sucht, findet Mauern.',
+  'Dein Haus wird stehen, wenn du die Alten ehrst und die Armen nicht vergisst.',
+  'Zwei Kronen streiten um ein Land jenseits des Wassers. Halte dich an den, der zuletzt lacht.',
+  'Die Steine haben vieles kommen und gehen sehen. Auch dich werden sie gehen sehen.',
+  'Ein Ritter ohne Gefolge ist ein Baum ohne Wurzeln.',
+];
+
+function hermitState(s) {
+  if (!G.s.hermits) G.s.hermits = {};
+  return G.s.hermits[s.id] || (G.s.hermits[s.id] = { visited: false, adviceDay: -1, blessDay: -9, giftDay: -1 });
+}
+
+// Beim ersten Besuch: ein wenig Ruhm, weil man von solchen Orten erzählt
+function visitHermit(s) {
+  const st = hermitState(s);
+  if (st.visited) return;
+  st.visited = true;
+  log(`Du findest einen mystischen Ort: ${s.name}.`, 'gold');
+  addRenown(3);
+}
+
+function hermitAdvice(s) {
+  const st = hermitState(s);
+  if (st.adviceDay === G.s.day) return false;
+  st.adviceDay = G.s.day;
+  const hint = G.rumor ? G.rumor(s) : '';
+  log(`Der Einsiedler spricht leise: „${pick(PROPHECY)}“ Und dann: „${hint}“`, 'gold');
+  return true;
+}
+
+function canBless(s) { return G.s.day - hermitState(s).blessDay >= 3; }
+function hermitBless(s) {
+  if (!canBless(s)) return false;
+  hermitState(s).blessDay = G.s.day;
+  const p = G.s.player;
+  p.hp = p.st.maxHp;
+  for (const c of partyMembers()) c.hp = c.st.maxHp;
+  G.s.buff = { day: G.s.day + 1 };
+  log('Der Einsiedler legt dir die Hand auf und gibt dir bittere Kräuter. Ihr seid geheilt und gesegnet: bis morgen Abend +10 % Angriff und Abwehr, +15 % Erfahrung.', 'good');
+  changeRep('kirche', 1);
+  return true;
+}
+
+function hermitGift(s) {
+  const st = hermitState(s);
+  if (st.giftDay === G.s.day || G.s.gold < 20) return false;
+  st.giftDay = G.s.day;
+  G.s.gold -= 20;
+  log('Du lässt Brot, Salz und ein paar Münzen bei der Klause. „Gib es den Armen, die hierher kommen“, sagt der Einsiedler.', 'good');
+  changeRep('kirche', 2);
+  addRenown(1);
+  return true;
+}
+
 // ===== cheats.js =====
 // Testmodus: Cheats zum Ausprobieren. Unendlich Gold und Rohstoffe, unverwundbar, sofort bauen,
 // Sofortreise über die Karte, dazu Knöpfe, die Ereignisse sofort auslösen. Taste F9 oder Menü.
@@ -6009,11 +6283,11 @@ function initTowns() {
   }
 }
 
-// Fehlende Waren (z. B. nach einem Update) im Bestand ergänzen
+// Fehlende Orte und Waren (z. B. nach einem Update) im Bestand ergänzen
 function ensureTownStock() {
   for (const s of G.world.sites) {
+    if (!G.s.towns[s.id]) G.s.towns[s.id] = { stock: {}, quests: [], questDay: 0, giftDay: -1 };
     const town = G.s.towns[s.id];
-    if (!town) continue;
     for (const g of GOOD_IDS) if (town.stock[g] == null) town.stock[g] = targetStock(s, g);
   }
 }
@@ -6236,7 +6510,7 @@ function makeQuest(site) {
 
 function refreshTownQuests(site) {
   const town = G.s.towns[site.id];
-  if (!site.faction || town.questDay > G.s.day) return;
+  if (!site.faction || site.type === 'einsiedelei' || town.questDay > G.s.day) return;
   town.quests = town.quests.filter((q) => q.state === 'offen' && G.s.day - q.created < 4);
   while (town.quests.length < 3) town.quests.push(makeQuest(site));
   town.questDay = G.s.day + 3;
@@ -6693,6 +6967,7 @@ function loadCargo(good, n) {
 
 
 
+
 function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
@@ -6749,6 +7024,7 @@ function newDay() {
   dailyDynamics();
   dailyTourney();
   dailyJustice();
+  dailyMines();
   dailyRepairs();
   dailyBurials();
   const now = seasonIndex();
@@ -6959,8 +7235,9 @@ function poly(c, pts, fill) {
 function P(x, y, z = 0) { return [isoX(x, y), isoY(x, y) - z - baseZ]; }
 function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
 
-// Größe der Figuren und Tiere im Verhältnis zu den Häusern: eine Kate ist gut zwei- bis dreimal so hoch wie ein Mensch
-const FIG = 0.75;
+// Größe der Figuren und Tiere im Verhältnis zu den Häusern: Die Traufe einer Kate liegt gut zwei
+// Menschenhöhen über dem Boden, mit Dach ist sie drei- bis viermal so hoch wie eine Figur
+const FIG = 0.6;
 
 function winterize(col) { const lv = snowLevel(); return lv > 0 ? mix(col, '#f0f4f4', 0.68 * lv) : col; }
 
@@ -7164,7 +7441,7 @@ function drawHouse(c, b) {
     c.stroke();
   }
   // Tür mit Rahmen
-  const dh = Math.min(20, b.h * 0.7);
+  const dh = Math.min(16, b.h * 0.6);
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.36, 0.64, 0, dh + 1.5, '#6a4c34');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.4, 0.6, 0, dh, '#3d2b1f');
   windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, b.lit);
@@ -7344,16 +7621,16 @@ function tourneyParts() {
 }
 
 function drawTiltPiece(c, x0, x1, y, col, first, last) {
-  const a = P(x0, y, 3), b = P(x1, y, 3), a2 = P(x0, y, 10), b2 = P(x1, y, 10);
+  const a = P(x0, y, 2), b = P(x1, y, 2), a2 = P(x0, y, 7), b2 = P(x1, y, 7);
   poly(c, [a, b, b2, a2], col);
   c.strokeStyle = 'rgba(60,40,20,0.35)'; c.lineWidth = 0.8;
   c.beginPath(); for (const f of [0.33, 0.66]) { const p1 = lerp2(a, b, f), p2 = lerp2(a2, b2, f); c.moveTo(p1[0], p1[1] + 1); c.lineTo(p2[0], p2[1]); } c.stroke();
   c.strokeStyle = '#6b4a2e'; c.lineWidth = 2.2;
   c.beginPath(); c.moveTo(a2[0], a2[1] - 1); c.lineTo(b2[0], b2[1] - 1); c.stroke();
   c.lineWidth = 1.8;
-  const p0 = P(x0, y, 0), p1 = P(x0, y, 11);
+  const p0 = P(x0, y, 0), p1 = P(x0, y, 8);
   c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke();
-  if (last) { const q0 = P(x1, y, 0), q1 = P(x1, y, 11); c.beginPath(); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); c.stroke(); }
+  if (last) { const q0 = P(x1, y, 0), q1 = P(x1, y, 8); c.beginPath(); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); c.stroke(); }
 }
 
 function drawStand(c, x, y, col, crowd) {
@@ -7403,28 +7680,150 @@ function drawPavilion(c, x, y, col) {
 // Galgen: Podest mit Stufe, zwei Pfosten, Querbalken, Strick
 function drawGallows(c, g, hanged) {
   const wood = '#6b4a2e';
-  drawShadow(c, g.x, g.y, 1.6, 1.1, 50, 0.14);
-  drawBox(c, g.x, g.y + 0.1, 1.6, 1.1, 7, '#7a5a3a', 0, 'plank');
-  drawBox(c, g.x, g.y + 0.85, 0.6, 0.4, 3.5, '#6b4a2e', 0, 'plank');
-  for (const dx of [-0.62, 0.62]) drawBox(c, g.x + dx, g.y, 0.14, 0.14, 44, wood, 7);
-  drawBox(c, g.x, g.y, 1.4, 0.15, 4, '#5a3d26', 51);
-  const [ax, ay] = P(g.x - 0.62, g.y, 38), [bx, by] = P(g.x - 0.25, g.y, 51);
-  c.strokeStyle = wood; c.lineWidth = 2; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
-  const [rx, ry] = P(g.x + 0.15, g.y, 51);
-  c.strokeStyle = '#b8a070'; c.lineWidth = 1.1;
+  drawShadow(c, g.x, g.y, 1.2, 0.9, 34, 0.14);
+  drawBox(c, g.x, g.y + 0.1, 1.2, 0.9, 5, '#7a5a3a', 0, 'plank');
+  drawBox(c, g.x, g.y + 0.7, 0.5, 0.3, 2.5, '#6b4a2e', 0, 'plank');
+  for (const dx of [-0.45, 0.45]) drawBox(c, g.x + dx, g.y, 0.1, 0.1, 29, wood, 5);
+  drawBox(c, g.x, g.y, 1.05, 0.11, 3, '#5a3d26', 34);
+  const [ax, ay] = P(g.x - 0.45, g.y, 26), [bx, by] = P(g.x - 0.18, g.y, 34);
+  c.strokeStyle = wood; c.lineWidth = 1.6; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+  const [rx, ry] = P(g.x + 0.12, g.y, 34);
+  c.strokeStyle = '#b8a070'; c.lineWidth = 0.9;
   if (!hanged) {
-    c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx, ry + 12); c.stroke();
-    c.beginPath(); c.ellipse(rx, ry + 15, 2.2, 3, 0, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx, ry + 8); c.stroke();
+    c.beginPath(); c.ellipse(rx, ry + 10, 1.6, 2.1, 0, 0, Math.PI * 2); c.stroke();
     return;
   }
   // Eine stille dunkle Gestalt, leicht im Wind
-  c.save(); c.translate(rx, ry); c.rotate(Math.sin(G.time * 1.1) * 0.05);
+  c.save(); c.translate(rx, ry); c.scale(0.62, 0.62); c.rotate(Math.sin(G.time * 1.1) * 0.05);
   c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 14); c.stroke();
   c.fillStyle = 'rgba(58,52,48,0.92)';
   c.beginPath(); c.arc(0, 17, 3, 0, Math.PI * 2); c.fill();
   c.beginPath(); c.moveTo(-4, 20); c.lineTo(4, 20); c.lineTo(3.4, 32); c.lineTo(-3.4, 32); c.closePath(); c.fill();
   c.fillRect(-2.6, 32, 2, 8); c.fillRect(0.6, 32, 2, 8);
   c.restore();
+}
+
+// ---------------------------------------------------------------- Erzgrube
+// Stollen: Felsrippe im Hang mit hölzernem Mundloch, Schienen aus Bohlen
+function drawStollen(c, b) {
+  const rock = '#857b6c';
+  drawShadow(c, b.x, b.y, b.wx, b.wy, 30, 0.18);
+  drawBox(c, b.x, b.y, b.wx, b.wy, 20, rock, 0, 'stone');
+  drawBox(c, b.x + 0.3, b.y - 0.25, b.wx * 0.6, b.wy * 0.55, 10, '#918779', 20, 'stone');
+  if (lookSeason() !== 3) { const [gx, gy] = P(b.x, b.y, 30); c.fillStyle = 'rgba(95,140,60,0.75)'; c.beginPath(); c.ellipse(gx + 4, gy + 2, 16, 5, 0, 0, Math.PI * 2); c.fill(); }
+  // Mundloch an der Vorderseite
+  const L = (u, z) => facePoint(b.x, b.y, b.wx, b.wy, 'L', u, z);
+  const q = [L(0.32, 0), L(0.62, 0), L(0.62, 13), L(0.32, 13)];
+  poly(c, q, '#1a1512');
+  c.strokeStyle = '#6b4a2e'; c.lineWidth = 2.2;
+  c.beginPath(); c.moveTo(q[0][0], q[0][1]); c.lineTo(q[3][0], q[3][1] - 1); c.moveTo(q[1][0], q[1][1]); c.lineTo(q[2][0], q[2][1] - 1);
+  const l0 = L(0.28, 14), l1 = L(0.66, 14); c.moveTo(l0[0], l0[1]); c.lineTo(l1[0], l1[1]); c.stroke();
+  // Bohlenweg hinaus
+  const a0 = P(b.x - 0.1, b.y + b.wy / 2, 0), a1 = P(b.x - 0.25, b.y + b.wy / 2 + 1.2, 0);
+  c.strokeStyle = '#7a5636'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(a0[0] - 3, a0[1]); c.lineTo(a1[0] - 3, a1[1]); c.moveTo(a0[0] + 3, a0[1]); c.lineTo(a1[0] + 3, a1[1]); c.stroke();
+  if (darkness() > 0.2) addLight(b.x - 0.1, b.y + b.wy / 2, 6, 20, 0.6);
+}
+
+// Abraumhalde aus Gestein und Schlacke
+function drawHalde(c, b) {
+  const [x, y] = P(b.x, b.y, 0);
+  const base = b.ore === 'eisen' ? '#6e5a4c' : '#787470';
+  c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(x + 4, y + 2, 34, 15, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = shade(base, 0.8); c.beginPath(); c.ellipse(x, y, 32, 14, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = base; c.beginPath(); c.ellipse(x - 2, y - 6, 24, 11, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = shade(base, 1.15); c.beginPath(); c.ellipse(x - 5, y - 11, 13, 6, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = shade(base, 0.6);
+  for (let k = 0; k < 18; k++) { const ox = ((k * 29) % 44) - 22, oy = ((k * 17) % 16) - 9; c.fillRect(x + ox, y + oy - 2, 2.2, 1.6); }
+  if (lookSeason() === 3) { c.fillStyle = 'rgba(240,244,244,0.85)'; c.beginPath(); c.ellipse(x - 5, y - 13, 11, 4.5, 0, 0, Math.PI * 2); c.fill(); }
+}
+
+// ---------------------------------------------------------------- Einsiedelei
+// Klause: runde Steinhütte mit Strohkegel
+function drawKlause(c, b) {
+  const stone = '#9a9384';
+  drawShadow(c, b.x, b.y, b.wx, b.wy, b.h + 18, 0.18);
+  drawBox(c, b.x, b.y, b.wx, b.wy, b.h, stone, 0, 'stone');
+  faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.38, 0.62, 0, Math.min(14, b.h * 0.8), '#3a2a1c');
+  windowOn(c, b, 'R', 0.42, 0.58, b.h * 0.5, b.h * 0.72, true);
+  drawPyramid(c, b.x, b.y, b.wx + 0.15, b.wy + 0.15, b.h, 16, winterize(ROOFS.thatch));
+  const top = P(b.x, b.y, b.h + 16);
+  if (Math.random() < 0.05) smokeEmit(top[0], top[1] - 2, 0.4);
+  if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, 8, 26, 0.8);
+}
+
+// Der heilige Ort: Quelle, Steinkreis, Hügelgrab, Höhle oder alte Eibe
+function drawMystic(c, b) {
+  const f = b.feature, t = G.time, r = mulberry32((b.idx || 7) + 99);
+  if (f === 'quelle') {
+    const [x, y] = P(b.x, b.y, 0);
+    c.fillStyle = '#8f897c'; c.beginPath(); c.ellipse(x, y, 20, 10, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#6f695e'; c.beginPath(); c.ellipse(x, y - 1, 15, 7.5, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#4f86a8'; c.beginPath(); c.ellipse(x, y - 1, 12.5, 6, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(220,240,250,0.7)'; c.lineWidth = 0.8;
+    const k = (t * 0.6) % 1; c.beginPath(); c.ellipse(x, y - 1, 4 + k * 8, 2 + k * 4, 0, 0, Math.PI * 2); c.stroke();
+    // kleines Holzkreuz
+    c.strokeStyle = '#5a3d26'; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(x + 16, y - 2); c.lineTo(x + 16, y - 20); c.moveTo(x + 11, y - 15); c.lineTo(x + 21, y - 15); c.stroke();
+  } else if (f === 'steine') {
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * Math.PI * 2, sx = b.x + Math.cos(a) * 1.15, sy = b.y + Math.sin(a) * 0.95;
+      const h = 13 + r() * 9;
+      drawBox(c, sx, sy, 0.22, 0.16, h, k % 2 ? '#8e8a80' : '#9c978b', 0, 'stone');
+      if (lookSeason() !== 3) { const [mx, my] = P(sx, sy, h * 0.4); c.fillStyle = 'rgba(100,130,70,0.6)'; c.fillRect(mx - 3, my, 3, 3); }
+    }
+    drawBox(c, b.x, b.y, 0.5, 0.3, 4, '#8a857a', 0, 'stone');
+  } else if (f === 'grab') {
+    // Langes Hügelgrab mit Steinportal
+    const [x, y] = P(b.x, b.y, 0);
+    const g = lookSeason() === 3 ? '#e3e9e9' : '#5f8a3a';
+    c.fillStyle = shade(g, 0.8); c.beginPath(); c.ellipse(x - 4, y - 2, 34, 13, -0.46, 0, Math.PI * 2); c.fill();
+    c.fillStyle = g; c.beginPath(); c.ellipse(x - 6, y - 6, 28, 10, -0.46, 0, Math.PI * 2); c.fill();
+    for (const [dx, dy, h] of [[0.7, 0.75, 16], [1.05, 0.45, 18], [0.35, 1.0, 14]]) drawBox(c, b.x + dx, b.y + dy, 0.24, 0.2, h, '#9a958a', 0, 'stone');
+    drawBox(c, b.x + 0.8, b.y + 0.65, 0.7, 0.35, 3, '#8a857a', 15, 'stone');
+    const [dx, dy] = P(b.x + 0.75, b.y + 0.62, 0); c.fillStyle = '#1e1a16'; c.fillRect(dx - 3, dy - 11, 5, 10);
+  } else if (f === 'hoehle') {
+    // Felswand mit Höhle und eingehauenem Kreuz
+    drawBox(c, b.x + 0.2, b.y - 0.3, 1.8, 1.2, 26, '#8a7f70', 0, 'stone');
+    drawBox(c, b.x - 0.3, b.y - 0.1, 1.0, 0.9, 16, '#968b7b', 0, 'stone');
+    const q = [0.25, 0.55].map((u) => facePoint(b.x + 0.2, b.y - 0.3, 1.8, 1.2, 'L', u, 0));
+    const tq = [0.3, 0.5].map((u) => facePoint(b.x + 0.2, b.y - 0.3, 1.8, 1.2, 'L', u, 14));
+    poly(c, [q[0], q[1], tq[1], tq[0]], '#16120f');
+    const cr = facePoint(b.x + 0.2, b.y - 0.3, 1.8, 1.2, 'L', 0.78, 18);
+    c.strokeStyle = '#5a5248'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(cr[0], cr[1] - 6); c.lineTo(cr[0], cr[1] + 4); c.moveTo(cr[0] - 3, cr[1] - 2); c.lineTo(cr[0] + 3, cr[1] - 2); c.stroke();
+    if (darkness() > 0.2) addLight(b.x, b.y + 0.4, 6, 24, 0.7);
+  } else {
+    // Alte Eibe mit bunten Bändern und kleinem Schrein
+    const [x, y] = P(b.x, b.y, 0);
+    c.fillStyle = '#4a3428'; c.fillRect(x - 5, y - 28, 10, 28);
+    c.fillStyle = '#1f3a24'; c.beginPath(); c.ellipse(x, y - 42, 30, 22, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#2a4a2e'; c.beginPath(); c.ellipse(x - 6, y - 48, 20, 14, 0, 0, Math.PI * 2); c.fill();
+    const cols = ['#c9302a', '#e8e0cc', '#3d6fa3', '#d6ad4c'];
+    for (let k = 0; k < 6; k++) { const bx = x - 18 + k * 7, by = y - 26 - (k % 2) * 6, sw = Math.sin(t * 2 + k) * 2; c.strokeStyle = cols[k % 4]; c.lineWidth = 1.4; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + sw, by + 9); c.stroke(); }
+    drawBox(c, b.x + 0.7, b.y + 0.5, 0.3, 0.3, 9, '#8a857a', 0, 'stone');
+  }
+}
+
+// Glühwürmchen und Nebel an mystischen Orten in der Dämmerung, ein Funkeln am Tag
+function drawMysticGlow(c, s) {
+  const dk = darkness(), t = G.time;
+  const n = dk > 0.15 ? 12 : 3;
+  for (let k = 0; k < n; k++) {
+    const a = t * (0.3 + (k % 3) * 0.12) + k * 2.1;
+    const x = s.x + 1.3 + Math.cos(a) * (1.2 + (k % 4) * 0.35), y = s.y + 0.3 + Math.sin(a * 1.3) * (0.9 + (k % 3) * 0.3);
+    const [px, py] = P(x, y, 8 + Math.sin(a * 2.2) * 6 + (k % 5) * 3);
+    const al = dk > 0.15 ? 0.55 + 0.45 * Math.sin(t * 4 + k) : 0.4 * Math.max(0, Math.sin(t * 2 + k * 1.7));
+    c.fillStyle = dk > 0.15 ? `rgba(220,255,150,${al})` : `rgba(255,250,220,${al})`;
+    c.beginPath(); c.arc(px, py, dk > 0.15 ? 1.6 : 1.1, 0, Math.PI * 2); c.fill();
+  }
+  if (dk > 0.15) {
+    const [mx, my] = P(s.x + 1, s.y + 0.5, 2);
+    const g = c.createRadialGradient(mx, my, 4, mx, my, 70);
+    g.addColorStop(0, `rgba(210,230,235,${0.16 * dk})`); g.addColorStop(1, 'rgba(210,230,235,0)');
+    c.fillStyle = g; c.fillRect(mx - 70, my - 70, 140, 140);
+    addLight(s.x + 1.3, s.y + 0.3, 10, 34, 0.5);
+  }
 }
 
 function drawLooseHorse(c, f) {
@@ -7948,7 +8347,7 @@ function drawFire(c, b) {
   c.beginPath(); c.moveTo(x - 5, y); c.quadraticCurveTo(x, y - 16 * f, x + 5, y); c.fill();
   c.fillStyle = '#ffd25a';
   c.beginPath(); c.moveTo(x - 2.5, y); c.quadraticCurveTo(x, y - 9 * f, x + 2.5, y); c.fill();
-  addLight(b.x, b.y, 6, 60, 1.3);
+  if (b.camp) addLight(b.x, b.y, 6, 34, 0.85); else addLight(b.x, b.y, 6, 60, 1.3);
   b.smoke = [x, y - 14];
 }
 
@@ -7986,6 +8385,39 @@ function drawProp(c, b) {
   c.fillStyle = 'rgba(25,35,15,0.2)';
   c.beginPath(); c.ellipse(x + 3, y, 8, 3.5, 0, 0, Math.PI * 2); c.fill();
   switch (b.prop) {
+    case 'sitzstamm': {
+      drawBox(c, b.x, b.y, 0.75, 0.2, 3.5, '#6e5034');
+      const [ex, ey] = P(b.x + 0.37, b.y, 1.8);
+      c.fillStyle = '#c9a274'; c.beginPath(); c.ellipse(ex, ey, 1.6, 2, 0, 0, Math.PI * 2); c.fill();
+      if (winter) { const [sx, sy] = P(b.x, b.y, 3.6); c.fillStyle = '#eef2f2'; c.fillRect(sx - 8, sy - 1, 14, 1.5); }
+      break;
+    }
+    case 'meiler': {
+      // Kohlenmeiler: mit Erde bedeckter Holzhaufen, der leise qualmt
+      const [mx, my] = P(b.x, b.y, 0);
+      c.fillStyle = '#4a3a2a'; c.beginPath(); c.ellipse(mx, my - 4, 18, 9, 0, Math.PI, 0); c.fill();
+      c.fillStyle = '#5e4a34'; c.beginPath(); c.ellipse(mx, my - 4, 18, 13, 0, Math.PI, 0); c.fill();
+      c.fillStyle = '#3a2e22'; for (let k = 0; k < 5; k++) c.fillRect(mx - 12 + k * 5, my - 9 - (k % 2) * 4, 3, 2);
+      if (Math.random() < 0.08) smokeEmit(mx + 2, my - 16, 0.6);
+      break;
+    }
+    case 'wildbret': {
+      // Erlegter Hirsch am Dreibein
+      c.strokeStyle = '#5a3d26'; c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(x - 6, y); c.lineTo(x, y - 18); c.lineTo(x + 6, y); c.moveTo(x, y - 18); c.lineTo(x + 2, y + 2); c.stroke();
+      c.fillStyle = '#8a5a34'; c.beginPath(); c.ellipse(x, y - 10, 3, 6.5, 0, 0, Math.PI * 2); c.fill();
+      break;
+    }
+    case 'erzhaufen': {
+      const col = { eisen: '#8a4a32', blei: '#6f7580', zinn: '#9aa0a6', silber: '#b4b8c0' }[b.ore] || '#8a4a32';
+      for (let k = 0; k < 14; k++) {
+        const ox = ((k * 37) % 17) - 8, oy = ((k * 13) % 7) - 3, h = 3 + (k % 4);
+        c.fillStyle = k % 3 ? col : shade(col, 0.75);
+        c.beginPath(); c.ellipse(x + ox, y + oy - h * (k < 5 ? 1.4 : 0.6), 3, 2.2, 0, 0, Math.PI * 2); c.fill();
+      }
+      if (b.ore === 'silber' && Math.sin(G.time * 3 + b.x) > 0.9) { c.fillStyle = '#ffffff'; c.fillRect(x - 2, y - 9, 2, 2); }
+      break;
+    }
     case 'fass': {
       for (let k = 0; k < (b.v > 0.5 ? 2 : 1); k++) {
         const bx = x - k * 7, by = y - k * 2;
@@ -8185,6 +8617,7 @@ function buildStaticParts() {
       house: drawHouseFast, church: drawChurchFast, longhall: drawLonghall, tent: drawTent, stall: drawStall,
       well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
       landmark: drawLandmark, stonehenge: drawStonehenge,
+      stollen: drawStollen, halde: drawHalde, klause: drawKlause, mystic: drawMystic,
     }[b.kind];
     if (b.kind === 'friedhof') continue;
     if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
@@ -9138,6 +9571,14 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     c.globalAlpha = season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
+    // Hänge auch auf der gemalten Wiese sichtbar machen: Lichtseite heller, Schattenseite dunkler
+    for (const [f, a, b2] of [[fL, Bp, Lp], [fR, Rp, Bp]]) {
+      const d = f - 1;
+      if (Math.abs(d) < 0.015) continue;
+      c.globalAlpha = Math.min(0.3, Math.abs(d) * 1.1);
+      c.fillStyle = d > 0 ? '#fff6d8' : '#1c2410';
+      c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(a[0], a[1]); c.lineTo(b2[0], b2[1]); c.closePath(); c.fill();
+    }
     c.restore();
   }
 
@@ -9596,6 +10037,8 @@ function drawVillagerGear(c, u, yb) {
     c.beginPath(); c.moveTo(2.8, yb - 14); c.lineTo(6.5, yb - 17 - wave); c.stroke();
     c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(6.8, yb - 17.5 - wave, 1.3, 0, Math.PI * 2); c.fill();
   }
+  if (u.beard) { c.fillStyle = '#d8d4cc'; c.beginPath(); c.moveTo(-1.5, yb - 17.5); c.lineTo(3.8, yb - 17.5); c.lineTo(1.6, yb - 11.5); c.closePath(); c.fill(); }
+  if (u.staff && !['sitzen', 'beten'].includes(u.act)) { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(5, yb + 1); c.lineTo(5, yb - 27); c.stroke(); c.fillStyle = '#e8dcc0'; c.beginPath(); c.arc(5, yb - 27, 1.8, 0, Math.PI * 2); c.fill(); }
   if (u.act === 'gefesselt') { c.strokeStyle = '#b8a070'; c.lineWidth = 1; c.beginPath(); c.moveTo(-3, yb - 10); c.lineTo(3, yb - 10); c.stroke(); }
   if (u.patches) { c.fillStyle = shade(u.tunic || '#7a7062', 0.7); c.fillRect(-2.6, yb - 13, 2.2, 2.4); c.fillStyle = shade(u.tunic || '#7a7062', 1.25); c.fillRect(1, yb - 10, 2.4, 2); }
   if (u.crutch) { c.strokeStyle = '#7a5a3a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-7, yb + 3); c.lineTo(-4.5, yb - 17); c.moveTo(-6.4, yb - 16.5); c.lineTo(-2.6, yb - 17.5); c.stroke(); }
@@ -9651,6 +10094,10 @@ function drawVillagerGear(c, u, yb) {
     case 'holz': c.strokeStyle = '#7a5636'; c.lineWidth = 2.2; for (let k = 0; k < 3; k++) { c.beginPath(); c.moveTo(-5, yb - 18.5 + k * 1.6); c.lineTo(5, yb - 20 + k * 1.6); c.stroke(); } break;
     case 'heu': c.fillStyle = '#d8b452'; c.beginPath(); c.ellipse(0, yb - 24.5, 5.5, 2.8, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'fisch': c.fillStyle = '#b9c4c8'; c.beginPath(); c.ellipse(5.5, yb - 6, 3, 1.2, 0.4, 0, Math.PI * 2); c.fill(); break;
+    case 'erz':
+      c.fillStyle = '#6b4a2a'; c.beginPath(); c.moveTo(-8, yb - 21); c.lineTo(-1, yb - 21); c.lineTo(-2, yb - 13); c.lineTo(-7, yb - 13); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#7a5a4a'; c.beginPath(); c.arc(-5.5, yb - 21.5, 2, 0, Math.PI * 2); c.arc(-3, yb - 22, 1.8, 0, Math.PI * 2); c.fill();
+      break;
     case 'balken': c.fillStyle = '#9a7448'; c.save(); c.translate(0, yb - 18); c.rotate(-0.18); c.fillRect(-12, -1.6, 24, 3.2); c.strokeRect(-12, -1.6, 24, 3.2); c.restore(); break;
     case 'reisig':
       c.strokeStyle = '#6e5232'; c.lineWidth = 1.1;
@@ -10172,6 +10619,7 @@ function render() {
     for (const sh of sg.shots) objs.push({ d: 1e6, z: 0, f: (c) => drawSiegeShot(c, sh) });
   }
   for (const part of tourneyParts()) if (inView(part.x, part.y)) objs.push(part);
+  for (const s of W.sites) if (s.type === 'einsiedelei' && inView(s.x, s.y)) objs.push({ d: s.x + s.y + 3, z: zAt(s.x, s.y), f: (c) => drawMysticGlow(c, s) });
   for (const g of gallows) objs.push({ d: g.x + g.y, z: zAt(g.x, g.y), f: (c) => drawGallows(c, g, G.exec && G.exec.g === g && G.exec.hanged) });
   for (const f of G.fx) {
     if (f.kind === 'pferd' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 0.1, z: zAt(f.x, f.y), f: (c) => drawLooseHorse(c, f) });
@@ -10412,7 +10860,7 @@ function drawMap(c, w, h, opts = {}) {
     c.beginPath(); c.arc(q.x, q.y, big ? 7 : 5, 0, Math.PI * 2); c.stroke();
   }
   c.textAlign = 'center';
-  const RANK = { spieler: 0, stadt: 1, burg: 2, abtei: 3, markt: 4, halle: 5, dorf: 6, lager: 7 };
+  const RANK = { spieler: 0, stadt: 1, burg: 2, abtei: 3, markt: 4, halle: 5, dorf: 6, lager: 7, mine: 8, einsiedelei: 9 };
   const placed = [];
   const order = W.sites.slice().sort((a, b) => RANK[a.type] - RANK[b.type]);
   for (const s of order) {
@@ -10420,8 +10868,20 @@ function drawMap(c, w, h, opts = {}) {
     if (q.x < -20 || q.y < -20 || q.x > w + 20 || q.y > h + 20) continue;
     const col = s.faction ? FACTIONS[s.faction].color : '#ffd65a';
     const r = big ? (s.type === 'stadt' || s.type === 'spieler' ? 4.5 : 3.5) : 3;
-    c.fillStyle = '#1d140c'; c.fillRect(q.x - r - 1, q.y - r - 1, r * 2 + 2, r * 2 + 2);
-    c.fillStyle = col; c.fillRect(q.x - r, q.y - r, r * 2, r * 2);
+    if (s.type === 'einsiedelei') {
+      // Mystischer Ort: kleiner heller Stern
+      c.fillStyle = '#1d140c'; c.beginPath(); c.arc(q.x, q.y, r + 1.2, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#d8f0a8'; c.beginPath();
+      for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 - Math.PI / 2, rr = k % 2 ? r * 0.45 : r * 1.05; c.lineTo(q.x + Math.cos(a) * rr, q.y + Math.sin(a) * rr); }
+      c.closePath(); c.fill();
+    } else if (s.type === 'mine') {
+      // Grube: dunkles Dreieck wie eine Halde
+      c.fillStyle = '#1d140c'; c.beginPath(); c.moveTo(q.x, q.y - r - 2); c.lineTo(q.x + r + 2, q.y + r + 1); c.lineTo(q.x - r - 2, q.y + r + 1); c.closePath(); c.fill();
+      c.fillStyle = col; c.beginPath(); c.moveTo(q.x, q.y - r); c.lineTo(q.x + r, q.y + r * 0.85); c.lineTo(q.x - r, q.y + r * 0.85); c.closePath(); c.fill();
+    } else {
+      c.fillStyle = '#1d140c'; c.fillRect(q.x - r - 1, q.y - r - 1, r * 2 + 2, r * 2 + 2);
+      c.fillStyle = col; c.fillRect(q.x - r, q.y - r, r * 2, r * 2);
+    }
     placed.push({ x0: q.x - r - 1, y0: q.y - r - 1, x1: q.x + r + 1, y1: q.y + r + 1 });
     if (!big && v.s < 4) continue;
     const fs = big ? (s.type === 'stadt' || s.type === 'spieler' ? 13 : 11) : 11;
@@ -11018,6 +11478,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -11182,6 +11643,7 @@ function questCard(q, buttons) {
 // ---------------------------------------------------------------- Siedlung
 function townPanel() {
   const site = G.ui.arg;
+  if (site.type === 'einsiedelei') return hermitPanel(site);
   const f = site.faction;
   const town = G.s.towns[site.id];
   const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
@@ -11218,6 +11680,7 @@ function townInfo(site) {
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${mineAction(site)}
       ${tourneyAction(site)}
       ${tavernAction(site)}
       ${harbourActions(site)}
@@ -11237,6 +11700,35 @@ function buildFact(site) {
   if (dmg) parts.push(`${dmg} beschädigt`);
   if (ruin) parts.push(`${ruin} ${ruin === 1 ? 'Ruine' : 'Ruinen'}`);
   return `<dt>Häuser</dt><dd>${hs.filter(standing).length} bewohnt${parts.length ? `, ${parts.join(', ')}` : ''}</dd>`;
+}
+
+// Erzgrube: Anteil pachten
+function mineAction(site) {
+  if (site.type !== 'mine') return '';
+  const g = GOODS[site.ore].name, n = MINE_YIELD[site.ore];
+  if (ownsShare(site)) return `<h3>Dein Anteil</h3><div class="notice"><p>Du bist an der Grube beteiligt. Jeden Morgen bringen Fuhrleute ${n} ${esc(g)} nach ${esc(homeName())}, solange die ${esc(FACTIONS[site.faction].short)} dir nicht feindlich sind.</p></div>`;
+  const cost = leaseCost(site);
+  return `<h3>Die Grube</h3><div class="action"><div><b>Anteil pachten</b><p>Ein Anteil am Ertrag: jeden Morgen ${n} ${esc(g)} frei Haus in dein Burglager. Im Markt der Grube gibt es ${esc(g)} schon jetzt billig.</p></div><button class="btn primary" data-act="lease" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+}
+
+// Einsiedelei: Rat, Segen, Spende
+const FEATURE_TEXT = { quelle: 'Eine Quelle sprudelt zwischen moosigen Steinen.', steine: 'Graue Steine stehen im Kreis, älter als jede Kirche.', grab: 'Ein uralter Grabhügel liegt im Gras, mit einem Tor aus Felsblöcken.', hoehle: 'In der Felswand öffnet sich eine Höhle, ein Kreuz ist in den Stein gehauen.', eibe: 'Eine uralte Eibe breitet ihre Äste aus, bunte Bänder hängen darin.' };
+function hermitPanel(site) {
+  visitHermit(site);
+  const st = hermitState(site);
+  const bless = canBless(site);
+  return {
+    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · Einsiedelei`, tabs: [],
+    body: `<div class="cols">
+      <div><p class="lede">${esc(site.desc)}</p><p>${esc(FEATURE_TEXT[site.feature] || '')} Glühwürmchen tanzen hier in der Dämmerung, und es ist seltsam still.</p></div>
+      <div class="actions">
+        <h3>Beim Einsiedler</h3>
+        <div class="action"><div><b>Um Rat fragen</b><p>Der Einsiedler sieht mehr, als man glaubt: ein Spruch und ein echter Hinweis. Einmal am Tag.</p></div><button class="btn" data-act="hrat" ${st.adviceDay === G.s.day ? 'disabled' : ''}>Fragen</button></div>
+        <div class="action"><div><b>Segen erbitten</b><p>Heilkräuter und ein Segen: Du und dein Gefolge seid ganz geheilt, bis morgen Abend +10 % Angriff und Abwehr, +15 % Erfahrung. Alle drei Tage.</p></div><button class="btn primary" data-act="hsegen" ${bless ? '' : 'disabled'}>Segnen lassen</button></div>
+        <div class="action"><div><b>Spende für die Armen</b><p>Brot, Salz und Münzen, die der Einsiedler weitergibt. Ansehen bei der Kirche +2, Ruhm +1. Einmal am Tag.</p></div><button class="btn" data-act="hspende" ${st.giftDay === G.s.day || G.s.gold < 20 ? 'disabled' : ''}>20 Gold</button></div>
+      </div>
+    </div>`,
+  };
 }
 
 // Turnier: Ankündigung, Teilnehmer, Anmeldung
@@ -11745,6 +12237,10 @@ const ACTIONS = {
   gift: () => giveGift(G.ui.arg),
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
+  lease: () => leaseMine(G.ui.arg),
+  hrat: () => hermitAdvice(G.ui.arg),
+  hsegen: () => hermitBless(G.ui.arg),
+  hspende: () => hermitGift(G.ui.arg),
   atone: () => atone(G.ui.arg),
   raid: () => {
     const site = G.ui.arg, f = site.faction;
@@ -11886,9 +12382,20 @@ function deserialize(json) {
     if (g) { g.id = gd.id; g.home = gd.home; g.provoked = gd.provoked; }
   }
   G.nextId = Math.max(G.nextId, data.nextId);
+  pruneRemovedSites();
   ensureTownStock();
   spawnPeasants();
   rebuildUnits();
+}
+
+// Orte, die es in dieser Fassung nicht mehr gibt: Aufträge, Turnier und Urteil dort verfallen
+function pruneRemovedSites() {
+  const ids = new Set(G.world.sites.map((s) => s.id));
+  const s = G.s;
+  s.quests = (s.quests || []).filter((q) => ids.has(q.from) && (!q.target || ids.has(q.target)));
+  for (const id of Object.keys(s.towns || {})) if (!ids.has(id)) delete s.towns[id];
+  if (s.tourney && !ids.has(s.tourney.site)) s.tourney = null;
+  if (s.hanging && !ids.has(s.hanging.site)) s.hanging = null;
 }
 
 function saveGame() {
@@ -11997,7 +12504,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.3 : 1.9) : (G.view.w < 720 ? 1.3 : 1.6);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.7 : 2.4) : (G.view.w < 720 ? 1.7 : 2.0);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -12296,7 +12803,7 @@ G.setGfx = setGfx;
 G.cycleGfx = () => setGfx(GFX_MODES[(GFX_MODES.indexOf(G.gfx) + 1) % GFX_MODES.length]);
 
 // Zoom von der Übersicht (0,45) bis ganz nah (4): Figuren füllen dann gut ein Zehntel der Bildhöhe
-function zoom(f) { G.cam.zoom = Math.max(0.45, Math.min(4, G.cam.zoom * f)); }
+function zoom(f) { G.cam.zoom = Math.max(0.45, Math.min(5, G.cam.zoom * f)); }
 
 function togglePanel(kind) {
   if (G.ui.panel === kind) closePanel();

@@ -13,6 +13,7 @@ import { dailyDynamics } from './dynamics.js';
 import { dailyTourney } from './tournament.js';
 import { dailyJustice } from './justice.js';
 import { passWeather } from './weather.js';
+import { dailyMines } from './mines.js';
 
 export function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
 
@@ -70,6 +71,7 @@ function newDay() {
   dailyDynamics();
   dailyTourney();
   dailyJustice();
+  dailyMines();
   dailyRepairs();
   dailyBurials();
   const now = seasonIndex();

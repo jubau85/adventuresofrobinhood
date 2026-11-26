@@ -25,6 +25,7 @@ import {
   canRaid, startRaid, isBlighted, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
 } from './dynamics.js';
 import { tourneyAt, canJoin, joinTourney } from './tournament.js';
+import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
 
@@ -192,6 +193,7 @@ function questCard(q, buttons) {
 // ---------------------------------------------------------------- Siedlung
 function townPanel() {
   const site = G.ui.arg;
+  if (site.type === 'einsiedelei') return hermitPanel(site);
   const f = site.faction;
   const town = G.s.towns[site.id];
   const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
@@ -228,6 +230,7 @@ function townInfo(site) {
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${mineAction(site)}
       ${tourneyAction(site)}
       ${tavernAction(site)}
       ${harbourActions(site)}
@@ -247,6 +250,35 @@ function buildFact(site) {
   if (dmg) parts.push(`${dmg} beschädigt`);
   if (ruin) parts.push(`${ruin} ${ruin === 1 ? 'Ruine' : 'Ruinen'}`);
   return `<dt>Häuser</dt><dd>${hs.filter(standing).length} bewohnt${parts.length ? `, ${parts.join(', ')}` : ''}</dd>`;
+}
+
+// Erzgrube: Anteil pachten
+function mineAction(site) {
+  if (site.type !== 'mine') return '';
+  const g = GOODS[site.ore].name, n = MINE_YIELD[site.ore];
+  if (ownsShare(site)) return `<h3>Dein Anteil</h3><div class="notice"><p>Du bist an der Grube beteiligt. Jeden Morgen bringen Fuhrleute ${n} ${esc(g)} nach ${esc(homeName())}, solange die ${esc(FACTIONS[site.faction].short)} dir nicht feindlich sind.</p></div>`;
+  const cost = leaseCost(site);
+  return `<h3>Die Grube</h3><div class="action"><div><b>Anteil pachten</b><p>Ein Anteil am Ertrag: jeden Morgen ${n} ${esc(g)} frei Haus in dein Burglager. Im Markt der Grube gibt es ${esc(g)} schon jetzt billig.</p></div><button class="btn primary" data-act="lease" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+}
+
+// Einsiedelei: Rat, Segen, Spende
+const FEATURE_TEXT = { quelle: 'Eine Quelle sprudelt zwischen moosigen Steinen.', steine: 'Graue Steine stehen im Kreis, älter als jede Kirche.', grab: 'Ein uralter Grabhügel liegt im Gras, mit einem Tor aus Felsblöcken.', hoehle: 'In der Felswand öffnet sich eine Höhle, ein Kreuz ist in den Stein gehauen.', eibe: 'Eine uralte Eibe breitet ihre Äste aus, bunte Bänder hängen darin.' };
+function hermitPanel(site) {
+  visitHermit(site);
+  const st = hermitState(site);
+  const bless = canBless(site);
+  return {
+    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · Einsiedelei`, tabs: [],
+    body: `<div class="cols">
+      <div><p class="lede">${esc(site.desc)}</p><p>${esc(FEATURE_TEXT[site.feature] || '')} Glühwürmchen tanzen hier in der Dämmerung, und es ist seltsam still.</p></div>
+      <div class="actions">
+        <h3>Beim Einsiedler</h3>
+        <div class="action"><div><b>Um Rat fragen</b><p>Der Einsiedler sieht mehr, als man glaubt: ein Spruch und ein echter Hinweis. Einmal am Tag.</p></div><button class="btn" data-act="hrat" ${st.adviceDay === G.s.day ? 'disabled' : ''}>Fragen</button></div>
+        <div class="action"><div><b>Segen erbitten</b><p>Heilkräuter und ein Segen: Du und dein Gefolge seid ganz geheilt, bis morgen Abend +10 % Angriff und Abwehr, +15 % Erfahrung. Alle drei Tage.</p></div><button class="btn primary" data-act="hsegen" ${bless ? '' : 'disabled'}>Segnen lassen</button></div>
+        <div class="action"><div><b>Spende für die Armen</b><p>Brot, Salz und Münzen, die der Einsiedler weitergibt. Ansehen bei der Kirche +2, Ruhm +1. Einmal am Tag.</p></div><button class="btn" data-act="hspende" ${st.giftDay === G.s.day || G.s.gold < 20 ? 'disabled' : ''}>20 Gold</button></div>
+      </div>
+    </div>`,
+  };
 }
 
 // Turnier: Ankündigung, Teilnehmer, Anmeldung
@@ -755,6 +787,10 @@ const ACTIONS = {
   gift: () => giveGift(G.ui.arg),
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
+  lease: () => leaseMine(G.ui.arg),
+  hrat: () => hermitAdvice(G.ui.arg),
+  hsegen: () => hermitBless(G.ui.arg),
+  hspende: () => hermitGift(G.ui.arg),
   atone: () => atone(G.ui.arg),
   raid: () => {
     const site = G.ui.arg, f = site.faction;

@@ -23,11 +23,11 @@ export function initTowns() {
   }
 }
 
-// Fehlende Waren (z. B. nach einem Update) im Bestand ergänzen
+// Fehlende Orte und Waren (z. B. nach einem Update) im Bestand ergänzen
 export function ensureTownStock() {
   for (const s of G.world.sites) {
+    if (!G.s.towns[s.id]) G.s.towns[s.id] = { stock: {}, quests: [], questDay: 0, giftDay: -1 };
     const town = G.s.towns[s.id];
-    if (!town) continue;
     for (const g of GOOD_IDS) if (town.stock[g] == null) town.stock[g] = targetStock(s, g);
   }
 }

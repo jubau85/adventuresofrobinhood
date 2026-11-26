@@ -24,13 +24,16 @@ const ROLES = {
   abtei: ['moench', 'moench', 'moench', 'moench', 'moench', 'bauer', 'magd', 'fischer'],
   burg: ['wache', 'wache', 'wache', 'handwerker', 'magd', 'bauer', 'bauer', 'priester', 'wirt', 'jaeger'],
   lager: ['waldmann', 'waldmann', 'holzer'],
+  mine: ['bergmann', 'bergmann', 'bergmann', 'bergmann', 'magd', 'wache', 'kind'],
+  einsiedelei: ['einsiedler'],
   hof: ['bauer', 'baeuerin'],
 };
 
 const NAMES = {
   haendler: 'Händler', magd: 'Magd', handwerker: 'Handwerker', buerger: 'Bürger', kind: 'Kind', moench: 'Mönch', wache: 'Wache',
   bauer: 'Bauer', baeuerin: 'Bäuerin', hirte: 'Hirte', waldmann: 'Waldmann', holzer: 'Holzfäller', priester: 'Priester', wirt: 'Wirt',
-  jaeger: 'Jäger', fischer: 'Fischer', bettler: 'Bettler',
+  jaeger: 'Jäger', fischer: 'Fischer', bettler: 'Bettler', bergmann: 'Bergmann', einsiedler: 'Einsiedler',
+  reisender: 'Reisender', pilger: 'Pilger',
 };
 
 const MERCHANT_COLS = ['#3d6fa3', '#a33b32', '#5e2f6e', '#3f6b2f', '#a8791f'];
@@ -51,6 +54,10 @@ function dress(role, site) {
     case 'waldmann': case 'holzer': o.look = 'wald'; o.tunic = null; break;
     case 'jaeger': o.tunic = pick(['#4a5a2a', '#5a5a32', '#4e4a2c']); o.cap = '#3e4a22'; o.bow = true; break;
     case 'fischer': o.tunic = pick(['#5a6a7a', '#6a6a5a', '#4a5a6a']); o.hat = '#8a7a5a'; break;
+    case 'bergmann': o.tunic = pick(['#5a5048', '#4e4a44', '#625646']); o.cap = '#3a3028'; break;
+    case 'einsiedler': o.look = 'moench'; o.tunic = '#6a5a44'; o.beard = true; break;
+    case 'reisender': o.tunic = pick(['#5a4a6a', '#4a5a4a', '#6a4a3a', '#3e4e6a']); o.hat = '#5a4a3a'; break;
+    case 'pilger': o.tunic = '#6e6252'; o.hat = '#4a3a2a'; o.staff = true; break;
     case 'bettler': o.tunic = pick(['#7a7062', '#6e6658', '#857a66']); o.patches = true; o.crutch = Math.random() < 0.4; o.female = Math.random() < 0.3; if (o.female) o.scarf = '#a89a80'; break;
     default: break;
   }
@@ -71,12 +78,16 @@ function siteSpots(s) {
     else if (b.kind === 'stall' || b.kind === 'tent') sp.stalls.push({ x: b.x, y: b.y, front: { x: b.x + 0.05, y: b.y + 0.62 }, back: { x: b.x, y: b.y - 0.5 } });
     else if (b.kind === 'well') sp.wells.push({ x: b.x + 0.45, y: b.y + 0.35 });
     else if (b.kind === 'fire') sp.fire = { x: b.x, y: b.y };
+    else if (b.kind === 'stollen') sp.adit = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
+    else if (b.kind === 'mystic') sp.mystic = { x: b.x - 0.2, y: b.y + b.wy / 2 + 0.2 };
+    else if (b.kind === 'klause') sp.houses.push({ x: b.x - 0.1, y: b.y + b.wy / 2 + 0.3 });
     else if (b.kind === 'church') sp.church = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
     else if (b.kind === 'landmark' && b.lm === 'kathedrale') sp.church = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
     else if (b.kind === 'landmark' && b.lm === 'tuchhalle') for (let k = 0; k < 3; k++) { const x = b.x - 1 + k, y = b.y + b.wy / 2 + 0.55; sp.stalls.push({ x, y, front: { x, y: y + 0.6 }, back: { x, y: y - 0.45 } }); }
     else if (b.kind === 'prop') {
       const p = { x: b.x + 0.35, y: b.y + 0.3 };
       if (b.prop === 'amboss') sp.anvils.push({ x: b.x - 0.05, y: b.y + 0.4 });
+      else if (b.prop === 'erzhaufen') sp.ore = { x: b.x + 0.5, y: b.y + 0.45 };
       else if (b.prop === 'holzstapel') sp.wood.push(p);
       else if (b.prop === 'heu') sp.hay.push(p);
       else if (b.prop === 'beet') sp.gardens.push({ x: b.x, y: b.y + 0.32 });
@@ -135,12 +146,13 @@ export function spawnVillagers() {
   G.peasants = [];
   resetLife();
   const lvl = G.s.castle.level;
-  const homes = G.world.sites.concat(G.world.farms || []);
+  const homes = G.world.sites.concat(G.world.farms || [], G.world.camps || []);
   for (const site of homes) {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
     if (site.type === 'hof' && Math.random() < 0.25) roles = roles.concat('jaeger');
+    if (site.type === 'lagerfeuer') roles = site.roles.slice(0, 1 + Math.floor(Math.random() * site.roles.length));
     // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
     if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
       const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
@@ -162,7 +174,7 @@ export function spawnVillagers() {
 export function makeVillager(site, role, stall = 0) {
   const o = dress(role, site);
   const v = makeUnit(o);
-  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch']) if (o[k]) v[k] = o[k];
+  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch', 'beard', 'staff']) if (o[k]) v[k] = o[k];
   v.role = role; v.home = site; v.task = null;
   v.hair = pick(HAIR);
   v.stall = stall;
@@ -228,6 +240,28 @@ function chooseTask(v) {
     if (src && Math.hypot(src.x - fb.x, src.y - fb.y) < 25) { goTo(v, src, 'schoepfen', rand(0.8, 1.6), null, 1.6); v.task.fireB = fb; return; }
     v.carry = 'eimer';
     goTo(v, { x: fb.x + rand(-0.5, 0.5), y: fb.y + fb.wy / 2 + 0.5 }, 'loeschen', rand(1.2, 2), null, 1.6); v.task.douse = fb; return;
+  }
+  // Am Lagerfeuer: sitzen, reden, Holz nachlegen
+  if (s.type === 'lagerfeuer') {
+    if (sp.fire && Math.random() < 0.75) { const a = (v.id % 5) / 5 * Math.PI * 2; goTo(v, { x: sp.fire.x + Math.cos(a) * 0.8, y: sp.fire.y + Math.sin(a) * 0.55 }, Math.random() < 0.6 ? 'sitzen' : 'reden', rand(20, 50), null, 0.7); return; }
+    if (sp.trees.length && Math.random() < 0.5) { goTo(v, pick(sp.trees), 'sammeln', rand(8, 14), 'reisig'); return; }
+    goTo(v, wander(v, s, 3), 'stehen', rand(6, 12)); return;
+  }
+  // Der Einsiedler betet am heiligen Ort, pflegt seinen Garten oder sitzt vor der Klause
+  if (v.role === 'einsiedler') {
+    const r2 = Math.random();
+    if (sp.mystic && r2 < 0.45) { goTo(v, sp.mystic, 'beten', rand(20, 40), null, 0.6); return; }
+    if (sp.gardens.length && r2 < 0.7) { goTo(v, pick(sp.gardens), 'jaeten', rand(14, 26), null, 0.6); return; }
+    goTo(v, house(), 'sitzen', rand(15, 30), null, 0.6); return;
+  }
+  // Bergleute: im Stollen Erz brechen und es zum Haufen tragen
+  if (v.role === 'bergmann' && (ph === 'arbeit' || ph === 'morgen')) {
+    if (sp.adit && Math.random() < 0.75) {
+      goTo(v, { x: sp.adit.x + rand(-0.4, 0.4), y: sp.adit.y + rand(-0.1, 0.3) }, 'hacke', rand(14, 28));
+      if (sp.ore) v.task.next = { spot: sp.ore, act: 'abladen', dur: rand(2, 3), carry: 'erz', speed: 0.75, props: { dropAfter: true } };
+      return;
+    }
+    if (sp.wood.length) { goTo(v, pick(sp.wood), 'axt', rand(10, 18), 'holz'); return; }
   }
   // Bettler sitzen den ganzen Tag an ihrem Platz
   if (v.role === 'bettler') {
@@ -364,7 +398,10 @@ function chooseTask(v) {
 export function updateVillager(v, dt) {
   if (v.funeral || v.spectator || v.execution) return;
   const h = hourOf(), ph = phase(h);
-  if (ph === 'nacht') { v.hidden = true; v.inside = true; v.task = null; v.act = null; v.carry = null; return; }
+  if (ph === 'nacht') {
+    if (v.home && v.home.type === 'lagerfeuer') { campNight(v, dt); return; }
+    v.hidden = true; v.inside = true; v.task = null; v.act = null; v.carry = null; return;
+  }
   if (v.inside) {
     if (ph === 'abend' && h >= 20) return;
     if ((v.hideUntil || 0) > G.time || (G.raid && G.raid.site === v.home)) return;
@@ -421,6 +458,18 @@ export function updateVillager(v, dt) {
   }
 }
 
+// Nachts am Lagerfeuer: im Kreis um die Flammen sitzen
+function campNight(v, dt) {
+  const sp = siteSpots(v.home);
+  if (!sp.fire) { v.hidden = true; return; }
+  v.hidden = false; v.inside = false; v.carry = null;
+  const a = (v.id % 5) / 5 * Math.PI * 2, x = sp.fire.x + Math.cos(a) * 0.8, y = sp.fire.y + Math.sin(a) * 0.55;
+  if (Math.hypot(x - v.x, y - v.y) > 0.2) { v.act = null; chaseTo(v, x, y, dt, 0.1, 0.6); return; }
+  v.task = null; v.act = 'sitzen';
+  const sx = (sp.fire.x - v.x) - (sp.fire.y - v.y);
+  if (Math.abs(sx) > 0.05) v.facing = sx > 0 ? 1 : -1;
+}
+
 // Jäger: Liegt ein Hirsch in Schussweite, fliegt ein Pfeil. Sonst gibt es vielleicht einen Hasen aus der Schlinge.
 function huntShot(v, t) {
   let deer = null, bd = 10;
@@ -451,6 +500,10 @@ const SAYINGS = {
   hirte: ['Brav, brav.', 'Ein Lamm fehlt mir.', 'Der Wolf war wieder da.'],
   waldmann: ['Pst. Nicht so laut.', 'Der Sheriff soll kommen.', 'Wildbret schmeckt am besten, wenn es dem König gehört.'],
   holzer: ['Holz! Achtung!', 'Gutes Eichenholz.'],
+  bergmann: ['Glück auf!', 'Die Ader wird dünner.', 'Da unten hört man das Wasser rauschen.', 'Der Vogt will schon wieder seinen Zehnten.'],
+  einsiedler: ['Der Wald hört alles, mein Sohn.', 'Gottes Wege sind verschlungen wie Wurzeln.', 'Hier war schon lange vor den Kirchen ein heiliger Ort.', 'Setz dich. Du hast einen weiten Weg hinter dir.'],
+  reisender: ['Nach London sind es noch drei Tage.', 'Die Straßen sind unsicher geworden.', 'Ein Becher Wein am Feuer, mehr braucht es nicht.'],
+  pilger: ['Wir ziehen nach Canterbury, zum Grab des Märtyrers.', 'Gott schütze alle Pilger.', 'Meine Füße, meine Füße …'],
   jaeger: ['Pst! Da drüben im Unterholz …', 'Ein Hirsch, so groß wie ein Pferd, sag ich Euch.', 'Der Förster darf mich nicht sehen.'],
   fischer: ['Heute beißen sie gut.', 'Hecht zum Abendessen!', 'Ruhig, sonst verscheucht Ihr die Fische.'],
 };

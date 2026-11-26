@@ -47,9 +47,20 @@ export function deserialize(json) {
     if (g) { g.id = gd.id; g.home = gd.home; g.provoked = gd.provoked; }
   }
   G.nextId = Math.max(G.nextId, data.nextId);
+  pruneRemovedSites();
   ensureTownStock();
   spawnPeasants();
   rebuildUnits();
+}
+
+// Orte, die es in dieser Fassung nicht mehr gibt: Aufträge, Turnier und Urteil dort verfallen
+function pruneRemovedSites() {
+  const ids = new Set(G.world.sites.map((s) => s.id));
+  const s = G.s;
+  s.quests = (s.quests || []).filter((q) => ids.has(q.from) && (!q.target || ids.has(q.target)));
+  for (const id of Object.keys(s.towns || {})) if (!ids.has(id)) delete s.towns[id];
+  if (s.tourney && !ids.has(s.tourney.site)) s.tourney = null;
+  if (s.hanging && !ids.has(s.hanging.site)) s.hanging = null;
 }
 
 export function saveGame() {
