@@ -10,7 +10,7 @@ import { generateWorld, groundZ, worldSig } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
-  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus,
+  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus, spawnGroup,
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
@@ -538,6 +538,7 @@ function tool(name) {
     case 'quests': togglePanel('quests'); break;
     case 'politics': togglePanel('politics'); break;
     case 'map': togglePanel('map'); break;
+    case 'chronik': togglePanel('chronik'); break;
     case 'menu': togglePanel('menu'); break;
     case 'music': toggleMusic(); break;
     case 'ride': if (!panelOpen()) toggleRide(); break;
@@ -563,7 +564,7 @@ function onKey(e) {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (k === 'escape') { if (panelOpen()) closePanel(); else openPanel('menu'); e.preventDefault(); return; }
   if (k === 'f9') { togglePanel('cheat'); e.preventDefault(); return; }
-  const panelKeys = { i: 'party', j: 'quests', p: 'politics', m: 'map', h: 'help' };
+  const panelKeys = { i: 'party', j: 'quests', p: 'politics', m: 'map', n: 'chronik', h: 'help' };
   if (panelKeys[k]) { if (k === 'h') togglePanel('help'); else tool(panelKeys[k]); e.preventDefault(); return; }
   if (panelOpen()) return;
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); return; }
@@ -851,4 +852,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, step: (dt) => { G.time += dt; step(dt); } };

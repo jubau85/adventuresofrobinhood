@@ -162,7 +162,7 @@ export const NPC_TYPES = {
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
   huskarl: { cls: 'soldat', name: 'Huskarl', eq: { waffe: 'streitaxt', ruestung: 'kettenhemd', schild: 'rundschild' }, lv: [2, 3], look: 'sachsen' },
-  freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
+  freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'lederwams', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
   sachs_bogen: { cls: 'soldat', name: 'Sächsischer Bogner', eq: { waffe: 'kurzbogen', ruestung: 'lederwams' }, lv: [1, 2], look: 'sachsen' },
   ritter_n: { cls: 'ritter', name: 'Normannischer Ritter', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'drachenschild', pferd: 'klepper' }, lv: [2, 3], look: 'soldat' },
   thane: { cls: 'ritter', name: 'Sächsischer Than', eq: { waffe: 'streitaxt', ruestung: 'kettenhemd', schild: 'rundschild', pferd: 'klepper' }, lv: [2, 3], look: 'sachsen' },
@@ -216,7 +216,7 @@ export const GROUP_TYPES = {
   heer_richard: {
     name: 'Das Heer der Getreuen König Richards', nom: 'Das Heer der Getreuen', acc: 'das Heer der Getreuen', pl: false, faction: 'sachsen', army: true,
     // Richards Getreue: Thane und Huskarle in Kettenhemd, Freisassen, Langbogenschützen aus den Wäldern
-    members: [['thane', 6, 6], ['huskarl', 4, 4], ['freisasse', 20, 20], ['waldmann', 4, 4], ['sachs_bogen', 13, 13], ['bandit', 3, 3]],
+    members: [['thane', 6, 6], ['huskarl', 7, 7], ['freisasse', 17, 17], ['waldmann', 6, 6], ['sachs_bogen', 13, 13], ['bandit', 1, 1]],
     gold: [260, 480], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['en', 'wa'],
     kill: { sachsen: -14, normannen: 12 },
   },

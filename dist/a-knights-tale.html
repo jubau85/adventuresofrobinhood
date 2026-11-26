@@ -86,6 +86,15 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .msg.bad { border-left-color: #e0604a; }
 .msg.gold { border-left-color: var(--gold); color: #f8e7b5; }
 .msg.old { opacity: 0; }
+#log .msg { pointer-events: auto; cursor: pointer; }
+#log .msg.old { pointer-events: none; }
+@media (max-width: 720px) { #toolbar [data-tool="chronik"] { display: none; } }
+/* Chronik: alle Meldungen nach Tagen */
+.chronik-tag { margin: 14px 0 6px; font-family: var(--font-head); font-size: 16px; font-weight: 600; }
+.chronik-tag:first-child { margin-top: 0; }
+.chronik { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.chronik .msg { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); gap: 8px; font-size: 14px; }
+.chronik time { color: var(--gold); opacity: 0.85; font-variant-numeric: tabular-nums; }
 #prompt {
   position: absolute; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(68px + env(safe-area-inset-bottom, 0px));
   padding: 6px 14px; border-radius: 4px; background: rgba(24, 16, 10, 0.88); border: 1px solid var(--gold-deep);
@@ -110,6 +119,8 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   font-family: var(--font-ui); font-weight: 500; letter-spacing: 0.02em;
 }
 #toolbar button:hover { border-color: var(--gold-deep); color: #fff6dc; }
+/* Mittlere Breite: Tastenkürzel weglassen, damit die Leiste in eine Reihe passt */
+@media (max-width: 1180px) and (min-width: 721px) { #toolbar kbd { display: none; } #toolbar button { padding: 6px 10px; } }
 #toolbar button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); color: var(--gold); }
 #toolbar button:focus-visible, .btn:focus-visible, .tab:focus-visible, .ros:focus-visible, .close:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .narrow-only { display: none !important; }
@@ -459,6 +470,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
     <button data-tool="quests" title="Aufträge (J)"><span>Aufträge</span><kbd>J</kbd></button>
     <button data-tool="politics" title="Politik (P)"><span>Politik</span><kbd>P</kbd></button>
     <button data-tool="map" title="Karte (M)"><span>Karte</span><kbd>M</kbd></button>
+    <button data-tool="chronik" title="Chronik: alle Meldungen zum Nachlesen (N)"><span>Chronik</span><kbd>N</kbd></button>
     <button data-tool="ride" title="Auf- und absitzen (R)"><span>Reiten</span><kbd>R</kbd></button>
     <button data-tool="order" title="Befehl an das Gefolge (F)"><span id="order-label">Folgen</span><kbd>F</kbd></button>
     <button data-tool="fast" title="Zeitraffer (T)"><span>Zeitraffer</span><kbd>T</kbd></button>
@@ -710,7 +722,7 @@ const NPC_TYPES = {
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
   huskarl: { cls: 'soldat', name: 'Huskarl', eq: { waffe: 'streitaxt', ruestung: 'kettenhemd', schild: 'rundschild' }, lv: [2, 3], look: 'sachsen' },
-  freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
+  freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'lederwams', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
   sachs_bogen: { cls: 'soldat', name: 'Sächsischer Bogner', eq: { waffe: 'kurzbogen', ruestung: 'lederwams' }, lv: [1, 2], look: 'sachsen' },
   ritter_n: { cls: 'ritter', name: 'Normannischer Ritter', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'drachenschild', pferd: 'klepper' }, lv: [2, 3], look: 'soldat' },
   thane: { cls: 'ritter', name: 'Sächsischer Than', eq: { waffe: 'streitaxt', ruestung: 'kettenhemd', schild: 'rundschild', pferd: 'klepper' }, lv: [2, 3], look: 'sachsen' },
@@ -764,7 +776,7 @@ const GROUP_TYPES = {
   heer_richard: {
     name: 'Das Heer der Getreuen König Richards', nom: 'Das Heer der Getreuen', acc: 'das Heer der Getreuen', pl: false, faction: 'sachsen', army: true,
     // Richards Getreue: Thane und Huskarle in Kettenhemd, Freisassen, Langbogenschützen aus den Wäldern
-    members: [['thane', 6, 6], ['huskarl', 4, 4], ['freisasse', 20, 20], ['waldmann', 4, 4], ['sachs_bogen', 13, 13], ['bandit', 3, 3]],
+    members: [['thane', 6, 6], ['huskarl', 7, 7], ['freisasse', 17, 17], ['waldmann', 6, 6], ['sachs_bogen', 13, 13], ['bandit', 1, 1]],
     gold: [260, 480], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['en', 'wa'],
     kill: { sachsen: -14, normannen: 12 },
   },
@@ -2134,6 +2146,12 @@ function uid() { return G.nextId++; }
 function log(text, kind = 'info') {
   G.messages.push({ text, kind, t: performance.now() });
   if (G.messages.length > 60) G.messages.shift();
+  // Chronik: alles zum Nachlesen, mit Tag und Uhrzeit (wird mit dem Spielstand gesichert)
+  if (G.s) {
+    const c = G.s.chronik || (G.s.chronik = []);
+    c.push({ text, kind, day: G.s.day, time: Math.round(G.s.time) });
+    if (c.length > 500) c.splice(0, c.length - 500);
+  }
   if (G.onLog) G.onLog();
 }
 
@@ -3920,6 +3938,7 @@ function placeTrees(W, rng) {
 
 
 
+
 // ---------------------------------------------------------------- Werte
 function computeStats(u) {
   const c = CLASSES[u.cls];
@@ -3937,7 +3956,7 @@ function computeStats(u) {
   const s = ITEMS[u.eq.schild];
   if (s) def += s.def;
   const horse = ITEMS[u.eq.pferd] || null;
-  u.st = { maxHp: Math.round(hp), atk, def, range, cd, speed, ranged, horse, armorDef: a ? a.def : 0 };
+  u.st = { maxHp: Math.round(hp), atk, def, range, cd, speed, ranged, horse, armorDef: a ? a.def : 0, shield: s ? s.def : 0 };
   if (u.hp > u.st.maxHp) u.hp = u.st.maxHp;
   if (!horse) u.mounted = false;
   return u.st;
@@ -4072,6 +4091,7 @@ function wantsRun(u) {
   if (u.combatT > 0 || u.attackTarget) return true;
   if (u.kind === 'player') return (!!u.runClick || !!G.input.shift) && (!!u.path || !!G.input.dx || !!G.input.dy);
   if (u.kind === 'companion') return !!G.s.player.run || !!u.catchUp;
+  if (u.group && u.group.tac) return !!u.tacRun || !!u.catchUp;
   if (u.group) return !!(u.group.engaged || u.group.feud) || !!u.catchUp;
   return !!u.catchUp;
 }
@@ -4233,13 +4253,27 @@ function inCombat() {
 }
 
 // ---------------------------------------------------------------- Kampf
-function calcDamage(a, t) {
+// Von wo kommt der Schlag? 1 von vorn (±60°), 0.5 von der Seite, 0 von hinten (der Schild hilft nur nach vorn)
+function shieldFacing(t, ox, oy) {
+  if (t.dirX === undefined) return 1;
+  const dx = ox - t.x, dy = oy - t.y, d = Math.hypot(dx, dy);
+  if (d < 1e-3) return 1;
+  const c = (dx * t.dirX + dy * t.dirY) / d;
+  return c >= 0.5 ? 1 : c > -0.34 ? 0.5 : 0;
+}
+function calcDamage(a, t, face = 1, charge = false) {
   let atk = a.st.atk, def = t.st.def;
   if (a.mounted && a.st.horse) atk += a.st.horse.atk;
   if (t.mounted && t.st.horse) def += t.st.horse.def;
+  // Schild: voll von vorn, halb von der Seite, gar nicht von hinten
+  const sh = t.st.shield || 0;
+  def -= sh * (1 - face);
   if (a.team === 'player') { const b = castleBonusAt(a.x, a.y); if (b) atk *= 1 + b.atk; if (buffActive()) atk *= 1.1; }
   if (t.team === 'player') { const b = castleBonusAt(t.x, t.y); if (b) def = def * (1 + b.def) + G.s.castle.level; if (buffActive()) def *= 1.1; }
   let dmg = (atk * atk) / (atk + def * 1.5) * rand(0.8, 1.2);
+  // In den Rücken trifft man härter; ein Reiter im vollen Ansturm noch mehr
+  if (face === 0) dmg *= 1.2;
+  if (charge) dmg *= 1.6;
   let crit = false;
   if (Math.random() < 0.08) { dmg *= 1.6; crit = true; }
   return { dmg: Math.max(1, Math.round(dmg)), crit };
@@ -4265,22 +4299,40 @@ function attack(u, t) {
     G.projectiles.push({ x: u.x, y: u.y, tx: t.x, ty: t.y, target: t, att: u, t: 0, dur: Math.max(0.18, d / 15), bolt: ITEMS[u.eq.waffe].kind === 'armbrust' });
   } else {
     sfxAt('hieb', u.x, u.y, 0.6);
-    applyHit(u, t);
+    // Ansturm: Wer zu Pferd mit Anlauf zuschlägt, trifft mit voller Wucht
+    const charge = !!(u.mounted && u.st.horse && (u.runDist || 0) > 3.5);
+    u.runDist = 0;
+    applyHit(u, t, false, u.x, u.y, charge);
   }
 }
 
-function applyHit(a, t, ranged = false) {
+function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
   if (t.dead) return;
   if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
-  const { dmg, crit } = calcDamage(a, t);
+  const face = shieldFacing(t, ox, oy), sh = t.st.shield || 0;
+  // Zählung für die Auswertung (Testmodus): Treffer von vorn, von der Seite, von hinten, Ansturm, abgefangen
+  const hs = G.hitStats || (G.hitStats = { vorn: 0, seite: 0, hinten: 0, ansturm: 0, schild: 0 });
+  hs[face === 1 ? 'vorn' : face ? 'seite' : 'hinten']++; if (charge) hs.ansturm++;
+  // Ein Pfeil von vorn bleibt oft im Schild stecken
+  if (ranged && sh && face === 1 && Math.random() < 0.06 + sh * 0.04) {
+    sfxAt('pfeilholz', t.x, t.y, 0.7);
+    t.combatT = 5; hs.schild++;
+    if (a.team === 'player' || t.team === 'player') G.fx.push({ kind: 'text', x: t.x, y: t.y, text: 'Schild', color: '#c8d0d8', t: 0, dur: 0.8 });
+    return;
+  }
+  const { dmg, crit } = calcDamage(a, t, face, charge);
+  // Für die Schlachtführung: Wann hat es zuletzt Treffer gegeben?
+  if (t.group && t.group.tac) t.group.tac.lastHit = G.time;
+  if (a.group && a.group.tac) a.group.tac.lastHit = G.time;
   // Pfeile klingen anders als Hiebe: in den Schild, an der Rüstung abprallend oder ins Fleisch
-  const shield = t.eq && t.eq.schild && Math.random() < 0.4, heavy = (t.st.armorDef || 0) >= 6;
+  const shield = sh && face > 0 && Math.random() < 0.4 * face, heavy = (t.st.armorDef || 0) >= 6;
   sfxAt(ranged ? (shield ? 'pfeilholz' : heavy ? 'pfeilmetall' : 'pfeil') : shield ? 'schild' : heavy ? 'klirren' : 'treffer', t.x, t.y, crit ? 1 : 0.8);
   t.hp -= dmg;
   t.flash = 0.18;
   t.combatT = 5;
-  const col = t.team === 'player' ? '#ff8a6a' : crit ? '#ffd84a' : '#fff4d8';
-  G.fx.push({ kind: 'text', x: t.x, y: t.y, text: crit ? `${dmg}!` : String(dmg), color: col, t: 0, dur: 1.0 });
+  const col = t.team === 'player' ? '#ff8a6a' : crit || charge ? '#ffd84a' : face === 0 ? '#ffb070' : '#fff4d8';
+  G.fx.push({ kind: 'text', x: t.x, y: t.y, text: crit || charge ? `${dmg}!` : String(dmg), color: col, t: 0, dur: 1.0 });
+  if (charge && (a.team === 'player' || t.team === 'player')) G.fx.push({ kind: 'text', x: t.x, y: t.y - 0.6, text: 'Ansturm!', color: '#ffd84a', t: 0, dur: 1.2 });
   if (t.hp <= 0) unitDown(t, a);
 }
 
@@ -4311,7 +4363,7 @@ function updateProjectiles(dt) {
         if (p.npcHunt) { if (!tg.dead) takeAnimal(tg); }
         else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) { sfxAt('pfeil', tg.x, tg.y, 0.7); hitAnimal(tg, p.dmg, p.att); }
         else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
-      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true);
+      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true, p.x, p.y);
       else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
       G.projectiles.splice(i, 1);
     }
@@ -4353,6 +4405,8 @@ function unitDown(t, killer) {
   }
   G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25, ...corpseOf(t) });
   const g = t.group;
+  // Auswertung der Feldschlacht (Testmodus): wer fällt durch wen
+  if (g && g.tac && killer && killer.group) { const ks = G.killStats || (G.killStats = {}); const k = `${killer.group.type}:${killer.role || '?'}>${t.role || '?'}`; ks[k] = (ks[k] || 0) + 1; }
   countDead(t);
   if (t.kind === 'peasant') { villagerKilled(t); return; }
   // Erfahrung nur für Kämpfe, an denen du beteiligt bist
@@ -4504,7 +4558,15 @@ function updateUnits(dt) {
     G.units = G.units.filter((u) => !u.dead || u.kind === 'player');
     rebuildUnits();
   }
-  for (const u of G.units) if (u.moving) u.anim += dt;
+  for (const u of G.units) {
+    if (u.moving) u.anim += dt;
+    // Anlauf zu Pferd (für den Ansturm): Strecke im Lauf, sie verfällt im Stand
+    if (u.mounted) {
+      const dd = u._px === undefined ? 0 : Math.hypot(u.x - u._px, u.y - u._py);
+      u.runDist = u.moving && u.run && dd < 1 ? Math.min(12, (u.runDist || 0) + dd) : Math.max(0, (u.runDist || 0) - dt * 3);
+    }
+    u._px = u.x; u._py = u.y;
+  }
 }
 
 function updatePlayer(p, dt) {
@@ -4610,6 +4672,7 @@ function updateDefender(m, g, dt) {
 
 function updateGroupMember(m, g, k, dt) {
   if (g.defender && m.post) { updateDefender(m, g, dt); return; }
+  if (g.tac) { updateTacMember(m, g, dt); return; }
   if (g.engaged || g.feud) {
     const e = nearestEnemy(m, 22);
     if (e) { engage(m, e, dt); return; }
@@ -4780,6 +4843,9 @@ function chooseDest(g) {
   if (g.army && g.siege && !g.siegeDone && G.siege && G.siege.army === g) {
     dest = G.siege.stage === 'anmarsch' ? G.siege.camp : null;
     if (!dest) { g.wait = 99999; return; }
+  } else if (g.army && g.foe && g.foe.members.length && G.groups.includes(g.foe)) {
+    // Unterwegs aufgehalten (etwa von einer Streife): weiter dem Feind entgegen
+    dest = { x: g.foe.x, y: g.foe.y };
   } else if (g.army) {
     // Nach der Schlacht zieht das Heer heim und löst sich auf, sobald es außer Sicht ist
     dest = g.home;
@@ -4819,7 +4885,13 @@ function updateGroups(dt) {
     const gt = GROUP_TYPES[g.type];
     const lead = g.members[0];
     if (g.army) updateArmy(g, p);
-    if (g.feud) {
+    if (g.tac) {
+      updateTactics(g, dt);
+      // Fern vom Spieler wird die Schlacht ausgewürfelt
+      if (g.tac && !g.engaged && g.feud && Math.hypot(g.x - p.x, g.y - p.y) > 70 && Math.hypot(g.feud.x - p.x, g.feud.y - p.y) > 70) { resolveFeud(g, g.feud); continue; }
+      if (!g.engaged) continue;
+    }
+    if (g.feud && !g.tac) {
       const f = g.feud;
       g.x = lead.x; g.y = lead.y;
       if (!f.members.length || !G.groups.includes(f) || Math.hypot(f.x - g.x, f.y - g.y) > (g.siege || g.defender ? 60 : 26)) endFeud(g);
@@ -4935,7 +5007,7 @@ const OUTLAWS = { banditen: 1, raubritter: 1 };
 const PREY = { haendler: 1, steuer: 1, patrouille: 1, franzosen: 1, sachsen: 1 };
 
 function groupsFeud(a, b) {
-  if (a === b || a.questId || b.questId || a.army || b.army || a.defender || b.defender) return false;
+  if (a === b || a.questId || b.questId || a.defender || b.defender || a.siege || b.siege) return false;
   if (OUTLAWS[a.type] || OUTLAWS[b.type]) {
     if (OUTLAWS[a.type] && OUTLAWS[b.type]) return false;
     return !!PREY[(OUTLAWS[a.type] ? b : a).type];
@@ -4960,17 +5032,23 @@ function checkFeuds() {
     for (let j = i + 1; j < gs.length; j++) {
       const b = gs[j];
       if (!b.members.length || b.feud || b.engaged || (b.peace || 0) > G.time) continue;
-      if (Math.abs(a.x - b.x) > 6 || Math.abs(a.y - b.y) > 6 || Math.hypot(a.x - b.x, a.y - b.y) > 6) continue;
+      // Verfeindete sehen sich von weitem: Heere stellen sich schon auf Bogenschussweite mal drei auf
+      const both = a.army && b.army, range = both ? DEPLOY_DIST : a.army || b.army ? 12 : 9;
+      if (Math.abs(a.x - b.x) > range || Math.abs(a.y - b.y) > range || Math.hypot(a.x - b.x, a.y - b.y) > range) continue;
       if (!groupsFeud(a, b)) continue;
+      // Zwei verfeindete Heere: Feldschlacht, wo immer sie sich treffen (fern von dir wird sie ausgewürfelt)
+      if (both) {
+        if (!nearPlayer(a, 70) && !nearPlayer(b, 70)) { resolveFeud(a, b); break; }
+        a.foe = b; b.foe = a;
+        startTactics(a, b);
+        if (!G.battle) G.battle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, a, b };
+        break;
+      }
       // Der Angreifer: Banden greifen an, sonst der stärkere Trupp
       const att = OUTLAWS[a.type] ? a : OUTLAWS[b.type] ? b : a.members.length >= b.members.length ? a : b;
       const def = att === a ? b : a;
-      // Fern vom Spieler: Meist ziehen sie mit bösen Blicken aneinander vorbei, manchmal kommt es zum Kampf
-      if (!nearPlayer(a, 50) && !nearPlayer(b, 50)) {
-        if (Math.random() < 0.3) resolveFeud(att, def);
-        else { a.peace = G.time + 60; b.peace = G.time + 60; }
-        break;
-      }
+      // Fern vom Spieler wird der Kampf ausgewürfelt: Verfeindete lassen einander nie einfach ziehen
+      if (!nearPlayer(a, 50) && !nearPlayer(b, 50)) { resolveFeud(att, def); break; }
       a.feud = b; b.feud = a;
       a.path = null; b.path = null;
       if (nearPlayer(att, 32)) {
@@ -5007,8 +5085,9 @@ function checkFeuds() {
 
 function endFeud(g) {
   const f = g.feud;
-  g.feud = null; g.path = null; g.wait = g.defender ? 99999 : rand(2, 5); g.peace = G.time + 90;
-  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = f.defender ? 99999 : rand(2, 5); f.peace = G.time + 90; }
+  // Kurze Atempause nach einem Kampf, dann geht jeder wieder auf den nächsten Feind los
+  g.feud = null; g.path = null; g.wait = g.defender ? 99999 : rand(2, 5); g.peace = G.time + 20;
+  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = f.defender ? 99999 : rand(2, 5); f.peace = G.time + 20; }
 }
 
 // Fern vom Spieler wird eine Fehde einfach ausgewürfelt
@@ -5117,6 +5196,9 @@ function startBattle(force = null) {
     if (!pa || !pb) continue;
     const patha = findPath(W, pa.x, pa.y, bx, by, 60000), pathb = findPath(W, pb.x, pb.y, bx, by, 60000);
     if (!patha || !pathb) continue;
+    // Kein Fluss und kein Sumpf dazwischen, der lange Umwege erzwingt: Die Heere sollen sich auch finden
+    const plen = (path, x, y) => { let l = 0, px = x, py = y; for (const q of path) { l += Math.hypot(q.x - px, q.y - py); px = q.x; py = q.y; } return l; };
+    if (plen(patha, pa.x, pa.y) > Math.hypot(bx - pa.x, by - pa.y) * 1.35 || plen(pathb, pb.x, pb.y) > Math.hypot(bx - pb.x, by - pb.y) * 1.35) continue;
     // Beide Heere sind 50 Mann stark angelegt; die Stärke im Feld wird ausgewürfelt (force: feste Größen zum Testen)
     const [na, nb] = force || battleSizes();
     // Kriegsglück: gut geführt, ausgeruht und satt (+1) oder müde, schlecht verpflegt (−1)
@@ -5124,7 +5206,7 @@ function startBattle(force = null) {
     const A = spawnGroup(ta, { pos: pa, scale: na / 50, luck: luck() }), B = spawnGroup(tb, { pos: pb, scale: nb / 50, luck: luck() });
     if (!A || !B) return false;
     for (const [g, path] of [[A, patha], [B, pathb]]) { g.path = path; g.pathI = 0; g.wait = 0; g.foe = g === A ? B : A; g.peace = 0; }
-    G.battle = { x: bx, y: by, a: A, b: B };
+    G.battle = { x: bx, y: by, a: A, b: B, t0: G.time };
     rebuildUnits();
     const dx = bx - p.x, dy = by - p.y, ang = (Math.atan2(dx, -dy) * 180) / Math.PI;
     const dir = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'][Math.round(((ang + 360) % 360) / 45) % 8];
@@ -5138,10 +5220,12 @@ function updateArmy(g, p) {
   if (g.siege) return;
   const f = g.foe;
   if (f && f.members.length && G.groups.includes(f)) {
-    // Treffen die Heere aufeinander, beginnt die Schlacht
-    if (!g.feud && Math.hypot(f.x - g.x, f.y - g.y) < 16) {
-      g.feud = f; f.feud = g; g.path = null; f.path = null;
-      if (nearPlayer(g, 60)) log('Die Heere prallen aufeinander!', 'bad');
+    // Kommen sich die Heere nahe, stellen sie sich zur Schlacht auf (tactics.js)
+    if (!g.feud && !g.tac && Math.hypot(f.x - g.x, f.y - g.y) < DEPLOY_DIST) startTactics(g, f);
+    // Finden sie lange nicht zueinander, ziehen beide ab
+    else if (!g.tac && !f.tac && G.battle && G.battle.a === g && G.time - (G.battle.t0 || G.time) > 200) {
+      if (nearPlayer(g, 60) || nearPlayer(f, 60)) log('Die Heere finden nicht zueinander und ziehen wieder ab.');
+      g.foe = null; f.foe = null; g.path = null; f.path = null; G.battle = null;
     }
   } else if (G.battle && (G.battle.a === g || G.battle.b === g)) {
     // Der Gegner ist geschlagen oder fort: Sieg melden, dann heimziehen
@@ -5157,6 +5241,357 @@ function battleStatus() {
   const b = G.battle;
   if (!b) return null;
   return { a: GROUP_TYPES[b.a.type].name, na: b.a.members.length, b: GROUP_TYPES[b.b.type].name, nb: b.b.members.length, x: b.x, y: b.y };
+}
+
+// ===== tactics.js =====
+// Feldschlacht mit Verstand. Treffen zwei Heere aufeinander, stellen sie sich auf: Fußvolk vorn in Reihen,
+// Schützen dahinter, Reiter auf beiden Flügeln. Das Heer mit den stärkeren Schützen erwartet den Angriff und lässt
+// den Gegner in den Beschuss laufen, das andere rückt geschlossen vor. Die Linien halten zusammen: Wer kämpft,
+// entfernt sich nur ein Stück von seinem Platz. Sobald die Linien aufeinanderprallen (oder es zu lange dauert),
+// umgehen die Reiter die Flanke und fallen dem Gegner in den Rücken, am liebsten über seine Schützen her.
+// Wer zu viele Leute verliert, wankt und flieht; die Sieger setzen eine Weile nach.
+// Schilde schützen nur nach vorn (calcDamage in units.js): voll von vorn, halb von der Seite, gar nicht von hinten.
+
+
+
+
+
+
+const SP_COL = 0.82, SP_ROW = 0.9;      // Abstand nebeneinander und zwischen den Reihen
+const DEPLOY_DIST = 26;          // so weit voneinander stellen sich die Heere auf
+
+const roleOf = (m) => (m.st.ranged ? 'schuetze' : m.st.horse ? 'reiter' : 'fuss');
+const nomOf = (g) => GROUP_TYPES[g.type].nom;
+
+// Plätze in der Aufstellung, in Front-Koordinaten: l quer (rechts positiv), f nach vorn
+function layout(g) {
+  const T = g.tac, by = { fuss: [], schuetze: [], reiter: [] };
+  for (const m of g.members) { m.role = roleOf(m); m.tgt = null; m.wp = 0; by[m.role].push(m); }
+  const rows = (list, width, sp, f0, spRow) => {
+    list.forEach((m, i) => {
+      const row = Math.floor(i / width), n = Math.min(width, list.length - row * width), col = i % width;
+      m.slot = { l: (col - (n - 1) / 2) * sp, f: f0 - row * spRow };
+    });
+    return Math.ceil(list.length / width);
+  };
+  const nf = by.fuss.length;
+  const width = Math.max(5, Math.min(16, Math.ceil(nf / 3)));
+  const ranksF = nf ? rows(by.fuss, width, SP_COL, 0, SP_ROW) : 0;
+  const ns = by.schuetze.length;
+  const back = ranksF ? -(ranksF * SP_ROW + 2.2) : 0;
+  rows(by.schuetze, Math.max(4, Math.min(18, Math.ceil(ns / 2))), 0.95, back, SP_ROW);
+  T.halfW = ((Math.min(width, nf || width) - 1) / 2) * SP_COL;
+  T.depth = -back + 2 * SP_ROW;
+  by.reiter.forEach((m, i) => {
+    const side = i % 2 ? 1 : -1, j = Math.floor(i / 2);
+    m.wing = side;
+    m.slot = { l: side * (T.halfW + 2.6 + (j % 2) * 1.1), f: -0.6 - Math.floor(j / 2) * 1.2 };
+  });
+  T.count = { fuss: nf, schuetze: ns, reiter: by.reiter.length };
+  // Marschtempo der Linie: das langsamste Fußvolk im Schritt
+  T.speed = Math.min(...g.members.filter((m) => m.role === 'fuss').map((m) => m.st.speed), 1.4) * WALK * 0.92;
+}
+
+function slotPos(g, m) {
+  const T = g.tac, s = m.slot || { l: 0, f: 0 };
+  const x = T.ax - T.fy * s.l + T.fx * s.f, y = T.ay + T.fx * s.l + T.fy * s.f;
+  if (isWalkable(G.world, x, y)) { m._slotOk = { x, y }; return m._slotOk; }
+  return m._slotOk || { x: T.ax, y: T.ay };
+}
+
+// Was richten die Schützen gegen die Rüstungen des Gegners aus? (Schaden je Sekunde, mit Reichweite gewichtet)
+function rangedPower(g, f) {
+  const def = f.members.reduce((a, m) => a + m.st.def, 0) / Math.max(1, f.members.length);
+  let r = 0;
+  for (const m of g.members) if (m.st.ranged) r += ((m.st.atk * m.st.atk) / (m.st.atk + def * 1.5) / m.st.cd) * (m.st.range / 6);
+  return r;
+}
+
+// Treffen sich zwei Heere, stellen sie sich gegeneinander auf
+function startTactics(a, b) {
+  for (const [g, f] of [[a, b], [b, a]]) {
+    const dx = f.x - g.x, dy = f.y - g.y, d = Math.hypot(dx, dy) || 1;
+    g.tac = { state: 'aufstellen', fx: dx / d, fy: dy / d, ax: g.x, ay: g.y, t: 0, all: 0, cav: 'warten', start: g.members.length, broken: false, said: {}, lastHit: G.time };
+    g.path = null; g.feud = f;
+    layout(g);
+  }
+  // Haltung: Wer die besseren Schützen hat, lässt den Gegner kommen; ein klar größeres Heer greift an
+  const ra = rangedPower(a, b), rb = rangedPower(b, a), na = a.members.length, nb = b.members.length;
+  a.tac.stance = b.tac.stance = 'angriff';
+  if (na > nb * 1.35) b.tac.stance = rb > ra ? 'halten' : 'angriff';
+  else if (nb > na * 1.35) a.tac.stance = ra > rb ? 'halten' : 'angriff';
+  else if (Math.abs(ra - rb) > 0.15 * Math.max(ra, rb) && Math.random() < 0.8) (ra > rb ? a : b).tac.stance = 'halten';
+  if (nearPlayer(a, 60) || nearPlayer(b, 60)) {
+    log('Die Heere stellen sich zur Schlacht auf: Fußvolk in Reihen vorn, Schützen dahinter, Reiter auf den Flügeln.', 'bad');
+    for (const g of [a, b]) if (g.tac.stance === 'halten') log(`${nomOf(g)} erwartet den Angriff und lässt die Schützen arbeiten.`);
+  }
+}
+
+function endTactics(g) {
+  if (!g.tac) return;
+  g.tac = null;
+  for (const m of g.members) { m.tgt = null; m.role = null; m.slot = null; m._slotOk = null; m.tacRun = false; }
+}
+
+function centroid(list) {
+  if (!list.length) return null;
+  let x = 0, y = 0;
+  for (const m of list) { x += m.x; y += m.y; }
+  return { x: x / list.length, y: y / list.length };
+}
+
+// Wie weit vor der eigenen Front steht der nächste Feind (nur im Streifen vor der Linie)?
+function frontGap(g, f) {
+  const T = g.tac;
+  let best = Infinity;
+  for (const e of f.members) {
+    const dx = e.x - T.ax, dy = e.y - T.ay;
+    const fwd = dx * T.fx + dy * T.fy, lat = -dx * T.fy + dy * T.fx;
+    if (Math.abs(lat) < T.halfW + 3 && fwd < best) best = fwd;
+  }
+  return best;
+}
+
+function tacSay(g, key, text, kind) {
+  const T = g.tac;
+  if (T.said[key]) return;
+  T.said[key] = true;
+  if (nearPlayer(g, 60)) log(text, kind);
+}
+
+function shouldBreak(g, f) {
+  const lost = 1 - g.members.length / g.tac.start, flost = 1 - f.members.length / f.tac.start;
+  return g.members.length < 4 || lost > 0.62 || (lost > 0.42 && lost - flost > 0.25);
+}
+
+function finishBattle(win, lose) {
+  if (nearPlayer(win, 60) || nearPlayer(lose, 60)) log(`${nomOf(win)} behauptet das Feld. ${nomOf(lose)} ist geschlagen und zieht ab.`, 'gold');
+  endTactics(win); endTactics(lose);
+  endFeud(win);
+  win.foe = null; lose.foe = null;
+  const c = centroid(lose.members);
+  if (c) { lose.x = c.x; lose.y = c.y; }
+  const cw = centroid(win.members);
+  if (cw) { win.x = cw.x; win.y = cw.y; }
+  // Die Geschlagenen bekommen einen kleinen Vorsprung; begegnet man sich danach wieder, wird wieder gekämpft
+  lose.peace = G.time + 60; win.peace = G.time + 30;
+  lose.wait = 0; win.wait = 6;
+  if (G.battle && (G.battle.a === win || G.battle.b === win)) G.battle = null;
+}
+
+function partWays(a, b) {
+  if (nearPlayer(a, 60) || nearPlayer(b, 60)) log('Die Heere kommen nicht aneinander und trennen sich ohne Entscheidung.');
+  endTactics(a); endTactics(b); endFeud(a);
+  a.foe = null; b.foe = null;
+  for (const g of [a, b]) { const c = centroid(g.members); if (c) { g.x = c.x; g.y = c.y; } g.peace = G.time + 120; }
+  if (G.battle && (G.battle.a === a || G.battle.b === a)) G.battle = null;
+}
+
+// Jede Runde: Front ausrichten, vorrücken oder halten, Reiter führen, Moral prüfen
+function updateTactics(g, dt) {
+  const T = g.tac, f = g.feud;
+  if (!f || !f.tac || !f.members.length || !G.groups.includes(f)) { endTactics(g); return; }
+  T.t += dt; T.all += dt;
+  // Moral: Wer zu viel verliert, flieht; die Sieger setzen nach
+  if (!T.broken && !f.tac.broken && shouldBreak(g, f)) {
+    T.broken = true; T.brokeAt = G.time;
+    f.tac.state = 'verfolgen'; f.tac.t = 0;
+    tacSay(g, 'flucht', `${nomOf(g)} wankt und flieht!`, 'bad');
+  }
+  if (T.broken) {
+    T.ax = g.members[0].x; T.ay = g.members[0].y; g.x = T.ax; g.y = T.ay;
+    let close = false;
+    for (const m of g.members) { for (const e of f.members) if (Math.abs(e.x - m.x) + Math.abs(e.y - m.y) < 12) { close = true; break; } if (close) break; }
+    if (G.time - T.brokeAt > 22 || (!close && G.time - T.brokeAt > 5)) finishBattle(f, g);
+    return;
+  }
+  if (T.state === 'verfolgen' || T.state === 'handgemenge') { const c = centroid(g.members); T.ax = c.x; T.ay = c.y; g.x = c.x; g.y = c.y; return; }
+  // Steckt die Schlacht fest (Wald, Bach, Hang dazwischen, niemand trifft), löst sich die Ordnung ins Handgemenge auf
+  const idle = G.time - Math.max(T.lastHit || 0, f.tac.lastHit || 0);
+  // Kommen sie auch dann nicht aneinander, trennen sich die Heere ohne Sieger
+  if (T.all > 300 && idle > 30) { partWays(g, f); return; }
+  if ((T.all > 30 && idle > 18) || T.all > 180) {
+    for (const h of [g, f]) { h.tac.state = 'handgemenge'; h.tac.cav = 'angriff'; }
+    tacSay(g, 'gemenge', 'Die Ordnung löst sich auf, die Heere stürzen ins Handgemenge!', 'bad');
+    return;
+  }
+
+  // Die Front dreht langsam zum Gegner, solange die Linien sich nicht berühren
+  const ec = centroid(f.members.filter((m) => m.role === 'fuss')) || centroid(f.members);
+  if (T.state !== 'nahkampf' && ec) {
+    const dx = ec.x - T.ax, dy = ec.y - T.ay, d = Math.hypot(dx, dy) || 1, k = Math.min(1, dt * 0.35);
+    T.fx += (dx / d - T.fx) * k; T.fy += (dy / d - T.fy) * k;
+    const l = Math.hypot(T.fx, T.fy) || 1; T.fx /= l; T.fy /= l;
+  }
+  const gap = frontGap(g, f);
+  // Wie gut hält die Linie ihre Plätze? (Vorrücken nur, wenn sie geschlossen folgt)
+  let err = 0, n = 0;
+  for (const m of g.members) if (m.role === 'fuss' && !m.tgt) { const s = slotPos(g, m); err += Math.hypot(s.x - m.x, s.y - m.y); n++; }
+  const loose = n ? err / n : 0;
+  const advance = (mult) => {
+    const st = T.speed * mult * dt, nx = T.ax + T.fx * st, ny = T.ay + T.fy * st;
+    if (isWalkable(G.world, nx, ny)) { T.ax = nx; T.ay = ny; }
+  };
+  if (T.state === 'aufstellen') {
+    if ((n && loose < 1.1) || T.t > 10 || !n) { T.state = 'vorruecken'; T.t = 0; }
+  } else if (T.state === 'vorruecken') {
+    if (gap < 2.4) { T.state = 'nahkampf'; T.t = 0; if (f.tac.state === 'vorruecken') { f.tac.state = 'nahkampf'; f.tac.t = 0; } tacSay(g, 'prall', 'Die Linien prallen aufeinander!', 'bad'); f.tac.said.prall = true; }
+    else if (T.stance === 'angriff' && loose < 1.6) advance(1);
+    // Wer hält und nicht angegriffen wird, rückt nach einer Weile doch vor
+    if (T.stance === 'halten' && T.t > 24 && f.tac.stance === 'halten') T.stance = 'angriff';
+    if (T.stance === 'halten' && T.t > 40) T.stance = 'angriff';
+  } else if (T.state === 'nahkampf') {
+    // Die Linie drückt nach, solange vorn niemand steht
+    if (gap > 1.1 && loose < 2.2) advance(0.45);
+  }
+  // Reiter: warten auf dem Flügel, umgehen die Flanke, fallen in den Rücken
+  if (T.count.reiter) {
+    const inMelee = T.state === 'nahkampf' || f.tac.state === 'nahkampf';
+    // Wer angreift, schickt die Reiter los, kurz bevor die Linien sich treffen; wer hält, behält sie als Rückhalt
+    // und wirft sie feindlichen Reitern entgegen, die herankommen
+    let foeRiders = false;
+    if (T.cav === 'warten') for (const e of f.members) if (e.role === 'reiter' && Math.hypot(e.x - T.ax, e.y - T.ay) < T.halfW + 8) { foeRiders = true; break; }
+    const go = T.stance === 'halten' ? inMelee : inMelee || gap < 9 || T.all > 24;
+    if (T.cav === 'warten' && foeRiders) {
+      T.cav = 'angriff';
+      tacSay(g, 'gegenstoss', `${nomOf(g)}: Die Reiter werfen sich den feindlichen Reitern entgegen!`);
+    } else if (T.cav === 'warten' && go) {
+      T.cav = 'umgehen'; T.cavT = 0;
+      tacSay(g, 'flanke', `${nomOf(g)}: Die Reiter umgehen die Flanke!`);
+    } else if (T.cav === 'umgehen') {
+      T.cavT += dt;
+      if (T.cavT > 16) T.cav = 'angriff';
+    }
+  }
+  g.x = T.ax; g.y = T.ay;
+}
+
+// Ziel behalten, solange es lebt, Feind ist und in Reichweite bleibt
+function keepTarget(m, r) {
+  const t = m.tgt;
+  if (!t || t.dead || !isEnemy(m, t) || Math.hypot(t.x - m.x, t.y - m.y) > r) { m.tgt = null; return null; }
+  return t;
+}
+
+function fight(m, t, dt) {
+  m.tgt = t; m.tacRun = true;
+  const d = Math.hypot(t.x - m.x, t.y - m.y), r = m.st.range;
+  if (d > r * 0.95) chaseTo(m, t.x, t.y, dt, r * 0.85);
+  if (d <= r + 0.15 && m.cd <= 0) attack(m, t);
+}
+
+// Am Platz still stehen und nach vorn blicken
+function holdSlot(m, g, dt, vx, vy, mult = 1.15) {
+  const s = slotPos(g, m), T = g.tac, d = Math.hypot(s.x - m.x, s.y - m.y);
+  m.tacRun = d > 2;
+  if (d > 30) { m.x = s.x; m.y = s.y; return; }
+  const done = followSlot(m, s.x, s.y, vx, vy, dt, d > 2 ? 1.5 : mult);
+  if (done || d < 0.6) {
+    const k = Math.min(1, dt * 3);
+    faceDir(m, (m.dirX ?? T.fx) + (T.fx - (m.dirX ?? T.fx)) * k, (m.dirY ?? T.fy) + (T.fy - (m.dirY ?? T.fy)) * k);
+  }
+}
+
+function flee(m, g, dt) {
+  const f = g.feud;
+  m.tacRun = true; m.tgt = null;
+  const c = f && centroid(f.members);
+  let dx = c ? m.x - c.x : -g.tac.fx, dy = c ? m.y - c.y : -g.tac.fy;
+  const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+  if (!moveToward(m, m.x + dx * 4, m.y + dy * 4, dt, 0.05, 1.05)) chaseTo(m, m.x + dx * 6 - dy * 3, m.y + dy * 6 + dx * 3, dt, 0.3);
+}
+
+// Schützen nehmen das lohnendste Ziel in Reichweite: wenig Rüstung, und ein Schild hilft nur, wenn er zum Schützen zeigt
+function bestShot(m, f) {
+  if (!f) return null;
+  const r = m.st.range, atk = m.st.atk;
+  let best = null, bs = 0;
+  for (const e of f.members) {
+    const d = Math.hypot(e.x - m.x, e.y - m.y);
+    if (d > r) continue;
+    let def = e.st.def;
+    if (e.st.shield && e.dirX !== undefined && ((m.x - e.x) * e.dirX + (m.y - e.y) * e.dirY) / (d || 1) >= 0.5) def += e.st.shield * 0.5;
+    const sc = (atk * atk) / (atk + def * 1.5) * (1.15 - d / r * 0.3);
+    if (sc > bs) { bs = sc; best = e; }
+  }
+  return best;
+}
+
+// Wegpunkte der Reiter eines Flügels: erst seitlich neben die feindliche Linie, dann hinter sie
+function wingPoints(g, side) {
+  const T = g.tac, E = g.feud.tac;
+  const lx = -T.fy, ly = T.fx;               // eigene Querrichtung (der eigene Flügel liegt auf dieser Seite)
+  const w = (E.halfW || 4) + 5;
+  const p1 = { x: E.ax + lx * side * w - T.fx * 1, y: E.ay + ly * side * w - T.fy * 1 };
+  const back = (E.depth || 4) + 2.5;
+  const p2 = { x: E.ax + lx * side * (E.halfW || 4) * 0.4 + T.fx * back, y: E.ay + ly * side * (E.halfW || 4) * 0.4 + T.fy * back };
+  return [p1, p2];
+}
+
+function updateTacMember(m, g, dt) {
+  const T = g.tac;
+  if (T.broken) { flee(m, g, dt); return; }
+  if (T.state === 'verfolgen' || T.state === 'handgemenge') {
+    const r = T.state === 'handgemenge' ? 40 : 14;
+    const e = keepTarget(m, r) || nearestEnemy(m, r);
+    if (e) fight(m, e, dt); else { m.tacRun = false; m.tgt = null; }
+    return;
+  }
+  const vx = g.vx || 0, vy = g.vy || 0;
+  const role = m.role || (m.role = roleOf(m));
+  if (role === 'schuetze') {
+    // Nahkämpfer dicht dran: ein paar Schritte zurück, dann wehren
+    const close = nearestEnemy(m, 1.8);
+    if (close && !close.st.ranged) {
+      m.backT = (m.backT || 0) + dt;
+      if (m.backT < 2.5) { m.tacRun = true; moveToward(m, m.x - (close.x - m.x) * 2, m.y - (close.y - m.y) * 2, dt, 0.05, 0.95); if (m.cd <= 0 && Math.hypot(close.x - m.x, close.y - m.y) < 1.2) attack(m, close); return; }
+      fight(m, close, dt); return;
+    }
+    m.backT = Math.max(0, (m.backT || 0) - dt * 0.5);
+    m.pickT = (m.pickT || 0) - dt;
+    let t = keepTarget(m, m.st.range + 0.4);
+    if (!t || m.pickT <= 0) { t = bestShot(m, g.feud) || t; m.pickT = 1.5; }
+    if (t) { m.tgt = t; m.tacRun = false; faceDir(m, t.x - m.x, t.y - m.y); if (m.cd <= 0) attack(m, t); return; }
+    holdSlot(m, g, dt, vx, vy);
+    return;
+  }
+  if (role === 'fuss') {
+    const s = slotPos(g, m);
+    const leash = T.state === 'nahkampf' ? 5 : 1.8;
+    let t = keepTarget(m, m.st.range + 1.4);
+    if (t && Math.hypot(t.x - s.x, t.y - s.y) > leash + 2) { t = null; m.tgt = null; }
+    if (!t) { const e = nearestEnemy(m, leash + 1.5); if (e && Math.hypot(e.x - s.x, e.y - s.y) <= leash + 1.5) t = e; }
+    if (t) { fight(m, t, dt); return; }
+    holdSlot(m, g, dt, vx, vy);
+    return;
+  }
+  // Reiter
+  const near = nearestEnemy(m, T.cav === 'angriff' ? 14 : 2.6);
+  if (T.cav === 'angriff') {
+    // Im Rücken des Gegners: am liebsten die Schützen
+    let t = keepTarget(m, 4);
+    if (!t) {
+      let best = null, bd = 9;
+      for (const e of g.feud.members) { if (e.role !== 'schuetze') continue; const d = Math.hypot(e.x - m.x, e.y - m.y); if (d < bd) { bd = d; best = e; } }
+      t = best || near;
+    }
+    if (t) { fight(m, t, dt); return; }
+    holdSlot(m, g, dt, vx, vy); return;
+  }
+  if (near) { fight(m, near, dt); return; }
+  if (T.cav === 'umgehen') {
+    const pts = wingPoints(g, m.wing || 1);
+    m.wp = m.wp || 0;
+    const wp = pts[Math.min(1, m.wp)];
+    const j = (m.slot ? m.slot.f : 0) * 0.8;
+    m.tacRun = true; m.tgt = null;
+    if (chaseTo(m, wp.x - T.fx * j, wp.y - T.fy * j, dt, 1.2) || Math.hypot(wp.x - m.x, wp.y - m.y) < 2.4) {
+      if (m.wp === 0) m.wp = 1;
+      else { T.cav = 'angriff'; tacSay(g, 'ruecken', `${nomOf(g)}: Die Reiter fallen dem Gegner in den Rücken!`, 'bad'); }
+    }
+    return;
+  }
+  holdSlot(m, g, dt, vx, vy);
 }
 
 // ===== animals.js =====
@@ -9182,14 +9617,14 @@ function mercFaction(site) { return FACTIONS[site.faction] ? FACTIONS[site.facti
 
 
 
-function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
+function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
 
 function yearOf(day = G.s.day) { return 1194 + Math.floor((day - 1) / (DAYS_PER_SEASON * 4)); }
 
-function clockText() {
-  const h = hourOf();
+function clockText(time = G.s.time) {
+  const h = hourOf(time);
   const hh = Math.floor(h), mm = Math.floor((h - hh) * 60 / 15) * 15;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
@@ -16105,13 +16540,14 @@ function updateHUD() {
   const fast = document.querySelector('[data-tool="fast"]');
   if (fast) fast.classList.toggle('on', G.fast);
   const now = performance.now();
-  for (const el of byId('log').children) el.classList.toggle('old', now - Number(el.dataset.t) > 14000);
+  for (const el of byId('log').children) el.classList.toggle('old', now - Number(el.dataset.t) > 25000);
 }
 
 function renderLog() {
   const el = byId('log');
-  const msgs = G.messages.slice(-7);
-  el.innerHTML = msgs.map((m) => `<p class="msg ${m.kind}" data-t="${m.t}">${esc(m.text)}</p>`).join('');
+  const msgs = G.messages.slice(-8);
+  if (G.ui && G.ui.panel === 'chronik') refreshPanel();
+  el.innerHTML = msgs.map((m) => `<p class="msg ${m.kind}" data-t="${m.t}" title="Chronik öffnen (N)">${esc(m.text)}</p>`).join('');
 }
 
 function showPrompt(text) {
@@ -16139,7 +16575,7 @@ function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c', siege: 's', camp: 'c' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', chronik: 'alle', victory: 'v', cheat: 'c', siege: 's', camp: 'c' };
 
 function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -16172,7 +16608,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel, camp: campPanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, chronik: chronikPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel, camp: campPanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -16918,6 +17354,7 @@ function menuPanel() {
         <button class="btn sm${G.sfxOn && G.sfxOn() ? ' primary' : ''}" data-act="sfx" aria-pressed="${!!(G.sfxOn && G.sfxOn())}">Geräusche ${G.sfxOn && G.sfxOn() ? 'an' : 'aus'}</button>
       </div>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
+      <button class="btn" data-act="chronik">Chronik</button>
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -16940,6 +17377,28 @@ function cheatPanel() {
   };
 }
 
+// Chronik: alle Meldungen nach Tagen, die neuesten oben, wahlweise nur Kampf, nur Erfolge oder das Übrige
+const CHRONIK_FILTER = { alle: () => true, kampf: (m) => m.kind === 'bad', erfolge: (m) => m.kind === 'good' || m.kind === 'gold', sonst: (m) => m.kind !== 'bad' && m.kind !== 'good' && m.kind !== 'gold' };
+function chronikPanel() {
+  const all = G.s.chronik || [];
+  const list = all.filter(CHRONIK_FILTER[G.ui.tab] || CHRONIK_FILTER.alle).reverse();
+  let html = '', day = null;
+  for (const m of list) {
+    if (m.day !== day) {
+      if (day !== null) html += '</ol>';
+      day = m.day;
+      html += `<h3 class="chronik-tag">Tag ${m.day} · ${SEASONS[seasonIndex(m.day)]} ${yearOf(m.day)}</h3><ol class="chronik">`;
+    }
+    html += `<li class="msg ${m.kind}"><time>${clockText(m.time)}</time>${esc(m.text)}</li>`;
+  }
+  if (day !== null) html += '</ol>';
+  return {
+    title: 'Chronik', sub: `${all.length} Einträge, die neuesten oben`,
+    tabs: [['alle', 'Alles'], ['kampf', 'Kampf und Gefahr'], ['erfolge', 'Erfolge'], ['sonst', 'Übriges']],
+    body: html || '<p class="muted">Noch nichts verzeichnet.</p>',
+  };
+}
+
 function helpPanel() {
   return {
     title: 'Steuerung & Tipps', tabs: [],
@@ -16956,6 +17415,7 @@ function helpPanel() {
         <dt>F oder 1 2 3</dt><dd>Gefolge: folgen, Stellung halten, angreifen</dd>
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
+        <dt>N</dt><dd>Chronik: alle Meldungen zum Nachlesen</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
         <dt>L</dt><dd>Musik an und aus</dd>
         <dt>K</dt><dd>Geräusche an und aus</dd>
@@ -17007,6 +17467,7 @@ const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
+  chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
@@ -17127,6 +17588,8 @@ const ACTIONS = {
 
 function initUI() {
   G.onLog = renderLog;
+  // Ein Klick auf eine Meldung öffnet die Chronik
+  byId('log').addEventListener('click', (e) => { if (e.target.closest('.msg') && G.started) openPanel('chronik'); });
   G.rumor = rumor;
   byId('panel').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
@@ -17770,6 +18233,7 @@ function tool(name) {
     case 'quests': togglePanel('quests'); break;
     case 'politics': togglePanel('politics'); break;
     case 'map': togglePanel('map'); break;
+    case 'chronik': togglePanel('chronik'); break;
     case 'menu': togglePanel('menu'); break;
     case 'music': toggleMusic(); break;
     case 'ride': if (!panelOpen()) toggleRide(); break;
@@ -17795,7 +18259,7 @@ function onKey(e) {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (k === 'escape') { if (panelOpen()) closePanel(); else openPanel('menu'); e.preventDefault(); return; }
   if (k === 'f9') { togglePanel('cheat'); e.preventDefault(); return; }
-  const panelKeys = { i: 'party', j: 'quests', p: 'politics', m: 'map', h: 'help' };
+  const panelKeys = { i: 'party', j: 'quests', p: 'politics', m: 'map', n: 'chronik', h: 'help' };
   if (panelKeys[k]) { if (k === 'h') togglePanel('help'); else tool(panelKeys[k]); e.preventDefault(); return; }
   if (panelOpen()) return;
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); return; }
@@ -18083,7 +18547,7 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, step: (dt) => { G.time += dt; step(dt); } };
 
 })();
 </script>
