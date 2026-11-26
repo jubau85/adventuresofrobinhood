@@ -6,6 +6,18 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
 
 **Eigener Stil:** Das Spiel hat seinen eigenen Look. In den Prompts bitte keine Namen bestehender Spiele, Filme oder Künstler verwenden.
 
+**Stand dieses Briefs:** Spielversion 18. Seit der letzten Fassung sind dazugekommen:
+- der neue Maßstab: Figuren sind deutlich kleiner im Verhältnis zu den Häusern (siehe „Maßstab“ unten)
+- Baustellen, Brandruinen und Bauplätze, weil die Welt ständig baut und verfällt
+- neue Bewohner: Jäger, Fischer, Bettler, Bergleute, Einsiedler, Pilger, Reisende, Henker
+- Erzgruben, mystische Orte mit Einsiedlern, Lagerfeuer, Galgen, Friedhöfe, Turniere
+- Wahrzeichen: Kathedralen, Tower, Tuchhallen, Stonehenge und andere
+- Stadtmauern um die großen Städte
+- der kahle Winter vor dem ersten Schnee und das schrittweise Tauwetter
+- drei neue Burggebäude (Hospiz, Schafzucht, Felder) und neue Waren (Blei, Zinn, Silber)
+
+Die neuen Pakete 11 bis 13 und die Ergänzungen in den alten Paketen sind mit **neu** markiert.
+
 ---
 
 ## 1. Regeln für alle Bilder
@@ -22,7 +34,7 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
 - Keinen Schlagschatten auf den Boden malen, den zeichnet das Spiel selbst.
 
 **Freistellen:**
-- Unter dem Objekt kein Boden, kein Sockel, keine Grasplatte. Ausnahmen sind die Bodentexturen (Paket 2) und der weich auslaufende Bodenfuß der Gebäude (Paket 4 und 6). Mauerteile in Paket 5 bleiben ohne Boden, damit sie nahtlos aneinanderpassen.
+- Unter dem Objekt kein Boden, kein Sockel, keine Grasplatte. Ausnahmen sind die Bodentexturen (Paket 2) und der weich auslaufende Bodenfuß der Gebäude (Paket 4, 6, 11 und 12). Mauerteile in Paket 5 bleiben ohne Boden, damit sie nahtlos aneinanderpassen.
 - Am besten ein transparenter Hintergrund (PNG mit Alpha).
 - Falls Oakgen das nicht kann, ein einfarbiger Hintergrund, den ich ausstanze:
   - Reingrün `#00FF00` für alles außer Pflanzen
@@ -37,8 +49,17 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
   - Markisen der Marktstände und Zeltbahnen auf dem Markt
 - Das Spiel färbt Magenta automatisch um. Deshalb sonst nirgends Pink oder Violett verwenden.
 
+**Maßstab (neu, wichtig):**
+- Eine Bodenkachel ist im Spiel 64 × 32 Pixel groß (1×).
+- Ein erwachsener Mensch zu Fuß ist **etwa 15 Pixel** hoch, ein Reiter mit Pferd etwa 24.
+- Eine Bauernkate ist **drei- bis viermal so hoch wie ein Mensch**: Die Traufe liegt bei gut 1,5 Menschenhöhen, der First bei 3 bis 3,5. Die Tür ist knapp eine Menschenhöhe hoch.
+- Burg- und Stadtmauern sind etwa 2,5 Menschenhöhen hoch, Türme 4, ein Bergfried 6 bis 7. Kathedralen überragen alles.
+- Eine große Eiche ist etwa fünfmal so hoch wie ein Mensch.
+- Bei allen Bildern mit Menschen darin oder daneben bitte genau auf dieses Verhältnis achten. Ist eine Tür doppelt so hoch wie eine Figur, wirkt alles falsch.
+
 **Größe:**
-- In den Tabellen steht die Größe im Spiel (1×). Bitte **viermal so groß** liefern (4×), gern auch größer, solange das Seitenverhältnis gleich bleibt. Beispiel: 1× = 64 × 84 heißt Lieferung 256 × 336.
+- In den Tabellen steht die Größe im Spiel (1×). Gebäude, Bäume und Dinge bitte **viermal so groß** liefern (4×), gern auch sechsmal, solange das Seitenverhältnis gleich bleibt. Beispiel: 1× = 64 × 84 heißt Lieferung 256 × 336.
+- **Figuren und Tiere achtmal so groß** (8×). Sie sind im Spiel klein, aber man kann bis zur fünffachen Größe heranzoomen.
 - Das Objekt steht mittig, ist ganz zu sehen und hat rundherum etwa 5 % Luft.
 - Der Fußpunkt (Mitte der Grundfläche) liegt unten in der Mitte.
 
@@ -81,24 +102,34 @@ Was noch fehlt, zeichnet das Spiel weiter selbst. Du kannst also stückweise lie
 | `titel/titel_quer.jpg`, `titel_hoch.jpg` | Passt, ist eingebaut. |
 | `boden/wiese_sommer.png` | Passt, ist eingebaut. Die übrigen Bodentexturen bitte im selben Maßstab: Grashalme so groß wie hier. |
 | `natur/laub_1_sommer.png` | Passt, ist eingebaut. Weitere Bäume bitte genauso freigestellt, Stammfuß unten in der Mitte. |
-| `haus/stroh_1.png` | Schön gemalt, aber zu sehr Aufbauspiel und zu „aufgesetzt“. Bitte nach den neuen Regeln in Paket 4 neu erzeugen. |
+| `haus/stroh_1.png` | Schön gemalt, aber zu sehr Aufbauspiel und zu „aufgesetzt“. Bitte nach den Regeln in Paket 4 neu erzeugen, mit dem neuen Maßstab (Tür knapp eine Menschenhöhe). |
+
+**Als Nächstes empfehle ich diese Reihenfolge:**
+1. `haus/stroh_1.png` neu, dann der Rest von Paket 4. Häuser bestimmen das Bild jedes Ortes.
+2. Paket 7, Figuren im neuen Maßstab, zuerst `figuren/ritter.png` als Probestück.
+3. Paket 3, Bäume mit den neuen kahlen Wintervarianten.
+4. Paket 2, Bodentexturen.
+5. Danach nach Lust und Laune: Wahrzeichen (Paket 11), mystische Orte und Gruben (12), Turnier (13).
 
 ## 3. Pakete in der Reihenfolge der Wirkung
 
 | Paket | Inhalt | ca. Bilder | Wirkung |
 | --- | --- | --- | --- |
 | 1 | Titelbild | 2 | sofort sichtbar |
-| 2 | Bodentexturen | 24 | ganze Landschaft |
-| 3 | Bäume, Büsche, Felsen | 37 | ganze Landschaft |
-| 4 | Häuser, Kirchen, Dorfdinge | 30 | alle Orte |
-| 5 | Burgen-Baukasten, Hafen | 22 | Burgen, Küste |
-| 6 | Eigene Burg im Ausbau | 33 | das Herz des Spiels |
-| 7 | Figuren | 26 Bögen | alle Menschen |
+| 2 | Bodentexturen | 27 | ganze Landschaft |
+| 3 | Bäume, Büsche, Felsen | 44 | ganze Landschaft |
+| 4 | Häuser, Kirchen, Dorfdinge, Baustellen | 35 | alle Orte |
+| 5 | Burgen-Baukasten, Stadtmauer, Hafen | 25 | Burgen, Städte, Küste |
+| 6 | Eigene Burg im Ausbau | 42 | das Herz des Spiels |
+| 7 | Figuren, Lasten | 42 Bögen, 13 Lasten | alle Menschen |
 | 8 | Tiere | 6 Bögen | Weiden, Wald |
-| 9 | Symbole und Porträts | 60 | Tafeln und Menüs |
+| 9 | Symbole und Porträts | 66 | Tafeln und Menüs |
 | 10 | Musik (optional) | 7 Stücke | Ton |
+| 11 | **neu:** Wahrzeichen | 15 | Kathedralen, Tower, Tuchhallen, Stonehenge |
+| 12 | **neu:** Mystische Orte, Gruben, Lagerfeuer, Galgen, Friedhof | 23 | Land zwischen den Orten |
+| 13 | **neu:** Turnier | 4 | Turnierplatz |
 
-Die Pakete 1 bis 4 verändern das Bild am stärksten, damit würde ich anfangen.
+Die Pakete 2 bis 4 und 7 verändern das Bild am stärksten, damit würde ich anfangen.
 
 ---
 
@@ -138,12 +169,15 @@ Größe 1× 256 × 256, Lieferung 1024 × 1024. Das Spiel legt die Textur selbst
 | `boden/wiese_fruehling.png` | fresh light-green meadow with tiny white and yellow flowers |
 | `boden/wiese_herbst.png` | late-autumn meadow, yellowed and olive grass, a few fallen leaves |
 | `boden/wiese_winter.png` | thin snow cover with grass tufts showing through |
+| `boden/wiese_kahl.png` | **neu:** bare early-winter meadow without snow, dull olive and brown grass, a touch of frost |
 | `boden/waldboden_sommer.png` | forest floor, moss, ferns, dark soil, twigs |
 | `boden/waldboden_herbst.png` | forest floor covered in orange and brown fallen leaves |
 | `boden/waldboden_winter.png` | forest floor with patchy snow, needles and dark leaves |
+| `boden/waldboden_kahl.png` | **neu:** wet dark forest floor in early winter, brown leaves, no snow |
 | `boden/heide_sommer.png` | upland moor, heather, short grass, small grey stones |
 | `boden/heide_herbst.png` | upland moor, purple-brown heather, bracken |
 | `boden/heide_winter.png` | snowy upland moor, rocks and dry heather peeking out |
+| `boden/heide_kahl.png` | **neu:** bare brown upland moor in early winter, no snow |
 | `boden/acker_jung.png` | ploughed field with straight rows of young green crops, rows run horizontally |
 | `boden/acker_reif.png` | ripe golden wheat field, rows run horizontally |
 | `boden/acker_brach.png` | freshly ploughed brown furrows, rows run horizontally |
@@ -159,6 +193,8 @@ Größe 1× 256 × 256, Lieferung 1024 × 1024. Das Spiel legt die Textur selbst
 | `boden/pflaster.png` | rough cobblestone town square |
 | `boden/schlamm.png` | wet mud with puddles (for camps and building sites) |
 
+> **Neu:** Der Winter kommt jetzt nach und nach. Erst ist das Land kahl und graugrün (`_kahl`), dann bleibt Schnee in Flecken liegen, dann ist alles weiß (`_winter`). Die Schneeflecken dazwischen malt das Spiel selbst.
+
 ---
 
 ## Paket 3: Bäume, Büsche, Felsen
@@ -173,6 +209,7 @@ Stil-Baustein + Motiv. Hintergrund transparent oder Magenta.
 | `natur/laub_4_sommer.png` | 56 × 64 | small apple tree with red apples |
 | `natur/laub_1_herbst.png` … `laub_4_herbst.png` | wie oben | same trees in autumn colours, orange, rust and gold leaves |
 | `natur/laub_1_winter.png` … `laub_4_winter.png` | wie oben | same trees bare in winter, snow on the branches |
+| `natur/laub_1_kahl.png` … `laub_4_kahl.png` | wie oben | **neu:** same trees bare in early winter, no snow, dark wet bark |
 | `natur/laub_1_fruehling.png` … `laub_4_fruehling.png` | wie oben | same trees in spring, fresh light green, white blossoms on the apple tree |
 | `natur/nadel_1.png` | 44 × 92 | tall pine tree, rounded layered branches, reddish trunk |
 | `natur/nadel_2.png` | 44 × 92 | dark spruce, soft drooping branches |
@@ -183,6 +220,7 @@ Stil-Baustein + Motiv. Hintergrund transparent oder Magenta.
 | `natur/busch_3_sommer.png` | 36 × 28 | bramble bush with berries |
 | `natur/busch_1_herbst.png` … `busch_3_herbst.png` | wie oben | same bushes in autumn colours |
 | `natur/busch_1_winter.png` … `busch_3_winter.png` | wie oben | same bushes bare with snow |
+| `natur/busch_1_kahl.png` … `busch_3_kahl.png` | wie oben | **neu:** same bushes bare, brown twigs, no snow |
 | `natur/fels_1.png` | 48 × 36 | rounded mossy boulder |
 | `natur/fels_2.png` | 52 × 34 | cluster of three weathered grey rocks |
 | `natur/fels_3.png` | 40 × 40 | tall standing stone, lichen |
@@ -238,6 +276,8 @@ flower box, brick chimney, chimney pot, glass windows, decorative ridge beam, al
 
 Die **Grundfläche** ist in Feldern angegeben, eine Raute entspricht 1 × 1.
 
+**Maßstab:** Bei einer Kate mit 1,2 × 1 Feldern liegt die Traufe etwa 26 Pixel (1×) über dem Boden, der First etwa 50. Die Tür ist rund 15 Pixel hoch, so hoch wie ein Mensch. Stadthäuser sind zwei- bis dreigeschossig und entsprechend höher.
+
 | Datei | Grundfläche | 1× | Motiv |
 | --- | --- | --- | --- |
 | `haus/stroh_1.png` | 1.2 × 1 | 92 × 88 | small english peasant cottage with low limewashed wattle-and-daub walls, a huge thick weathered thatched hipped roof sweeping down almost to head height with deep rounded eaves, curved cruck timbers visible on the gable end, smoke hole at the top of the thatch, no chimney, small unglazed window with a wooden shutter, low plank door |
@@ -269,6 +309,16 @@ Die **Grundfläche** ist in Feldern angegeben, eine Raute entspricht 1 × 1.
 | `haus/kisten.png` | 0.4 | 28 × 26 | wooden crates and a sack |
 | `haus/zaun_x.png` | 1 Feld | 68 × 40 | woven wattle hurdle fence segment running from upper left to lower right |
 | `haus/zaun_y.png` | 1 Feld | 68 × 40 | woven wattle hurdle fence segment running from upper right to lower left |
+
+**Neu: Bauen und Verfall.** Auf Bauplätzen am Ortsrand entstehen laufend neue Häuser, anderswo brennt eines ab und wird neu errichtet. Dafür braucht es diese Stufen, passend zur Grundfläche einer Kate (1,2 × 1). Bauleute und Rauch zeichnet das Spiel darüber.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `haus/bauplatz.png` | 1.2 × 1 | 90 × 50 | staked-out building plot, wooden pegs and string, a small pile of timber, trampled earth |
+| `haus/rohbau_1.png` | 1.2 × 1 | 90 × 70 | foundation of rubble stones and the first oak frame posts standing, timber pile beside it |
+| `haus/rohbau_2.png` | 1.2 × 1 | 90 × 84 | cottage half built: oak frame complete, wattle panels half filled with daub, simple wooden scaffolding with a ladder |
+| `haus/rohbau_3.png` | 1.2 × 1 | 92 × 88 | walls finished, bare roof rafters, first bundles of thatch on the lower edge, scaffolding |
+| `haus/brandruine.png` | 1.2 × 1 | 90 × 60 | burnt-out cottage, blackened wall stubs, charred fallen beams, ash, a little smoke |
 
 > Die Dateinamen haben sich geändert: Statt `ziegel_1..3` heißen die Stadthäuser jetzt `fachwerk_1..2` und `stein_1`. Rote Ziegeldächer gab es um 1194 in englischen Städten kaum.
 
@@ -303,6 +353,9 @@ Die Anschlüsse sollen nahtlos aneinanderpassen. Gleich hoch, gleiche Steine, ke
 | `burg/ruine_mauer_2.png` | 68 × 40 | low ruined wall with a broken arch |
 | `burg/ruine_turm.png` | 72 × 90 | ruined tower stump, broken top, ivy |
 | `burg/schutt.png` | 56 × 30 | pile of rubble and fallen dressed stones |
+| `burg/stadtmauer_block.png` | 68 × 92 | **neu:** one block of a town wall exactly one tile in size, crenellated on top, the same stone on all sides, so blocks can follow a curving ring |
+| `burg/stadtturm.png` | 84 × 130 | **neu:** square town-wall tower, slightly wider than one tile, crenellated, arrow slits |
+| `burg/stadttor.png` | 84 × 140 | **neu:** town gate tower over a road, open arch, a magenta banner on top |
 | `hafen/kogge_x.png` | 150 × 140 | medieval cog ship, round wooden hull, single mast, big square sail with red and cream stripes, small castles fore and aft, ship lies along the line from upper left to lower right, calm water line, no water around it |
 | `hafen/kogge_y.png` | 150 × 140 | same cog, lying along the line from upper right to lower left |
 | `hafen/boot.png` | 60 × 40 | small wooden fishing boat with nets |
@@ -329,6 +382,9 @@ Für alle Gebäude hier gelten der Haus-Baustein und die englischen Regeln aus P
 | `eigen/markt_1..3.png` | 2.8 × 2.4 | two stalls on a trampled square | four stalls and a well | paved market square, market cross, covered market hall |
 | `eigen/kapelle_1..3.png` | 2.6 × 1.3 | wooden wayside cross with a tiny roof | small wooden chapel | stone chapel with bell tower |
 | `eigen/wachturm_1..3.png` | 1 × 1 | wooden lookout platform | wooden tower with roof | tall round stone tower with crenellations |
+| `eigen/hospiz_1..3.png` | 2 × 2.4 | **neu:** herb garden and a small timber infirmary | timber hospice with beds under a long roof, herb beds | stone hospital with a chapel end and a cloister garden |
+| `eigen/schafzucht_1..3.png` | 3 × 2.6 | **neu:** wattle sheep pen and a lean-to | pen, sheepfold barn and wool bales | large stone sheepfold, shearing shed, stacked wool bales |
+| `eigen/felder_1..3.png` | 1.8 × 1.6 | **neu:** small field barn | tithe barn of timber with a thatched roof | big stone tithe barn and a wooden post windmill |
 | `eigen/baustelle_klein.png` | 1 × 1 | wooden scaffolding around a half-built wall, stacked timber, ropes, a ladder | | |
 | `eigen/baustelle_mittel.png` | 2 × 1.5 | larger building site, scaffolding, half-built stone walls, wooden crane | | |
 | `eigen/baustelle_gross.png` | 3 × 2 | big building site for a keep, scaffolding on several levels, treadwheel crane, material piles | | |
@@ -352,9 +408,9 @@ Alle Menschen kommen als **Bogen** (Sprite-Sheet) mit festem Raster:
   - Zeile 1: Die Figur geht **schräg auf den Betrachter zu, nach links unten**.
   - Zeile 2: Sie geht **schräg vom Betrachter weg, nach rechts oben** (Rücken zu sehen).
   - Die übrigen Richtungen erzeugt das Spiel daraus.
-- **Zellgröße:**
-  - Zu Fuß 1× 40 × 40, die Figur ist etwa 28 Pixel hoch. Lieferung 4×, also 160 × 160 je Zelle und **1280 × 320** je Bogen.
-  - Beritten 1× 64 × 56, Lieferung 256 × 224 je Zelle und **2048 × 448** je Bogen.
+- **Zellgröße (neu, kleinerer Maßstab):**
+  - Zu Fuß 1× 24 × 24, die Figur ist etwa 15 Pixel hoch. Lieferung 8×, also 192 × 192 je Zelle und **1536 × 384** je Bogen. Die Figur füllt etwa zwei Drittel der Zellhöhe.
+  - Beritten 1× 40 × 34, Lieferung 8×, also 320 × 272 je Zelle und **2560 × 544** je Bogen.
 - Die Füße stehen in jeder Zelle auf derselben Höhe, der Fußpunkt liegt mittig im unteren Fünftel.
 - Gleiche Figur, gleiche Farben und gleiche Größe in allen Zellen.
 
@@ -404,6 +460,30 @@ Falls Oakgen keine sauberen Bögen schafft, reichen auch Einzelbilder, etwa `rit
 | `figuren/moench.png` | monk in a brown habit with a rope belt, hood |
 | `figuren/kind.png` | village child, simple tunic (only idle and walking needed) |
 
+**Neu: weitere Leute im Land.** Für sie gilt ein **Alltags-Bogen** mit 8 Spalten: Stehen, Gehen 1 bis 4, Arbeiten 1 und 2 (die Bewegung ihrer Arbeit), Sitzen. Zwei Zeilen wie oben. Das Werkzeug der Arbeit bitte mitmalen.
+
+| Datei | Motiv |
+| --- | --- |
+| `figuren/jaeger.png` | hunter in green-brown, hood, longbow; work frames: crouching and drawing the bow |
+| `figuren/fischer.png` | fisherman with a wide hat, rod; work frames: casting and waiting |
+| `figuren/bergmann.png` | miner in a dark hooded tunic and leather apron, pickaxe; work frames: swinging the pick |
+| `figuren/bettler.png` | ragged beggar in a patched grey tunic, wooden bowl, some with a crutch; work frames: sitting and holding out the bowl |
+| `figuren/einsiedler.png` | old hermit with a long white beard, brown robe, walking staff; work frames: kneeling in prayer |
+| `figuren/pilger.png` | pilgrim with a wide-brimmed hat, a scallop shell, tall staff and a satchel |
+| `figuren/reisender.png` | traveller in a hooded cloak with a bundle on a stick |
+| `figuren/priester.png` | priest in a black cassock with a wooden cross; work frames: blessing |
+| `figuren/wirt.png` | innkeeper with a white apron and a jug of ale |
+| `figuren/hirte.png` | shepherd with a crook and a straw hat |
+| `figuren/magd.png` | maid with a headscarf and a wooden bucket |
+| `figuren/handwerker.png` | craftsman with a leather apron and a hammer |
+| `figuren/buerger.png`, `figuren/buergerin.png` | townsfolk in coloured wool clothes, plain and tidy |
+| `figuren/haendler.png` | market trader on foot in a coloured tunic and a cap; work frames: calling out and waving |
+| `figuren/henker.png` | executioner in a black hood and dark tunic |
+| `figuren/turnierritter_beritten.png` | tournament knight on a warhorse with a magenta caparison, lance with a magenta pennant; attack frames: lance couched forward |
+
+**Neu: Lasten zum Auflegen.** Was die Leute tragen, legt das Spiel als kleines Bild auf den Rücken oder in die Hand. Einzelbilder, 1× 16 × 16, Lieferung 8×, Baustein aus Paket 9:
+`last_reisig`, `last_holz`, `last_balken`, `last_sack`, `last_korb`, `last_eimer`, `last_erz`, `last_wild` (deer over the shoulders), `last_hase`, `last_fisch`, `last_heu`, `last_bahre` (stretcher with a shrouded body), `last_kreuz` (processional cross), jeweils als `figuren/<name>.png`.
+
 ---
 
 ## Paket 8: Tiere
@@ -419,12 +499,14 @@ Dazu 2 Zeilen wie bei den Figuren.
 
 | Datei | Zelle 1× | Motiv |
 | --- | --- | --- |
-| `tiere/schaf.png` | 32 × 28 | fluffy cream sheep, black face |
-| `tiere/kuh.png` | 44 × 36 | brown and white cow |
-| `tiere/huhn.png` | 18 × 18 | small brown hen |
-| `tiere/hirsch.png` | 44 × 44 | red deer stag with antlers |
-| `tiere/ente.png` | 20 × 16 | mallard duck swimming (no water drawn) |
-| `tiere/pferd.png` | 56 × 48 | riderless chestnut horse with saddle |
+| `tiere/schaf.png` | 20 × 17 | fluffy cream sheep, black face |
+| `tiere/kuh.png` | 27 × 22 | brown and white cow |
+| `tiere/huhn.png` | 11 × 11 | small brown hen |
+| `tiere/hirsch.png` | 27 × 27 | red deer stag with antlers |
+| `tiere/ente.png` | 12 × 10 | mallard duck swimming (no water drawn) |
+| `tiere/pferd.png` | 34 × 29 | riderless chestnut horse with saddle |
+
+Neuer Maßstab: Die Zellen sind kleiner als in der ersten Fassung, dafür bitte **8×** liefern (Schaf also 160 × 136 je Zelle).
 
 ---
 
@@ -452,6 +534,9 @@ Größe 1× 64 × 64, Lieferung 256 × 256.
 | wein | wine barrel with a jug |
 | fleisch | joint of meat |
 | felle | stack of furs |
+| blei | **neu:** grey lead ingots |
+| zinn | **neu:** small shining tin ingots |
+| silber | **neu:** silver ingot and a few coins |
 
 **Ausrüstung** (`icons/item_<name>.png`):
 
@@ -477,6 +562,9 @@ Größe 1× 64 × 64, Lieferung 256 × 256.
 | markt | Münze |
 | kapelle | Kreuz |
 | wehr | Turm |
+| hospiz | **neu:** Kräuterbund |
+| schafzucht | **neu:** Schaf |
+| felder | **neu:** Ähre |
 
 **Fraktionswappen** (`icons/wappen_<name>.png`), als Wappenschild:
 
@@ -523,10 +611,93 @@ Falls Oakgen auch Musik kann. Bitte als OGG oder MP3 mit 160 kbit/s, nahtlos wie
 
 ---
 
+## Paket 11 (neu): Wahrzeichen
+
+Große, bekannte Bauten der Zeit um 1194. Stil-Baustein wie immer, **ohne** Haus-Baustein, aber mit Bodenfuß. Die Bauten sind echt. Bitte so malen, wie sie um 1194 aussahen: romanisch, mit Rundbögen, viele Kathedralen noch im Bau. Keine späteren gotischen Spitzbogenfassaden.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `wahrzeichen/kathedrale_tuerme.png` | 5.5 × 3.6 | 300 × 250 | large romanesque cathedral of pale limestone, two square west towers with low pyramid roofs, long nave with round-arched windows and buttresses, transepts, a massive square crossing tower with battlements, round apse at the east end, slate roofs |
+| `wahrzeichen/kathedrale_spitze.png` | 6 × 3.6 | 300 × 320 | romanesque cathedral with a tall slender timber spire on the crossing tower, long nave, transepts, round apse |
+| `wahrzeichen/kathedrale_bau.png` | 5.5 × 3.6 | 310 × 280 | cathedral under construction: east end finished, nave walls half built, wooden scaffolding, a treadwheel crane, stacked stone blocks |
+| `wahrzeichen/kathedrale_ruine.png` | 5.5 × 3.6 | 300 × 220 | cathedral recently gutted by fire: roof gone, blackened walls and window arches, charred beams, scaffolding at one end |
+| `wahrzeichen/abtei_fels.png` | 4.5 × 3.5 | 260 × 300 | small abbey church and monastery buildings crowded on top of a steep rocky island hill, a few houses clinging to the slope |
+| `wahrzeichen/tower_weiss.png` | 3.7 × 3.4 | 230 × 210 | great square norman keep of whitewashed stone with four corner turrets, inside a low curtain wall with a gate, a magenta banner on top |
+| `wahrzeichen/tower_grau.png` | 3.7 × 3.4 | 230 × 210 | the same kind of keep in grey stone, a flemish count's castle |
+| `wahrzeichen/motte.png` | 3.2 × 3.2 | 205 × 200 | motte-and-bailey castle: a steep grassy earth mound with a wooden keep and palisade on top, a wooden stair up the mound |
+| `wahrzeichen/rundturm.png` | 2.6 × 2.6 | 170 × 200 | massive round stone keep under construction inside a square curtain wall, scaffolding on the top storey |
+| `wahrzeichen/tuchhalle.png` | 3.4 × 1.8 | 170 × 150 | long stone cloth hall with arcades on the ground floor, a steep tiled roof, market stalls in front |
+| `wahrzeichen/tuchhalle_belfried.png` | 3.4 × 1.8 | 170 × 260 | the same cloth hall with a tall square belfry tower in the middle |
+| `wahrzeichen/stonehenge.png` | 3.6 × 3.6 | 230 × 130 | ancient circle of huge grey sarsen stones with lintels, some fallen, inner horseshoe of trilithons, grassy ground patch |
+| `wahrzeichen/tor.png` | 5.5 × 5.5 | 350 × 260 | steep green conical hill with terraced sides and a small stone chapel tower on the summit |
+| `wahrzeichen/wall_x.png` | 1 Feld | 68 × 60 | segment of an ancient roman frontier wall, crumbled top, grass and moss, runs from upper left to lower right (dazu `wall_y.png` in der anderen Richtung) |
+
+---
+
+## Paket 12 (neu): Mystische Orte, Gruben, Lagerfeuer, Galgen, Friedhof
+
+Stil-Baustein, Haus-Baustein bei Hütten, Bodenfuß überall außer bei den kleinen Dingen. **Keine Menschen** in die Bilder malen, die zeichnet das Spiel.
+
+**Mystische Orte der Einsiedler.** Sie sollen still, alt und ein wenig geheimnisvoll wirken: Moos, Flechten, Nebelfetzen am Boden, warmes Licht in der Klause. Kein Fantasy-Glühen, keine Runen, keine Magie.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `mystisch/klause.png` | 1.2 × 1.2 | 80 × 76 | tiny round hermit's hut of rough stone with a conical thatched roof, low wooden door, a small wooden cross by the door, smoke hole |
+| `mystisch/quelle.png` | 1.2 × 1 | 72 × 52 | holy spring: a small stone basin with clear water among mossy stones, a simple wooden cross, ferns |
+| `mystisch/steinkreis.png` | 2.4 × 2.2 | 150 × 100 | small circle of nine weathered standing stones with lichen, a flat altar stone in the middle |
+| `mystisch/huegelgrab.png` | 2.2 × 2 | 140 × 80 | long grassy burial mound with a dark entrance framed by huge upright stones and a capstone |
+| `mystisch/hoehle.png` | 2 × 1.4 | 110 × 84 | sandstone rock face with a dark cave mouth, a cross carved into the rock, ivy |
+| `mystisch/eibe.png` | 1.5 × 1.5 | 100 × 110 | ancient gnarled yew tree with a hollow trunk, coloured cloth ribbons tied to the branches, a small stone shrine at its foot |
+
+**Erzgruben.** Bergbau um 1194: kleine Stollen im Hang, Handarbeit, Holz und Stein.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `grube/stollen.png` | 2.4 × 1.5 | 130 × 92 | mine entrance: a rocky hillside outcrop with grass on top and a timber-framed adit portal leading into darkness, plank track coming out |
+| `grube/halde.png` | 2.2 × 1.8 | 130 × 70 | spoil heap of grey-brown waste rock and slag |
+| `grube/erz_eisen.png` | 0.6 | 40 × 26 | pile of rusty red-brown iron ore |
+| `grube/erz_blei.png` | 0.6 | 40 × 26 | pile of grey lead ore (galena) with a metallic sheen |
+| `grube/erz_zinn.png` | 0.6 | 40 × 26 | pile of dark tin ore and washed grey gravel |
+| `grube/erz_silber.png` | 0.6 | 40 × 26 | pile of grey ore with bright silvery glints |
+| `grube/meiler.png` | 1.2 | 76 × 42 | charcoal clamp: a dome of stacked wood covered with earth and turf, thin smoke |
+| `grube/hunt.png` | 0.6 | 40 × 30 | small wooden mine cart on plank rails, loaded with ore |
+
+**Lagerfeuer.** Köhler, Jäger, Hirten und Pilger rasten an Waldrändern. Das Feuer selbst zeichnet das Spiel.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `lager/sitzstamm.png` | 0.8 | 50 × 22 | fallen log used as a bench |
+| `lager/unterstand.png` | 1 × 1 | 64 × 50 | lean-to shelter of branches and hides |
+| `lager/wildbret.png` | 0.5 | 30 × 40 | wooden tripod with a deer carcass hanging from it |
+| `lager/kessel.png` | 0.4 | 26 × 30 | iron cooking pot hanging from a tripod (no fire, the game draws it) |
+
+**Galgen und Friedhof.** Der Galgen bitte **leer**, mit Strick. Den Rest zeichnet das Spiel.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `recht/galgen.png` | 1.2 × 0.9 | 70 × 76 | wooden gallows: two posts, a crossbeam with an empty noose, a small plank platform with steps |
+| `friedhof/grab_1.png`, `grab_2.png`, `grab_3.png` | 0.3 | 22 × 22 | grave mound with a small wooden cross (dazu zwei Varianten: grave slab, small stone cross) |
+| `friedhof/zaun.png` | 1 Feld | 68 × 30 | low wattle churchyard fence segment, runs from upper left to lower right |
+
+---
+
+## Paket 13 (neu): Turnier
+
+Vor einer Stadt oder Burg wird ein Turnierplatz aufgebaut. Die Farben der Ritter und des Gastgebers bitte in **Magenta**, das Spiel färbt um.
+
+| Datei | Grundfläche | 1× | Motiv |
+| --- | --- | --- | --- |
+| `turnier/schranke.png` | 1 Feld | 68 × 34 | one segment of a jousting tilt barrier: low wooden fence with a draped cloth in magenta and cream stripes, runs from upper left to lower right, open ends so segments join |
+| `turnier/tribuene.png` | 7.2 × 1.5 | 280 × 190 | long wooden spectator stand with three tiers, a raised central box under a striped magenta canopy, banners; seated spectators painted in, small and simple |
+| `turnier/pavillon.png` | 1 × 1 | 70 × 82 | round knight's pavilion tent with magenta and cream stripes, scalloped edge, pennant on top |
+| `turnier/bannerstange.png` | 0.2 | 24 × 64 | tall pole with a long magenta banner |
+
+---
+
 ## 4. Lieferung
 
 **Ordner:** alles unter `assets/` mit diesen Unterordnern:
-`titel`, `boden`, `natur`, `haus`, `burg`, `hafen`, `eigen`, `figuren`, `tiere`, `icons`, `portraits`, `ui`, `musik`
+`titel`, `boden`, `natur`, `haus`, `burg`, `hafen`, `eigen`, `figuren`, `tiere`, `icons`, `portraits`, `ui`, `musik`, und neu `wahrzeichen`, `mystisch`, `grube`, `lager`, `recht`, `friedhof`, `turnier`
 
 **Übergabe:**
 - Hier im Chat anhängen oder direkt in den Ordner legen.
@@ -540,3 +711,10 @@ Falls Oakgen auch Musik kann. Bitte als OGG oder MP3 mit 160 kbit/s, nahtlos wie
 - Bodentexturen werden auf die schrägen Rauten und Hügel gelegt.
 - Die Mauerteile werden zu den Burgringen zusammengesetzt.
 - Fußpunkte und Größen gleiche ich pro Bild ab.
+
+**Was das Spiel weiterhin selbst zeichnet** (bitte nicht mitmalen):
+- Feuer, Rauch, Licht bei Nacht, Glühwürmchen
+- Regen, Schneefall und die Schneeflecken im Übergang
+- Schlagschatten unter allen Dingen
+- Brandspuren und Löcher bei beschädigten Häusern, Gerüste bei Reparaturen
+- Lanzensplitter, Staubwolken, Sprechblasen, Schadenszahlen
