@@ -12,17 +12,65 @@ import { refreshCastleHerd } from './animals.js';
 import { startSiege, homeGateClosed } from './siege.js';
 import { cheatOn } from './cheats.js';
 import { shireIncome, shireGoods, shireDef, shireRenown, ownsHomeShire } from './shires.js';
+import { CASTLE_TYPES, OUTER_ONLY, STACKABLE, castleType, ringR, plotLayout } from './plots.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
-export function bLevel(id) { return id === 'burg' ? G.s.castle.level : G.s.castle.b[id] || 0; }
+// ---------------------------------------------------------------- Bauplätze (plots.js)
+// Gebäude je Platz: { id, lv, dmg } oder null. Ein alter Spielstand (eine Stufe je Gebäude) zieht beim ersten Blick
+// auf eine Turmburg um: Werkstätten und Unterkünfte in den Hof, Land, Markt und Türme davor.
+function freePlotFor(id, lay, plots) {
+  const wantInner = !OUTER_ONLY[id] && id !== 'wehr' && id !== 'markt';
+  const ok = lay.filter((p) => !plots[p.i] && !(OUTER_ONLY[id] && p.inner));
+  const pref = ok.find((p) => p.inner === wantInner);
+  return pref ? pref.i : ok.length ? ok[0].i : -1;
+}
+export function castlePlots() {
+  const C = G.s.castle;
+  if (!CASTLE_TYPES[C.type]) C.type = 'turm';
+  const lay = plotLayout(castleSite(), C.type);
+  if (!C.plots) {
+    C.plots = lay.map(() => null);
+    for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'kapelle', 'hospiz', 'markt', 'wehr', 'holzfaeller', 'steinbruch', 'felder', 'schafzucht']) {
+      const L = (C.b && C.b[id]) || 0;
+      if (!L) continue;
+      const i = freePlotFor(id, lay, C.plots);
+      if (i >= 0) C.plots[i] = { id, lv: L };
+    }
+  }
+  while (C.plots.length < lay.length) C.plots.push(null);
+  if (C.plots.length > lay.length) C.plots.length = lay.length;
+  return C.plots;
+}
+export function castleLayout() { return plotLayout(castleSite(), castleType()); }
+// Belagert? Dann ruht die Arbeit vor der Mauer
+export function homeBesieged() { return !!(G.siege && G.siege.site && G.siege.site.type === 'spieler' && G.siege.stage !== 'anmarsch'); }
+function working(p, lay) { return !!p && !p.dmg && !(homeBesieged() && !lay.inner); }
+// Höchste arbeitende Stufe eines Gebäudes (der Bergfried: Burgstufe)
+export function bLevel(id) {
+  if (id === 'burg') return G.s.castle.level;
+  const plots = castlePlots(), lay = castleLayout();
+  let m = 0;
+  for (let i = 0; i < plots.length; i++) { const p = plots[i]; if (p && p.id === id && working(p, lay[i]) && p.lv > m) m = p.lv; }
+  return m;
+}
+// Gebaute Stufe, auch abgebrannt (für Tafeln)
+export function bBuilt(id) { return castlePlots().reduce((a, p) => (p && p.id === id ? Math.max(a, p.lv) : a), 0); }
+// Alle arbeitenden Gebäude einer Art
+export function workingPlots(id) {
+  const plots = castlePlots(), lay = castleLayout(), out = [];
+  for (let i = 0; i < plots.length; i++) { const p = plots[i]; if (p && p.id === id && working(p, lay[i])) out.push({ i, lv: p.lv, plot: lay[i] }); }
+  return out;
+}
+// Summe über alle arbeitenden Gebäude einer Art, nach einer Tabelle je Stufe
+export function bSum(id, table) { return workingPlots(id).reduce((a, w) => a + (table ? table[w.lv] : w.lv), 0); }
+export function castleTypeName() { return CASTLE_TYPES[castleType()].name; }
 
 // Baufortschritt 0..1 der laufenden Baustelle
 export function conProgress() {
   const c = G.s.castle.construction;
   if (!c) return 0;
-  const lv = c.id === 'burg' ? BUILDINGS.burg.levels[c.level] : BUILDINGS[c.id].levels[c.level];
-  const days = lv.days || 1;
+  const days = c.days || (c.id === 'burg' ? BUILDINGS.burg.levels[c.level] : BUILDINGS[c.id] ? BUILDINGS[c.id].levels[c.level] : null)?.days || 1;
   return Math.max(0, Math.min(1, (G.s.day - (c.done - days) + G.s.time / DAY_LEN) / days));
 }
 
@@ -31,31 +79,29 @@ export function villageHouses() { return [0, 2, 5, 9][G.s.castle.level]; }
 
 // Häuser der Burgsiedlung rund um die Burg (fest je Welt), gezeichnet in render.js
 export function villageSpots(s) {
-  if (s.villageSpots) return s.villageSpots;
+  const type = castleType(), key = `villageSpots_${type}`;
+  if (s[key]) return s[key];
   const W = G.world;
   const r = mulberry32(W.seed + 991);
-  const avoid = Object.values(CASTLE_LAYOUT).map((o) => ({ x: s.x + o.dx, y: s.y + o.dy, r: 2.4 }));
-  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.05, y: s.y + 2.6, r: 2.4 });
-  for (const [dx, dy] of CASTLE_TOWERS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.5 });
-  // Schafhütte und Scherschuppen liegen hinter der Weide, etwas abseits des Bauplatzes
-  const sz = CASTLE_LAYOUT.schafzucht;
-  avoid.push({ x: s.x + sz.dx - 1.2, y: s.y + sz.dy - 1.55, r: 1.4 }, { x: s.x + sz.dx + 1.5, y: s.y + sz.dy - 1.55, r: 1.4 });
-  // zweite Hütte des Holzfällers (größte Stufe)
-  avoid.push({ x: s.x + CASTLE_LAYOUT.holzfaeller.dx - 0.4, y: s.y + CASTLE_LAYOUT.holzfaeller.dy - 1.4, r: 1.4 });
+  const R = ringR(type);
+  // Die Häuser stehen zwischen und hinter den Bauplätzen, nie auf ihnen und nie vor dem Tor
+  const lay = plotLayout(s, type);
+  const onPlot = (x, y) => lay.some((p) => Math.abs(p.x - x) < p.size / 2 + 0.8 && Math.abs(p.y - y) < p.size / 2 + 0.8);
   const spots = [];
-  for (let tries = 0; tries < 600 && spots.length < 9; tries++) {
-    const a = r() * Math.PI * 2, d = 7.6 + r() * 3.2;
+  for (let tries = 0; tries < 1500 && spots.length < 9; tries++) {
+    const a = r() * Math.PI * 2, d = R + 3 + r() * 9;
     const x = Math.floor(s.x + Math.cos(a) * d) + 0.5, y = Math.floor(s.y + Math.sin(a) * d) + 0.5;
     const t = tileAt(W, x, y);
     if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) continue;
-    if (Math.hypot(x - s.x, y - s.y) < 6) continue;
-    if (avoid.some((o) => Math.hypot(o.x - x, o.y - y) < o.r)) continue;
+    if (Math.max(Math.abs(x - s.x), Math.abs(y - s.y)) < R + 2) continue;
+    if (y - s.y > R && Math.abs(x - s.x) < 2.5) continue;
+    if (onPlot(x, y)) continue;
     if (spots.some((o) => Math.hypot(o.x - x, o.y - y) < 1.9)) continue;
     const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: (13 + r() * 6) * 1.6, rh: (11 + r() * 5) * 1.5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
     if (r() < 0.6) b.prop = { prop: ['heu', 'holzstapel', 'fass', 'beet'][Math.floor(r() * 4)], x: x + 0.75, y: y + (r() - 0.5) * 0.6, v: r() };
     spots.push(b);
   }
-  s.villageSpots = spots;
+  s[key] = spots;
   spots.forEach((b, k) => { b.idx = `v${k}`; const d = G.s && G.s.damage && G.s.damage[b.idx]; if (d) b.dmg = d; });
   return spots;
 }
@@ -65,41 +111,54 @@ export function villageSpots(s) {
 // Dort geht niemand hindurch; Äcker und Wege bleiben frei.
 export function castleObstacles() {
   const s = castleSite(), C = G.s.castle, out = [];
-  const r = (x, y, wx, wy, pen = false) => out.push({ x, y, wx, wy, pen });
   const k = CASTLE_KEEP[C.level];
-  r(s.x + k.dx, s.y + k.dy, k.w, k.w);
-  const lv = (id) => C.b[id] || 0;
-  const P = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
-  let L, p;
-  if ((L = lv('halle'))) { p = P('halle'); const wy = [0, 2.2, 2.6, 2.9][L]; r(p.x, p.y, 1.2 + L * 0.1, wy); if (L === 3) r(p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8); }
-  if ((L = lv('kaserne'))) { p = P('kaserne'); r(p.x, p.y, [0, 2.0, 2.4, 2.6][L], L === 3 ? 1.2 : 1.0); r(s.x - 2.7, s.y + 6.5, 2.0, 1.6, true); }
-  if ((L = lv('schmiede'))) { p = P('schmiede'); if (L === 1) { r(p.x, p.y, 1.1, 1.0); r(p.x + 0.75, p.y - 0.1, 0.4, 0.4); } else r(p.x, p.y, L === 2 ? 1.4 : 1.7, L === 2 ? 1.2 : 1.4); }
-  if ((L = lv('stall'))) { p = P('stall'); r(p.x, p.y, 1.1 + L * 0.05, [0, 2.0, 2.6, 3.0][L]); r(p.x + 1.55 + L * 0.1, p.y + 0.2, [0, 1.4, 1.8, 2.2][L], [0, 1.6, 2.2, 2.8][L], true); }
-  if ((L = lv('holzfaeller'))) { p = P('holzfaeller'); r(p.x, p.y, 1.0, 0.9); if (L === 3) r(p.x - 0.4, p.y - 1.4, 0.9, 0.9); r(p.x + 1.1, p.y + 0.42, 1.0, 0.62); }
-  if ((L = lv('steinbruch'))) { p = P('steinbruch'); r(p.x, p.y, 2.0, 1.6); }
-  if ((L = lv('markt'))) {
-    p = P('markt');
-    for (let n = 0; n < [0, 2, 4, 6][L]; n++) r(p.x - 0.9 + (n % 3) * 0.95, p.y - 0.6 + Math.floor(n / 3) * 1.25, 0.8, 0.6);
-    if (L >= 2) r(p.x + 1.8, p.y + 0.3, 0.6, 0.6);
-  }
-  if ((L = lv('kapelle'))) { p = P('kapelle'); r(p.x, p.y, [0, 1.6, 2.0, 2.6][L], [0, 1.0, 1.0, 1.2][L]); }
-  if ((L = lv('hospiz'))) { p = P('hospiz'); const h = [null, [0.2, -0.3, 1.3, 1.1], [0.3, -0.2, 1.2, 2.0], [0.3, -0.2, 1.4, 2.3]][L]; r(p.x + h[0], p.y + h[1], h[2], h[3]); if (L >= 2) r(p.x - 1.0, p.y - 1.05, 0.6, 0.6); }
-  if ((L = lv('schafzucht'))) {
-    p = P('schafzucht');
-    r(p.x - 1.2, p.y - 1.55, L === 3 ? 1.0 : 0.85, L === 3 ? 0.9 : 0.75);
-    if (L >= 2) r(p.x + 1.5, p.y - 1.55, 0.9, 0.8);
-    const pa = { x: p.x + 0.5, y: p.y + 0.3, w: [0, 1.9, 2.5, 2.9][L], h: [0, 1.7, 2.1, 2.5][L] };
-    r(pa.x, pa.y, pa.w, pa.h, true);
-  }
-  if ((L = lv('felder'))) { p = P('felder'); if (L === 1) r(p.x, p.y, 0.8, 0.7); else r(p.x - 0.1, p.y - 0.1, 1.1, 1.6); if (L === 3) r(p.x + 1.3, p.y - 0.9, 0.75, 0.62); }
-  for (let t = 0; t < lv('wehr'); t++) r(s.x + CASTLE_TOWERS[t][0], s.y + CASTLE_TOWERS[t][1], 0.9, 0.9);
-  for (const b of villageSpots(s).slice(0, villageHouses())) r(b.x, b.y, b.wx, b.wy);
+  out.push({ x: s.x + k.dx, y: s.y + k.dy, wx: k.w, wy: k.w, pen: false });
+  const plots = castlePlots(), lay = castleLayout();
+  for (let i = 0; i < plots.length; i++) if (plots[i]) for (const [x, y, wx, wy, pen] of plotRects(plots[i].id, plots[i].lv, lay[i])) out.push({ x, y, wx, wy, pen: !!pen });
+  for (const b of villageSpots(s).slice(0, villageHouses())) out.push({ x: b.x, y: b.y, wx: b.wx, wy: b.wy, pen: false });
   return out;
 }
 
+// Feste Teile eines Gebäudes auf seinem Platz (wie render.js es zeichnet): [x, y, Breite, Tiefe, Pferch]
+// Innen (Platz 2 × 2) stehen die Gebäude enger und ohne Nebenanlagen.
+export function plotRects(id, L, p) {
+  const c = p.size < 3, x = p.x, y = p.y;
+  switch (id) {
+    case 'halle': return [[x, y, 1.2 + L * 0.1, c ? 1.8 : [0, 2.2, 2.4, 2.6][L]]];
+    case 'kaserne': return c ? [[x, y, 1.8, 1.0]] : [[x, y - 0.7, [0, 2.0, 2.4, 2.6][L], L === 3 ? 1.2 : 1.0], [x - 0.1, y + 0.75, 2.0, 1.1, true]];
+    case 'schmiede': return L === 1 ? [[x, y, 1.1, 1.0], [x + 0.75, y - 0.1, 0.4, 0.4]] : [[x, y, c ? 1.4 : L === 2 ? 1.4 : 1.7, L === 2 ? 1.2 : 1.4]];
+    case 'stall': return c ? [[x, y, 1.1 + L * 0.05, 1.8]] : [[x - 0.6, y, 1.1 + L * 0.05, [0, 2.0, 2.6, 2.8][L]], [x + 0.75, y + 0.1, 1.3, 2.6, true]];
+    case 'holzfaeller': { const r = [[x - 0.4, y - 0.4, 1.0, 0.9], [x + 0.7, y + 0.42, 1.0, 0.62]]; if (L === 3) r.push([x + 0.7, y - 0.95, 0.9, 0.9]); return r; }
+    case 'steinbruch': return [[x, y - 0.3, 2.0, 1.6]];
+    case 'markt': {
+      const r = [], n = c ? [0, 2, 2, 3][L] : [0, 2, 4, 6][L];
+      for (let k = 0; k < n; k++) r.push(c ? [x - 0.5 + (k % 2) * 1.0, y - 0.4 + Math.floor(k / 2) * 1.0, 0.8, 0.6] : [x - 0.95 + (k % 3) * 0.95, y - 0.75 + Math.floor(k / 3) * 1.25, 0.8, 0.6]);
+      if (!c && L >= 2) r.push([x + 1.05, y + 1.05, 0.6, 0.6]);
+      return r;
+    }
+    case 'kapelle': return [[x, y, c ? Math.min(1.8, [0, 1.6, 2.0, 2.6][L]) : [0, 1.6, 2.0, 2.6][L], [0, 1.0, 1.0, 1.2][L]]];
+    case 'hospiz': {
+      const h = [null, [0.2, -0.3, 1.3, 1.1], [0.3, -0.2, 1.2, 2.0], [0.3, -0.2, 1.4, 2.3]][L];
+      const r = [[x + (c ? 0 : h[0]), y + (c ? 0 : h[1]), h[2], c ? Math.min(1.8, h[3]) : h[3]]];
+      if (!c && L >= 2) r.push([x - 1.0, y - 1.05, 0.6, 0.6]);
+      return r;
+    }
+    case 'schafzucht': {
+      const pa = pastureOf(L, p), r = [[x - 0.95, y - 1.0, L === 3 ? 1.0 : 0.85, L === 3 ? 0.9 : 0.75], [pa.x, pa.y, pa.w, pa.h, true]];
+      if (L >= 2) r.push([x + 0.85, y - 1.05, 0.9, 0.8]);
+      return r;
+    }
+    case 'felder': { const r = [L === 1 ? [x - 1.0, y - 1.0, 0.8, 0.7] : [x - 0.95, y - 1.0, 0.95, 0.8]]; if (L === 3) r.push([x + 1.05, y - 1.05, 0.75, 0.62]); return r; }
+    case 'wehr': return [[x, y, 0.9, 0.9]];
+    default: return [];
+  }
+}
+// Weide einer Schafzucht auf ihrem Platz
+export function pastureOf(L, p) { return { x: p.x + 0.35, y: p.y + 0.35, w: [0, 1.7, 2.0, 2.2][L], h: [0, 1.6, 1.9, 2.1][L] }; }
+
 // Mauern und Burggebäude neu eintragen (nach Ausbau, Laden, Schummeln)
 export function refreshCastleBlock() {
-  setPlayerWalls(G.world, G.s.castle.level >= 1, castleObstacles());
+  setPlayerWalls(G.world, G.s.castle.level >= 1, castleObstacles(), ringR());
 }
 
 export function levelName() { return BUILDINGS.burg.levels[G.s.castle.level].name; }
@@ -110,32 +169,39 @@ export function cargoCap() { return 20 + bLevel('stall') * 20 + partyMembers().l
 
 export function haveMaterial(m) { return (G.s.castle.storage[m] || 0) + (G.s.cargo[m] || 0); }
 
-export function buildInfo(id) {
+// Was kostet der nächste Schritt? id: Gebäude (oder 'burg' für den Bergfried), i: Bauplatz
+export function buildInfo(id, i = null) {
   const def = BUILDINGS[id];
-  const cur = bLevel(id);
-  const next = cur + 1;
-  const lv = def.levels[next];
-  const res = { id, def, cur, next, lv, ok: false, reasons: [] };
+  const res = { id, def, cur: 0, next: 1, lv: null, ok: false, reasons: [], plot: i };
+  if (id === 'burg') res.cur = G.s.castle.level;
+  else {
+    const plots = castlePlots(), lay = castleLayout(), here = i !== null ? plots[i] : null;
+    if (i === null || !lay[i]) { res.reasons.push('Kein Bauplatz'); return res; }
+    if (here && here.id !== id) { res.reasons.push('Der Platz ist belegt'); return res; }
+    res.cur = here ? here.lv : 0;
+    if (OUTER_ONLY[id] && lay[i].inner) res.reasons.push('Braucht Land vor der Mauer');
+    if (!res.cur && !STACKABLE[id] && plots.some((q) => q && q.id === id)) res.reasons.push('Gibt es schon in deiner Burg');
+    if (here && here.dmg) res.reasons.push('Erst ausbessern');
+  }
+  res.next = res.cur + 1;
+  const lv = def.levels[res.next];
+  res.lv = lv;
   if (!lv) { res.reasons.push('Höchste Stufe erreicht'); return res; }
   const c = G.s.castle.construction;
   if (c) res.reasons.push('Die Baumeister sind beschäftigt');
-  if (id !== 'burg' && next > G.s.castle.level + 1) res.reasons.push(`Braucht zuerst ${BUILDINGS.burg.levels[next - 1].name}`);
+  if (id !== 'burg' && res.next > G.s.castle.level + 1) res.reasons.push(`Braucht zuerst ${BUILDINGS.burg.levels[res.next - 1].name}`);
   if (lv.need) {
     if (lv.need.renown && G.s.renown < lv.need.renown) res.reasons.push(`Braucht ${lv.need.renown} Ruhm`);
     if (lv.need.allies && alliesCount() < lv.need.allies) res.reasons.push(`Braucht ${lv.need.allies} Verbündete`);
   }
-  for (const [k, v] of Object.entries(lv.cost)) {
-    const have = k === 'gold' ? G.s.gold : haveMaterial(k);
-    if (have < v) res.reasons.push(`Zu wenig ${k === 'gold' ? 'Gold' : GOODS[k].name}`);
-  }
+  if (!payable(lv.cost)) res.reasons.push(lackText(lv.cost));
   res.ok = res.reasons.length === 0;
   return res;
 }
-
-export function startBuild(id) {
-  const info = buildInfo(id);
-  if (!info.ok) { log(info.reasons[0], 'bad'); return false; }
-  for (const [k, v] of Object.entries(info.lv.cost)) {
+function payable(cost) { return Object.entries(cost).every(([k, v]) => (k === 'gold' ? G.s.gold : haveMaterial(k)) >= v); }
+function lackText(cost) { const k = Object.keys(cost).find((m) => (m === 'gold' ? G.s.gold : haveMaterial(m)) < cost[m]); return `Zu wenig ${k === 'gold' ? 'Gold' : GOODS[k].name}`; }
+function pay(cost) {
+  for (const [k, v] of Object.entries(cost)) {
     if (k === 'gold') { G.s.gold -= v; continue; }
     let need = v;
     const fromStore = Math.min(need, G.s.castle.storage[k] || 0);
@@ -143,12 +209,98 @@ export function startBuild(id) {
     need -= fromStore;
     if (need > 0) G.s.cargo[k] -= need;
   }
-  G.s.castle.construction = { id, level: info.next, done: G.s.day + info.lv.days };
-  if (cheatOn('build')) { G.s.castle.construction.done = G.s.day; finishConstruction(); return true; }
-  const nm = id === 'burg' ? info.lv.name : `${info.def.name} Stufe ${info.next}`;
-  log(`Baubeginn: ${nm}. Fertig an Tag ${G.s.castle.construction.done}.`, 'gold');
+}
+function begin(con, label) {
+  G.s.castle.construction = con;
+  if (cheatOn('build')) { con.done = G.s.day; finishConstruction(); return true; }
+  log(`Baubeginn: ${label}. Fertig an Tag ${con.done}.`, 'gold');
   G.castleDirty = true;
   return true;
+}
+
+export function startBuild(id, i = null) {
+  const info = buildInfo(id, i);
+  if (!info.ok) { log(info.reasons[0], 'bad'); return false; }
+  pay(info.lv.cost);
+  const con = { id, level: info.next, done: G.s.day + info.lv.days, days: info.lv.days };
+  if (id !== 'burg') con.plot = i;
+  return begin(con, id === 'burg' ? info.lv.name : `${info.def.name} Stufe ${info.next}`);
+}
+
+// Abgebrannt: Ausbessern kostet etwas Gold und Holz und einen Tag
+export function repairCost(i) { const p = castlePlots()[i]; return p ? { gold: 20 + 25 * p.lv, holz: 6 * p.lv } : null; }
+export function startRepair(i) {
+  const p = castlePlots()[i];
+  if (!p || !p.dmg) return false;
+  if (G.s.castle.construction) { log('Die Baumeister sind beschäftigt.', 'bad'); return false; }
+  const cost = repairCost(i);
+  if (!payable(cost)) { log(lackText(cost), 'bad'); return false; }
+  pay(cost);
+  return begin({ id: p.id, level: p.lv, plot: i, repair: true, done: G.s.day + 1, days: 1 }, `${BUILDINGS[p.id].name} ausbessern`);
+}
+
+// Abreißen: Der Platz wird frei, das Gebäude ist fort (ohne Erstattung)
+export function demolish(i) {
+  const plots = castlePlots(), p = plots[i], c = G.s.castle.construction;
+  if (!p) return false;
+  if (c && c.plot === i) { log('Hier wird gerade gebaut.', 'bad'); return false; }
+  plots[i] = null;
+  log(`${BUILDINGS[p.id].name} abgerissen. Der Bauplatz ist frei.`);
+  if (p.id === 'schafzucht') refreshCastleHerd();
+  refreshCastleBlock();
+  G.castleDirty = true;
+  return true;
+}
+
+// Burgart wechseln: neuer Mauerring, andere Plätze. Solange nur die Ruine steht, ist es bloß ein Plan.
+export function typeChangeCost(type) {
+  const L = G.s.castle.level;
+  if (!L) return { gold: 0 };
+  const big = CASTLE_TYPES[type].R > ringR();
+  return { gold: 150 + L * (big ? 250 : 120), [L >= 2 ? 'stein' : 'holz']: (big ? 40 : 15) * L };
+}
+export function typeChangeDays(type) { return G.s.castle.level ? 1 + G.s.castle.level + (CASTLE_TYPES[type].R > ringR() ? 1 : 0) : 0; }
+// Welche Gebäude passen nach dem Wechsel nicht mehr hin?
+export function typeChangeLosses(type) {
+  const plots = castlePlots(), lay = castleLayout(), nlay = plotLayout(castleSite(), type);
+  const free = { in: nlay.filter((p) => p.inner).length, out: nlay.filter((p) => !p.inner).length };
+  const lost = [];
+  // Erst was nach draußen muss, dann der Rest, innen zuerst
+  const list = plots.map((p, i) => ({ p, inner: lay[i].inner })).filter((e) => e.p);
+  for (const e of list.filter((e) => OUTER_ONLY[e.p.id])) { if (free.out > 0) free.out--; else lost.push(e.p); }
+  for (const e of list.filter((e) => !OUTER_ONLY[e.p.id])) {
+    if (e.inner && free.in > 0) free.in--;
+    else if (!e.inner && free.out > 0) free.out--;
+    else if (free.in > 0) free.in--;
+    else if (free.out > 0) free.out--;
+    else lost.push(e.p);
+  }
+  return lost;
+}
+export function startTypeChange(type) {
+  if (!CASTLE_TYPES[type] || type === castleType()) return false;
+  if (G.s.castle.construction) { log('Die Baumeister sind beschäftigt.', 'bad'); return false; }
+  const cost = typeChangeCost(type);
+  if (!payable(cost)) { log(lackText(cost), 'bad'); return false; }
+  pay(cost);
+  if (!G.s.castle.level) { applyTypeChange(type); return true; }
+  const days = typeChangeDays(type);
+  return begin({ id: 'umbau', type, done: G.s.day + days, days }, `Umbau zur ${CASTLE_TYPES[type].name}`);
+}
+function applyTypeChange(type) {
+  const C = G.s.castle, plots = castlePlots(), lay = castleLayout();
+  const nlay = plotLayout(castleSite(), type), next = nlay.map(() => null);
+  const lost = [];
+  const place = (p, preferInner) => {
+    const ok = nlay.filter((q) => !next[q.i] && !(OUTER_ONLY[p.id] && q.inner));
+    const q = ok.find((o) => o.inner === preferInner) || ok[0];
+    if (q) next[q.i] = p; else lost.push(p);
+  };
+  const list = plots.map((p, i) => ({ p, inner: lay[i].inner })).filter((e) => e.p);
+  for (const e of list.filter((e) => OUTER_ONLY[e.p.id])) place(e.p, false);
+  for (const e of list.filter((e) => !OUTER_ONLY[e.p.id])) place(e.p, e.inner);
+  C.type = type; C.plots = next;
+  log(`${homeName()} ist jetzt eine ${CASTLE_TYPES[type].name}.${lost.length ? ` Kein Platz mehr für: ${lost.map((p) => BUILDINGS[p.id].name).join(', ')}.` : ''}`, 'gold');
 }
 
 export function finishConstruction() {
@@ -160,17 +312,47 @@ export function finishConstruction() {
     addRenown(5 * c.level);
     spawnPeasants();
     rebuildUnits();
+  } else if (c.id === 'umbau') {
+    applyTypeChange(c.type);
+    spawnPeasants();
+    rebuildUnits();
+    refreshCastleHerd();
   } else {
-    G.s.castle.b[c.id] = c.level;
-    log(`Fertiggestellt: ${BUILDINGS[c.id].name} Stufe ${c.level}.`, 'gold');
-    addRenown(1);
-    if (c.id === 'halle' && !G.s.castle.recruits.length) refreshRecruits();
+    const plots = castlePlots();
+    if (c.repair) {
+      if (plots[c.plot]) plots[c.plot].dmg = 0;
+      log(`Ausgebessert: ${BUILDINGS[c.id].name}.`, 'good');
+    } else {
+      plots[c.plot] = { id: c.id, lv: c.level };
+      log(`Fertiggestellt: ${BUILDINGS[c.id].name} Stufe ${c.level}.`, 'gold');
+      addRenown(1);
+      if (c.id === 'halle' && !G.s.castle.recruits.length) refreshRecruits();
+    }
     if (c.id === 'schafzucht') refreshCastleHerd();
   }
   G.s.castle.construction = null;
   refreshCastleBlock();
   G.castleDirty = true;
-  G.celebrate = { id: c.id, level: c.level, t0: G.time };
+  G.celebrate = { id: c.id, level: c.level, plot: c.plot, type: c.type, t0: G.time };
+}
+
+// Vor der Mauer: Belagerer und Plünderer brennen Gebäude nieder (frac: Anteil)
+export function burnOuterPlots(frac, by) {
+  const plots = castlePlots(), lay = castleLayout(), hit = [];
+  for (let i = 0; i < plots.length; i++) {
+    const p = plots[i];
+    if (!p || p.dmg || lay[i].inner || Math.random() >= frac) continue;
+    p.dmg = 1; hit.push(BUILDINGS[p.id].name);
+  }
+  if (hit.length) {
+    const cnt = {};
+    for (const n of hit) cnt[n] = (cnt[n] || 0) + 1;
+    const list = Object.entries(cnt).map(([n, k]) => (k > 1 ? `${k} × ${n}` : n)).join(', ');
+    log(`Vor den Mauern gehen in Flammen auf: ${list} (${by}). Bessere sie aus, sonst bleiben sie nutzlos.`, 'bad');
+    if (hit.includes(BUILDINGS.schafzucht.name)) refreshCastleHerd();
+    G.castleDirty = true;
+  }
+  return hit.length;
 }
 
 // ---------------------------------------------------------------- Anwerben
@@ -229,7 +411,7 @@ export function dismiss(u) {
 // Innerhalb der eigenen Mauern (und am Tor) kämpfen du und dein Gefolge besser
 export function castleBonusAt(x, y) {
   const s = castleSite();
-  if (!s || Math.hypot(x - s.x, y - s.y) > 6.5) return null;
+  if (!s || Math.hypot(x - s.x, y - s.y) > ringR() + 2.5) return null;
   return CASTLE_BONUS[G.s.castle.level];
 }
 
@@ -241,7 +423,7 @@ const FIELD_SEASON = [0.5, 1, 1.5, 0];
 
 // ---------------------------------------------------------------- Werte
 export function castleDefense() {
-  let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')] + shireDef();
+  let d = [5, 25, 55, 90][G.s.castle.level] + (G.s.castle.level ? CASTLE_TYPES[castleType()].def : 0) + bSum('wehr', [0, 15, 35, 60]) + shireDef();
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
   if (homeGateClosed()) d += 10;
@@ -255,7 +437,8 @@ export function dailyBalance() {
     ['Marktgeld', homeGateClosed() ? 0 : [0, 15, 35, 60][bLevel('markt')]],
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
-  if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);
+  const mills = workingPlots('felder').filter((w) => w.lv >= 3).length;
+  if (mills) income.push([mills > 1 ? `Mahlgeld der ${mills} Windmühlen` : 'Mahlgeld der Windmühle', 10 * mills]);
   // Eigene Grafschaften: Abgaben ihrer Orte
   income.push(...shireIncome());
   const costs = [];
@@ -263,14 +446,16 @@ export function dailyBalance() {
   if (wages) costs.push(['Sold', wages]);
   // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
   if (!isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
-  const season = seasonIndex(), sz = bLevel('schafzucht');
+  // Erträge aller arbeitenden Gebäude zusammen (mehrere Holzfäller liefern mehrfach); vor der Mauer ruht bei
+  // einer Belagerung die Arbeit, Abgebranntes liefert nichts
+  const season = seasonIndex();
   const prod = {
-    holz: [0, 6, 12, 18][bLevel('holzfaeller')],
-    stein: [0, 4, 8, 12][bLevel('steinbruch')],
-    getreide: Math.round([0, 6, 12, 18][bLevel('felder')] * FIELD_SEASON[season]),
-    wolle: [0, 4, 8, 12][sz],
-    fleisch: [0, 0, 2, 4][sz],
-    felle: [0, 0, 0, 1][sz],
+    holz: bSum('holzfaeller', [0, 6, 12, 18]),
+    stein: bSum('steinbruch', [0, 4, 8, 12]),
+    getreide: Math.round(bSum('felder', [0, 6, 12, 18]) * FIELD_SEASON[season]),
+    wolle: bSum('schafzucht', [0, 4, 8, 12]),
+    fleisch: bSum('schafzucht', [0, 0, 2, 4]),
+    felle: bSum('schafzucht', [0, 0, 0, 1]),
   };
   if (season === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); prod.wolle = Math.floor(prod.wolle / 2); }
   // Vorzüge eigener Grafschaften (Wolle aus dem West Riding, Caen-Stein …)
@@ -395,6 +580,7 @@ function checkRaid() {
         if (n > 0) { G.s.castle.storage[g] -= n; lost.push(`${n} ${GOODS[g].name}`); }
       }
       log(`${t.by} haben ${homeName()} überfallen (Verteidigung ${def} gegen ${strength})! Verloren: ${lostGold} Gold${lost.length ? ', ' + lost.join(', ') : ''}. Wachtürme und Garnison schützen.`, 'bad');
+      burnOuterPlots(0.2, t.by);
     }
     break;
   }

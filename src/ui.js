@@ -15,7 +15,9 @@ import {
 import {
   bLevel, levelName, partyCap, cargoCap, buildInfo, startBuild, hire, setCompanionStatus, dismiss,
   castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses, foodNeed, foodStock,
+  castlePlots, castleLayout, homeBesieged, repairCost, startRepair, demolish, typeChangeCost, typeChangeDays, typeChangeLosses, startTypeChange, castleTypeName,
 } from './castle.js';
+import { CASTLE_TYPES, TYPE_IDS, OUTER_ONLY, STACKABLE, PLOT_BUILDINGS, castleType } from './plots.js';
 import { partyMembers, equip, unequip, previewEquip, xpNeeded, setPlayerPath, ferryRoutes, ferryCost, sail } from './units.js';
 import { seasonIndex, yearOf, clockText, passHours, hourOf } from './sim.js';
 import { buffActive } from './life.js';
@@ -488,7 +490,7 @@ function townQuests(site) {
 // ---------------------------------------------------------------- Burg
 function castlePanel() {
   const f = G.ui.arg && G.ui.arg.focus;
-  if (f && f !== 'burg') return castleFocusPanel(f);
+  if (f === 'plot') return plotPanel(G.ui.arg.plot);
   const tabs = [['ausbau', 'Ausbau'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager']];
   if (bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', 'Rüstkammer']);
   if (bLevel('markt')) tabs.push(['markt', 'Markt']);
@@ -509,12 +511,20 @@ function castlePanel() {
 
 // Ein einzelnes Burggebäude (Klick auf Gebäude oder Bauplatz in der Burg)
 const FOCUS_TAB = { halle: ['halle', 'Anwerben'], kaserne: ['gefolge', 'Gefolge'], schmiede: ['ruest', 'Rüstkammer'], stall: ['ruest', 'Rüstkammer'], markt: ['markt', 'Markt'] };
-export function castleFocusTab(id) { return bLevel(id) && FOCUS_TAB[id] ? FOCUS_TAB[id][0] : 'ausbau'; }
-function castleFocusPanel(id) {
-  const L = bLevel(id), def = BUILDINGS[id], con = G.s.castle.construction;
-  const site = castleSite();
-  const tabs = [['ausbau', L ? 'Ausbau' : 'Bauplatz']];
-  if (L && FOCUS_TAB[id]) tabs.push(FOCUS_TAB[id]);
+// Klick auf ein Gebäude: gleich die passende Tafel (Rittersaal: Anwerben, Schmiede: Rüstkammer …)
+export function castleFocusTab(i) { const b = castlePlots()[i]; return b && !b.dmg && bLevel(b.id) && FOCUS_TAB[b.id] ? FOCUS_TAB[b.id][0] : 'ausbau'; }
+function conNote(con) {
+  if (!con) return '';
+  const what = con.id === 'burg' ? BUILDINGS.burg.levels[con.level].name : con.id === 'umbau' ? `Umbau zur ${CASTLE_TYPES[con.type].name}` : con.repair ? `${BUILDINGS[con.id].name} ausbessern` : `${BUILDINGS[con.id].name} Stufe ${con.level}`;
+  return `<div class="notice"><b>Im Bau:</b> ${esc(what)}, fertig an Tag ${con.done}.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>`;
+}
+// Tafel eines Bauplatzes: frei (welche Gebäude passen hierher?) oder belegt (Ausbau, Ausbessern, Abreißen)
+function plotPanel(i) {
+  const plots = castlePlots(), lay = castleLayout(), p = lay[i], b = plots[i], con = G.s.castle.construction;
+  if (!p) return { title: 'Bauplatz', sub: '', tabs: [], body: '<p class="muted">Diesen Bauplatz gibt es nicht mehr.</p>' };
+  const site = castleSite(), where = p.inner ? 'im Hof (geschützt)' : 'vor der Mauer';
+  const tabs = [['ausbau', b ? 'Ausbau' : 'Bauplatz']];
+  if (b && !b.dmg && FOCUS_TAB[b.id]) tabs.push(FOCUS_TAB[b.id]);
   let body = '';
   switch (G.ui.tab) {
     case 'halle': body = castleHall(); break;
@@ -522,14 +532,21 @@ function castleFocusPanel(id) {
     case 'ruest': body = shopView(site); break;
     case 'markt': body = marketTable(site); break;
     default: {
-      const building = con && con.id === id;
-      const note = building ? `<div class="notice"><b>Im Bau:</b> Stufe ${con.level}, fertig an Tag ${con.done}.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>`
-        : con ? `<div class="notice"><p>Die Bauleute arbeiten gerade an ${con.id === 'burg' ? 'der Burg' : esc(BUILDINGS[con.id].name)}. Erst danach kann hier gebaut werden.</p></div>` : '';
-      body = `${note}<div class="bgrid one">${buildCard(id)}</div>
-        <div class="row"><button class="btn" data-act="castleall">Ganze Burg</button></div>`;
+      const note = con && con.plot === i ? conNote(con) : con ? `<div class="notice"><p>Die Bauleute sind gerade anderswo beschäftigt. Erst danach kann hier gebaut werden.</p></div>` : '';
+      if (!b) {
+        const ids = PLOT_BUILDINGS.filter((id) => !(OUTER_ONLY[id] && p.inner));
+        const here = ids.filter((id) => STACKABLE[id] || !plots.some((q) => q && q.id === id));
+        body = `${note}<p class="muted">${p.inner ? 'Ein Platz im Hof, 2 × 2 Felder, geschützt hinter der Mauer: Was hier steht, arbeitet auch während einer Belagerung.' : 'Ein Platz vor der Mauer, 3 × 3 Felder: Platz für Äcker, Weiden, Holzfäller und Steinbruch. Bei einer Belagerung ruht hier die Arbeit, und manches geht in Flammen auf.'}</p>
+          <div class="bgrid">${here.map((id) => buildCard(id, i)).join('')}</div>`;
+      } else {
+        const dmg = b.dmg ? `<div class="notice bad"><p>Abgebrannt: ${esc(BUILDINGS[b.id].name)} arbeitet erst wieder, wenn es ausgebessert ist.</p><div class="chips">${costChips(repairCost(i))}<span class="chip">1 Tag</span></div><button class="btn primary" data-act="repair" data-plot="${i}" ${con ? 'disabled' : ''}>Ausbessern</button></div>` : '';
+        body = `${note}${dmg}<div class="bgrid one">${buildCard(b.id, i)}</div>
+          <div class="row"><button class="btn" data-act="demolish" data-plot="${i}" ${con && con.plot === i ? 'disabled' : ''}>Abreißen</button><button class="btn" data-act="castleall">Ganze Burg</button></div>`;
+      }
+      if (!b) body += '<div class="row"><button class="btn" data-act="castleall">Ganze Burg</button></div>';
     }
   }
-  return { title: def.name, sub: `Burg ${esc(homeName())} · ${L ? `Stufe ${L}/3` : 'Bauplatz'}`, tabs, body };
+  return { title: b ? BUILDINGS[b.id].name : 'Freier Bauplatz', sub: `Burg ${esc(homeName())} · ${where}${b ? ` · Stufe ${b.lv}/3${b.dmg ? ' · abgebrannt' : ''}` : ''}`, tabs, body };
 }
 
 // Burgtor: von Hand öffnen und schließen
@@ -543,8 +560,8 @@ function gateAction() {
 }
 
 // Karte eines Burggebäudes: was es jetzt leistet, was die nächste Stufe bringt und kostet
-function buildCard(id) {
-  const info = buildInfo(id);
+function buildCard(id, i = null) {
+  const info = buildInfo(id, i);
   const def = BUILDINGS[id];
   const isBurg = id === 'burg';
   const name = isBurg ? `${def.levels[info.cur].name}` : def.name;
@@ -552,12 +569,12 @@ function buildCard(id) {
   const nextName = isBurg && info.lv ? `Ausbau zur ${info.lv.name}` : 'Nächste Stufe';
   const btnLabel = info.ok ? (info.cur || isBurg ? 'Ausbauen' : 'Errichten') : esc(info.reasons[0]);
   return `<article class="bcard${info.cur ? ' built' : ''}">
-    <header><b>${esc(name)}</b><span class="lvl">${isBurg ? `Stufe ${info.cur}/3` : `${info.cur}/3`}</span></header>
+    <header><b>${esc(name)}</b><span class="lvl">${isBurg ? `Stufe ${info.cur}/3` : `${info.cur}/3`}</span></header>${!isBurg && STACKABLE[id] ? '<p class="muted small">Mehrfach baubar: Die Erträge addieren sich.</p>' : ''}${!isBurg && OUTER_ONLY[id] ? '<p class="muted small">Nur vor der Mauer.</p>' : ''}
     ${def.desc ? `<p class="muted">${esc(def.desc)}</p>` : ''}
     <p><span class="label">Jetzt</span> ${esc(now)}</p>
     ${info.lv ? `<p><span class="label">${nextName}</span> ${esc(info.lv.eff)}</p>
     <div class="chips">${costChips(info.lv.cost)}<span class="chip">${info.lv.days} ${info.lv.days === 1 ? 'Tag' : 'Tage'}</span>${info.lv.need && info.lv.need.renown ? `<span class="chip ${G.s.renown >= info.lv.need.renown ? 'ok' : 'miss'}">${info.lv.need.renown} Ruhm</span>` : ''}${info.lv.need && info.lv.need.allies ? `<span class="chip ${alliesCount() >= info.lv.need.allies ? 'ok' : 'miss'}">${info.lv.need.allies} Verbündete</span>` : ''}</div>
-    <button class="btn${info.ok ? ' primary' : ''}" data-act="build" data-id="${id}" ${info.ok ? '' : 'disabled'}>${btnLabel}</button>` : '<p class="muted">Vollständig ausgebaut.</p>'}
+    <button class="btn${info.ok ? ' primary' : ''}" data-act="build" data-id="${id}"${i !== null ? ` data-plot="${i}"` : ''} ${info.ok ? '' : 'disabled'}>${btnLabel}</button>` : '<p class="muted">Vollständig ausgebaut.</p>'}
   </article>`;
 }
 
@@ -566,8 +583,7 @@ function castleBuild() {
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0), cost = bal.costs.reduce((a, [, v]) => a + v, 0);
   const con = c.construction;
-  const conText = con ? `<div class="notice"><b>Im Bau:</b> ${con.id === 'burg' ? BUILDINGS.burg.levels[con.level].name : `${BUILDINGS[con.id].name} Stufe ${con.level}`}, fertig an Tag ${con.done}. Die Bauleute arbeiten schon auf dem Bauplatz.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>` : '';
-  const cards = BUILDING_IDS.map(buildCard).join('');
+  const conText = conNote(con) + (homeBesieged() ? '<div class="notice bad"><p>Feinde lagern vor der Burg: Vor der Mauer ruht die Arbeit, nur der Hof erzeugt noch etwas.</p></div>' : '');
   const st = c.storage;
   return `${conText}
     <div class="summary">
@@ -577,7 +593,42 @@ function castleBuild() {
       <div><span class="label">Verpflegung</span><b class="${bal.food.short ? 'neg' : 'pos'}">${foodStock()} Rationen</b><span class="muted">${st.getreide || 0} Getreide, ${st.fleisch || 0} Fleisch im Lager. ${foodNeed()} ${foodNeed() === 1 ? 'Mund' : 'Münder'} am Tisch: Täglich ${foodNeed()} ${foodNeed() === 1 ? 'Ration' : 'Rationen'}.${bal.food.short ? ` Es fehlen ${bal.food.short}, die für je ${FOOD_PRICE} Gold zugekauft werden.` : ''} Felder, Schafzucht und Jagd füllen die Vorräte.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
     </div>
-    <div class="bgrid">${cards}</div>`;
+    <h3>Bergfried</h3>
+    <div class="bgrid one">${buildCard('burg')}</div>
+    ${castleTypeSection()}
+    ${plotList(true)}
+    ${plotList(false)}`;
+}
+
+// Burgart: Mauerring und Aufteilung der Plätze
+function castleTypeSection() {
+  const cur = castleType(), con = G.s.castle.construction;
+  const cards = TYPE_IDS.map((t) => {
+    const d = CASTLE_TYPES[t], here = t === cur;
+    const cost = typeChangeCost(t), lost = here ? [] : typeChangeLosses(t);
+    const free = !G.s.castle.level;
+    const can = !here && !con && Object.entries(cost).every(([k, v]) => (k === 'gold' ? G.s.gold : (G.s.castle.storage[k] || 0) + (G.s.cargo[k] || 0)) >= v);
+    return `<article class="bcard${here ? ' built' : ''}">
+      <header><b>${esc(d.name)}</b><span class="lvl">${d.inner} im Hof · ${d.outer} davor</span></header>
+      <p class="muted">${esc(d.desc)}</p>
+      <p><span class="label">Verteidigung</span> ${d.def ? `+${d.def} (ab der Holzburg)` : 'keine zusätzliche'}</p>
+      ${here ? '<p class="muted">So ist deine Burg angelegt.</p>' : `${free ? '<p class="muted">Solange nur die Ruine steht, ist das bloß ein Plan und kostet nichts.</p>' : `<div class="chips">${costChips(cost)}<span class="chip">${typeChangeDays(t)} Tage</span></div>`}
+      ${lost.length ? `<p class="warn">Kein Platz mehr für: ${esc(lost.map((x) => BUILDINGS[x.id].name).join(', '))}</p>` : ''}
+      <button class="btn${can ? ' primary' : ''}" data-act="settype" data-type="${t}" ${can ? '' : 'disabled'}>${free ? 'So anlegen' : 'Umbauen'}</button>`}
+    </article>`;
+  }).join('');
+  return `<h3>Burgart: ${esc(castleTypeName())}</h3><p class="muted">Eine große Burg hat weniger Plätze, aber mehr davon geschützt im Hof; eine kleine hat mehr Land davor, das bei einer Belagerung brachliegt oder abbrennt.</p><div class="bgrid">${cards}</div>`;
+}
+// Liste der Plätze im Hof oder vor der Mauer
+function plotList(inner) {
+  const plots = castlePlots(), lay = castleLayout().filter((p) => p.inner === inner);
+  const used = lay.filter((p) => plots[p.i]).length, con = G.s.castle.construction;
+  const rows = lay.map((p) => {
+    const b = plots[p.i], building = con && con.plot === p.i;
+    const label = b ? `${esc(BUILDINGS[b.id].name)} · Stufe ${b.lv}${b.dmg ? ' · <span class="neg">abgebrannt</span>' : ''}` : building ? `${esc(BUILDINGS[con.id].name)} · im Bau` : '<span class="muted">frei</span>';
+    return `<button class="plotrow${b ? '' : ' free'}" data-act="plot" data-plot="${p.i}"><span>${label}</span><span class="muted">${b ? 'Ausbau' : 'Bauen'} ›</span></button>`;
+  }).join('');
+  return `<h3>${inner ? 'Im Hof' : 'Vor der Mauer'} <span class="muted">${used} von ${lay.length} belegt</span></h3><div class="plotlist">${rows || '<p class="muted">Keine Plätze.</p>'}</div>`;
 }
 
 function unitStatsLine(u) {
@@ -1116,7 +1167,16 @@ const ACTIONS = {
       closePanel();
     } else log('Dorthin führt kein Weg.', 'bad');
   },
-  build: (d) => startBuild(d.id),
+  build: (d) => startBuild(d.id, d.plot !== undefined ? +d.plot : null),
+  plot: (d) => { G.ui.arg = { focus: 'plot', plot: +d.plot }; G.ui.tab = 'ausbau'; byId('panel-body').scrollTop = 0; },
+  repair: (d) => startRepair(+d.plot),
+  demolish: (d) => { const b = castlePlots()[+d.plot]; if (b) confirmDialog(`${BUILDINGS[b.id].name} abreißen? Das Gebäude ist dann fort, es gibt nichts zurück.`, 'Abreißen', () => { demolish(+d.plot); refreshPanel(); }); },
+  settype: (d) => {
+    const lost = typeChangeLosses(d.type), t = CASTLE_TYPES[d.type];
+    const go = () => { startTypeChange(d.type); refreshPanel(); };
+    if (lost.length) confirmDialog(`Zur ${t.name} umbauen? Kein Platz mehr für: ${lost.map((x) => BUILDINGS[x.id].name).join(', ')}. Diese Gebäude werden abgerissen.`, 'Umbauen', go);
+    else go();
+  },
   castleall: () => { G.ui.arg = null; G.ui.tab = 'ausbau'; byId('panel-body').scrollTop = 0; },
   hire: (d) => hire(Number(d.i)),
   sel: (d) => { G.ui.sel = Number(d.u); },

@@ -1,7 +1,7 @@
 // Einstieg: Spielstart, Hauptschleife, Eingabe, Kamera.
 
 import { G, log, homeName } from './state.js';
-import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY, CASTLE_PLOT } from './data.js';
+import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { CHARGES, CHARGE_IDS, chargeSVG, preloadChargeArt, PLATE_W, PLATE_H } from './heraldry.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
@@ -14,7 +14,7 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles } from './castle.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots } from './castle.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, findLists, tourneyRects } from './tournament.js';
@@ -278,22 +278,23 @@ function interactHere() {
 
 // Eigene Burg: Ein Klick auf ein Gebäude oder einen Bauplatz öffnet nur dieses Gebäude,
 // der Bergfried die ganze Burg. Steht man zu weit weg, geht man erst hin.
-function buildingReach(id) {
-  if (id === 'burg') return 4.2;
-  const [w, h] = CASTLE_PLOT[id] || [1, 1];
-  return Math.max(w, h) / 2 + 1.9;
+function buildingReach(a) {
+  if (a.id === 'burg') return 4.2;
+  const p = castleLayout()[a.plot];
+  return (p ? p.size : 2) / 2 + 1.9;
 }
-function openCastleBuilding(id) {
+// a: Anker aus render.js ({ id: 'burg' } oder { id: 'plot', plot, bid })
+function openCastleBuilding(a) {
   G.pendingBuild = null;
   G.s.player.path = null;
-  if (id === 'burg') openPanel('castle');
-  else openPanel('castle', { focus: id }, castleFocusTab(id));
+  if (a.id === 'burg') openPanel('castle');
+  else openPanel('castle', { focus: 'plot', plot: a.plot }, castleFocusTab(a.plot));
 }
 function goBuilding(a) {
-  const p = G.s.player, r = buildingReach(a.id);
-  if (Math.hypot(a.x - p.x, a.y - p.y) < r) { openCastleBuilding(a.id); return; }
+  const p = G.s.player, r = buildingReach(a);
+  if (Math.hypot(a.x - p.x, a.y - p.y) < r) { openCastleBuilding(a); return; }
   G.pendingSite = null; G.pendingPostern = null;
-  const pb = { id: a.id, x: a.x, y: a.y, r };
+  const pb = { id: a.id, plot: a.plot, x: a.x, y: a.y, r };
   if (setPlayerPath(a.x, a.y)) { G.pendingBuild = pb; G.clickMarker = { x: a.x, y: a.y, t: 0 }; return; }
   const pt = posternRoute(a.x, a.y);
   if (pt && setPlayerPath(pt.x, pt.y)) { G.pendingPostern = { x: a.x, y: a.y, site: null, build: pb }; G.clickMarker = { x: a.x, y: a.y, t: 0 }; }
@@ -317,7 +318,7 @@ function checkNearSite() {
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   const pb = G.pendingBuild;
-  if (pb && !inCombat() && Math.hypot(pb.x - G.s.player.x, pb.y - G.s.player.y) < pb.r) { openCastleBuilding(pb.id); return; }
+  if (pb && !inCombat() && Math.hypot(pb.x - G.s.player.x, pb.y - G.s.player.y) < pb.r) { openCastleBuilding(pb); return; }
   if (pb && !G.s.player.path) G.pendingBuild = null;
   if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
   const pp = G.pendingPostern;

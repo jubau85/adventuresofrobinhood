@@ -5,7 +5,8 @@ import { G, log } from './state.js';
 import { claimShire, shireAt, HOME_SHIRE } from './shires.js';
 import { GOOD_IDS, FACTION_IDS, BUILDINGS, BUILDING_IDS, DAYS_PER_SEASON, DAY_LEN } from './data.js';
 import { passHours } from './sim.js';
-import { finishConstruction, castleSite, refreshCastleBlock } from './castle.js';
+import { finishConstruction, castleSite, refreshCastleBlock, castlePlots, castleLayout } from './castle.js';
+import { OUTER_ONLY, STACKABLE } from './plots.js';
 import { partyMembers, placeNear, rebuildUnits, startBattle, computeStats, grantXp, xpNeeded, spawnPeasants } from './units.js';
 import { changeRep, addRenown } from './politics.js';
 import { startSiege } from './siege.js';
@@ -97,7 +98,17 @@ const CHEAT_ACTIONS = {
   burg: () => {
     const cs = G.s.castle;
     cs.level = BUILDINGS.burg.levels.length - 1;
-    for (const id of BUILDING_IDS) if (id !== 'burg') cs.b[id] = BUILDINGS[id].levels.length - 1;
+    // Jedes Gebäude einmal auf höchster Stufe, die übrigen Plätze davor mit Land, im Hof mit Wachtürmen
+    const plots = castlePlots(), lay = castleLayout(), top = (id) => BUILDINGS[id].levels.length - 1;
+    for (const id of BUILDING_IDS) {
+      if (id === 'burg' || plots.some((p) => p && p.id === id)) continue;
+      const q = lay.filter((p) => !plots[p.i] && !(OUTER_ONLY[id] && p.inner));
+      const pick2 = q.find((p) => p.inner === !OUTER_ONLY[id]) || q[0];
+      if (pick2) plots[pick2.i] = { id, lv: top(id) };
+    }
+    const land = ['felder', 'holzfaeller', 'schafzucht', 'steinbruch'];
+    lay.forEach((p, k) => { if (!plots[p.i]) plots[p.i] = p.inner ? { id: 'wehr', lv: 3 } : { id: land[k % 4], lv: 3 }; });
+    for (const p of plots) if (p) { p.lv = top(p.id); p.dmg = 0; }
     cs.construction = null;
     refreshCastleBlock();
     refreshCastleHerd();

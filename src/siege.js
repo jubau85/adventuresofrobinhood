@@ -9,7 +9,8 @@ import { changeRep, addRenown, isHostileFaction } from './politics.js';
 import { cargoFree, addCargo } from './economy.js';
 import { spawnGroup, rebuildUnits, inCombat, makeNpc, partyMembers } from './units.js';
 import { isWalkable, landAt, findPath, wallRing, palisadeBand, nearestWalkable } from './world.js';
-import { villageHouses, castleDefense } from './castle.js';
+import { villageHouses, castleDefense, bSum, burnOuterPlots } from './castle.js';
+import { ringR } from './plots.js';
 import { sfxAt } from './audio.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
@@ -160,7 +161,7 @@ export function startSiege(target = null, armyType = null, scale = null) {
 function wallBand(s) {
   const W = G.world;
   if (s.cityWall) return { band: s.cityWall, square: false };
-  if (s.type === 'burg' || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, 4), square: true };
+  if (s.type === 'burg' || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, s.type === 'spieler' ? ringR() : 4), square: true };
   if (s.palisade) return { band: palisadeBand(s, true), square: false };
   return null;
 }
@@ -257,9 +258,9 @@ export function hasHomeGate() { return !!G.s && G.s.castle.level >= 1; }
 export function homeGateClosed() { return hasHomeGate() && !!G.s.gateClosed; }
 export function homeGateTiles() {
   const W = G.world, N = W.N;
-  return wallRing(W, homeSite(), 4).filter(([x, y]) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE; });
+  return wallRing(W, homeSite(), ringR()).filter(([x, y]) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE; });
 }
-function insideHome(x, y) { const s = homeSite(); return Math.abs(x - s.x) < 3.4 && Math.abs(y - s.y) < 3.4; }
+function insideHome(x, y) { const s = homeSite(), r = ringR() - 0.6; return Math.abs(x - s.x) < r && Math.abs(y - s.y) < r; }
 
 export function setHomeGate(closed) {
   if (!hasHomeGate()) return false;
@@ -368,7 +369,7 @@ function rawPosts(sg, members) {
 function raiseDefenders(sg) {
   const s = sg.site, own = s.type === 'spieler';
   const types = own ? ['wache'] : DEFENDER_NPC[s.faction] || ['wache'];
-  const n = own ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + (G.s.castle.b.wehr || 0) * 2 : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
+  const n = own ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + bSum('wehr') * 2 : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
   const muster = musterPoints(sg);
   const members = [];
   for (let k = 0; k < n; k++) {
@@ -459,6 +460,8 @@ export function updateSiege(dt) {
       setupWalls(sg);
       closeGates(sg);
       sg.def = raiseDefenders(sg);
+      // Vor der eigenen Burg: Die Belagerer schlagen ihr Lager auf und brennen nieder, was vor den Mauern steht
+      if (sg.site.type === 'spieler') burnOuterPlots(0.45, GROUP_TYPES[army.type].nom);
       sg.att0 = army.members.length; sg.def0 = sg.def ? sg.def.members.length : 0;
       if (Math.hypot(s.x - p.x, s.y - p.y) < 70) log(sg.walls ? `Die Tore von ${siteName(s)} schlagen zu, die Riegel fallen. Die Besatzung rückt aus und bezieht Stellung hinter der Mauer. Draußen wird das Trebuchet aufgestellt.` : `Die Belagerung von ${siteName(s)} beginnt. Das Trebuchet wird aufgestellt.`, 'bad');
     } else if (sg.t > 260) return endSiege(sg, 'abgezogen');

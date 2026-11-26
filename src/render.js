@@ -6,7 +6,8 @@ import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERR
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt, PAL_GATE } from './world.js';
-import { conProgress, villageSpots } from './castle.js';
+import { conProgress, villageSpots, castlePlots, castleLayout, pastureOf } from './castle.js';
+import { ringR, CASTLE_TYPES } from './plots.js';
 import { castlePasture } from './animals.js';
 import { ART, onArt, wantArt, wantArtPrefix } from './assets.js';
 import { HORSE3D } from './pferde.js';
@@ -1632,9 +1633,9 @@ function castleGateClosed(site) {
   return site.type === 'spieler' && homeGateClosed();
 }
 
-function castlePieces(site, level, bannerCol) {
+function castlePieces(site, level, bannerCol, R = 4) {
   const parts = [];
-  const cx = site.x, cy = site.y, R = 4;
+  const cx = site.x, cy = site.y;
   const z0 = groundZ(G.world, cx, cy);
   const add = (x, y, f, bias = 0) => parts.push({ x, y, d: x + y + bias, z: z0, f });
   const stone = '#a5a092', wood = '#8a6440';
@@ -2186,36 +2187,38 @@ function drawStoneOutcrop(c, x, y, n) {
   }
 }
 
+// Ein Gebäude auf seinem Bauplatz p ({ x, y, size }). Innen (2 × 2) steht es enger und ohne Nebenanlagen;
+// die festen Teile entsprechen plotRects in castle.js.
 function addCastleBuilding(add, id, L, p, s) {
+  const cpt = p.size < 3;
   switch (id) {
     case 'halle': {
-      const wy = [0, 2.2, 2.6, 2.9][L], h = [0, 20, 24, 28][L];
+      const wy = cpt ? 1.8 : [0, 2.2, 2.4, 2.6][L], h = [0, 20, 24, 28][L];
       add(p.x, p.y, (c) => {
         // Gemalt: Holzhalle, ab Stufe 2 der steinerne Palas; das Bild liegt längs zu x, gespiegelt längs zu y
         if (p5(c, L === 1 ? 'burg_holzhalle' : 'burg_palas', p.x, p.y, wy / 2, true)) { if (darkness() > 0.2) addLight(p.x, p.y + 0.3, 14, 30, 0.8); return; }
         drawHouse(c, { x: p.x, y: p.y, wx: 1.2 + L * 0.1, wy, h, rh: 13 + L * 2, wall: L === 1 ? 'timber' : 'stone', roof: L === 1 ? 'thatch' : L === 2 ? 'tile' : 'slate', lit: true, chimney: true, v: 0.75 });
         if (L >= 2) banner(c, p.x + 0.45, p.y + wy / 2 - 0.15, h + 2, playerColor());
       });
-      if (L === 3) add(p.x + 0.1, p.y - wy / 2 - 0.35, (c) => { drawBox(c, p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8, 46, '#ada798', 0, 'stone'); drawPyramid(c, p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8, 46, 22, ROOFS.slate); banner(c, p.x + 0.1, p.y - wy / 2 - 0.35, 68, '#d6ad4c'); });
       break;
     }
     case 'kaserne': {
-      const wx = [0, 2.0, 2.4, 2.6][L];
-      add(p.x, p.y, (c) => drawHouse(c, { x: p.x, y: p.y, wx, wy: L === 3 ? 1.2 : 1.0, h: [0, 15, 18, 27][L], rh: 10, wall: L === 1 ? 'wood' : 'stone', roof: L === 3 ? 'tile' : 'wood', lit: true, v: 0.2 }));
-      // Übungsplatz vor dem Tor
-      const t = { x: s.x - 2.7, y: s.y + 6.5 };
-      add(t.x, t.y - 0.6, (c) => drawFenceRect(c, t.x, t.y, 2.0, 1.6));
-      add(t.x - 0.5, t.y - 0.3, (c) => drawDummy(c, t.x - 0.5, t.y - 0.3));
-      if (L >= 2) { add(t.x + 0.1, t.y - 0.4, (c) => drawDummy(c, t.x + 0.1, t.y - 0.4)); add(t.x + 0.6, t.y + 0.4, (c) => drawTarget(c, t.x + 0.6, t.y + 0.4)); }
-      if (L >= 2) add(p.x + 0.4, p.y + 0.85, (c) => drawRack(c, p.x + 0.4, p.y + 0.85));
+      const wx = cpt ? 1.8 : [0, 2.0, 2.4, 2.6][L], hy = cpt ? p.y : p.y - 0.7;
+      add(p.x, hy, (c) => drawHouse(c, { x: p.x, y: hy, wx, wy: L === 3 && !cpt ? 1.2 : 1.0, h: [0, 15, 18, 27][L], rh: 10, wall: L === 1 ? 'wood' : 'stone', roof: L === 3 ? 'tile' : 'wood', lit: true, v: 0.2 }));
+      if (cpt) break;
+      // Übungsplatz vor der Unterkunft
+      const t = { x: p.x - 0.1, y: p.y + 0.75 };
+      add(t.x, t.y - 0.55, (c) => drawFenceRect(c, t.x, t.y, 2.0, 1.1));
+      add(t.x - 0.5, t.y - 0.1, (c) => drawDummy(c, t.x - 0.5, t.y - 0.1));
+      if (L >= 2) { add(t.x + 0.1, t.y - 0.2, (c) => drawDummy(c, t.x + 0.1, t.y - 0.2)); add(t.x + 0.65, t.y + 0.25, (c) => drawTarget(c, t.x + 0.65, t.y + 0.25)); }
       if (L === 3) {
-        add(t.x - 0.4, t.y + 0.35, (c) => drawWorker(c, t.x - 0.4, t.y + 0.35, 'schwert', 0, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, role: 'soldat' }));
-        add(t.x + 0.1, t.y + 0.55, (c) => drawWorker(c, t.x + 0.1, t.y + 0.55, 'schwert', 2.5, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, flip: true, role: 'soldat' }));
+        add(t.x - 0.4, t.y + 0.3, (c) => drawWorker(c, t.x - 0.4, t.y + 0.3, 'schwert', 0, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, role: 'soldat' }));
+        add(t.x + 0.1, t.y + 0.35, (c) => drawWorker(c, t.x + 0.1, t.y + 0.35, 'schwert', 2.5, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, flip: true, role: 'soldat' }));
       }
       break;
     }
     case 'schmiede': {
-      const anvil = { x: p.x + 0.4, y: p.y + 0.95 };
+      const anvil = { x: p.x + 0.4, y: p.y + (cpt ? 0.8 : 0.95) };
       if (L === 1) {
         add(p.x, p.y, (c) => {
           drawHouse(c, { x: p.x, y: p.y, wx: 1.1, wy: 1.0, h: 13, rh: 9, wall: 'wood', roof: 'thatch', lit: true, v: 0.1 });
@@ -2224,7 +2227,7 @@ function addCastleBuilding(add, id, L, p, s) {
           addLight(p.x + 0.75, p.y - 0.1, 8, 22, 0.9);
         });
       } else {
-        const wx = L === 2 ? 1.4 : 1.7, wy = L === 2 ? 1.2 : 1.4;
+        const wx = cpt || L === 2 ? 1.4 : 1.7, wy = L === 2 ? 1.2 : 1.4;
         add(p.x, p.y, (c) => {
           drawHouse(c, { x: p.x, y: p.y, wx, wy, h: L === 2 ? 16 : 20, rh: 11, wall: 'stone', roof: 'tile', lit: true, v: 0.1 });
           for (let k = 0; k < L - 1; k++) {
@@ -2234,11 +2237,11 @@ function addCastleBuilding(add, id, L, p, s) {
           }
           if (darkness() > 0.1) addLight(p.x + wx / 2, p.y, 8, 30, 1);
         });
-        add(p.x + 1.15, p.y - 0.3, (c) => drawRack(c, p.x + 1.15, p.y - 0.3));
+        if (!cpt) add(p.x + 1.15, p.y - 0.3, (c) => drawRack(c, p.x + 1.15, p.y - 0.3));
       }
       add(anvil.x, anvil.y, (c) => drawAnvil(c, anvil.x, anvil.y, true));
       add(anvil.x + 0.35, anvil.y + 0.15, (c) => { const s2 = drawWorker(c, anvil.x + 0.35, anvil.y + 0.15, 'hammer', 0, { apron: true, col: '#7a6a55', flip: true, speed: 4 }); drawSparks(c, anvil.x, anvil.y, 8, s2); });
-      if (L === 3) {
+      if (L === 3 && !cpt) {
         const a2 = { x: p.x - 0.5, y: p.y + 1.05 };
         add(a2.x, a2.y, (c) => drawAnvil(c, a2.x, a2.y, true));
         add(a2.x - 0.35, a2.y + 0.1, (c) => { const s2 = drawWorker(c, a2.x - 0.35, a2.y + 0.1, 'hammer', 1.7, { apron: true, col: '#6a5a45', speed: 4.5 }); drawSparks(c, a2.x, a2.y, 8, s2); });
@@ -2246,13 +2249,15 @@ function addCastleBuilding(add, id, L, p, s) {
       break;
     }
     case 'stall': {
-      const wy = [0, 2.0, 2.6, 3.0][L];
-      add(p.x, p.y, (c) => {
-        drawHouse(c, { x: p.x, y: p.y, wx: 1.1 + L * 0.05, wy, h: 14 + L, rh: 10, wall: L === 3 ? 'stone' : 'wood', roof: 'thatch', lit: false, v: 0.3 });
+      const wy = cpt ? 1.8 : [0, 2.0, 2.6, 2.8][L], hx = cpt ? p.x : p.x - 0.6;
+      add(hx, p.y, (c) => {
+        drawHouse(c, { x: hx, y: p.y, wx: 1.1 + L * 0.05, wy, h: 14 + L, rh: 10, wall: L === 3 ? 'stone' : 'wood', roof: 'thatch', lit: false, v: 0.3 });
       });
-      const pad = { x: p.x + 1.55 + L * 0.1, y: p.y + 0.2 }, pw = [0, 1.4, 1.8, 2.2][L], ph = [0, 1.6, 2.2, 2.8][L];
+      if (cpt) break;
+      // Koppel neben dem Stall
+      const pad = { x: p.x + 0.75, y: p.y + 0.1 }, pw = 1.3, ph = 2.6;
       add(pad.x, pad.y - ph / 2, (c) => drawFenceRect(c, pad.x, pad.y, pw, ph));
-      const n = [0, 1, 2, 4][L];
+      const n = [0, 1, 2, 3][L];
       const cols = ['#7a5232', '#b8b0a2', '#2e2925', '#9a6a3a'];
       for (let k = 0; k < n; k++) {
         add(pad.x, pad.y + (k - n / 2) * 0.3, (c) => {
@@ -2260,10 +2265,10 @@ function addCastleBuilding(add, id, L, p, s) {
           const cyc = 26, walk = 9, tt = G.time + k * 7.3, cyc0 = Math.floor(tt / cyc), inC = tt - cyc0 * cyc;
           const moving = inC < walk;
           const t = (cyc0 * walk + Math.min(inC, walk)) * 0.22 + k * 2.1;
-          const ax = pw / 2 - 0.45, ay = ph / 2 - 0.45;
-          const hx = pad.x + Math.sin(t) * ax, hy = pad.y + Math.cos(t * 0.8 + k) * ay;
+          const ax = pw / 2 - 0.4, ay = ph / 2 - 0.45;
+          const hx2 = pad.x + Math.sin(t) * ax, hy = pad.y + Math.cos(t * 0.8 + k) * ay;
           const dx = Math.cos(t) * ax, dy = -Math.sin(t * 0.8 + k) * 0.8 * ay;
-          const [px, py] = P(hx, hy);
+          const [px, py] = P(hx2, hy);
           c.save(); c.translate(px, py);
           if (horseReady('pferd')) {
             c.scale(1.14 * FIG, 1.14 * FIG);
@@ -2277,61 +2282,63 @@ function addCastleBuilding(add, id, L, p, s) {
           c.restore();
         });
       }
-      if (L >= 2) add(p.x - 0.2, p.y + wy / 2 + 0.4, (c) => drawProp(c, { prop: 'heu', x: p.x - 0.2, y: p.y + wy / 2 + 0.4, v: 0.3 }));
-      if (L === 3) add(p.x + 0.4, p.y + wy / 2 + 0.5, (c) => drawProp(c, { prop: 'heu', x: p.x + 0.4, y: p.y + wy / 2 + 0.5, v: 0.6 }));
+      if (L >= 2) add(hx - 0.2, p.y + wy / 2 + 0.25, (c) => drawProp(c, { prop: 'heu', x: hx - 0.2, y: p.y + wy / 2 + 0.25, v: 0.3 }));
       break;
     }
     case 'holzfaeller': {
-      add(p.x, p.y, (c) => drawHouse(c, { x: p.x, y: p.y, wx: 1.0, wy: 0.9, h: 12, rh: 8, wall: 'wood', roof: 'wood', lit: true, v: 0.9, chimney: true }));
-      if (L === 3) add(p.x - 0.4, p.y - 1.4, (c) => drawHouse(c, { x: p.x - 0.4, y: p.y - 1.4, wx: 0.9, wy: 0.9, h: 11, rh: 8, wall: 'wood', roof: 'thatch', lit: true, v: 0.4 }));
-      add(p.x + 1.1, p.y + 0.3, (c) => drawLogs(c, p.x + 1.1, p.y + 0.2, [0, 4, 8, 12][L]));
-      add(p.x + 0.3, p.y + 1.0, (c) => { drawBox(c, p.x + 0.3, p.y + 1.0, 0.25, 0.25, 5, '#7a5636'); });
-      add(p.x + 0.55, p.y + 1.15, (c) => drawWorker(c, p.x + 0.55, p.y + 1.15, 'axt', 0.7, { col: '#5f7a3a', flip: true, speed: 3.5 }));
-      if (L >= 2) add(p.x + 1.4, p.y + 1.2, (c) => drawWorker(c, p.x + 1.4, p.y + 1.2, 'axt', 2.2, { col: '#7a5a3a', speed: 3 }));
-      if (L >= 2) add(p.x - 0.4, p.y + 1.0, (c) => drawProp(c, { prop: 'karren', x: p.x - 0.4, y: p.y + 1.0, v: 0.1 }));
+      const h = { x: p.x - 0.4, y: p.y - 0.4 };
+      add(h.x, h.y, (c) => drawHouse(c, { x: h.x, y: h.y, wx: 1.0, wy: 0.9, h: 12, rh: 8, wall: 'wood', roof: 'wood', lit: true, v: 0.9, chimney: true }));
+      if (L === 3) add(p.x + 0.7, p.y - 0.95, (c) => drawHouse(c, { x: p.x + 0.7, y: p.y - 0.95, wx: 0.9, wy: 0.9, h: 11, rh: 8, wall: 'wood', roof: 'thatch', lit: true, v: 0.4 }));
+      add(p.x + 0.7, p.y + 0.42, (c) => drawLogs(c, p.x + 0.7, p.y + 0.32, [0, 4, 8, 12][L]));
+      add(p.x - 0.1, p.y + 0.8, (c) => { drawBox(c, p.x - 0.1, p.y + 0.8, 0.25, 0.25, 5, '#7a5636'); });
+      add(p.x + 0.15, p.y + 0.95, (c) => drawWorker(c, p.x + 0.15, p.y + 0.95, 'axt', 0.7, { col: '#5f7a3a', flip: true, speed: 3.5 }));
+      if (L >= 2) add(p.x + 1.05, p.y + 1.1, (c) => drawWorker(c, p.x + 1.05, p.y + 1.1, 'axt', 2.2, { col: '#7a5a3a', speed: 3 }));
+      if (L >= 2) add(p.x - 1.0, p.y + 0.75, (c) => drawProp(c, { prop: 'karren', x: p.x - 1.0, y: p.y + 0.75, v: 0.1 }));
       break;
     }
     case 'steinbruch': {
-      add(p.x, p.y, (c) => {
-        if (L === 1) drawStoneOutcrop(c, p.x, p.y, 4);
+      const r = { x: p.x, y: p.y - 0.3 };
+      add(r.x, r.y, (c) => {
+        if (L === 1) drawStoneOutcrop(c, r.x, r.y, 4);
         else {
-          drawBox(c, p.x, p.y, 2.0, 1.6, 6, '#8f897c', 0, 'stone');
-          drawBox(c, p.x - 0.3, p.y - 0.3, 1.4, 1.0, 10, '#9a958a', 6, 'stone');
-          if (L === 3) drawBox(c, p.x - 0.5, p.y - 0.45, 0.9, 0.6, 9, '#a39e92', 16, 'stone');
+          drawBox(c, r.x, r.y, 2.0, 1.6, 6, '#8f897c', 0, 'stone');
+          drawBox(c, r.x - 0.3, r.y - 0.3, 1.4, 1.0, 10, '#9a958a', 6, 'stone');
+          if (L === 3) drawBox(c, r.x - 0.5, r.y - 0.45, 0.9, 0.6, 9, '#a39e92', 16, 'stone');
         }
       });
-      add(p.x + 1.2, p.y + 0.6, (c) => drawStones(c, p.x + 1.2, p.y + 0.6, [0, 4, 8, 12][L]));
-      add(p.x + 0.4, p.y + 1.1, (c) => drawWorker(c, p.x + 0.4, p.y + 1.1, 'hacke', 0.3, { col: '#8a7a64', speed: 3.6 }));
-      if (L >= 2) add(p.x + 1.3, p.y - 0.6, (c) => drawCrane(c, p.x + 1.3, p.y - 0.6, 0));
-      if (L >= 2) add(p.x - 0.7, p.y + 1.0, (c) => drawWorker(c, p.x - 0.7, p.y + 1.0, 'hammer', 1.4, { col: '#6e6458', flip: true, speed: 4 }));
-      if (L === 3) { add(p.x - 1.1, p.y - 0.4, (c) => drawCrane(c, p.x - 1.1, p.y - 0.4, 2)); add(p.x + 1.8, p.y + 1.3, (c) => drawProp(c, { prop: 'karren', x: p.x + 1.8, y: p.y + 1.3, v: 0.1 })); }
+      add(p.x + 0.95, p.y + 0.85, (c) => drawStones(c, p.x + 0.95, p.y + 0.85, [0, 4, 8, 12][L]));
+      add(p.x + 0.3, p.y + 0.95, (c) => drawWorker(c, p.x + 0.3, p.y + 0.95, 'hacke', 0.3, { col: '#8a7a64', speed: 3.6 }));
+      if (L >= 2) add(p.x + 1.15, p.y - 0.95, (c) => drawCrane(c, p.x + 1.15, p.y - 0.95, 0));
+      if (L >= 2) add(p.x - 0.7, p.y + 0.95, (c) => drawWorker(c, p.x - 0.7, p.y + 0.95, 'hammer', 1.4, { col: '#6e6458', flip: true, speed: 4 }));
+      if (L === 3) add(p.x - 1.15, p.y - 0.9, (c) => drawCrane(c, p.x - 1.15, p.y - 0.9, 2));
       break;
     }
     case 'markt': {
       const cols = ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#e8e0cc', '#7d2a52'];
-      const n = [0, 2, 4, 6][L];
+      const n = cpt ? [0, 2, 2, 3][L] : [0, 2, 4, 6][L];
       for (let k = 0; k < n; k++) {
-        const x = p.x - 0.9 + (k % 3) * 0.95, y = p.y - 0.6 + Math.floor(k / 3) * 1.25;
+        const x = cpt ? p.x - 0.5 + (k % 2) * 1.0 : p.x - 0.95 + (k % 3) * 0.95, y = cpt ? p.y - 0.4 + Math.floor(k / 2) * 1.0 : p.y - 0.75 + Math.floor(k / 3) * 1.25;
         add(x, y, (c) => drawStall(c, { x, y, color: cols[k % cols.length] }));
-        if (L >= 2 && k % 2 === 0) add(x + 0.1, y + 0.55, (c) => drawWorker(c, x + 0.1, y + 0.55, null, k, { col: cols[(k + 2) % cols.length], speed: 1, role: 'buerger', act: 'verkaufen' }));
+        if (L >= 2 && k % 2 === 0) add(x + 0.1, y + 0.5, (c) => drawWorker(c, x + 0.1, y + 0.5, null, k, { col: cols[(k + 2) % cols.length], speed: 1, role: 'buerger', act: 'verkaufen' }));
       }
-      if (L >= 2) add(p.x + 1.8, p.y + 0.3, (c) => drawWell(c, { x: p.x + 1.8, y: p.y + 0.3 }));
-      if (L === 3) add(p.x + 0.1, p.y + 0.15, (c) => { drawBox(c, p.x + 0.1, p.y + 0.15, 0.4, 0.4, 6, '#9a958a', 0, 'stone'); drawBox(c, p.x + 0.1, p.y + 0.15, 0.14, 0.14, 26, '#a8a296', 6); const tp = P(p.x + 0.1, p.y + 0.15, 32); c.fillStyle = '#a8a296'; c.fillRect(tp[0] - 4, tp[1] - 2, 8, 2); });
+      if (!cpt && L >= 2) add(p.x + 1.05, p.y + 1.05, (c) => drawWell(c, { x: p.x + 1.05, y: p.y + 1.05 }));
       break;
     }
     case 'kapelle': {
+      const wx = [0, 1.6, 2.0, 2.6][L], fit = cpt ? Math.min(1.8, wx) : wx;
       if (L === 1) {
         add(p.x, p.y, (c) => {
-          drawHouse(c, { x: p.x, y: p.y, wx: 1.6, wy: 1.0, h: 15, rh: 12, wall: 'wood', roof: 'thatch', lit: true, v: 0.05 });
-          const t = P(p.x + 0.8, p.y, 28); c.fillStyle = '#d6ad4c'; c.fillRect(t[0] - 0.8, t[1] - 8, 1.6, 8); c.fillRect(t[0] - 3, t[1] - 6, 6, 1.5);
+          drawHouse(c, { x: p.x, y: p.y, wx: fit, wy: 1.0, h: 15, rh: 12, wall: 'wood', roof: 'thatch', lit: true, v: 0.05 });
+          const t = P(p.x + fit / 2, p.y, 28); c.fillStyle = '#d6ad4c'; c.fillRect(t[0] - 0.8, t[1] - 8, 1.6, 8); c.fillRect(t[0] - 3, t[1] - 6, 6, 1.5);
         });
       } else {
-        add(p.x, p.y, (c) => drawChurch(c, { x: p.x, y: p.y, wx: L === 2 ? 2.0 : 2.6, wy: L === 2 ? 1.0 : 1.2, h: L === 2 ? 22 : 28, abbey: L === 3 }));
+        add(p.x, p.y, (c) => drawChurch(c, { x: p.x, y: p.y, wx: fit, wy: L === 2 ? 1.0 : 1.2, h: L === 2 ? 22 : 28, abbey: L === 3 }));
       }
-      if (L === 3) for (let k = 0; k < 6; k++) { const gx = p.x - 1.0 + (k % 3) * 0.45, gy = p.y + 1.1 + Math.floor(k / 3) * 0.4; add(gx, gy, (c) => drawGrave(c, gx, gy)); }
-      if (L >= 2) add(p.x - 1.4, p.y + 0.9, (c) => drawProp(c, { prop: 'beet', x: p.x - 1.4, y: p.y + 0.9, v: 0.2 }));
+      if (L === 3 && !cpt) for (let k = 0; k < 6; k++) { const gx = p.x - 1.0 + (k % 3) * 0.45, gy = p.y + 0.95 + Math.floor(k / 3) * 0.35; add(gx, gy, (c) => drawGrave(c, gx, gy)); }
+      if (L >= 2 && !cpt) add(p.x + 1.0, p.y + 1.0, (c) => drawProp(c, { prop: 'beet', x: p.x + 1.0, y: p.y + 1.0, v: 0.2 }));
       break;
     }
+    case 'wehr': addTowerAt(add, p.x, p.y, L, p.i || 0); break;
     default: break;
   }
 }
@@ -2477,65 +2484,69 @@ export function fieldSpots(s) {
 }
 
 function addNewCastleBuilding(add, addFlat, id, L, p, s) {
+  const cpt = p.size < 3;
   switch (id) {
     case 'hospiz': {
-      const house = [null,
-        { x: p.x + 0.2, y: p.y - 0.3, wx: 1.3, wy: 1.1, h: 13, rh: 10, wall: 'timber', roof: 'thatch', lit: true, chimney: true, v: 0.35 },
-        { x: p.x + 0.3, y: p.y - 0.2, wx: 1.2, wy: 2.0, h: 16, rh: 12, wall: 'plaster', roof: 'tile', lit: true, chimney: true, v: 0.15 },
-        { x: p.x + 0.3, y: p.y - 0.2, wx: 1.4, wy: 2.3, h: 22, rh: 13, wall: 'stone', roof: 'slate', lit: true, chimney: true, v: 0.2 }][L];
+      const base = [null,
+        { dx: 0.2, dy: -0.3, wx: 1.3, wy: 1.1, h: 13, rh: 10, wall: 'timber', roof: 'thatch', lit: true, chimney: true, v: 0.35 },
+        { dx: 0.3, dy: -0.2, wx: 1.2, wy: 2.0, h: 16, rh: 12, wall: 'plaster', roof: 'tile', lit: true, chimney: true, v: 0.15 },
+        { dx: 0.3, dy: -0.2, wx: 1.4, wy: 2.3, h: 22, rh: 13, wall: 'stone', roof: 'slate', lit: true, chimney: true, v: 0.2 }][L];
+      const house = { ...base, x: p.x + (cpt ? 0 : base.dx), y: p.y + (cpt ? 0 : base.dy), wy: cpt ? Math.min(1.8, base.wy) : base.wy };
       add(house.x, house.y, (c) => {
         drawHouse(c, house);
         if (L === 3) { const tx = house.x, ty = house.y - house.wy / 2 + 0.25; drawBox(c, tx, ty, 0.36, 0.36, 12, '#b2ab9c', house.h + 8, 'stone'); drawPyramid(c, tx, ty, 0.36, 0.36, house.h + 20, 9, ROOFS.slate); }
       });
-      const beds = [0, 2, 3, 4][L];
-      for (let k = 0; k < beds; k++) {
-        const bx = p.x - 0.75 + (k % 2) * 0.7, by = p.y + 0.55 + Math.floor(k / 2) * 0.55;
-        add(bx, by, (c) => drawProp(c, { prop: 'beet', x: bx, y: by, v: 0.2 + k * 0.2 }));
+      if (!cpt) {
+        const beds = [0, 2, 3, 4][L];
+        for (let k = 0; k < beds; k++) {
+          const bx = p.x - 0.75 + (k % 2) * 0.7, by = p.y + 0.55 + Math.floor(k / 2) * 0.5;
+          add(bx, by, (c) => drawProp(c, { prop: 'beet', x: bx, y: by, v: 0.2 + k * 0.2 }));
+        }
+        if (L >= 2) add(p.x - 1.0, p.y - 1.05, (c) => drawWell(c, { x: p.x - 1.0, y: p.y - 1.05 }));
       }
-      if (L >= 2) add(p.x - 1.0, p.y - 1.05, (c) => drawWell(c, { x: p.x - 1.0, y: p.y - 1.05 }));
-      add(p.x - 0.4, p.y + 1.15, (c) => drawWorker(c, p.x - 0.4, p.y + 1.15, null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2, role: 'moench', act: 'segnen' }));
-      if (L === 3) add(p.x + 0.4, p.y + 1.2, (c) => drawWorker(c, p.x + 0.4, p.y + 1.2, null, 2.4, { col: '#e8e0cc', hat: '#e8e0cc', speed: 1, flip: true, role: 'moench' }));
+      add(p.x - 0.4, p.y + (cpt ? 0.8 : 1.15), (c) => drawWorker(c, p.x - 0.4, p.y + (cpt ? 0.8 : 1.15), null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2, role: 'moench', act: 'segnen' }));
       break;
     }
     case 'schafzucht': {
-      const pa = castlePasture(s);
-      if (pa) {
-        addFlat(pa.x - pa.w / 2, pa.y - pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, false));
-        add(pa.x + pa.w / 2, pa.y + pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, true));
-      }
+      const pa = pastureOf(L, p);
+      addFlat(pa.x - pa.w / 2, pa.y - pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, false));
+      add(pa.x + pa.w / 2, pa.y + pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, true));
       // Hütte und Scherschuppen hinter dem Weidezaun (nicht darin)
       const hut = L === 3
-        ? { x: p.x - 1.2, y: p.y - 1.55, wx: 1.0, wy: 0.9, h: 12, rh: 9, wall: 'stone', roof: 'slate', lit: true, v: 0.6 }
-        : { x: p.x - 1.2, y: p.y - 1.55, wx: 0.85, wy: 0.75, h: 10, rh: 9, wall: 'wood', roof: 'thatch', lit: true, v: 0.6 };
+        ? { x: p.x - 0.95, y: p.y - 1.0, wx: 1.0, wy: 0.9, h: 12, rh: 9, wall: 'stone', roof: 'slate', lit: true, v: 0.6 }
+        : { x: p.x - 0.95, y: p.y - 1.0, wx: 0.85, wy: 0.75, h: 10, rh: 9, wall: 'wood', roof: 'thatch', lit: true, v: 0.6 };
       add(hut.x, hut.y, (c) => drawHouse(c, hut));
-      if (L >= 2) add(p.x + 1.5, p.y - 1.55, (c) => {
+      const sh = { x: p.x + 0.85, y: p.y - 1.05 };
+      if (L >= 2) add(sh.x, sh.y, (c) => {
         // Scherschuppen: offenes Dach auf Pfosten
-        for (const [dx, dy] of [[-0.35, -0.3], [0.35, -0.3], [-0.35, 0.3], [0.35, 0.3]]) drawBox(c, p.x + 1.5 + dx, p.y - 1.55 + dy, 0.08, 0.08, 12, '#6b4a2e');
-        drawGableRoof(c, p.x + 1.5, p.y - 1.55, 0.9, 0.8, 12, 7, ROOFS.thatch, '#8a6a40', true);
+        for (const [dx, dy] of [[-0.35, -0.3], [0.35, -0.3], [-0.35, 0.3], [0.35, 0.3]]) drawBox(c, sh.x + dx, sh.y + dy, 0.08, 0.08, 12, '#6b4a2e');
+        drawGableRoof(c, sh.x, sh.y, 0.9, 0.8, 12, 7, ROOFS.thatch, '#8a6a40', true);
       });
-      if (L >= 2) add(p.x + 2.4, p.y - 0.85, (c) => drawWoolBales(c, p.x + 2.4, p.y - 0.85, L === 3 ? 6 : 3));
-      add(p.x - 1.3, p.y + 0.4, (c) => drawWorker(c, p.x - 1.3, p.y + 0.4, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8, role: 'hirte', staff: true }));
+      if (L >= 2) add(p.x - 1.15, p.y + 0.15, (c) => drawWoolBales(c, p.x - 1.15, p.y + 0.15, L === 3 ? 6 : 3));
+      add(p.x - 1.2, p.y + 1.0, (c) => drawWorker(c, p.x - 1.2, p.y + 1.0, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8, role: 'hirte', staff: true }));
       break;
     }
     case 'felder': {
-      const spots = fieldSpots(s).slice(0, [0, 2, 4, 6][L]);
-      spots.forEach((f, k) => {
+      // Äcker auf dem Platz: eins, ab Stufe 2 zwei nebeneinander, dazu Hütte oder Scheune, auf Stufe 3 eine Windmühle
+      const fields = L === 1 ? [{ x: p.x + 0.3, y: p.y + 0.35, wx: 2.2, wy: 1.5 }]
+        : [{ x: p.x - 0.6, y: p.y + 0.45, wx: 1.5, wy: 1.9 }, { x: p.x + 0.85, y: p.y + 0.45, wx: 1.1, wy: 1.9 }];
+      fields.forEach((f, k) => {
         addFlat(f.x - f.wx / 2, f.y - f.wy / 2, (c) => drawCropField(c, f));
-        if (k % 2 === 0 && seasonIndex() < 3) add(f.x + 0.2, f.y + 0.2, (c) => drawWorker(c, f.x + 0.2, f.y + 0.2, 'hacke', k * 1.3, { col: '#8a7a55', hat: '#c9b06a', speed: 2.2, flip: k % 4 === 0 }));
+        if (k === 0 && seasonIndex() < 3) add(f.x + 0.2, f.y + 0.2, (c) => drawWorker(c, f.x + 0.2, f.y + 0.2, 'hacke', p.x * 1.3, { col: '#8a7a55', hat: '#c9b06a', speed: 2.2 }));
       });
-      if (spots[0]) add(spots[0].x - 0.4, spots[0].y - 0.3, (c) => drawScarecrow(c, spots[0].x - 0.4, spots[0].y - 0.3));
-      if (L === 1) add(p.x, p.y, (c) => { drawHouse(c, { x: p.x, y: p.y, wx: 0.8, wy: 0.7, h: 9, rh: 8, wall: 'wood', roof: 'thatch', lit: false, v: 0.4 }); });
-      if (L >= 2) add(p.x - 0.1, p.y - 0.1, (c) => drawHouse(c, { x: p.x - 0.1, y: p.y - 0.1, wx: 1.1, wy: 1.6, h: 14, rh: 14, wall: 'wood', roof: 'thatch', lit: false, v: 0.7 }));
-      if (L >= 2) add(p.x + 0.9, p.y + 0.6, (c) => drawProp(c, { prop: 'heu', x: p.x + 0.9, y: p.y + 0.6, v: 0.4 }));
-      if (L === 3) add(p.x + 1.3, p.y - 0.9, (c) => drawWindmill(c, p.x + 1.3, p.y - 0.9));
+      add(fields[0].x - 0.35, fields[0].y - 0.3, (c) => drawScarecrow(c, fields[0].x - 0.35, fields[0].y - 0.3));
+      if (L === 1) add(p.x - 1.0, p.y - 1.0, (c) => drawHouse(c, { x: p.x - 1.0, y: p.y - 1.0, wx: 0.8, wy: 0.7, h: 9, rh: 8, wall: 'wood', roof: 'thatch', lit: false, v: 0.4 }));
+      else add(p.x - 0.95, p.y - 1.0, (c) => drawHouse(c, { x: p.x - 0.95, y: p.y - 1.0, wx: 0.95, wy: 0.8, h: 12, rh: 11, wall: 'wood', roof: 'thatch', lit: false, v: 0.7 }));
+      if (L >= 2) add(p.x + 0.1, p.y - 1.05, (c) => drawProp(c, { prop: 'heu', x: p.x + 0.1, y: p.y - 1.05, v: 0.4 }));
+      if (L === 3) add(p.x + 1.05, p.y - 1.05, (c) => drawWindmill(c, p.x + 1.05, p.y - 1.05));
       break;
     }
     default: break;
   }
 }
 
-function addTower(add, s, k, L) {
-  const x = s.x + TOWER_SPOTS[k][0], y = s.y + TOWER_SPOTS[k][1];
+// Wachturm auf einem Bauplatz (Holz bis Stufe 1, dann Stein, mit Wache oben)
+function addTowerAt(add, x, y, L, k) {
   const stone = L >= 2;
   const h = stone ? 52 : 44;
   add(x, y, (c) => {
@@ -2545,51 +2556,55 @@ function addTower(add, s, k, L) {
     if (stone) drawMerlons(c, x, y, 0.9, 0.9, h, '#a5a092');
     else { drawBox(c, x, y, 1.1, 1.1, 3, '#6e5236', h); }
     drawWorker(c, x + 0.1, y + 0.1, null, k, { z: h + (stone ? 0 : 3), col: '#4d74ad', hat: '#9aa1a6', speed: 0.5, role: 'wache' });
-    if (L >= 3 || (stone && k === 0)) drawBrazier(c, x - 0.25, y - 0.25, h + 2);
+    if (L >= 3 || stone) drawBrazier(c, x - 0.25, y - 0.25, h + 2);
+  });
+}
+
+// Abgebrannt: Ruß, verkohlte Balken, ein wenig Rauch
+function addBurnt(add, p) {
+  add(p.x + 0.3, p.y + 0.3, (c) => {
+    const r = p.size / 2 - 0.2;
+    for (let k = 0; k < 5; k++) {
+      const a = k * 1.9 + p.x, d = (k % 3) * 0.3 * r;
+      const q = P(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 0);
+      c.fillStyle = 'rgba(30,22,16,0.55)'; c.beginPath(); c.ellipse(q[0], q[1], 14 + k * 2, 6 + k, 0, 0, Math.PI * 2); c.fill();
+    }
+    drawLogs(c, p.x + 0.35, p.y + 0.2, 3);
+    const sp = P(p.x, p.y, 10); smokeEmit(sp[0], sp[1], 0.25);
   });
 }
 
 function buildPlayerCastle() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
   const C = G.s.castle;
-  const parts = castlePieces(s, C.level, playerColor());
+  const parts = castlePieces(s, C.level, playerColor(), ringR());
   const z0 = groundZ(G.world, s.x, s.y);
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
   // Flache Dinge (Äcker, hintere Zäune) liegen unter allem, was auf ihnen steht
   const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
-  const lv = (id) => C.b[id] || 0;
-  const pos = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
   const con = C.construction;
-  castleAnchors = [{ id: 'burg', castle: true, x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
-
-  for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle', 'hospiz', 'schafzucht', 'felder']) {
-    const L = lv(id), p = pos(id), building = con && con.id === id;
-    const [pw, ph] = PLOT[id];
-    const signAt = { x: p.x - pw / 2 - 0.25, y: p.y + ph / 2 + 0.15 };
-    const name = BUILDINGS[id].name;
-    if (!L && !building) {
-      add(p.x - 0.5, p.y - 0.5, (c) => drawPlot(c, p.x, p.y, pw, ph));
-      add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], true));
-      castleAnchors.push({ id, castle: true, plot: true, x: p.x, y: p.y, h: 20, label: `Bauplatz: ${name}` });
-      continue;
+  const R = ringR();
+  castleAnchors = [{ id: 'burg', castle: true, x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : con && con.id === 'umbau' ? ` (Umbau zur ${CASTLE_TYPES[con.type].name})` : ''}` }];
+  // Bauplätze: belegt, frei oder im Bau; abgebrannte Gebäude mit Ruß und Rauch
+  const plots = castlePlots(), lay = castleLayout();
+  lay.forEach((p, i) => {
+    const b = plots[i], building = con && con.plot === i;
+    const where = p.inner ? 'im Hof' : 'vor der Mauer';
+    const signAt = { x: p.x - p.size / 2 + 0.1, y: p.y + p.size / 2 - 0.1 };
+    if (!b && !building) {
+      add(p.x - 0.5, p.y - 0.5, (c) => drawPlot(c, p.x, p.y, p.size * 0.86, p.size * 0.86));
+      add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, 'hacke', true));
+      castleAnchors.push({ id: 'plot', plot: i, castle: true, x: p.x, y: p.y, h: 18, label: `Freier Bauplatz ${where}` });
+      return;
     }
+    const id = b ? b.id : con.id, L = b ? b.lv : 0;
     if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
+    if (b && b.dmg) addBurnt(add, p);
     if (building) addConstruction(add, id, p, L);
-    add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], false));
-    castleAnchors.push({ id, castle: true, x: p.x, y: p.y, h: 40, label: `${name} · Stufe ${L}${building ? ` (Ausbau auf Stufe ${con.level} läuft)` : ''}` });
-  }
-
-  // Wachtürme
-  const WE = lv('wehr');
-  for (let k = 0; k < WE; k++) addTower(add, s, k, WE);
-  const nextT = con && con.id === 'wehr' ? con.level - 1 : WE;
-  if (nextT < 3) {
-    const tx = s.x + TOWER_SPOTS[nextT][0], ty = s.y + TOWER_SPOTS[nextT][1];
-    if (con && con.id === 'wehr') addConstruction(add, 'wehr', { x: tx, y: ty }, 0);
-    else { add(tx - 0.3, ty - 0.3, (c) => drawPlot(c, tx, ty, 1.0, 1.0)); add(tx - 0.7, ty + 0.65, (c) => drawSign(c, tx - 0.7, ty + 0.65, 'turm', true)); }
-    castleAnchors.push({ id: 'wehr', castle: true, plot: true, x: tx, y: ty, h: 30, label: con && con.id === 'wehr' ? `Wachturm im Bau` : 'Bauplatz: Wachturm' });
-  }
-  for (let k = 0; k < WE; k++) castleAnchors.push({ id: 'wehr', castle: true, x: s.x + TOWER_SPOTS[k][0], y: s.y + TOWER_SPOTS[k][1], h: 60, label: `Wachturm · Stufe ${WE}` });
+    if (id !== 'wehr') add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], false));
+    const state = building ? (con.repair ? ' (wird ausgebessert)' : ` (Ausbau auf Stufe ${con.level} läuft)`) : b && b.dmg ? ' (abgebrannt)' : '';
+    castleAnchors.push({ id: 'plot', plot: i, bid: id, castle: true, x: p.x, y: p.y, h: id === 'wehr' ? 60 : 40, label: `${BUILDINGS[id].name}${L ? ` · Stufe ${L}` : ''}${state}` });
+  });
 
   // Burgsiedlung
   const spots = villageSpots(s);
@@ -2602,7 +2617,6 @@ function buildPlayerCastle() {
 
   // Burg im Ausbau
   if (con && con.id === 'burg') {
-    const R = 4;
     if (con.level === 1) {
       // Die Palisade wächst Stück für Stück
       const sides = [];
@@ -2643,7 +2657,7 @@ function buildPlayerCastle() {
 }
 
 function addConstruction(add, id, p, L) {
-  const [pw, ph] = PLOT[id];
+  const pw = id === 'wehr' ? 1.0 : (p.size || 2) * 0.8, ph = pw;
   const full = id === 'wehr' ? 46 : 24;
   const tex = STONE_BUILDINGS[id] ? 'stone' : 'plank';
   add(p.x, p.y, (c) => {
@@ -2687,12 +2701,11 @@ function drawCelebration(c, dt) {
     const s = G.world.sites.find((x) => x.type === 'spieler');
     let px = s.x - 1, py = s.y - 1;
     if (ce.x !== undefined) { px = ce.x; py = ce.y; }
-    else if (ce.id === 'wehr') { px = s.x + TOWER_SPOTS[ce.level - 1][0]; py = s.y + TOWER_SPOTS[ce.level - 1][1]; }
-    else if (ce.id !== 'burg') { px = s.x + CASTLE_LAYOUT[ce.id].dx; py = s.y + CASTLE_LAYOUT[ce.id].dy; }
+    else if (ce.plot !== undefined && castleLayout()[ce.plot]) { const q = castleLayout()[ce.plot]; px = q.x; py = q.y; }
     const sp = toScreen(px, py);
     const z = G.cam.zoom;
     if (sparkles.length < 140) for (let k = 0; k < 3; k++) sparkles.push({ x: sp.x + (Math.random() - 0.5) * 90 * z, y: sp.y - Math.random() * 40 * z, vy: -20 - Math.random() * 30, life: 0, max: 1.2 + Math.random() * 1.2 });
-    const label = ce.label || `Fertig: ${ce.id === 'burg' ? BUILDINGS.burg.levels[ce.level].name : `${BUILDINGS[ce.id].name} Stufe ${ce.level}`}`;
+    const label = ce.label || `Fertig: ${ce.id === 'burg' ? BUILDINGS.burg.levels[ce.level].name : ce.id === 'umbau' ? CASTLE_TYPES[ce.type].name : `${BUILDINGS[ce.id].name} Stufe ${ce.level}`}`;
     c.font = `600 ${Math.round(15 + z * 2)}px "IM Fell English SC", Georgia, serif`;
     c.textAlign = 'center';
     const tw = c.measureText(label).width;

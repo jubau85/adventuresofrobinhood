@@ -361,9 +361,10 @@ export function palisadeBand(s, withGate) {
 // Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten. rects: Grundflächen der Burggebäude
 // (Bergfried, Saal, Türme, Hütten, Pferche ...), die castle.js je nach Ausbau liefert; ohne Angabe
 // bleiben die alten. Sie sperren auch Straßenfelder (ein Wachturm kann am Weg stehen).
-export function setPlayerWalls(W, on, rects) {
+export function setPlayerWalls(W, on, rects, R) {
   const N = W.N;
   W.playerWalls = on;
+  if (R) W.playerR = R;
   if (rects) {
     W.castleObs = rects.map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
     W.cgrid = new Map();
@@ -373,7 +374,7 @@ export function setPlayerWalls(W, on, rects) {
   W.penTile = new Uint8Array(N * N);
   if (on) {
     const s = W.sites.find((x) => x.type === 'spieler');
-    blockTiles(W, W.block, wallRing(W, s, 4));
+    blockTiles(W, W.block, wallRing(W, s, W.playerR || 4));
   }
   for (const o of W.castleObs || []) for (const [x, y] of obstacleTiles(W, o, false)) {
     const i = y * N + x;

@@ -11,7 +11,7 @@ import { isoX, isoY } from './iso.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed } from './politics.js';
 import { cargoFree, addCargo, siteById } from './economy.js';
-import { castleSite, bLevel, castleBonusAt } from './castle.js';
+import { castleSite, bLevel, castleBonusAt, workingPlots } from './castle.js';
 import { hourOf, passHours } from './sim.js';
 import { hitAnimal, takeAnimal } from './animals.js';
 import { spawnVillagers, updateVillager, updateSayings, buffActive } from './life.js';
@@ -1207,14 +1207,14 @@ export function removeGroup(g) {
 // ---------------------------------------------------------------- Wachtürme der eigenen Burg
 // Die Bogenschützen auf den Türmen schießen auf alles, was dir feindlich ist und in Reichweite kommt.
 function updateTowers(dt) {
-  const L = bLevel('wehr');
-  if (!L) return;
-  const s = castleSite();
-  if (!G.towerCd) G.towerCd = [0, 0, 0];
-  for (let k = 0; k < L; k++) {
-    G.towerCd[k] -= dt;
+  const towers = workingPlots('wehr');
+  if (!towers.length) return;
+  if (!G.towerCd) G.towerCd = {};
+  for (const w of towers) {
+    const L = w.lv, k = w.i;
+    G.towerCd[k] = (G.towerCd[k] || 0) - dt;
     if (G.towerCd[k] > 0) continue;
-    const tx = s.x + CASTLE_TOWERS[k][0], ty = s.y + CASTLE_TOWERS[k][1];
+    const tx = w.plot.x, ty = w.plot.y;
     let best = null, bd = 7 + L;
     for (const g of G.groups) {
       if (!(g.engaged || groupHostile(g))) continue;

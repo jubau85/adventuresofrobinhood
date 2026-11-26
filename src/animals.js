@@ -3,7 +3,7 @@
 
 import { G, log } from './state.js';
 import { T, GOODS, CASTLE_LAYOUT } from './data.js';
-import { bLevel } from './castle.js';
+import { bLevel, workingPlots, pastureOf } from './castle.js';
 import { isWalkable, tileAt } from './world.js';
 import { rand, randInt } from './rng.js';
 import { addCargo, cargoFree } from './economy.js';
@@ -55,11 +55,14 @@ function addHerd(kind, home, n, r, site = null, farFromPlayer = 0) {
 }
 
 // Weide der eigenen Schafzucht (passt zum Zaun, den der Renderer zeichnet)
+// Mehrere Schafzuchten: Die Herde weidet auf der größten Weide, so viele Schafe, wie alle zusammen halten
 export function castlePasture(s) {
-  const L = bLevel('schafzucht');
-  if (!L || !s) return null;
-  const o = CASTLE_LAYOUT.schafzucht;
-  return { x: s.x + o.dx + 0.5, y: s.y + o.dy + 0.3, w: [0, 1.9, 2.5, 2.9][L], h: [0, 1.7, 2.1, 2.5][L], r: [0, 0.55, 0.75, 0.95][L], n: [0, 6, 10, 14][L] };
+  if (!s) return null;
+  const all = workingPlots('schafzucht');
+  if (!all.length) return null;
+  const top = all.reduce((a, w) => (w.lv > a.lv ? w : a), all[0]), L = top.lv, pa = pastureOf(L, top.plot);
+  const n = Math.min(22, all.reduce((a, w) => a + [0, 6, 10, 14][w.lv], 0));
+  return { x: pa.x, y: pa.y, w: pa.w, h: pa.h, r: [0, 0.5, 0.65, 0.75][L], n };
 }
 
 function farmHerds(s) {
@@ -105,9 +108,8 @@ export function spawnAnimals() {
 export function refreshCastleHerd() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
   const pa = castlePasture(s);
-  if (!pa) return;
   G.animals = G.animals.filter((a) => !(a.kind === 'schaf' && a.site === s.id));
-  addHerd('schaf', { x: pa.x, y: pa.y }, pa.n, pa.r, s.id);
+  if (pa) addHerd('schaf', { x: pa.x, y: pa.y }, pa.n, pa.r, s.id);
 }
 
 export function replenishAnimals() {

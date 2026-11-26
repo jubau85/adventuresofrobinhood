@@ -79,12 +79,15 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Pennines, Caen-Stein, Salz aus Cheshire, halber Fährlohn in Kent, Grenzer in Cumberland …).
 - Karte: Grenzen, Farbe des Herrn, Namen; Liste der Grafschaften in der Kartentafel.
 
-### Phase 2: Burg mit freien Bauplätzen
+### Phase 2: Burg mit freien Bauplätzen (umgesetzt)
 - Der Bergfried bleibt der Kern: Ruine, Holzturm, normannischer Bergfried, Donjon.
 - Ringsum Bauplätze, frei mit Gebäuden zu belegen, auch mehrfach dasselbe (nur Holzfäller ist erlaubt).
 - Die Art der Burg legt die Plätze fest: Eine große Burg hat weniger Plätze, aber mehr davon innerhalb der Mauer;
   eine kleine hat mehr Plätze, die meisten davon ungeschützt außen. Vorschlag (25 sind eher zu viel):
-  Turmburg 4 innen + 16 außen, Ringburg 8 + 10, Festung 12 + 4.
+  Turmburg 4 innen + 16 außen (Ring 4), Ringburg 8 + 10 (Ring 5, +15 Verteidigung), Festung 12 + 4 (Ring 6,
+  +35 Verteidigung). Innen 2 × 2 Felder (kompakte Gebäude), außen 3 × 3. Äcker, Weiden, Holzfäller und Steinbruch
+  nur außen; mehrfach baubar sind sie und die Wachtürme. Umbau der Burgart kostet Gold und Baustoffe; was keinen
+  Platz mehr findet, wird abgerissen.
 - Bei einer Belagerung erzeugen Gebäude außerhalb der Mauer nichts, und die Belagerer brennen einige nieder;
   sie müssen wieder aufgebaut werden. Innen läuft alles weiter.
 - Unterhalt je Gebäude und sinkende Marktpreise halten das Spezialisieren im Zaum.
