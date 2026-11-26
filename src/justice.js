@@ -33,6 +33,9 @@ export function gallowsFor(s) {
     const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
     return !isWalkable(W, x, y) || t === T.FOREST || t === T.WATER || t === T.BRIDGE || t === T.ROAD || landAt(W, x, y) !== s.land || (W.solid && W.solid[Math.floor(y) * N + Math.floor(x)]);
   };
+  // Nachbarorte (in fester Reihenfolge nach Kennung) stellen ihren Galgen zuerst auf; zu diesen Abstand halten,
+  // sonst stehen bei York und Torquilstone zwei Galgen nebeneinander
+  const others = W.sites.filter((o) => o !== s && o.id < s.id && GALLOWS_TYPES[o.type] && Math.abs(o.x - s.x) < 45 && Math.abs(o.y - s.y) < 45).map((o) => gallowsFor(o)).filter(Boolean);
   let best = null;
   for (let k = 0; k < 140 && !best; k++) {
     const a = 0.6 + k * 2.399, r = (s.clear || 7) + 2.5 + (k % 6) * 0.8;
@@ -40,6 +43,7 @@ export function gallowsFor(s) {
     let ok = true;
     for (let y = gy - 1.5; y <= gy + 2.5 && ok; y += 1) for (let x = gx - 2; x <= gx + 2 && ok; x += 1) if (bad(x, y)) ok = false;
     if (!ok || near.some((b) => Math.abs(b.x - gx) < 2.4 && Math.abs(b.y - gy) < 2.4)) continue;
+    if (others.some((g) => Math.hypot(g.x - gx, g.y - gy) < 8)) continue;
     let road = false;
     for (let y = gy - 3; y <= gy + 3 && !road; y += 1) for (let x = gx - 3; x <= gx + 3; x += 1) if (W.tiles[Math.floor(y) * N + Math.floor(x)] === T.ROAD) { road = true; break; }
     if (road || k > 90) best = { x: gx, y: gy, site: s };

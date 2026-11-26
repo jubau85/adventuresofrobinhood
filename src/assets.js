@@ -516,6 +516,22 @@ const ART_FILES = {
   tier_ente: 'assets/tiere/ente.webp',
   tier_pferd: 'assets/tiere/pferd.webp',
   // Ende Tiere
+  // Bauten (tools/bauten.py)
+  bau_langhaus_rotherwood: 'assets/bauten/langhaus_rotherwood.webp',
+  bau_langhaus_rotherwood_winter: 'assets/bauten/langhaus_rotherwood_winter.webp',
+  bau_langhaus: 'assets/bauten/langhaus.webp',
+  bau_langhaus_winter: 'assets/bauten/langhaus_winter.webp',
+  bau_kate_a: 'assets/bauten/kate_a.webp',
+  bau_kate_a_winter: 'assets/bauten/kate_a_winter.webp',
+  bau_kate_b: 'assets/bauten/kate_b.webp',
+  bau_kate_b_winter: 'assets/bauten/kate_b_winter.webp',
+  bau_taverne: 'assets/bauten/taverne.webp',
+  bau_taverne_winter: 'assets/bauten/taverne_winter.webp',
+  bau_galgen: 'assets/bauten/galgen.webp',
+  bau_galgen_besetzt: 'assets/bauten/galgen_besetzt.webp',
+  bau_galgen_winter: 'assets/bauten/galgen_winter.webp',
+  bau_galgen_besetzt_winter: 'assets/bauten/galgen_besetzt_winter.webp',
+  // Ende Bauten
   // Gegenstände (tools/gegenstaende.py)
   geg_knueppel: 'assets/gegenstaende/knueppel.webp',
   geg_langschwert: 'assets/gegenstaende/langschwert.webp',

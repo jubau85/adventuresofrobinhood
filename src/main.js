@@ -26,7 +26,7 @@ import {
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { giveAlms } from './life.js';
-import { rescueCondemned, updateJustice, canRescue } from './justice.js';
+import { rescueCondemned, updateJustice, canRescue, gallowsFor } from './justice.js';
 import { darkness, seasonIndex, hourOf } from './sim.js';
 import { isoX, isoY } from './iso.js';
 
@@ -804,4 +804,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor };

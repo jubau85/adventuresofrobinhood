@@ -286,6 +286,8 @@ function windowOn(c, b, face, u0, u1, z0, z1, lit) {
 }
 
 function drawHouse(c, b) {
+  const hs = houseSprite(b);
+  if (hs && drawHouseSprite(c, b, hs)) return;
   const wall = WALLS[b.wall] || WALLS.plaster;
   const v = b.v ?? hash2(Math.round(b.x * 10), Math.round(b.y * 10), 3);
   if (b.shutter === undefined) b.shutter = v < 0.6 ? Math.floor(v * 10) : null;
@@ -365,7 +367,16 @@ function cachedDraw(c, o, bounds, fn) {
   if (e.smoke) o.smoke = [e.smoke[0], e.smoke[1] - baseZ];
 }
 
-function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
+function houseBounds(b) {
+  const half = (b.wx + b.wy) * 16, r = [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10];
+  // gemaltes Haus: so groß wie sein Bild (Dach, Schornstein, Rauch, Bänke)
+  const hs = houseSprite(b), a = hs && P5[`bau_${hs.name}`], im = hs && ART[`bau_${hs.name}`];
+  if (a && im) {
+    const w = im.width * a[2] * hs.sc, h = im.height * a[2] * hs.sc, l = hs.flip ? -(w - a[0] * hs.sc) : -a[0] * hs.sc;
+    r[0] = Math.min(r[0], l - 4); r[1] = Math.max(r[1], l + w + 4); r[2] = Math.min(r[2], -a[1] * hs.sc - 4); r[3] = Math.max(r[3], h - a[1] * hs.sc + 4);
+  }
+  return r;
+}
 function drawHouseFast(c, b) {
   if (b.cons < 1) { drawHouseStage(c, b); return; }
   if (b.dmg > 0 || b.fire > G.time || b.tavern || abandonedId(b.site)) { drawHouse(c, b); return; }
@@ -651,6 +662,8 @@ function drawPavilion(c, x, y, col) {
 
 // Galgen: Podest mit Stufe, zwei Pfosten, Querbalken, Strick
 function drawGallows(c, g, hanged) {
+  // Gemalter Galgen: leer oder mit dem Gehenkten, im Schnee mit Winterbild
+  if (p5(c, bauId(hanged ? 'galgen_besetzt' : 'galgen'), g.x, g.y)) return;
   const wood = '#6b4a2e';
   drawShadow(c, g.x, g.y, 1.2, 0.9, 34, 0.14);
   drawBox(c, g.x, g.y + 0.1, 1.2, 0.9, 5, '#7a5a3a', 0, 'plank');
@@ -1222,8 +1235,10 @@ function drawWallRuin(c, o) {
 
 function drawLonghall(c, b) {
   drawShadow(c, b.x, b.y, b.wx, b.wy, b.h + 18);
-  // Gemalte Holzhalle mit Schindeldach und geschnitzten Giebeln (Paket 5), so groß wie die Grundfläche
-  if (p5(c, 'burg_holzhalle', b.x, b.y, Math.min(b.wx / 2.3, b.wy / 1.05))) {
+  // Gemaltes sächsisches Langhaus: Rotherwood mit seinem Schild über der Tür, die anderen Hallen in der Gegenansicht
+  // (gespiegelt, damit der First längs liegt); sonst die Holzhalle aus Paket 5
+  const rw = b.site === 'rotherwood', lh = rw ? 'langhaus_rotherwood' : 'langhaus';
+  if (p5(c, bauId(lh), b.x, b.y, b.wx / 3.3, !rw) || p5(c, 'burg_holzhalle', b.x, b.y, Math.min(b.wx / 2.3, b.wy / 1.05))) {
     if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, 6, 40, 1);
     return;
   }
@@ -1496,6 +1511,33 @@ function p5(c, id, x, y, sc = 1, flip = false, color = null, z = 0) {
   c.restore();
   return true;
 }
+// Gemalte Bauten aus Rasterbögen (tools/bauten.py): Langhaus (Rotherwood mit Schild), Katen, Wirtshaus, Galgen,
+// je mit Winterbild. Fußpunkt in Weltpixeln, Maßstab; BAU_FLAECHE: Grundfläche (Kacheln) beim Maßstab 1.
+Object.assign(P5, {bau_langhaus_rotherwood:[85.12,98.7,0.3333],bau_langhaus_rotherwood_winter:[89.16,93.79,0.3333],bau_langhaus:[85.12,114.16,0.3333],bau_langhaus_winter:[84.83,111.85,0.3333],bau_kate_a:[33.79,48.53,0.3333],bau_kate_a_winter:[36.11,48.95,0.3333],bau_kate_b:[34.32,49.26,0.3333],bau_kate_b_winter:[36.63,49.89,0.3333],bau_taverne:[45.26,53.05,0.3333],bau_taverne_winter:[45.26,59.79,0.3333],bau_galgen:[34.95,47.07,0.3333],bau_galgen_besetzt:[33.69,47.07,0.3333],bau_galgen_winter:[34.65,50.71,0.3333],bau_galgen_besetzt_winter:[34.6,50.61,0.3333]});
+const BAU_FLAECHE = {langhaus_rotherwood:[3.3,1.6],langhaus:[1.6,3.3],kate_a:[0.95,0.95],kate_b:[0.95,0.95],taverne:[1.3,0.94],galgen:[1.2,0.9],galgen_besetzt:[1.2,0.9]};
+// Im Schnee das Winterbild, wenn es geladen ist
+function bauId(name) { const w = `bau_${name}_winter`; return lookSeason() === 3 && ART[w] ? w : `bau_${name}`; }
+// Haus als gemaltes Bild: Wirtshaus; strohgedeckte Holz- und Lehmhäuser als Kate (nicht zu lang gestreckt)
+function houseSprite(b) {
+  if (b.kind !== 'house' || b.cons < 1 || b.dmg > 0 || b.fire > G.time) return null;
+  let name = null;
+  if (b.tavern) name = 'taverne';
+  else if ((b.roof || 'thatch') === 'thatch' && Math.max(b.wx, b.wy) / Math.min(b.wx, b.wy) <= 1.4 && Math.max(b.wx, b.wy) <= 1.8) name = b.wall === 'wood' ? 'kate_a' : b.wall === 'plaster' ? 'kate_b' : null;
+  if (!name || !ART[`bau_${name}`]) return null;
+  const [fw, fh] = BAU_FLAECHE[name];
+  // Tür liegt im Bild auf der vorderen linken Seite; ein Haus, das quer steht, wird gespiegelt
+  const flip = name === 'taverne' ? b.wy > b.wx : false;
+  const sc = Math.sqrt((b.wx * b.wy) / (fw * fh));
+  return { name, flip, sc };
+}
+function drawHouseSprite(c, b, hs) {
+  drawShadow(c, b.x, b.y, b.wx, b.wy, b.h + b.rh * 0.7);
+  if (!p5(c, bauId(hs.name), b.x, b.y, hs.sc, hs.flip)) return false;
+  const lit = b.lit && !abandonedId(b.site);
+  if (lit && darkness() > 0.2) { addLight(b.x, b.y + b.wy / 2, b.h * 0.5, 22, 0.8); addLight(b.x + b.wx / 2, b.y, b.h * 0.5, 22, 0.7); }
+  return true;
+}
+
 // Schadensstufe eines Mauerstücks: 1–3 nach dem Schaden, 4 wenn die Bresche offen ist
 function dmgStage(hit) { if (!hit) return 0; if (hit.gone) return 4; return Math.min(3, 1 + Math.floor(hit.dmg * 3)); }
 const p5dmg = (base, st) => (st ? `${base}_schaden_${st}` : base);
@@ -1773,7 +1815,10 @@ function sortObjects(objs) {
 function buildStaticParts() {
   const W = G.world;
   const parts = [];
+  // Am gemalten Wirtshaus stehen Bänke und Fässer schon im Bild: die gezeichneten Dinge davor weglassen
+  const tavs = ART.bau_taverne ? W.buildings.filter((b) => b.tavern) : [];
   for (const b of W.buildings) {
+    if (b.kind === 'prop' && tavs.some((t) => Math.abs(t.x - b.x) < 1.6 && Math.abs(t.y - b.y) < 1.5)) continue;
     const f = {
       house: drawHouseFast, church: drawChurchFast, longhall: drawLonghall, tent: drawTent, stall: drawStall,
       well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
@@ -4486,6 +4531,8 @@ onArt((id) => {
   // Burgteile: die festen Teile neu zusammenstellen (Tore und Hallen fragen beim Aufbau, ob es ein Bild gibt)
   if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
   if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
+  // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
+  if (id.startsWith('bau_')) { partCache.clear(); G.staticDirty = true; }
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }
