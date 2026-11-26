@@ -1,0 +1,21 @@
+{
+  "zweck": "Spielerfigur: Edelmann um 1190, je Rüstung neu bemalt (gleiche Form und UV-Abwicklung, ein Skelett für alle)",
+  "meshy": {
+    "vorschau_text_to_3d": "01a21816-0b12-7009-8bd3-be7a42719a0c",
+    "bemalung_edel_refine": "01a21817-a139-7216-85e4-89bb46d7bf4a",
+    "neubemalung_retexture": {
+      "gambeson": "01a21819-c216-7751-843b-a5fc6d1bb24f",
+      "leder": "01a2181a-1106-76c1-9c6f-968da30fe305",
+      "kette": "01a2181a-1e9c-775d-9d78-0483474fe3ef",
+      "schuppe": "01a2181a-25ac-72fb-baac-09b3e19bc206",
+      "ritter": "01a2181a-2d14-7464-a63f-531486e2036d"
+    },
+    "skelett_rigging": "01a2181a-377c-76ad-8963-86fe75b74a4d",
+    "bewegungen": "01a2181b-ab9d-7671-9eb8-77f6ec1b196c",
+    "bewegungen_ids": {"0": "Idle", "219": "Right Hand Sword Slash", "178": "Hit Reaction", "189": "Dying Backwards"},
+    "punkte": 112
+  },
+  "helm": "topfhelm.glb aus tools/waffen.py, über sprites.py --helm auf den Kopf gesetzt",
+  "reiten": "eigene Haltung, sprites.py --reitpose 1",
+  "rendern": "sprites.py --meter 1.8 --punkt RightHand,LeftHand,Hips [--textur <bemalung.png>] [--helm topfhelm.glb]; packen: sprite_pack.py --zelle 112 (Ritter: --farbton 190 --breite 16 --hell 0.55)"
+}
