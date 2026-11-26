@@ -5,12 +5,12 @@
 //   --extern bettet Dateien unter diesen Ordnern in das Fragment nicht ein: Sie bleiben relative Pfade und müssen
 //            neben der Seite liegen (Liste in <fragment>.dateien.json). Die Einzeldatei in dist/ enthält immer alles.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'tactics', 'shires', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'heraldry', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
+const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'tactics', 'shires', 'plots', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'heraldry', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
 function topLevelNames(src) {
@@ -34,6 +34,10 @@ function topLevelNames(src) {
   }
   return names;
 }
+
+// Jedes Modul in src muss in ORDER stehen, sonst fehlt es in der Einzeldatei (und das Spiel bricht beim Start ab)
+const missing = readdirSync(join(ROOT, 'src')).filter((f) => f.endsWith('.js')).map((f) => f.slice(0, -3)).filter((n) => !ORDER.includes(n));
+if (missing.length) throw new Error(`Module fehlen in ORDER (tools/build.mjs): ${missing.join(', ')}`);
 
 const seen = new Map();
 let js = '';
