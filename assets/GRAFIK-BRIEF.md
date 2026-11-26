@@ -625,7 +625,7 @@ Größe 1× 64 × 64, Lieferung 256 × 256.
 | sachsen | weißer Drache auf Grün |
 | normannen | zwei goldene Löwen auf Rot |
 | kirche | goldenes Kreuz auf Weiß |
-| gilde | Waage und Wollsack auf Petrol (Blaugrün) |
+| gilde | Waage und Wollsack auf Lila |
 | waldleute | Eichenblatt und Pfeil auf Braungrün |
 | franken | goldene Lilien auf Blau |
 

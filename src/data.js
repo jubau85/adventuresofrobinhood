@@ -43,7 +43,7 @@ export const FACTIONS = {
     ally: 'Verwundete heilen doppelt so schnell, alle zwei Tage +1 Ruhm.',
   },
   gilde: {
-    name: 'Kaufmannsgilde', short: 'Gilde', color: '#2a7f7a', rivals: ['waldleute'],
+    name: 'Kaufmannsgilde', short: 'Gilde', color: '#9a4fc4', rivals: ['waldleute'],
     desc: 'Die Händler der Städte. Ihnen ist gleich, wer herrscht, solange die Straßen sicher sind.',
     ally: 'Bessere Preise auf allen Märkten, +15 Gold am Tag aus Handelsanteilen.',
   },
