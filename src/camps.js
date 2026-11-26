@@ -4,7 +4,7 @@
 // bieten sich Söldner ihrer Herren an.
 
 import { G, log } from './state.js';
-import { GOODS, CLASSES, FACTIONS } from './data.js';
+import { GOODS, CLASSES, FACTIONS, MAP_K } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { makeUnit, randomName, partyMembers, placeNear, rebuildUnits } from './units.js';
 import { cargoFree, addCargo } from './economy.js';
@@ -79,7 +79,7 @@ function makeOffers(classes, n, costF, gear, title = null) {
 export function freedToCamp(name, x, y) {
   const W = G.world, land = landAt(W, x, y);
   const camps = (W.camps || []).filter((c) => c.land === land).sort((a, b) => (a.camp === 'soeldner' ? 0 : 1) - (b.camp === 'soeldner' ? 0 : 1) || Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
-  const c = camps.find((q) => q.camp === 'soeldner' && Math.hypot(q.x - x, q.y - y) < 90) || camps[0];
+  const c = camps.find((q) => q.camp === 'soeldner' && Math.hypot(q.x - x, q.y - y) < 90 * MAP_K) || camps[0];
   if (!c) return null;
   const u = makeUnit({ kind: 'companion', cls: 'bauer', level: randInt(2, 3), eq: { ...CLASSES.bauer.start }, name, female: false, status: 'anwaerter' });
   u.cost = 0; u.wage = 1; u.title = 'Vom Galgen gerettet';

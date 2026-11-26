@@ -3,7 +3,7 @@
 // werden beschädigt. Danach bauen die Bewohner wieder auf, und die Toten werden begraben.
 
 import { G, log, homeName } from './state.js';
-import { GROUP_TYPES, FACTIONS, GOODS, T, dirText } from './data.js';
+import { GROUP_TYPES, FACTIONS, GOODS, T, dirText, MAP_K } from './data.js';
 import { rand, pick, randInt } from './rng.js';
 import { changeRep, addRenown, isHostileFaction } from './politics.js';
 import { cargoFree, addCargo } from './economy.js';
@@ -113,7 +113,7 @@ export function startSiege(target = null, armyType = null, scale = null) {
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
     const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
-      && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85);
+      && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85 * MAP_K);
     if (!cand.length) return false;
     target = pick(cand);
     armyType = ATTACKER[target.faction][target.realm];

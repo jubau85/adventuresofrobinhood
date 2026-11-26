@@ -4,7 +4,7 @@ import { G, uid, log, homeName, playerColor } from './state.js';
 import {
   CLASSES, ITEMS, NPC_TYPES, GROUP_TYPES, T, TERRAIN_SPEED, NAMES_M, NAMES_F, EPITHETS,
   GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS, FERRIES, FACTIONS, CASTLE_TOWERS,
-  LIVERY,
+  LIVERY, MAP_K, MAP_AREA,
 } from './data.js';
 import { isWalkable, findPath, tileAt, nearestWalkable, landAt, groundZ } from './world.js';
 import { isoX, isoY } from './iso.js';
@@ -296,7 +296,7 @@ function followPath(u, dt, mult = 1) {
 
 export function setPlayerPath(x, y) {
   const p = G.s.player;
-  const path = findPath(G.world, p.x, p.y, x, y, 450000);
+  const path = findPath(G.world, p.x, p.y, x, y, 450000 * MAP_AREA);
   p.path = path; p.pathI = 0;
   return !!path;
 }
@@ -981,7 +981,8 @@ export function maintainGroups(initial = false) {
   for (const [type, gt] of Object.entries(GROUP_TYPES)) {
     if (gt.minDay && G.s.day < gt.minDay && !initial) continue;
     if (gt.minDay && initial) continue;
-    const want = gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0);
+    // Auf der größeren Karte gibt es mehr Gruppen, aber nicht im Verhältnis der Fläche: es bleibt mehr Platz zwischen ihnen
+    const want = Math.round((gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0)) * MAP_K);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
     const n = initial ? want : Math.min(3, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });

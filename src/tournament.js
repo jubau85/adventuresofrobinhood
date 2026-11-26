@@ -3,7 +3,7 @@
 // Wer ein Pferd hat und das Startgeld zahlt, reitet mit: Die Lanze im rechten Moment senken.
 
 import { G, log, homeName, playerColor } from './state.js';
-import { FACTIONS, T, CHUNK } from './data.js';
+import { FACTIONS, T, CHUNK, MAP_K } from './data.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { makeUnit, rebuildUnits, partyMembers, faceDir } from './units.js';
 import { isoX, isoY } from './iso.js';
@@ -116,7 +116,7 @@ function syncObstacles() {
 
 function announce() {
   const p = G.s.player, land = landAt(G.world, p.x, p.y);
-  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s) && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
+  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s) && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130 * MAP_K);
   if (!cand.length) return;
   if (!G.s.flags.tourneys) { const ashby = cand.find((s) => s.id === 'ashby'); if (ashby) cand = [ashby]; }
   for (let tries = 0; tries < 6; tries++) {
@@ -183,7 +183,7 @@ function finishUnseen(tr) {
   if (tr.joined) { log(`Du bist nicht zum Turnier in ${s.name} erschienen. Das Startgeld ist verfallen.`, 'bad'); }
   const w = tr.knights.slice().sort((a, b) => (b.skill + Math.random() * 0.5) - (a.skill + Math.random() * 0.5))[0];
   const p = G.s.player;
-  if (Math.hypot(s.x - p.x, s.y - p.y) < 120) log(`${w.name} hat das Turnier von ${s.name} gewonnen, heißt es.`);
+  if (Math.hypot(s.x - p.x, s.y - p.y) < 120 * MAP_K) log(`${w.name} hat das Turnier von ${s.name} gewonnen, heißt es.`);
   tr.done = true;
 }
 

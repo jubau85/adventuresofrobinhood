@@ -483,14 +483,16 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 
 const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 const TH = 32;            // Kachelhöhe
-const MAP = 512;          // Kartengröße in Kacheln
+const MAP = 1024;         // Kartengröße in Kacheln (eine Kachel gut 800 m)
+// Maßstab gegenüber der Karte mit 512 Kacheln: Reichweiten zwischen Orten wachsen mit MAP_K, Anzahlen mit der Fläche
+const MAP_K = MAP / 512, MAP_AREA = MAP_K * MAP_K;
 const CHUNK = 8;          // Kacheln pro Render-Chunk
 const HMAX = 52;          // größte Geländehöhe in Pixeln
 const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 const DAYS_PER_SEASON = 6;
 const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
 const SAVE_KEY = 'a-knights-tale-v4';
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;   // 5: Karte mit 1024 Kacheln
 
 // Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
 // Eine Kachel entspricht etwa 1,6 km. Längengrade sind mit cos(51,5°) gestaucht.
@@ -2631,7 +2633,7 @@ function placeCamps(W) {
   const N = W.N, rng = mulberry32((W.seed ^ 0xC0FFEE) >>> 0);
   W.camps = [];
   const settled = new Set(W.sites.map((s) => s.land));
-  for (let tries = 0; tries < 30000 && W.camps.length < 60; tries++) {
+  for (let tries = 0; tries < 30000 * MAP_AREA && W.camps.length < Math.round(60 * MAP_AREA * 0.8); tries++) {
     const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
     const i = y * N + x;
     if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
@@ -2660,7 +2662,7 @@ function placeCamps(W) {
   // Steinbrüche am Fuß der Hügel und Berge, auch ohne Wald ringsum
   const quarry = CAMP_KINDS.find((k) => k.kind === 'steinbruch');
   let nq = W.camps.filter((c) => c.camp === 'steinbruch').length;
-  for (let tries = 0; tries < 30000 && nq < 14; tries++) {
+  for (let tries = 0; tries < 30000 * MAP_AREA && nq < Math.round(14 * MAP_AREA * 0.8); tries++) {
     const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
     const i = y * N + x;
     if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
@@ -2871,7 +2873,7 @@ function computeHeights(W) {
   for (const b of W.buildings) markBusy(b.x, b.y, Math.max(b.wx || 0.6, b.wy || 0.6) / 2 + 1.2);
   const rk = mulberry32((W.seed ^ 0x51ED) >>> 0);
   let knolls = 0;
-  for (let k = 0; k < 4000 && knolls < 320; k++) {
+  for (let k = 0; k < 4000 * MAP_AREA && knolls < 320 * MAP_AREA; k++) {
     const x = 4 + Math.floor(rk() * (N - 8)), y = 4 + Math.floor(rk() * (N - 8));
     const t0 = W.tiles[y * N + x];
     if ((t0 !== T.GRASS && t0 !== T.FOREST && t0 !== T.FIELD) || W.elev[y * N + x] > 0.55) continue;
@@ -3686,7 +3688,7 @@ function addFarms(W, rng) {
     }
     return false;
   };
-  for (let tries = 0; tries < 24000 && W.farms.length < 150; tries++) {
+  for (let tries = 0; tries < 24000 * MAP_AREA && W.farms.length < Math.round(150 * MAP_AREA * 0.8); tries++) {
     const x = 10 + Math.floor(rng() * (N - 20)), y = 10 + Math.floor(rng() * (N - 20));
     const i = y * N + x;
     if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
@@ -4126,7 +4128,7 @@ function followPath(u, dt, mult = 1) {
 
 function setPlayerPath(x, y) {
   const p = G.s.player;
-  const path = findPath(G.world, p.x, p.y, x, y, 450000);
+  const path = findPath(G.world, p.x, p.y, x, y, 450000 * MAP_AREA);
   p.path = path; p.pathI = 0;
   return !!path;
 }
@@ -4811,7 +4813,8 @@ function maintainGroups(initial = false) {
   for (const [type, gt] of Object.entries(GROUP_TYPES)) {
     if (gt.minDay && G.s.day < gt.minDay && !initial) continue;
     if (gt.minDay && initial) continue;
-    const want = gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0);
+    // Auf der größeren Karte gibt es mehr Gruppen, aber nicht im Verhältnis der Fläche: es bleibt mehr Platz zwischen ihnen
+    const want = Math.round((gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0)) * MAP_K);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
     const n = initial ? want : Math.min(3, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });
@@ -6165,7 +6168,7 @@ function startSiege(target = null, armyType = null, scale = null) {
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
     const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
-      && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85);
+      && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85 * MAP_K);
     if (!cand.length) return false;
     target = pick(cand);
     armyType = ATTACKER[target.faction][target.realm];
@@ -6872,7 +6875,7 @@ function dailyDynamics() {
   const p = G.s.player;
   let notes = 0;
   const note = (s, text, kind = 'info') => {
-    if (notes < 2 && Math.hypot(s.x - p.x, s.y - p.y) < 45) { log(text, kind); notes++; }
+    if (notes < 2 && Math.hypot(s.x - p.x, s.y - p.y) < 45 * MAP_K) { log(text, kind); notes++; }
   };
   for (const s of G.world.sites) {
     if (!GROWING[s.type]) continue;
@@ -7212,7 +7215,7 @@ function syncObstacles() {
 
 function announce() {
   const p = G.s.player, land = landAt(G.world, p.x, p.y);
-  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s) && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
+  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s) && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130 * MAP_K);
   if (!cand.length) return;
   if (!G.s.flags.tourneys) { const ashby = cand.find((s) => s.id === 'ashby'); if (ashby) cand = [ashby]; }
   for (let tries = 0; tries < 6; tries++) {
@@ -7279,7 +7282,7 @@ function finishUnseen(tr) {
   if (tr.joined) { log(`Du bist nicht zum Turnier in ${s.name} erschienen. Das Startgeld ist verfallen.`, 'bad'); }
   const w = tr.knights.slice().sort((a, b) => (b.skill + Math.random() * 0.5) - (a.skill + Math.random() * 0.5))[0];
   const p = G.s.player;
-  if (Math.hypot(s.x - p.x, s.y - p.y) < 120) log(`${w.name} hat das Turnier von ${s.name} gewonnen, heißt es.`);
+  if (Math.hypot(s.x - p.x, s.y - p.y) < 120 * MAP_K) log(`${w.name} hat das Turnier von ${s.name} gewonnen, heißt es.`);
   tr.done = true;
 }
 
@@ -7748,7 +7751,7 @@ function gallowsFor(s) {
   };
   // Nachbarorte (in fester Reihenfolge nach Kennung) stellen ihren Galgen zuerst auf; zu diesen Abstand halten,
   // sonst stehen bei York und Torquilstone zwei Galgen nebeneinander
-  const others = W.sites.filter((o) => o !== s && o.id < s.id && GALLOWS_TYPES[o.type] && Math.abs(o.x - s.x) < 45 && Math.abs(o.y - s.y) < 45).map((o) => gallowsFor(o)).filter(Boolean);
+  const others = W.sites.filter((o) => o !== s && o.id < s.id && GALLOWS_TYPES[o.type] && Math.abs(o.x - s.x) < 45 * MAP_K && Math.abs(o.y - s.y) < 45 * MAP_K).map((o) => gallowsFor(o)).filter(Boolean);
   let best = null;
   for (let k = 0; k < 140 && !best; k++) {
     const a = 0.6 + k * 2.399, r = (s.clear || 7) + 2.5 + (k % 6) * 0.8;
@@ -7772,7 +7775,7 @@ function dailyJustice() {
   if (G.exec) endExec();
   if (G.s.hanging || Math.random() > 0.35) return;
   const p = G.s.player, land = landAt(G.world, p.x, p.y);
-  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) < 70 && !isBlighted(s) && gallowsFor(s));
+  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) < 70 * MAP_K && !isBlighted(s) && gallowsFor(s));
   if (!cand.length) return;
   const s = pick(cand), [crime, who] = pick(CRIMES);
   const hh = { site: s.id, day: G.s.day, hour: randInt(11, 15), crime, who, name: pick(CONDEMNED_NAMES), done: false };
@@ -8425,13 +8428,13 @@ function makeQuest(site) {
       break;
     case 'bote': {
       // Meist ein Ort in der Nähe, manchmal eine Botschaft übers Meer
-      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 170);
+      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 170 * MAP_K);
       const tgt = pick(near.length && Math.random() < 0.8 ? near : others);
       const overSea = tgt.land !== site.land;
       q.target = tgt.id;
       q.days = overSea ? 7 : 5;
       const d = Math.hypot(tgt.x - site.x, tgt.y - site.y);
-      q.reward = { gold: Math.round(30 + d * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
+      q.reward = { gold: Math.round(30 + (d / MAP_K) * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
       // Einsiedler und Gruben liegen abseits: Der Brief geht an eine Person, nicht an einen Ort
       const to = tgt.type === 'einsiedelei' ? `zum Einsiedler (${tgt.name})` : tgt.type === 'mine' ? `zum Steiger der ${tgt.name}` : `nach ${tgt.name}`;
       q.title = tgt.type === 'einsiedelei' ? 'Botschaft an den Einsiedler' : tgt.type === 'mine' ? `Botschaft an die ${tgt.name}` : `Botschaft nach ${tgt.name}`;
@@ -8928,7 +8931,7 @@ function checkRaid() {
   for (const t of threats) {
     if (Math.random() >= t.chance) continue;
     const home = castleSite(), p = G.s.player;
-    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) { G.s.lastHomeSiege = G.s.day; break; }
+    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 * MAP_K && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) { G.s.lastHomeSiege = G.s.day; break; }
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {
@@ -9045,7 +9048,7 @@ function makeOffers(classes, n, costF, gear, title = null) {
 function freedToCamp(name, x, y) {
   const W = G.world, land = landAt(W, x, y);
   const camps = (W.camps || []).filter((c) => c.land === land).sort((a, b) => (a.camp === 'soeldner' ? 0 : 1) - (b.camp === 'soeldner' ? 0 : 1) || Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
-  const c = camps.find((q) => q.camp === 'soeldner' && Math.hypot(q.x - x, q.y - y) < 90) || camps[0];
+  const c = camps.find((q) => q.camp === 'soeldner' && Math.hypot(q.x - x, q.y - y) < 90 * MAP_K) || camps[0];
   if (!c) return null;
   const u = makeUnit({ kind: 'companion', cls: 'bauer', level: randInt(2, 3), eq: { ...CLASSES.bauer.start }, name, female: false, status: 'anwaerter' });
   u.cost = 0; u.wage = 1; u.title = 'Vom Galgen gerettet';

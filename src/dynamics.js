@@ -3,7 +3,7 @@
 // Wer einen Ort überfällt, legt ihn lahm: Dort wird eine Weile nichts gebaut, die Leute haben Angst.
 
 import { G, log } from './state.js';
-import { FACTIONS, GOODS } from './data.js';
+import { FACTIONS, GOODS, MAP_K } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { changeRep } from './politics.js';
 import { spawnGroup, rebuildUnits, makeNpc, removeGroup } from './units.js';
@@ -121,7 +121,7 @@ export function dailyDynamics() {
   const p = G.s.player;
   let notes = 0;
   const note = (s, text, kind = 'info') => {
-    if (notes < 2 && Math.hypot(s.x - p.x, s.y - p.y) < 45) { log(text, kind); notes++; }
+    if (notes < 2 && Math.hypot(s.x - p.x, s.y - p.y) < 45 * MAP_K) { log(text, kind); notes++; }
   };
   for (const s of G.world.sites) {
     if (!GROWING[s.type]) continue;

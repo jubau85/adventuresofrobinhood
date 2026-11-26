@@ -4,7 +4,7 @@
 // Wer den Mut hat, schneidet ihn vorher los, und die Wachen greifen an.
 
 import { G, log } from './state.js';
-import { T, dirText } from './data.js';
+import { T, dirText, MAP_K } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { isWalkable, landAt } from './world.js';
 import { hourOf, passHours } from './sim.js';
@@ -36,7 +36,7 @@ export function gallowsFor(s) {
   };
   // Nachbarorte (in fester Reihenfolge nach Kennung) stellen ihren Galgen zuerst auf; zu diesen Abstand halten,
   // sonst stehen bei York und Torquilstone zwei Galgen nebeneinander
-  const others = W.sites.filter((o) => o !== s && o.id < s.id && GALLOWS_TYPES[o.type] && Math.abs(o.x - s.x) < 45 && Math.abs(o.y - s.y) < 45).map((o) => gallowsFor(o)).filter(Boolean);
+  const others = W.sites.filter((o) => o !== s && o.id < s.id && GALLOWS_TYPES[o.type] && Math.abs(o.x - s.x) < 45 * MAP_K && Math.abs(o.y - s.y) < 45 * MAP_K).map((o) => gallowsFor(o)).filter(Boolean);
   let best = null;
   for (let k = 0; k < 140 && !best; k++) {
     const a = 0.6 + k * 2.399, r = (s.clear || 7) + 2.5 + (k % 6) * 0.8;
@@ -60,7 +60,7 @@ export function dailyJustice() {
   if (G.exec) endExec();
   if (G.s.hanging || Math.random() > 0.35) return;
   const p = G.s.player, land = landAt(G.world, p.x, p.y);
-  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) < 70 && !isBlighted(s) && gallowsFor(s));
+  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) < 70 * MAP_K && !isBlighted(s) && gallowsFor(s));
   if (!cand.length) return;
   const s = pick(cand), [crime, who] = pick(CRIMES);
   const hh = { site: s.id, day: G.s.day, hour: randInt(11, 15), crime, who, name: pick(CONDEMNED_NAMES), done: false };

@@ -2,17 +2,19 @@
 
 export const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 export const TH = 32;            // Kachelhöhe
-export const MAP = 512;          // Kartengröße in Kacheln
+export const MAP = 1024;         // Kartengröße in Kacheln (eine Kachel gut 800 m)
+// Maßstab gegenüber der Karte mit 512 Kacheln: Reichweiten zwischen Orten wachsen mit MAP_K, Anzahlen mit der Fläche
+export const MAP_K = MAP / 512, MAP_AREA = MAP_K * MAP_K;
 export const CHUNK = 8;          // Kacheln pro Render-Chunk
 export const HMAX = 52;          // größte Geländehöhe in Pixeln
 export const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 export const DAYS_PER_SEASON = 6;
 export const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
 export const SAVE_KEY = 'a-knights-tale-v4';
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;   // 5: Karte mit 1024 Kacheln
 
 // Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
-// Eine Kachel entspricht etwa 1,6 km. Längengrade sind mit cos(51,5°) gestaucht.
+// Eine Kachel entspricht gut 800 m (bei MAP 1024). Längengrade sind mit cos(51,5°) gestaucht.
 const LAT_N = 55.3, LAT_S = 47.9;
 export const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
 export const KM_PER_TILE = GEO.dLat * 111.2;

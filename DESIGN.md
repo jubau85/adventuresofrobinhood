@@ -36,7 +36,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 
 ## Stand des Prototyps (v0.2)
 
-- Karte von England und Frankreich (512 × 512, etwa 1,6 km je Feld) mit echten Küsten, Flüssen, Bergland und Wäldern, 69 Orten an historischen Stellen, Straßen, Brücken und Häfen
+- Karte von England und Frankreich (1024 × 1024, gut 800 m je Feld) mit echten Küsten, Flüssen, Bergland und Wäldern, 69 Orten an historischen Stellen, Straßen, Brücken und Häfen
 - Fähren über den Kanal und die Nordsee
 - Große Städte mit Stadtmauer, Strahlen- und Ringgassen, Häuserzeilen, Pfarrkirchen und mehreren Gasthäusern (London mit rund 180 Häusern)
 - Stufenloser Zoom von 0,45 bis 4, Standard nah am Geschehen

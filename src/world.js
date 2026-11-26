@@ -1,7 +1,7 @@
 // Weltgenerator: Küsten, Flüsse, Bergland, Siedlungen, Straßen, Häfen, Felder, Bäume, Gebäude.
 // Alles ist deterministisch aus dem Seed, daher muss nur der Seed gespeichert werden.
 
-import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE, POIS } from './data.js';
+import { MAP, MAP_K, MAP_AREA, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE, POIS } from './data.js';
 import { COAST_GB, COAST_IRELAND, COAST_CONTINENT, ISLANDS, RIVERS, UPLANDS, FORESTS } from './geo.js';
 import { mulberry32, makeNoise, fbm, rpick, hash2 } from './rng.js';
 
@@ -556,7 +556,7 @@ function placeCamps(W) {
   const N = W.N, rng = mulberry32((W.seed ^ 0xC0FFEE) >>> 0);
   W.camps = [];
   const settled = new Set(W.sites.map((s) => s.land));
-  for (let tries = 0; tries < 30000 && W.camps.length < 60; tries++) {
+  for (let tries = 0; tries < 30000 * MAP_AREA && W.camps.length < Math.round(60 * MAP_AREA * 0.8); tries++) {
     const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
     const i = y * N + x;
     if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
@@ -585,7 +585,7 @@ function placeCamps(W) {
   // Steinbrüche am Fuß der Hügel und Berge, auch ohne Wald ringsum
   const quarry = CAMP_KINDS.find((k) => k.kind === 'steinbruch');
   let nq = W.camps.filter((c) => c.camp === 'steinbruch').length;
-  for (let tries = 0; tries < 30000 && nq < 14; tries++) {
+  for (let tries = 0; tries < 30000 * MAP_AREA && nq < Math.round(14 * MAP_AREA * 0.8); tries++) {
     const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
     const i = y * N + x;
     if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
@@ -796,7 +796,7 @@ function computeHeights(W) {
   for (const b of W.buildings) markBusy(b.x, b.y, Math.max(b.wx || 0.6, b.wy || 0.6) / 2 + 1.2);
   const rk = mulberry32((W.seed ^ 0x51ED) >>> 0);
   let knolls = 0;
-  for (let k = 0; k < 4000 && knolls < 320; k++) {
+  for (let k = 0; k < 4000 * MAP_AREA && knolls < 320 * MAP_AREA; k++) {
     const x = 4 + Math.floor(rk() * (N - 8)), y = 4 + Math.floor(rk() * (N - 8));
     const t0 = W.tiles[y * N + x];
     if ((t0 !== T.GRASS && t0 !== T.FOREST && t0 !== T.FIELD) || W.elev[y * N + x] > 0.55) continue;
@@ -1611,7 +1611,7 @@ function addFarms(W, rng) {
     }
     return false;
   };
-  for (let tries = 0; tries < 24000 && W.farms.length < 150; tries++) {
+  for (let tries = 0; tries < 24000 * MAP_AREA && W.farms.length < Math.round(150 * MAP_AREA * 0.8); tries++) {
     const x = 10 + Math.floor(rng() * (N - 20)), y = 10 + Math.floor(rng() * (N - 20));
     const i = y * N + x;
     if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;

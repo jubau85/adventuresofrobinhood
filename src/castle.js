@@ -1,7 +1,7 @@
 // Die eigene Burg: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
 import { G, log, homeName } from './state.js';
-import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE, T, CASTLE_LAYOUT, CASTLE_TOWERS, CASTLE_KEEP } from './data.js';
+import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE, T, CASTLE_LAYOUT, CASTLE_TOWERS, CASTLE_KEEP, MAP_K } from './data.js';
 import { rand, randInt, pick, mulberry32 } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
@@ -371,7 +371,7 @@ function checkRaid() {
   for (const t of threats) {
     if (Math.random() >= t.chance) continue;
     const home = castleSite(), p = G.s.player;
-    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) { G.s.lastHomeSiege = G.s.day; break; }
+    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 * MAP_K && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) { G.s.lastHomeSiege = G.s.day; break; }
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {

@@ -1,7 +1,7 @@
 // Ansehen bei den Fraktionen, Ruhm und Aufträge.
 
 import { G, log } from './state.js';
-import { FACTIONS, FACTION_IDS, GOODS } from './data.js';
+import { FACTIONS, FACTION_IDS, GOODS, MAP_K } from './data.js';
 import { randInt, pick, clamp } from './rng.js';
 import { spawnGroup } from './units.js';
 import { siteById } from './economy.js';
@@ -89,13 +89,13 @@ function makeQuest(site) {
       break;
     case 'bote': {
       // Meist ein Ort in der Nähe, manchmal eine Botschaft übers Meer
-      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 170);
+      const near = others.filter((s) => s.land === site.land && Math.hypot(s.x - site.x, s.y - site.y) < 170 * MAP_K);
       const tgt = pick(near.length && Math.random() < 0.8 ? near : others);
       const overSea = tgt.land !== site.land;
       q.target = tgt.id;
       q.days = overSea ? 7 : 5;
       const d = Math.hypot(tgt.x - site.x, tgt.y - site.y);
-      q.reward = { gold: Math.round(30 + d * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
+      q.reward = { gold: Math.round(30 + (d / MAP_K) * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
       // Einsiedler und Gruben liegen abseits: Der Brief geht an eine Person, nicht an einen Ort
       const to = tgt.type === 'einsiedelei' ? `zum Einsiedler (${tgt.name})` : tgt.type === 'mine' ? `zum Steiger der ${tgt.name}` : `nach ${tgt.name}`;
       q.title = tgt.type === 'einsiedelei' ? 'Botschaft an den Einsiedler' : tgt.type === 'mine' ? `Botschaft an die ${tgt.name}` : `Botschaft nach ${tgt.name}`;
