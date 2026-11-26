@@ -164,10 +164,22 @@ export function placeNear(u, x, y, spread = 1.5) {
 }
 
 // ---------------------------------------------------------------- Bewegung
+// Gangart: Alle gehen. Gelaufen wird bei Gefahr (Kampf, Angriff, Flucht, Löschen), zum Aufholen und beim Helden
+// auf Doppelklick (oder mit gedrückter Umschalttaste). Gehen ist gut halb so schnell wie Laufen.
+export const WALK = 0.55;
+function wantsRun(u) {
+  if (u.kind === 'peasant') return !!u.flee || !!(u.task && u.task.speed >= 1.4);
+  if (u.combatT > 0 || u.attackTarget) return true;
+  if (u.kind === 'player') return !!u.runClick && (!!u.path || !!G.input.dx || !!G.input.dy);
+  if (u.kind === 'companion') return !!G.s.player.run || !!u.catchUp;
+  if (u.group) return !!(u.group.engaged || u.group.feud) || !!u.catchUp;
+  return !!u.catchUp;
+}
 export function unitSpeed(u) {
   const t = tileAt(G.world, u.x, u.y);
   let s = u.st.speed * TERRAIN_SPEED[t];
   if (u.mounted && u.st.horse) s *= (1 + u.st.horse.speed) * (t === T.FOREST ? 0.72 : 1);
+  if (u.kind !== 'peasant' && !u.run) s *= WALK;
   return s;
 }
 
@@ -497,6 +509,8 @@ export function updateUnits(dt) {
     if (u.flash > 0) u.flash -= dt;
     if (u.swing > 0) u.swing -= dt;
     if (u.combatT > 0) u.combatT -= dt;
+    u.run = wantsRun(u);
+    u.catchUp = false;
     // Wer auf einer neu gebauten Mauer steht, wird daneben gesetzt
     if (!u.hidden && !isWalkable(G.world, u.x, u.y)) {
       const n = nearestWalkable(G.world, Math.floor(u.x), Math.floor(u.y), 4);
@@ -610,6 +624,7 @@ function updateCompanion(u, k, dt) {
   const slot = formationSlot(k);
   const d = Math.hypot(slot.x - u.x, slot.y - u.y);
   if (d > 24) { placeNear(u, p.x, p.y, 1.5); return; }
+  if (d > 3) u.catchUp = true;
   if (d > 0.45) chaseTo(u, slot.x, slot.y, dt, 0.3, d > 3 ? 1.4 : 1.05);
 }
 
@@ -655,6 +670,7 @@ function updateGroupMember(m, g, k, dt) {
   const tx = g.x + o.x, ty = g.y + o.y;
   const d = Math.hypot(tx - m.x, ty - m.y);
   if (d > 30) { m.x = tx; m.y = ty; return; }
+  if (d > 2) m.catchUp = true;
   if (d > 0.3) chaseTo(m, tx, ty, dt, 0.2, d > 2 ? 1.5 : 1.1);
 }
 
@@ -881,7 +897,7 @@ export function updateGroups(dt) {
     const target = g.path[g.pathI];
     if (g.army) { const dd = Math.hypot(target.x - g.x, target.y - g.y) || 1; g.dirX = (target.x - g.x) / dd; g.dirY = (target.y - g.y) / dd; }
     const t = tileAt(G.world, g.x, g.y);
-    const sp = gt.speed * TERRAIN_SPEED[t] * dt;
+    const sp = gt.speed * TERRAIN_SPEED[t] * dt * WALK;
     const dx = target.x - g.x, dy = target.y - g.y, d = Math.hypot(dx, dy);
     if (d <= sp + 0.02) {
       g.x = target.x; g.y = target.y; g.pathI++;

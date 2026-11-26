@@ -518,6 +518,7 @@ export function generateWorld(seed) {
   flattenSites(W);
   placeTrees(W, rng);
   addWallRuinObjs(W);
+  addFieldObjs(W);
   buildStaticWalls(W);
   return W;
 }
@@ -1625,6 +1626,17 @@ function placePois(W, rng) {
     for (let r = 0; r < 6; r++) { if (footprintFree(W, spot.x, spot.y, 3, 3, 0)) break; spot = { x: near.x + 0.5 + r, y: near.y + 0.5 - r }; }
     W.buildings.push({ kind: 'stonehenge', x: spot.x, y: spot.y, wx: 3, wy: 3, noCost: true, label: p.name, site: null });
     W.pois.push({ ...p, x: spot.x, y: spot.y });
+  }
+}
+
+// Äcker: je Feld die Saat in Reihen als Objekt (render.js wählt das Bild nach Jahreszeit). Die Reihen laufen in
+// Blöcken von 4 × 4 Feldern gleich, damit ein Acker einheitlich aussieht.
+function addFieldObjs(W) {
+  const N = W.N;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (W.tiles[j * N + i] !== T.FIELD) continue;
+    const ci = Math.floor(j / CHUNK) * W.CN + Math.floor(i / CHUNK);
+    W.chunkObjs[ci].push({ kind: 'feld', x: i + 0.5, y: j + 0.5, ori: hash2(i >> 2, j >> 2, 515) < 0.5 ? 'x' : 'y', v: hash2(i, j, 516), s: 1 });
   }
 }
 

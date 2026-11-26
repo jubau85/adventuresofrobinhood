@@ -356,7 +356,7 @@ function updateMatch(t, m, dt) {
     const k = Math.min(1, m.t / dur), e = ease(k);
     for (const kn of [m.a, m.b]) {
       const s = laneStart(t, m, kn), u = kn.u;
-      u.x = s.x + s.dir * 10.8 * e; u.y = s.y; face(u, s.dir, 0); u.moving = true; u.anim += dt * (0.6 + k);
+      u.x = s.x + s.dir * 10.8 * e; u.y = s.y; face(u, s.dir, 0); u.moving = true; u.run = true; u.anim += dt * (0.6 + k);
       u.lanceDown = k > 0.22;
     }
     if (t.aim) t.aim.m = Math.min(1, k / IMPACT);
@@ -377,7 +377,7 @@ function updateMatch(t, m, dt) {
     for (const kn of [m.a, m.b]) {
       const s = laneStart(t, m, kn), u = kn.u, out = kn === m.a ? -1 : 1;
       face(u, -s.dir * Math.cos(Math.PI * q), out * Math.sin(Math.PI * q));
-      u.moving = q < 1; u.anim += dt * 0.3;
+      u.moving = q < 1; u.run = false; u.anim += dt * 0.3;
     }
     if (m.t > dur) { m.phase = 'anlauf'; m.t = 0; if (m.player) startAim(t, m); }
   }
@@ -392,6 +392,7 @@ function face(u, dx, dy) {
 }
 
 function rideTo(u, x, y, dt, v) {
+  u.run = v > 3;
   const dx = x - u.x, dy = y - u.y, d = Math.hypot(dx, dy);
   const step = Math.min(d, v * dt);
   u.x += (dx / d) * step; u.y += (dy / d) * step;

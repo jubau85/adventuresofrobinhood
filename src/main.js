@@ -392,7 +392,7 @@ function startHunt(a) {
   go();
 }
 
-function clickWorld(px, py) {
+function clickWorld(px, py, dbl = false) {
   if (!G.started || panelOpen() || dialogOpen()) return;
   if (joustPress() || (G.tour && G.tour.lock)) return;
   G.pendingBuild = null;
@@ -404,6 +404,8 @@ function clickWorld(px, py) {
   const p = G.s.player;
   p.attackTarget = null;
   p.huntTarget = null;
+  // Einfacher Klick: gehen, Doppelklick: laufen
+  p.runClick = dbl;
   const ba = buildingAtScreen(px, py);
   if (ba && ba.castle) { goBuilding(ba); return; }
   // Der Boden der eigenen Burg ist zum Hingehen da (dort sucht man Schutz), nur Gebäude öffnen sich
@@ -553,13 +555,15 @@ function readInput() {
   const l = Math.hypot(dx, dy);
   G.input.dx = l ? dx / l : 0;
   G.input.dy = l ? dy / l : 0;
+  // Mit gedrückter Umschalttaste läuft der Held auch bei Tastensteuerung
+  if (l) G.s.player.runClick = keys.has('shift');
 }
 
 function bindInput() {
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
   window.addEventListener('blur', () => keys.clear());
-  let down = null;
+  let down = null, lastClick = null;
   viewCanvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
   viewCanvas.addEventListener('pointerup', (e) => {
     if (!down) return;
@@ -567,7 +571,11 @@ function bindInput() {
     down = null;
     if (moved < 10) {
       const r = viewCanvas.getBoundingClientRect();
-      clickWorld(e.clientX - r.left, e.clientY - r.top);
+      // Zweiter Klick kurz danach an fast derselben Stelle: Doppelklick, der Held läuft
+      const now = performance.now();
+      const dbl = !!lastClick && now - lastClick.t < 400 && Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 28;
+      lastClick = dbl ? null : { t: now, x: e.clientX, y: e.clientY };
+      clickWorld(e.clientX - r.left, e.clientY - r.top, dbl);
     }
   });
   viewCanvas.addEventListener('pointermove', (e) => {

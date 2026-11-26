@@ -454,6 +454,9 @@ function drawClosedGate(c, x, y, wx, wy, h) {
 // Tore der laufenden Belagerung als Objekte für die Tiefensortierung
 function siegeGateParts() {
   const sg = G.siege, W = G.world;
+  // Gemalte Burgtore zeigen sich selbst offen oder geschlossen (castlePieces); hier nur noch die Stadttore
+  const painted = !!(ART.burg_stein_tor && ART.burg_holztor_zu);
+  if (painted) { if (!sg || !sg.walls || !sg.gatesClosed || sg.walls.square) return []; return siegeGatePartsFor(sg); }
   // Deine Burg mit geschlossenem Tor, auch ohne Belagerung
   if (homeGateClosed() && !(sg && sg.site.type === 'spieler' && sg.gatesClosed)) {
     const s = homeSite(), lvl = G.s.castle.level, x = s.x, y = s.y + 4, h = lvl >= 2 ? (lvl >= 3 ? 36 : 26) : 22;
@@ -1206,6 +1209,8 @@ function drawStonehenge(c, b) {
 // Ein Stück verfallener Römermauer
 function drawWallRuin(c, o) {
   const along = Math.abs(Math.cos(o.dir)) >= Math.abs(Math.sin(o.dir));
+  // Gemalte Reste: Mauerstümpfe mit Efeu oder mit zerbrochenem Bogen, ab und zu ein Turmstumpf
+  if (o.tower ? p5(c, 'burg_ruine_turm', o.x, o.y, 0.85) : p5(c, `burg_ruine_mauer_${(Math.floor(o.x * 3 + o.y * 7) & 1) + 1}${along ? '' : '_y'}`, o.x, o.y, 0.95)) return;
   const col = '#9e978a';
   if (o.tower) drawBox(c, o.x, o.y, 0.62, 0.62, o.h + 8, '#969083', 0, 'stone');
   drawBox(c, o.x, o.y, along ? 0.95 : 0.34, along ? 0.34 : 0.95, o.h, col, 0, 'stone');
@@ -1465,6 +1470,37 @@ function drawScaffold(c, x, y, wx, wy, h) {
 }
 
 // ---------------------------------------------------------------- Burgen
+// ---------------------------------------------------------------- Gemalte Burgteile (Paket 5)
+// Je Bild der Fußpunkt (x, y in 1×-Bildpunkten) und die Größe eines Bildpunkts in Weltpunkten. Mauern und Palisaden
+// sind genau ein Feld lang (x: links oben nach rechts unten, y: rechts oben nach links unten), der Fußpunkt liegt auf
+// der Mauerlinie in der Mitte. Türme stehen auf der Mitte ihres Sockels, Bergfried und Hallen auf ihrer Grundfläche.
+const P5 = {'burg_palisade_x':[33.88,54.0,0.25],'burg_palisade_x_schaden_1':[33.88,54.0,0.25],'burg_palisade_x_schaden_2':[33.88,54.0,0.25],'burg_palisade_x_schaden_3':[33.88,54.0,0.25],'burg_palisade_x_schaden_4':[33.88,54.0,0.25],'burg_palisade_y':[33.88,54.5,0.25],'burg_palisade_y_schaden_1':[33.88,54.5,0.25],'burg_palisade_y_schaden_2':[33.88,54.5,0.25],'burg_palisade_y_schaden_3':[33.88,54.5,0.25],'burg_palisade_y_schaden_4':[33.88,54.5,0.25],'burg_stein_mauer_x':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_1':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_2':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_3':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_4':[33.88,70.5,0.25],'burg_stein_mauer_y':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_1':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_2':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_3':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_4':[33.88,68.5,0.25],'burg_bergfried':[69.88,167.0,0.25],'burg_bergfried_gross':[84.88,197.25,0.25],'burg_holzhalle':[70.5,80.25,0.25],'burg_holztor':[35.5,84.0,0.25],'burg_holztor_schaden_1':[35.5,84.0,0.25],'burg_holztor_schaden_2':[35.5,84.0,0.25],'burg_holztor_schaden_3':[35.5,84.0,0.25],'burg_holztor_schaden_4':[35.5,84.0,0.25],'burg_holztor_zu':[35.5,84.0,0.25],'burg_holzturm':[32.0,97.75,0.25],'burg_holzturm_schaden_1':[32.0,97.75,0.25],'burg_holzturm_schaden_2':[32.0,97.75,0.25],'burg_holzturm_schaden_3':[32.0,97.75,0.25],'burg_holzturm_schaden_4':[32.0,97.75,0.25],'burg_palas':[78.0,99.25,0.25],'burg_stein_tor':[39.38,88.75,0.25],'burg_stein_tor_schaden_1':[39.38,88.75,0.25],'burg_stein_tor_schaden_2':[39.38,88.75,0.25],'burg_stein_tor_schaden_3':[39.38,88.75,0.25],'burg_stein_tor_schaden_4':[39.38,88.75,0.25],'burg_stein_tor_zu':[39.38,88.75,0.25],'burg_stein_turm':[35.75,104.88,0.25],'burg_stein_turm_schaden_1':[35.75,104.88,0.25],'burg_stein_turm_schaden_2':[35.75,104.88,0.25],'burg_stein_turm_schaden_3':[35.75,104.88,0.25],'burg_stein_turm_schaden_4':[35.75,104.88,0.25],'burg_ruine_mauer_1':[33.88,34.25,0.25],'burg_ruine_mauer_1_y':[33.88,33.75,0.25],'burg_ruine_mauer_2':[33.75,21.75,0.25],'burg_ruine_mauer_2_y':[34.0,24.0,0.25],'burg_ruine_turm':[37.5,66.88,0.25],'burg_schutt':[27.88,22.75,0.25],'feld_brach_x':[34.0,35.75,0.25],'feld_hoch_x':[34.0,35.75,0.25],'feld_jung_x':[34.0,35.75,0.25],'feld_jung_y':[34.0,35.75,0.25],'feld_reif_x':[34.0,35.75,0.25],'feld_reif_y':[34.0,35.75,0.25],'feld_winter_x':[34.0,35.75,0.25],'feld_winter_y':[34.0,35.75,0.25],'garben_1':[9.88,21.5,0.25],'garben_2':[9.88,22.0,0.25],'schneefleck_1':[31.75,15.75,0.5],'schneefleck_2':[28.75,15.88,0.5],'schneefleck_3':[28.38,15.12,0.5],'schneefleck_4':[23.25,11.75,0.5],'schneefleck_5':[22.75,12.38,0.5],'schneefleck_6':[18.88,10.12,0.5],'schneefleck_7':[18.38,10.5,0.5],'schneefleck_8':[15.25,9.5,0.5]};
+// Zeichnen mit Fußpunkt auf (x, y): sc vergrößert, flip spiegelt (vertauscht x und y der Schrägansicht),
+// color färbt Magenta (Banner) in diese Farbe; beim Herauszoomen nimmt es die passende verkleinerte Stufe
+function p5(c, id, x, y, sc = 1, flip = false, color = null, z = 0) {
+  const a = P5[id];
+  if (!a || !ART[id]) return false;
+  const spr = figSprite(id, color || '#808080');
+  if (!spr) return false;
+  const t = c.getTransform(), on = Math.hypot(t.a, t.b) * a[2] * sc;
+  const lv = Math.max(0, Math.min(spr.mips.length - 1, Math.floor(Math.log2(1 / Math.max(on, 1e-3)))));
+  const im = spr.mips[lv];
+  const [px, py] = P(x, y, z);
+  c.save(); c.translate(px, py); if (flip) c.scale(-1, 1);
+  c.drawImage(im, -a[0] * sc, -a[1] * sc, spr.w * a[2] * sc, spr.h * a[2] * sc);
+  c.restore();
+  return true;
+}
+// Schadensstufe eines Mauerstücks: 1–3 nach dem Schaden, 4 wenn die Bresche offen ist
+function dmgStage(hit) { if (!hit) return 0; if (hit.gone) return 4; return Math.min(3, 1 + Math.floor(hit.dmg * 3)); }
+const p5dmg = (base, st) => (st ? `${base}_schaden_${st}` : base);
+// Tor einer Burg geschlossen? Bei Belagerung oder wenn du das Tor deiner Burg geschlossen hast
+function castleGateClosed(site) {
+  const sg = G.siege;
+  if (sg && sg.site === site && sg.gatesClosed && sg.walls && sg.walls.square) return true;
+  return site.type === 'spieler' && homeGateClosed();
+}
+
 function castlePieces(site, level, bannerCol) {
   const parts = [];
   const cx = site.x, cy = site.y, R = 4;
@@ -1481,20 +1517,26 @@ function castlePieces(site, level, bannerCol) {
   const corners = [[cx - R, cy - R], [cx + R, cy - R], [cx - R, cy + R], [cx + R, cy + R]];
 
   if (level === 0) {
+    // Ruine: Mauerreste mit Efeu, Turmstümpfe, Schutt
     const r = mulberry32(site.tx * 31 + site.ty);
     for (const s of sides) {
       if (s.gate || r() < 0.45) continue;
-      const h = 4 + r() * 14;
-      add(s.x, s.y, (c) => drawBox(c, s.x, s.y, s.along === 'x' ? 1 : 0.45, s.along === 'x' ? 0.45 : 1, h, '#938e83', 0, 'stone'));
+      const h = 4 + r() * 14, v = r() < 0.5 ? 1 : 2;
+      add(s.x, s.y, (c) => { if (!p5(c, `burg_ruine_mauer_${v}${s.along === 'y' ? '_y' : ''}`, s.x, s.y)) drawBox(c, s.x, s.y, s.along === 'x' ? 1 : 0.45, s.along === 'x' ? 0.45 : 1, h, '#938e83', 0, 'stone'); });
     }
     for (const [x, y] of corners) {
       const h = 10 + r() * 18;
-      add(x, y, (c) => { drawShadow(c, x, y, 1.1, 1.1, h); drawBox(c, x, y, 1.1, 1.1, h, '#8e897e', 0, 'stone'); drawBox(c, x - 0.25, y - 0.2, 0.5, 0.6, 7, '#8e897e', h, 'stone'); });
+      add(x, y, (c) => { drawShadow(c, x, y, 1.1, 1.1, h); if (!p5(c, 'burg_ruine_turm', x, y, 1.15)) { drawBox(c, x, y, 1.1, 1.1, h, '#8e897e', 0, 'stone'); drawBox(c, x - 0.25, y - 0.2, 0.5, 0.6, 7, '#8e897e', h, 'stone'); } });
     }
-    add(cx - 1.2, cy - 1.2, (c) => { drawShadow(c, cx - 1.2, cy - 1.2, 2.1, 2.1, 30); drawBox(c, cx - 1.2, cy - 1.2, 2.1, 2.1, 24, '#8e897e', 0, 'stone'); drawBox(c, cx - 1.6, cy - 1.0, 0.8, 1.0, 12, '#8e897e', 24, 'stone'); });
+    add(cx - 1.2, cy - 1.2, (c) => {
+      drawShadow(c, cx - 1.2, cy - 1.2, 2.1, 2.1, 30);
+      if (p5(c, 'burg_ruine_turm', cx - 1.2, cy - 1.2, 1.7)) return;
+      drawBox(c, cx - 1.2, cy - 1.2, 2.1, 2.1, 24, '#8e897e', 0, 'stone'); drawBox(c, cx - 1.6, cy - 1.0, 0.8, 1.0, 12, '#8e897e', 24, 'stone');
+    });
+    add(cx - 0.2, cy + 0.1, (c) => p5(c, 'burg_schutt', cx - 0.2, cy + 0.1, 1.1));
     add(cx + 1.4, cy + 1.2, (c) => drawTent(c, { x: cx + 1.4, y: cy + 1.2, wx: 1.1, wy: 1.0, color: '#d8ccb0' }));
     add(cx + 2.4, cy + 2.4, (c) => drawFire(c, { x: cx + 2.4, y: cy + 2.4 }));
-    add(cx - 2.2, cy + 2.4, (c) => drawStones(c, cx - 2.2, cy + 2.4, 5));
+    add(cx - 2.2, cy + 2.4, (c) => { if (!p5(c, 'burg_schutt', cx - 2.2, cy + 2.4)) drawStones(c, cx - 2.2, cy + 2.4, 5); });
     return parts;
   }
 
@@ -1503,6 +1545,7 @@ function castlePieces(site, level, bannerCol) {
       if (s.gate) continue;
       add(s.x, s.y, (c) => {
         const hit = wallHit(site, s.x, s.y);
+        if (p5(c, p5dmg(`burg_palisade_${s.along}`, dmgStage(hit)), s.x, s.y)) { if (hit && hit.repair) drawScaffold(c, s.x, s.y, 1.1, 0.6, 30); return; }
         for (let k = -1; k <= 1; k++) {
           const px = s.along === 'x' ? s.x + k * 0.33 : s.x, py = s.along === 'y' ? s.y + k * 0.33 : s.y;
           const sh = !hit ? 24 : hit.gone ? (k === 0 ? 0 : 5) : 24 * (1 - 0.55 * hit.dmg * ((k + 2) % 3 === 0 ? 1 : 0.5));
@@ -1514,9 +1557,21 @@ function castlePieces(site, level, bannerCol) {
         if (hit && hit.repair) drawScaffold(c, s.x, s.y, 1.1, 0.6, 30);
       });
     }
-    for (const gx of [-1.15, 1.15]) add(cx + gx, cy + R, (c) => { drawBox(c, cx + gx, cy + R, 0.5, 0.5, 34, wood, 0, 'plank'); drawPyramid(c, cx + gx, cy + R, 0.5, 0.5, 34, 8, ROOFS.wood); });
+    // Holztürme an den Ecken, Tor mit Wehrgang (offen, geschlossen oder beschädigt)
+    for (const [x, y] of corners) add(x, y, (c) => p5(c, p5dmg('burg_holzturm', dmgStage(wallHit(site, x, y))), x, y, 1.25), 0.4);
+    if (ART.burg_holztor) {
+      add(cx, cy + R, (c) => { const st = dmgStage(wallHit(site, cx, cy + R)); p5(c, st ? p5dmg('burg_holztor', st) : castleGateClosed(site) ? 'burg_holztor_zu' : 'burg_holztor', cx, cy + R, 1.4); }, 0.3);
+    } else {
+      for (const gx of [-1.15, 1.15]) add(cx + gx, cy + R, (c) => { drawBox(c, cx + gx, cy + R, 0.5, 0.5, 34, wood, 0, 'plank'); drawPyramid(c, cx + gx, cy + R, 0.5, 0.5, 34, 8, ROOFS.wood); });
+    }
     add(cx - 1.2, cy - 1.2, (c) => {
       drawShadow(c, cx - 1.2, cy - 1.2, 1.6, 1.6, 70);
+      // Holzhalle mit Schindeldach als Haupthaus der Holzburg
+      if (p5(c, 'burg_holzhalle', cx - 1.2, cy - 1.2, 0.85)) {
+        banner(c, cx - 1.2, cy - 1.2, 58, bannerCol);
+        if (darkness() > 0.2) addLight(cx - 0.8, cy - 1.0, 14, 30, 0.8);
+        return;
+      }
       drawBox(c, cx - 1.2, cy - 1.2, 1.6, 1.6, 56, wood, 0, 'plank');
       faceQuad(c, cx - 1.2, cy - 1.2, 1.6, 1.6, 'L', 0.4, 0.6, 0, 12, '#3a2a1c');
       faceQuad(c, cx - 1.2, cy - 1.2, 1.6, 1.6, 'R', 0.4, 0.55, 34, 42, darkness() > 0.2 ? '#ffcf6a' : '#2a2018');
@@ -1534,6 +1589,7 @@ function castlePieces(site, level, bannerCol) {
     add(s.x, s.y, (c) => {
       const wx = s.along === 'x' ? 1.02 : 0.5, wy = s.along === 'y' ? 1.02 : 0.5;
       const hit = wallHit(site, s.x, s.y);
+      if (p5(c, p5dmg(`burg_stein_mauer_${s.along}`, dmgStage(hit)), s.x, s.y, level >= 3 ? 1.1 : 1)) { if (hit && hit.repair) drawScaffold(c, s.x, s.y, wx + 0.3, wy + 0.3, wh + 18); return; }
       if (hit) { drawWallRuined(c, s.x, s.y, wx, wy, wh, stone, hit); return; }
       drawBox(c, s.x, s.y, wx, wy, wh, stone, 0, 'stone');
       for (const k of [-0.25, 0.25]) {
@@ -1546,6 +1602,7 @@ function castlePieces(site, level, bannerCol) {
   for (const [x, y] of corners) {
     add(x, y, (c) => {
       drawShadow(c, x, y, 1.4, 1.4, th);
+      if (p5(c, p5dmg('burg_stein_turm', dmgStage(wallHit(site, x, y))), x, y, level >= 3 ? 1.42 : 1.3)) return;
       drawBox(c, x, y, 1.4, 1.4, th, stone, 0, 'stone');
       faceQuad(c, x, y, 1.4, 1.4, 'L', 0.42, 0.58, th * 0.6, th * 0.72, '#2c2622');
       faceQuad(c, x, y, 1.4, 1.4, 'R', 0.42, 0.58, th * 0.6, th * 0.72, '#2c2622');
@@ -1553,13 +1610,15 @@ function castlePieces(site, level, bannerCol) {
       else drawMerlons(c, x, y, 1.4, 1.4, th, stone);
     }, 0.4);
   }
-  for (const gx of [-1.3, 1.3]) {
+  // Torhaus mit zwei Rundtürmen: offen, geschlossen oder beschädigt, die Banner in der Farbe des Herrn
+  if (ART.burg_stein_tor) add(cx, cy + R, (c) => { const st = dmgStage(wallHit(site, cx, cy + R)); p5(c, st ? p5dmg('burg_stein_tor', st) : castleGateClosed(site) ? 'burg_stein_tor_zu' : 'burg_stein_tor', cx, cy + R, level >= 3 ? 1.25 : 1.15, false, bannerCol); }, 0.3);
+  else for (const gx of [-1.3, 1.3]) {
     add(cx + gx, cy + R, (c) => {
       drawBox(c, cx + gx, cy + R, 1.0, 1.0, wh + 16, stone, 0, 'stone');
       drawMerlons(c, cx + gx, cy + R, 1.0, 1.0, wh + 16, stone);
     }, 0.3);
   }
-  add(cx, cy + R - 0.05, (c) => {
+  if (!ART.burg_stein_tor) add(cx, cy + R - 0.05, (c) => {
     drawBox(c, cx, cy + R, 1.6, 0.8, 10, stone, wh - 4, 'stone');
     faceQuad(c, cx, cy + R, 1.6, 0.8, 'L', 0.05, 0.95, wh - 4, wh - 3, '#3a2a1c');
     c.strokeStyle = '#3a3632'; c.lineWidth = 1;
@@ -1568,11 +1627,16 @@ function castlePieces(site, level, bannerCol) {
     c.stroke();
   }, 0.2);
   if (level >= 3) {
-    for (const [x, y] of [[cx, cy - R], [cx - R, cy]]) add(x, y, (c) => { drawBox(c, x, y, 1.1, 1.1, 56, stone, 0, 'stone'); drawPyramid(c, x, y, 1.1, 1.1, 56, 24, ROOFS.slate); }, 0.3);
+    for (const [x, y] of [[cx, cy - R], [cx - R, cy]]) add(x, y, (c) => { if (p5(c, p5dmg('burg_stein_turm', dmgStage(wallHit(site, x, y))), x, y, 1.15)) return; drawBox(c, x, y, 1.1, 1.1, 56, stone, 0, 'stone'); drawPyramid(c, x, y, 1.1, 1.1, 56, 24, ROOFS.slate); }, 0.3);
   }
   const kw = level >= 3 ? 2.8 : 2.2, kh = level >= 3 ? 100 : 76;
   add(cx - 1.1, cy - 1.1, (c) => {
     drawShadow(c, cx - 1.1, cy - 1.1, kw, kw, kh);
+    // Bergfried: normannischer Wohnturm, in der Festung der große mit Ecktürmchen; Banner in der Farbe des Herrn
+    if (p5(c, level >= 3 ? 'burg_bergfried_gross' : 'burg_bergfried', cx - 1.1, cy - 1.1, level >= 3 ? 1.12 : 1.1, false, bannerCol)) {
+      if (darkness() > 0.2) addLight(cx - 1.1, cy - 1.1 + kw / 2, kh * 0.5, 40, 0.8);
+      return;
+    }
     drawBox(c, cx - 1.1, cy - 1.1, kw, kw, kh, '#ada798', 0, 'stone');
     faceQuad(c, cx - 1.1, cy - 1.1, kw, kw, 'L', 0.38, 0.62, 0, 18, '#5a4030');
     faceQuad(c, cx - 1.1, cy - 1.1, kw, kw, 'L', 0.42, 0.58, 0, 16, '#2c2420');
@@ -1890,6 +1954,8 @@ function addCastleBuilding(add, id, L, p, s) {
     case 'halle': {
       const wy = [0, 2.2, 2.6, 2.9][L], h = [0, 20, 24, 28][L];
       add(p.x, p.y, (c) => {
+        // Gemalt: Holzhalle, ab Stufe 2 der steinerne Palas; das Bild liegt längs zu x, gespiegelt längs zu y
+        if (p5(c, L === 1 ? 'burg_holzhalle' : 'burg_palas', p.x, p.y, wy / 2, true)) { if (darkness() > 0.2) addLight(p.x, p.y + 0.3, 14, 30, 0.8); return; }
         drawHouse(c, { x: p.x, y: p.y, wx: 1.2 + L * 0.1, wy, h, rh: 13 + L * 2, wall: L === 1 ? 'timber' : 'stone', roof: L === 1 ? 'thatch' : L === 2 ? 'tile' : 'slate', lit: true, chimney: true, v: 0.75 });
         if (L >= 2) banner(c, p.x + 0.45, p.y + wy / 2 - 0.15, h + 2, playerColor());
       });
@@ -2034,10 +2100,32 @@ function addCastleBuilding(add, id, L, p, s) {
 }
 
 // Acker als flache Fläche: Furchen und Feldfrucht je nach Jahreszeit
+// Gemalte Saat in Reihen je Jahreszeit: Furchen, junge Saat, halbhohes und reifes Korn, Winterfurchen;
+// nach der Ernte im Herbst Garben. Fehlt die y-Fassung, nimmt es das gespiegelte x-Bild.
+function fieldSprite(ori) {
+  const st = fieldStage(), se = lookSeason();
+  const base = st === 'acker_winter' ? 'feld_winter' : st === 'acker_reif' ? 'feld_reif' : st === 'acker_jung' ? (se === 1 ? 'feld_hoch' : 'feld_jung') : 'feld_brach';
+  return ART[`${base}_${ori}`] ? [`${base}_${ori}`, false] : [`${base}_x`, ori === 'y'];
+}
+const harvestTime = () => lookSeason() === 2 && fieldStage() === 'acker_brach';
+function drawFieldObj(c, o) {
+  const [id, flip] = fieldSprite(o.ori);
+  p5(c, id, o.x, o.y, 1, flip);
+  if (harvestTime() && o.v < 0.32) p5(c, o.v < 0.16 ? 'garben_1' : 'garben_2', o.x + (o.v - 0.16) * 2, o.y + 0.1, 1);
+}
+
 function drawCropField(c, f) {
   const se = seasonIndex();
   const x0 = f.x - f.wx / 2, x1 = f.x + f.wx / 2, y0 = f.y - f.wy / 2, y1 = f.y + f.wy / 2;
   poly(c, [P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)], se === 3 ? '#e4e9e8' : '#7a5a38');
+  // Gemalt: die Fläche in Zellen von etwa einem Feld, je Zelle ein Saatbild
+  if (ART.feld_brach_x) {
+    const nx = Math.max(1, Math.round(f.wx)), ny = Math.max(1, Math.round(f.wy)), cw = f.wx / nx, ch = f.wy / ny;
+    const ori = f.wx >= f.wy ? 'x' : 'y', [id, flip] = fieldSprite(ori);
+    for (let b = 0; b < ny; b++) for (let a = 0; a < nx; a++) p5(c, id, x0 + (a + 0.5) * cw, y0 + (b + 0.5) * ch, Math.min(cw, ch), flip);
+    if (harvestTime()) { const r = mulberry32(Math.round(f.x * 31 + f.y * 17)); for (let k = 0; k < 3; k++) p5(c, k % 2 ? 'garben_1' : 'garben_2', x0 + 0.3 + r() * (f.wx - 0.6), y0 + 0.3 + r() * (f.wy - 0.6)); }
+    return;
+  }
   const crop = [['#8fc256', 2.0], ['#c8b648', 2.8], ['#dcae3e', 3.2], ['#b9c0bf', 1.2]][se];
   c.strokeStyle = crop[0]; c.lineWidth = crop[1];
   const along = f.wx >= f.wy;
@@ -2755,6 +2843,9 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     for (let k = 0; k < n; k++) {
       const p = tp(0.2 + hash2(i + k * 5, j, 42) * 0.6, 0.2 + hash2(i, j + k * 5, 43) * 0.6);
       const rr = (4 + hash2(i + k, j + k, 44) * 7) * (0.7 + tileSnow);
+      // Gemalte Schneeflecken mit Grashalmen, sonst ein heller Fleck
+      const id = `schneefleck_${1 + Math.floor(hash2(i + k * 3, j - k, 45) * 8)}`, im = ART[id], a = P5[id];
+      if (im && a) { const w = rr * 2.6, sc = w / (im.width * a[2]); c.drawImage(im, p[0] - a[0] * sc, p[1] - a[1] * sc, w, im.height * a[2] * sc); continue; }
       c.beginPath(); c.ellipse(p[0], p[1], rr, rr * 0.5, 0, 0, Math.PI * 2); c.fill();
     }
   }
@@ -3292,6 +3383,8 @@ const ACT3D = {
   beten: ['knien'], kreuz: ['knien'], segnen: ['segnen', 'reden'],
 };
 const HOLD3D = { sitzen: 1, knien: 1 };
+// Weg (in Feldern) je Bewegungszyklus: daran hängt die Bildfolge beim Gehen und Laufen
+const STRIDE3D = { gehen: 0.8, laufen: 1.15, eimer: 0.7, schleichen: 0.55, huepfen: 0.9 };
 function modelAnim(u, key, m) {
   const M = model3d(key).M.bewegungen, has = (a) => modelHas(key, a);
   const pick = (a, p) => { const A = M[a]; return { anim: a, frame: Math.min(A.bilder - 1, Math.max(0, Math.floor(p * A.bilder))) }; };
@@ -3308,11 +3401,13 @@ function modelAnim(u, key, m) {
   if (dt > 0) u._hv = (u._hv || 0) * 0.8 + Math.min(d / dt, 8) * 0.2;
   u._hx = u.x; u._hy = u.y; u._ht = G.time;
   if (u.moving) {
-    let a = (u._hv || 0) > 1.15 && has('laufen') ? 'laufen' : 'gehen';
+    // Gangart steht fest (gehen oder bei Gefahr laufen), kein Umschalten nach dem geschätzten Tempo;
+    // die Bilder folgen dem zurückgelegten Weg, damit die Füße nicht rutschen
+    let a = u.run && has('laufen') ? 'laufen' : 'gehen';
     if (a === 'gehen' && u.carry === 'eimer' && has('eimer')) a = 'eimer';
     if (u.act === 'pirschen' && has('schleichen')) a = 'schleichen';
     if (u.act === 'spielen' && has('huepfen')) a = 'huepfen';
-    u._wp = (u._wp || 0) + dt * Math.max(0.6, (u._hv || 1) / (a === 'laufen' ? 1.7 : 1.0)) / M[a].dauer;
+    u._wp = (u._wp || 0) + Math.min(d, 0.5) / (STRIDE3D[a] || 0.85);
     return loop(a, u._wp);
   }
   const ph = ((u.id || 0) % 13) * 0.37;
@@ -3412,10 +3507,10 @@ function horseGait(u) {
   const d = u._hx === undefined ? 0 : Math.hypot(u.x - u._hx, u.y - u._hy);
   if (dt > 0) u._hv = (u._hv || 0) * 0.85 + (Math.min(d / dt, 8)) * 0.15;
   u._hx = u.x; u._hy = u.y; u._ht = G.time;
-  const v = u.moving ? Math.max(u._hv || 0, 0.4) : 0;
-  const anim = v < 0.15 ? 'stehen' : v < 1.35 ? 'schritt' : 'galopp';
-  const rate = anim === 'stehen' ? 1 / 4 : anim === 'schritt' ? Math.max(0.7, v / 0.9) : Math.max(1.3, Math.min(2.6, v * 0.85));
-  u._hp = (u._hp || ((u.id || 0) % 7) * 0.13) + dt * rate;
+  // Schritt beim Gehen, Galopp nur beim Laufen (feste Gangart, kein Flackern); die Beine folgen dem Weg
+  const anim = !u.moving ? 'stehen' : u.run ? 'galopp' : 'schritt';
+  const adv = anim === 'stehen' ? dt / 4 : Math.min(d, 0.6) / (anim === 'schritt' ? 1.25 : 1.6);
+  u._hp = (u._hp || ((u.id || 0) % 7) * 0.13) + adv;
   return { anim, phase: u._hp };
 }
 // Pferd eines Reiters: Sattelpunkt (im gespiegelten Raum der Figur) und eine Malfunktion.
@@ -4155,6 +4250,8 @@ export function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.ca
 onArt((id) => {
   if (/^(laub|nadel|busch|fels|schilf|baum|wildblumen)/.test(id)) sprites = null;
   if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee|fels|sand|kies|klippe|pflaster|schlamm)/.test(id)) { chunkCache.clear(); minimapBase = null; }
+  // Burgteile: die festen Teile neu zusammenstellen (Tore und Hallen fragen beim Aufbau, ob es ein Bild gibt)
+  if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }
@@ -4265,6 +4362,7 @@ export function render() {
       if (listsCore && Math.abs(o.x - lists.lx) < 11 && Math.abs(o.y - lists.ly) < 5 && listsCore.some((q) => o.x > q.x0 && o.x < q.x1 && o.y > q.y0 && o.y < q.y1)) continue;
       if (gallows.length && gallows.some((g) => Math.abs(o.x - g.x) < 2 && Math.abs(o.y - g.y) < 2.2)) continue;
       if (o.kind === 'mauer') objs.push({ d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => drawWallRuin(c, o) });
+      else if (o.kind === 'feld') { if (ART.feld_brach_x) objs.push({ d: o.x + o.y - 0.15, z: groundZ(W, o.x, o.y), f: (c) => drawFieldObj(c, o) }); }
       else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o), box: o.box || (o.box = [o.x - 0.25, o.x + 0.25, o.y - 0.25, o.y + 0.25]) });
     }
   }
