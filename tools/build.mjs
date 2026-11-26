@@ -49,16 +49,16 @@ for (const name of ORDER) {
 if (js.includes('</script')) throw new Error('Der Code enthält „</script“ und kann nicht eingebettet werden');
 
 // Handgemalte Grafiken als data-URL einbetten, damit die Einzeldatei ohne Ordner auskommt
-const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg' };
 let artBytes = 0;
-js = js.replace(/'(assets\/[^']+\.(?:jpg|jpeg|png|webp))'/g, (m, p) => {
+js = js.replace(/'(assets\/[^']+\.(?:jpg|jpeg|png|webp|mp3|ogg))'/g, (m, p) => {
   const file = join(ROOT, p);
   if (!existsSync(file)) return m;
   const buf = readFileSync(file);
   artBytes += buf.length;
   return `'data:${MIME[p.slice(p.lastIndexOf('.'))]};base64,${buf.toString('base64')}'`;
 });
-if (artBytes) console.log(`Grafiken eingebettet: ${(artBytes / 1024).toFixed(0)} KB`);
+if (artBytes) console.log(`Grafiken und Töne eingebettet: ${(artBytes / 1024).toFixed(0)} KB`);
 
 const css = readFileSync(join(ROOT, 'style.css'), 'utf8');
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8');

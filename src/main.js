@@ -4,7 +4,7 @@ import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
-import { startAudio, setMood, musicEnabled, setMusicEnabled, loadMusicPref } from './audio.js';
+import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, loadMusicPref, audioDebug } from './audio.js';
 import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
@@ -17,7 +17,7 @@ import { castleSite, castleBonusAt, dailyBalance, dailyCastle } from './castle.j
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
-import { initWeather, updateWeather } from './weather.js';
+import { initWeather, updateWeather, precip } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
 import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
@@ -27,7 +27,7 @@ import {
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { giveAlms } from './life.js';
 import { rescueCondemned, updateJustice, canRescue } from './justice.js';
-import { darkness } from './sim.js';
+import { darkness, seasonIndex } from './sim.js';
 import { isoX, isoY } from './iso.js';
 
 const keys = new Set();
@@ -641,10 +641,15 @@ function frameBody(now) {
       drawMap(c, mini.width / 2, mini.height / 2);
       miniT = 0.25;
     }
-    setMood(inCombat() ? 'kampf' : darkness() > 0.35 ? 'nacht' : 'welt');
+    // Musik und Hintergrund nach Lage: Aufnahmen, wo es welche gibt, sonst die erzeugte Musik
+    const fight = inCombat(), night = darkness() > 0.35;
+    setMood(fight ? 'kampf' : night ? 'nacht' : 'welt');
+    const season = seasonIndex();
+    setScene(!fight && !night && season <= 1 ? 'welt_sommer' : null, !night && season <= 2 && precip() < 0.35 ? 'wiese_tag' : null);
   }
   if (!byId('title').hidden) {
     setMood('titel');
+    setScene(null, null);
     drawTitleScreen();
     return;
   }
@@ -714,4 +719,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, dailyCastle, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };

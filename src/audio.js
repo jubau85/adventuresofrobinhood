@@ -1,5 +1,7 @@
 // Musik, live im Browser erzeugt (Web Audio): gezupfte Laute, Flöte, Hörner, Bordun und Trommel.
 // Stimmungen: Titel (episch), Welt (Estampie im Dreiertakt), Nacht (ruhig), Kampf (Trommeln).
+// Dazu fertige Aufnahmen aus assets/musik und assets/sound (Sound-Brief): Wo es eine passende gibt,
+// spielt sie statt der erzeugten Musik. Hintergrundgeräusche laufen darunter in einer Schleife.
 // Startet erst nach einer Eingabe des Spielers, so wie Browser es verlangen.
 
 let ac = null, master = null, dry = null, wet = null;
@@ -57,6 +59,8 @@ export function startAudio() {
   const conv = ac.createConvolver(); conv.buffer = makeImpulse(3.2, 2.6);
   wet = ac.createGain(); wet.gain.value = 0.35; wet.connect(conv); conv.connect(master);
   master.gain.setTargetAtTime(0.55, ac.currentTime, 1.2);
+  fileBus = ac.createGain(); fileBus.gain.value = 1; fileBus.connect(master);
+  loadFiles();
   nextTime = ac.currentTime + 0.3;
   timer = setInterval(tick, 150);
   document.addEventListener('visibilitychange', () => {
@@ -228,8 +232,78 @@ function schedWorld(t0, kind) {
   return t;
 }
 
+// ---------------------------------------------------------------- Aufnahmen
+// Fehlt eine Datei oder lädt sie nicht, bleibt es bei der erzeugten Musik und Stille.
+const FILES = {
+  welt_sommer: 'assets/musik/welt_sommer.mp3',
+  wiese_tag: 'assets/sound/ambiente/wiese_tag.mp3',
+};
+const buffers = {};
+let fileBus = null, want = { music: null, amb: null }, track = null, ambTrack = null, restUntil = 0;
+
+// Was gerade laufen soll: ein Musikstück und ein Hintergrund (Namen aus FILES oder null)
+export function setScene(music, amb) { want = { music: music || null, amb: amb || null }; }
+
+function loadFiles() {
+  for (const [id, url] of Object.entries(FILES)) {
+    fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
+      .then((buf) => { buffers[id] = buf; })
+      .catch(() => { /* ohne Datei geht es weiter wie bisher */ });
+  }
+}
+
+function fadeTo(g, to, tc) {
+  const now = ac.currentTime;
+  g.gain.cancelScheduledValues(now);
+  g.gain.setValueAtTime(g.gain.value, now);
+  g.gain.setTargetAtTime(to, now, tc);
+}
+
+function startTrack(id, loop, level) {
+  const src = ac.createBufferSource();
+  src.buffer = buffers[id]; src.loop = loop;
+  const g = ac.createGain(); g.gain.value = 0;
+  src.connect(g); g.connect(fileBus);
+  src.start();
+  fadeTo(g, level, 1.2);
+  return { id, src, g, endsAt: loop ? Infinity : ac.currentTime + buffers[id].duration };
+}
+
+function stopTrack(t, tc = 1.2) {
+  fadeTo(t.g, 0, tc);
+  setTimeout(() => { try { t.src.stop(); } catch (e) { /* schon aus */ } t.g.disconnect(); }, tc * 6000);
+}
+
+// Musikstück einmal ganz, dann eine Pause nur mit Hintergrund, dann wieder von vorn
+function updateFiles() {
+  const m = want.music && buffers[want.music] ? want.music : null;
+  if (track && track.id !== m) { stopTrack(track); track = null; restUntil = 0; }
+  if (track && ac.currentTime >= track.endsAt - 0.05) { track = null; restUntil = ac.currentTime + 18 + Math.random() * 22; }
+  if (!track && m && ac.currentTime >= restUntil) track = startTrack(m, false, 0.9);
+  const a = want.amb && buffers[want.amb] ? want.amb : null;
+  if (ambTrack && ambTrack.id !== a) { stopTrack(ambTrack, 1.5); ambTrack = null; }
+  if (!ambTrack && a) ambTrack = startTrack(a, true, 0.7);
+}
+
+// Für Tests: was geladen ist und was gerade läuft
+export function audioDebug() {
+  return { started, state: ac && ac.state, loaded: Object.keys(buffers), music: track && track.id, amb: ambTrack && ambTrack.id, resting: !!ac && !track && ac.currentTime < restUntil, want };
+}
+
+function fileMusicActive() { return !!(want.music && buffers[want.music]) && (!!track || ac.currentTime < restUntil); }
+
 function tick() {
   if (!ac || !enabled) return;
+  updateFiles();
+  // Läuft eine Aufnahme (oder die Pause danach), schweigt die erzeugte Musik
+  if (fileMusicActive()) {
+    if (droneNodes) setDrone(false);
+    playingMood = null;
+    nextTime = ac.currentTime + 0.3;
+    return;
+  }
   if (ac.currentTime < nextTime - 0.8) return;
   const t0 = Math.max(nextTime, ac.currentTime + 0.1);
   if (mood !== playingMood) {

@@ -129,8 +129,11 @@ node tools/build.mjs
 | `src/main.js` | Start, Hauptschleife, Eingabe |
 | `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
 | `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |
+| `tools/ton.py` | Macht aus gelieferten Tönen spielfertige MP3s: nahtlose Schleifen für Hintergründe, Stille weg bei Musikstücken (`python3 tools/ton.py schleife|stueck <quelle> <ziel.mp3>`) |
+| `tools/sprites.py` | Rendert eine animierte 3D-Figur (GLB) mit Blender in Sprite-Bögen: 2:1-Schrägansicht, 8 Richtungen, Umrisse, Fußpunkt (`/opt/blender-venv/bin/python tools/sprites.py <figur.glb> <ordner>`) |
+| `tools/waffen.py` | Baut einfache Waffen als 3D-Modelle für die Sprite-Strecke |
 | `tools/figur.py` | Stellt eine KI-Figur auf grünem Hintergrund frei, entfernt grüne Säume und verkleinert sie auf Spielgröße (`python3 tools/figur.py assets/roh/figuren/ritter_gemini.webp assets/figuren/ritter.png`). Magenta färbt das Spiel zur Wappenfarbe um. |
 
-Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet. Nach und nach kommen handgemalte Bilder dazu (Titelbild, Wiese, Eiche), der Plan dafür steht in [assets/GRAFIK-BRIEF.md](assets/GRAFIK-BRIEF.md). Der Build bettet sie in die Einzeldatei ein. Musik und Geräusche sind in [assets/SOUND-BRIEF.md](assets/SOUND-BRIEF.md) beschrieben.
+Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet. Nach und nach kommen handgemalte Bilder dazu (Titelbild, Wiese, Eiche), der Plan dafür steht in [assets/GRAFIK-BRIEF.md](assets/GRAFIK-BRIEF.md). Der Build bettet sie in die Einzeldatei ein. Musik und Geräusche sind in [assets/SOUND-BRIEF.md](assets/SOUND-BRIEF.md) beschrieben. Wo eine Aufnahme da ist (bisher Sommermusik und Wiese), spielt das Spiel sie, sonst erzeugt es die Musik selbst.
 
 Wie es weitergehen kann, steht in [DESIGN.md](DESIGN.md).

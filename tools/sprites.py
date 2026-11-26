@@ -1,0 +1,179 @@
+# Rendert eine animierte 3D-Figur (GLB mit Skelett und Bewegungen) zu Sprite-Bögen für die Schrägansicht.
+#
+# Aufruf (Blender als Python-Modul, siehe README):
+#   /opt/blender-venv/bin/python tools/sprites.py <figur.glb> <ausgabe-ordner> [optionen]
+# Optionen:
+#   --waffe <glb>        Waffe in die rechte Hand setzen
+#   --zelle <px>         Größe einer Zelle (Standard 224)
+#   --figur <px>         Höhe der Figur in Pixeln (Standard 120, also 8× die 15 px im Spiel)
+#   --richtungen <n>     Blickrichtungen (Standard 8)
+#   --bilder name=n,...  Bilder je Bewegung, z. B. Idle=4,Casual_Walk=8 (Standard 6, Gehen 8)
+#   --nur <name,...>     nur diese Bewegungen
+#   --probe              nur ein Bild je Bewegung und Richtung 0, zum schnellen Prüfen
+#
+# Ausgabe je Bewegung: <name>.png (Zeilen = Richtungen, Spalten = Bilder) und sprites.json mit Zellgröße,
+# Fußpunkt, Bildzahl und Richtungen. Richtung 0 schaut nach links unten (zum Betrachter), jede weitere
+# dreht sich um 45° gegen den Uhrzeigersinn, von oben gesehen.
+
+import bpy, sys, json, math, os
+from mathutils import Vector
+from bpy_extras.object_utils import world_to_camera_view
+
+argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
+src, out = argv[0], argv[1]
+opt = {}
+k = 2
+while k < len(argv):
+    a = argv[k]
+    if a == '--probe': opt['probe'] = True; k += 1; continue
+    opt[a.lstrip('-')] = argv[k + 1]; k += 2
+CELL = int(opt.get('zelle', 224))
+FIG_PX = float(opt.get('figur', 120))
+DIRS = int(opt.get('richtungen', 8))
+FRAMES = {}
+for part in (opt.get('bilder') or '').split(','):
+    if '=' in part: n, v = part.split('='); FRAMES[n.strip()] = int(v)
+ONLY = set(x.strip() for x in opt['nur'].split(',')) if opt.get('nur') else None
+os.makedirs(out, exist_ok=True)
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+sc = bpy.context.scene
+bpy.ops.import_scene.gltf(filepath=src)
+arm = next((o for o in sc.objects if o.type == 'ARMATURE'), None)
+meshes = [o for o in sc.objects if o.type == 'MESH']
+if not arm: sys.exit('Keine Figur mit Skelett in ' + src)
+
+# Wurzel: alles unter ein Leerobjekt hängen, das wir drehen und verschieben
+root = bpy.data.objects.new('wurzel', None); sc.collection.objects.link(root)
+for o in sc.objects:
+    if o is not root and o.parent is None: o.parent = root
+
+# Größe aus der Ruhehaltung: Füße auf 0, Höhe messen
+def bounds(objs):
+    bpy.context.view_layer.update()
+    lo, hi = Vector((1e9,) * 3), Vector((-1e9,) * 3)
+    dg = bpy.context.evaluated_depsgraph_get()
+    for o in objs:
+        ev = o.evaluated_get(dg)
+        me = ev.to_mesh()
+        for v in me.vertices:
+            w = ev.matrix_world @ v.co
+            lo = Vector(map(min, lo, w)); hi = Vector(map(max, hi, w))
+        ev.to_mesh_clear()
+    return lo, hi
+lo, hi = bounds(meshes)
+HEIGHT = hi.z - lo.z
+root.location.z -= lo.z
+
+# Waffe in die rechte Hand
+hand = None
+for b in arm.data.bones:
+    n = b.name.lower().replace('_', '').replace(':', '')
+    if ('righthand' in n or 'handr' in n or n.endswith('rhand')) and 'thumb' not in n and 'index' not in n:
+        hand = b.name; break
+if opt.get('waffe'):
+    before = set(sc.objects)
+    bpy.ops.import_scene.gltf(filepath=opt['waffe'])
+    wobjs = [o for o in sc.objects if o not in before]
+    wm = [o for o in wobjs if o.type == 'MESH']
+    wroot = bpy.data.objects.new('waffe', None); sc.collection.objects.link(wroot)
+    for o in wobjs:
+        if o.parent is None: o.parent = wroot
+    wlo, whi = bounds(wm)
+    size = whi - wlo
+    axis = max(range(3), key=lambda i: size[i])
+    # Klinge entlang der Längsachse, auf etwa 0,55 × Körpergröße bringen, Griff am Ursprung
+    s = HEIGHT * float(opt.get('waffenlaenge', 0.55)) / size[axis]
+    wroot.scale = (s, s, s)
+    grip = (wlo + whi) / 2; grip[axis] = wlo[axis] + size[axis] * float(opt.get('griff', 0.12))
+    for o in wobjs:
+        if o.parent is wroot: o.location -= grip
+    if hand:
+        wroot.parent = arm; wroot.parent_type = 'BONE'; wroot.parent_bone = hand
+        rot = [float(x) for x in opt.get('waffendreh', '0,0,0').split(',')]
+        wroot.rotation_euler = [math.radians(r) for r in rot]
+        wroot.location = (0, 0, 0)
+    meshes += wm
+
+# Kamera: orthografisch, 30° von oben, um 45° gedreht – genau die 2:1-Schrägansicht des Spiels
+cam = bpy.data.objects.new('kamera', bpy.data.cameras.new('kamera')); sc.collection.objects.link(cam); sc.camera = cam
+cam.data.type = 'ORTHO'
+el, az = math.radians(30), math.radians(45)
+target = Vector((0, 0, HEIGHT * 0.45))
+dist = 20
+cam.location = target + Vector((math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el))) * dist
+cam.rotation_euler = (math.radians(90) - el, 0, az)
+# Bildhöhe der Figur: HEIGHT * cos(30°) Meter sollen FIG_PX Pixel sein
+cam.data.ortho_scale = HEIGHT * math.cos(el) * CELL / FIG_PX
+cam.data.clip_start, cam.data.clip_end = 0.1, 100
+
+# Licht von links oben, dazu weiches Umgebungslicht, damit die gemalten Farben stehen bleiben
+sun = bpy.data.objects.new('sonne', bpy.data.lights.new('sonne', 'SUN')); sc.collection.objects.link(sun)
+sun.data.energy = 3.2; sun.data.angle = math.radians(8)
+sun.rotation_euler = (math.radians(50), 0, math.radians(-60))
+world = bpy.data.worlds.new('welt'); sc.world = world
+world.use_nodes = True
+world.node_tree.nodes['Background'].inputs[0].default_value = (0.62, 0.60, 0.56, 1)
+world.node_tree.nodes['Background'].inputs[1].default_value = 0.9
+
+r = sc.render
+r.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = 24; sc.cycles.use_denoising = True
+r.resolution_x = r.resolution_y = CELL; r.film_transparent = True
+r.image_settings.file_format = 'PNG'; r.image_settings.color_mode = 'RGBA'
+sc.view_settings.view_transform = 'Standard'
+# Umrisse wie bei den gezeichneten Figuren
+r.use_freestyle = True; r.line_thickness_mode = 'ABSOLUTE'; r.line_thickness = float(opt.get('linie', 1.1))
+ls = sc.view_layers[0].freestyle_settings.linesets.new('umriss')
+ls.select_by_visibility = True; ls.select_silhouette = True; ls.select_border = True; ls.select_crease = False
+ls.linestyle.color = (0.16, 0.11, 0.08); ls.linestyle.alpha = 0.9
+
+# Fußpunkt im Bild
+bpy.context.view_layer.update()
+fx, fy, _ = world_to_camera_view(sc, cam, Vector((0, 0, 0)))
+ANCHOR = (round(fx * CELL, 1), round((1 - fy) * CELL, 1))
+
+# Bewegungen
+acts = [a for a in bpy.data.actions if a.users or True]
+hips = next((b.name for b in arm.pose.bones if 'hip' in b.name.lower() or 'pelvis' in b.name.lower()), None)
+meta = {'zelle': CELL, 'fusspunkt': ANCHOR, 'figur_px': FIG_PX, 'richtungen': DIRS, 'hand': hand, 'bewegungen': {}}
+tmp = os.path.join(out, '_tmp.png')
+for act in acts:
+    name = act.name.split('|')[-1]
+    if ONLY and name not in ONLY and act.name not in ONLY: continue
+    arm.animation_data_create(); arm.animation_data.action = act
+    if hasattr(arm.animation_data, 'action_slot') and act.slots: arm.animation_data.action_slot = act.slots[0]
+    f0, f1 = act.frame_range
+    walk = 'walk' in name.lower() or 'run' in name.lower()
+    n = 1 if opt.get('probe') else FRAMES.get(name, 8 if walk else 6)
+    frames = [f0 + (f1 - f0) * i / (n if walk else max(1, n - 1)) for i in range(n)]
+    dirs = [0] if opt.get('probe') else list(range(DIRS))
+    sheet = bpy.data.images.new(f'bogen_{name}', CELL * n, CELL * len(dirs), alpha=True)
+    px = [0.0] * (CELL * n * CELL * len(dirs) * 4)
+    for di, d in enumerate(dirs):
+        root.rotation_euler = (0, 0, math.radians(45 * d))
+        for fi, f in enumerate(frames):
+            sc.frame_set(int(f), subframe=f - int(f))
+            # Gehen auf der Stelle: Hüfte waagerecht auf den Ursprung zurückziehen
+            root.location.x = root.location.y = 0
+            if walk and hips:
+                bpy.context.view_layer.update()
+                hw = arm.matrix_world @ arm.pose.bones[hips].head
+                root.location.x -= hw.x; root.location.y -= hw.y
+            r.filepath = tmp
+            bpy.ops.render.render(write_still=True)
+            im = bpy.data.images.load(tmp, check_existing=False)
+            src_px = list(im.pixels)
+            bpy.data.images.remove(im)
+            # Zelle in den Bogen kopieren (Blender-Bilder beginnen unten links)
+            rows = len(dirs)
+            for y in range(CELL):
+                sy = y * CELL * 4
+                dy = ((rows - 1 - di) * CELL + y) * CELL * n * 4 + fi * CELL * 4
+                px[dy:dy + CELL * 4] = src_px[sy:sy + CELL * 4]
+    sheet.pixels[:] = px
+    sheet.filepath_raw = os.path.join(out, f'{name}.png'); sheet.file_format = 'PNG'; sheet.save()
+    meta['bewegungen'][name] = {'bilder': n, 'schleife': walk or 'idle' in name.lower(), 'dauer': round((f1 - f0) / sc.render.fps, 3)}
+    print('fertig', name, n, 'Bilder,', len(dirs), 'Richtungen', flush=True)
+if os.path.exists(tmp): os.remove(tmp)
+json.dump(meta, open(os.path.join(out, 'sprites.json'), 'w'), indent=1, ensure_ascii=False)
+print('Fußpunkt', ANCHOR, 'Hand', hand, 'Höhe', round(HEIGHT, 2))

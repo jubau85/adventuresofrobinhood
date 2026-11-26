@@ -826,7 +826,7 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
-        <dt>L</dt><dd>Musik an und aus</dd>
+        <dt>L</dt><dd>Musik und Geräusche an und aus</dd>
         <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
         <dt>F9</dt><dd>Testmodus mit Cheats</dd>
