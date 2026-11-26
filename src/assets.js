@@ -6,6 +6,7 @@ const ART_FILES = {
   titel_hoch: 'assets/titel/titel_hoch.jpg',
   wiese_sommer: 'assets/boden/wiese_sommer.jpg',
   laub_1_sommer: 'assets/natur/laub_1_sommer.png',
+  fig_ritter: 'assets/figuren/ritter.png',
 };
 
 export const ART = {};

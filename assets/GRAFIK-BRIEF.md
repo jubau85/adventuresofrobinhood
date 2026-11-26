@@ -155,10 +155,18 @@ Ist das Haus gelungen, bitte im selben Gespräch gleich die Varianten aus Punkt 
 | `boden/wiese_sommer.png` | Passt, ist eingebaut. Die übrigen Bodentexturen bitte im selben Maßstab: Grashalme so groß wie hier. |
 | `natur/laub_1_sommer.png` | Passt, ist eingebaut. Weitere Bäume bitte genauso freigestellt, Stammfuß unten in der Mitte. |
 | `haus/stroh_1.png` | Schön gemalt, aber zu sehr Aufbauspiel und zu „aufgesetzt“. Bitte nach den Regeln in Paket 4 neu erzeugen, mit dem neuen Maßstab (Tür knapp eine Menschenhöhe). |
+| `figuren/ritter.png` (Gemini) | Passt und ist eingebaut: freigestellt mit `tools/figur.py`, Magenta wird zur Wappenfarbe, Größe stimmt zu den Häusern. Rüstung, Nasalhelm und Drachenschild passen zu 1194. Zwei Wünsche für die nächsten Bilder: etwas weniger feines Kettengeflecht und kräftigere Umrisse, denn ganz klein wird das Geflecht zu grauem Rauschen. Und das Magenta ruhig etwas reiner (näher an `#FF00FF`), Schmutzflecken auf dem Wappenrock lieber weglassen, sie färben sich nicht mit um. |
 
 **Als Nächstes empfehle ich diese Reihenfolge:**
-1. `haus/stroh_1.png` neu, dann der Rest von Paket 4. Häuser bestimmen das Bild jedes Ortes.
-2. Paket 7, Figuren im neuen Maßstab, zuerst `figuren/ritter.png` als Probestück.
+1. Die übrigen Posen des Ritters im selben Gespräch mit Gemini, damit Gesicht, Farben und Ausrüstung gleich bleiben. Jeweils Format 1:1, grüner Hintergrund wie beim ersten Bild:
+   - `figuren/ritter_gehen1.png`: „Same character, same angle, same colours and equipment, now walking: left leg forward, right leg back.“
+   - `figuren/ritter_gehen2.png`: „… walking: right leg forward, left leg back.“
+   - `figuren/ritter_schlag.png`: „… striking forward with the sword, sword arm extended, shield held in front.“
+   - `figuren/ritter_hinten.png`: „… seen from behind, walking away from the viewer towards the upper right.“
+   - `figuren/ritter_liegend.png`: „… lying on the ground on his back, defeated, sword beside him.“
+   - Danach `figuren/ritterin.png` und `figuren/ritter_beritten.png` (Paket 7).
+   Bis die Posen da sind, wippt und neigt sich der Ritter beim Gehen und kippt beim Schlag nach vorn.
+2. `haus/stroh_1.png` neu, dann der Rest von Paket 4. Häuser bestimmen das Bild jedes Ortes.
 3. Paket 3, Bäume mit den neuen kahlen Wintervarianten.
 4. Paket 2, Bodentexturen.
 5. Danach nach Lust und Laune: Wahrzeichen (Paket 11), mystische Orte und Gruben (12), Turnier (13).

@@ -2919,6 +2919,25 @@ function drawFigure(c, u, x, y) {
   }
   const sc = u.small ? 0.8 : 1.14;
   c.scale((u.facing || 1) * sc, sc);
+  // Handgemalte Figur, wo es eine gibt (bisher dein Ritter zu Fuß), sonst gezeichnet
+  const spr = !m && u.kind === 'player' && !u.female ? figSprite('fig_ritter', playerColor()) : null;
+  const yb = spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m);
+  if (u.flash > 0) {
+    c.globalAlpha = Math.min(1, u.flash * 5);
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.ellipse(0, yb - 13, 6, 10, 0, 0, Math.PI * 2); c.fill();
+    c.globalAlpha = 1;
+  }
+  c.restore();
+  if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999) && u.kind !== 'peasant') {
+    const w = 18, top = y + (m ? -44 : -32) * FIG;
+    c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
+    c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
+    c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
+  }
+}
+
+function drawFigureBody(c, u, L, m) {
   let by = 0;
   const low = u.kind === 'peasant' && (u.act === 'jaeten' || u.act === 'sitzen' || u.act === 'sammeln' || u.act === 'pirschen' || u.act === 'betteln');
   if (m) { drawHorse(c, HORSES[u.eq.pferd] || '#7a5232', u.anim, u.moving, u.eq.pferd === 'schlachtross' ? L : null); by = -12; }
@@ -2970,19 +2989,74 @@ function drawFigure(c, u, x, y) {
     if (u.female) c.fillRect(-3.4, yb - 19.5, 1.6, 5);
   }
   if (u.kind === 'peasant') drawVillagerGear(c, u, yb);
-  if (u.flash > 0) {
-    c.globalAlpha = Math.min(1, u.flash * 5);
-    c.fillStyle = '#ffffff';
-    c.beginPath(); c.ellipse(0, yb - 13, 6, 10, 0, 0, Math.PI * 2); c.fill();
-    c.globalAlpha = 1;
+  return yb;
+}
+
+// ---------------------------------------------------------------- Handgemalte Figuren (assets/figuren)
+// Magenta im Bild wird zur Wappenfarbe, Schatten und Lichter bleiben erhalten. Für kleine Zoomstufen
+// gibt es vorab verkleinerte Stufen, damit die Figur beim Herauszoomen nicht flimmert.
+const SPRITE_INFO = { fig_ritter: { ax: 85, ay: 182, top: 4 } };
+const spriteCache = new Map();
+function spriteRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function figSprite(id, color) {
+  const im = ART[id];
+  if (!im) return null;
+  const key = `${id}|${color}`;
+  let s = spriteCache.get(key);
+  if (s) return s;
+  const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
+  g.drawImage(im, 0, 0);
+  try {
+    const d = g.getImageData(0, 0, cv.width, cv.height), a = d.data;
+    const [tr, tg, tb] = spriteRgb(color);
+    for (let i = 0; i < a.length; i += 4) {
+      if (a[i + 3] < 8) continue;
+      const r = a[i], gg = a[i + 1], b = a[i + 2];
+      const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      if (mx < 45 || mx - mn < 45 || mx === gg) continue;
+      const hue = mx === r ? (60 * ((gg - b) / (mx - mn)) + 360) % 360 : 60 * ((r - gg) / (mx - mn)) + 240;
+      if (hue < 285 || hue > 350) continue;
+      const f = Math.min(1.35, mx / 255 / 0.72);
+      a[i] = Math.min(255, tr * f); a[i + 1] = Math.min(255, tg * f); a[i + 2] = Math.min(255, tb * f);
+    }
+    g.putImageData(d, 0, 0);
+  } catch (e) { /* ohne Pixelzugriff bleibt Magenta stehen */ }
+  const mips = [cv];
+  let prev = cv;
+  while (prev.width > 24) {
+    const n = makeCanvas(Math.ceil(prev.width / 2), Math.ceil(prev.height / 2)), ng = n.getContext('2d');
+    ng.imageSmoothingQuality = 'high';
+    ng.drawImage(prev, 0, 0, n.width, n.height);
+    mips.push(n);
+    prev = n;
   }
+  s = { mips, w: im.width, h: im.height, info: SPRITE_INFO[id] };
+  spriteCache.set(key, s);
+  return s;
+}
+
+// Bisher eine Pose: Beim Gehen wippt und neigt sich die Figur, beim Schlag kippt sie nach vorn.
+// Das Bild schaut nach links unten, im Spiel schaut die Figur bei facing = 1 nach rechts.
+function drawSpriteFigure(c, u, spr) {
+  const A = spr.info;
+  const k = 23.5 / (A.ay - A.top);
+  const ph = (u.anim || 0) * 7;
+  const bob = u.moving ? Math.abs(Math.sin(ph)) * 1.3 : 0;
+  const tilt = u.moving ? Math.sin(ph) * 0.06 : 0;
+  const hit = u.swing > 0 ? Math.sin(Math.min(1, (0.3 - u.swing) / 0.3) * Math.PI) * 0.22 : 0;
+  c.save();
+  c.translate(0, -bob);
+  c.rotate(tilt + hit);
+  c.scale(-k, k);
+  // Passende Verkleinerungsstufe für die aktuelle Bildschirmgröße
+  const t = c.getTransform(), px = Math.hypot(t.a, t.b);
+  let lv = 0;
+  while (lv < spr.mips.length - 1 && px * (1 << (lv + 1)) <= 1.05) lv++;
+  const mip = spr.mips[lv], q = 1 << lv;
+  c.imageSmoothingEnabled = true;
+  c.drawImage(mip, -A.ax, -A.ay, mip.width * q, mip.height * q);
   c.restore();
-  if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999) && u.kind !== 'peasant') {
-    const w = 18, top = y + (m ? -44 : -32) * FIG;
-    c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
-    c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
-    c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
-  }
+  return -bob;
 }
 
 // Kleidung, Werkzeug und Last der Bewohner, dazu die Arbeitsbewegung
