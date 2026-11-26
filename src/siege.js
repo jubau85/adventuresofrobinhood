@@ -352,7 +352,7 @@ export function posternNear() {
   const p = G.s.player, s = sg.site;
   if (s.type !== 'spieler' && (sg.side === 'att' || isHostileFaction(s.faction))) return null;
   for (const [x, y] of sg.walls.gates) {
-    if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 1.9) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y) };
+    if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y) };
   }
   return null;
 }
