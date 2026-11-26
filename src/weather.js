@@ -15,7 +15,8 @@ const dayInSeason = () => (G.s.day - 1) % DAYS_PER_SEASON;
 function chooseWeather() {
   const se = seasonIndex(), d = dayInSeason(), h = hourOf();
   let table;
-  if (se === 0) table = { klar: 4, wolken: 3, regen: d < 2 ? 4 : 2.5, nebel: h < 10 ? 1.4 : 0, schnee: d === 0 ? 0.7 : 0 };
+  // Im Frühling schneit es nicht mehr (das Spiel beginnt am ersten Frühlingstag); Schnee vom Winter taut nur noch weg
+  if (se === 0) table = { klar: 4, wolken: 3, regen: d < 2 ? 4 : 2.5, nebel: h < 10 ? 1.4 : 0 };
   else if (se === 1) table = { klar: 7, wolken: 2, regen: 1.5, nebel: 0 };
   else if (se === 2) table = { klar: 3, wolken: 3, regen: 3.4, nebel: h < 11 ? 2 : 0.4, schnee: d >= 4 ? 1.2 : 0 };
   else table = { klar: 3, wolken: 2.5, schnee: d === 0 ? 1.4 : 4, regen: d === DAYS_PER_SEASON - 1 ? 1.2 : 0.3, nebel: 0.6 };
