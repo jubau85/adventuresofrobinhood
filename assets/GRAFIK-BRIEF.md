@@ -6,7 +6,12 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
 
 **Eigener Stil:** Das Spiel hat seinen eigenen Look. In den Prompts bitte keine Namen bestehender Spiele, Filme oder Künstler verwenden.
 
-**Stand dieses Briefs:** Spielversion 18. Seit der letzten Fassung sind dazugekommen:
+**Stand dieses Briefs:** Spielversion 22. Neu in dieser Fassung:
+- **Figuren als Baukasten** (Paket 7, ganz neu gefasst): wenige Körper, Waffen und Schilde, die das Spiel zusammensetzt und einfärbt, am besten über 3D-Modelle
+- ein Abschnitt **„Werkzeuge: was wofür“**: welches Programm sich für welches Paket eignet
+- Belagerungsteile in Paket 5: geschlossene Tore, beschädigte Mauern, Bresche
+
+Aus Spielversion 18 stammen:
 - der neue Maßstab: Figuren sind deutlich kleiner im Verhältnis zu den Häusern (siehe „Maßstab“ unten)
 - Baustellen, Brandruinen und Bauplätze, weil die Welt ständig baut und verfällt
 - neue Bewohner: Jäger, Fischer, Bettler, Bergleute, Einsiedler, Pilger, Reisende, Henker
@@ -16,7 +21,7 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
 - der kahle Winter vor dem ersten Schnee und das schrittweise Tauwetter
 - drei neue Burggebäude (Hospiz, Schafzucht, Felder) und neue Waren (Blei, Zinn, Silber)
 
-Die neuen Pakete 11 bis 13 und die Ergänzungen in den alten Paketen sind mit **neu** markiert. Wer mit **Gemini** arbeitet, liest zuerst den Abschnitt „Mit Gemini erzeugen“.
+Die neuen Pakete 11 bis 13 und die Ergänzungen in den alten Paketen sind mit **neu** markiert. Zuerst bitte den Abschnitt „Werkzeuge: was wofür“ lesen, wer mit **Gemini** arbeitet, danach „Mit Gemini erzeugen“.
 
 ---
 
@@ -95,6 +100,21 @@ Was noch fehlt, zeichnet das Spiel weiter selbst. Du kannst also stückweise lie
 
 ---
 
+## Werkzeuge: was wofür (neu)
+
+Gemini und Oakgen machen gute **Einzelbilder**. Für ganze Pakete, die genau zusammenpassen müssen (eine Figur in vielen Posen und Richtungen, eine Häuserserie im selben Stil), gibt es bessere Wege. Die Angaben zu den Diensten stammen von ihren eigenen Seiten, ich habe sie nicht selbst geprüft. Vor dem Bezahlen bitte jeweils ein Probestück machen und die Nutzungsrechte für ein verkauftes Spiel lesen.
+
+| Was | Werkzeug | Warum |
+| --- | --- | --- |
+| Figuren, Pferde, Tiere (Pakete 7 und 8) | **3D-Weg:** jede Figur einmal als 3D-Modell, zum Beispiel mit [Meshy](https://www.meshy.ai/) (Bild zu 3D, Skelett automatisch). Daraus rendere ich mit Blender alle Posen, Richtungen und Ausrüstungen. | Jede Pose und jede Blickrichtung kommt aus demselben Modell, also passt alles genau übereinander. Waffen und Schilde sind eigene kleine Modelle in der Hand, dadurch wird der Baukasten einfach. Acht Blickrichtungen statt zwei. So entstanden auch die Figuren vieler klassischer Schrägansicht-Spiele: in 3D gebaut, als Bilder ausgegeben. |
+| Figuren zum schnellen Ausprobieren | [Ludo.ai](https://ludo.ai/features/directional-sprites) | Macht laut Anbieter aus einer Beschreibung ein Modell mit Skelett und daraus Bewegungsbögen in bis zu acht Richtungen, alles im Browser. Ob Waffen und Schilde als eigene Teile herauskommen, ist nicht beschrieben. Gut für Einzelfiguren, die nicht in den Baukasten passen. |
+| Häuser, Bäume, Boden, Burgen, Wahrzeichen (Pakete 2 bis 6, 11 bis 13) | [Scenario](https://www.scenario.com/features/train-model) mit eigenem Stilmodell | Man trainiert ein Modell auf unsere fertigen Bilder (Titel, Wiese, Baum, Ritter, dann die ersten guten Häuser). Danach entstehen ganze Serien im selben Stil. Laut Anbieter reichen 15 bis 50 Vorlagen. |
+| Vorlagen und Abwandlungen | Gemini | Sehr gut im Abwandeln: „dieselbe Person, jetzt im Kettenhemd“. Damit entstehen die Vorlagen für die 3D-Modelle und die ersten Stilvorlagen. |
+| Musik, Stimmen | [Oakgen](https://oakgen.ai/for/game-developers) oder ähnliche | Oakgen bündelt Bild, Musik, Stimme und Video. Für zusammenpassende Bildserien habe ich dort nichts gefunden, was über Gemini hinausgeht. |
+| Pixelgrafik | PixelLab | Nur falls das Spiel je ganz auf Pixelgrafik umsteigt. Unser Stil ist handgemalt. |
+
+Für Steam gilt bei allen Werkzeugen: KI-erzeugte Inhalte müssen bei der Einreichung angegeben werden.
+
 ## Mit Gemini erzeugen (neu)
 
 Gemini (am besten in Google AI Studio, dort lassen sich Seitenverhältnis und Download in voller Größe einstellen) arbeitet etwas anders als Oakgen. Diese Punkte gehen vor die Regeln oben:
@@ -119,11 +139,7 @@ So passen Jahreszeiten, Baustufen und Ruinen genau zusammen.
 
 **5. Seitenverhältnis wählen statt Pixel.** Gemini erzeugt feste Formate. Bitte das Format nehmen, das der 1×-Größe am nächsten kommt: Häuser und Bäume meist 1:1 oder 3:4, Türme 9:16, Tribüne, Mauern und lange Gebäude 16:9. Auf die genaue Pixelzahl kommt es nicht an, ich skaliere.
 
-**6. Figuren als Einzelbilder statt Bögen.** Ein sauberes Raster mit 8 × 2 Zellen schafft Gemini kaum. Deshalb jede Pose als eigenes Bild, Format 1:1, die Figur groß in der Mitte. Erst die stehende Figur erzeugen, dann im selben Gespräch: „Same character, same angle, now walking with the left leg forward“ und so weiter. Die Bögen setze ich daraus zusammen.
-- Dateinamen: `figuren/<name>_<pose>.png`, Rückansicht mit `_hinten`, zum Beispiel `ritter_gehen1.png`, `ritter_gehen1_hinten.png`.
-- Posen: `stehen`, `gehen1` bis `gehen4`, `ausholen`, `schlag`, `liegend`, bei Alltagsleuten zusätzlich `arbeit1`, `arbeit2`, `sitzen`.
-- Mindestens nötig: `stehen`, `gehen1`, `gehen2`, `schlag`, `liegend`, jeweils von vorn. Den Rest ergänze ich.
-- Die Figuren werden im Spiel sehr klein. Bitte dazuschreiben: „bold simple shapes and clear colour areas, readable when shrunk to a tiny size“.
+**6. Figuren: nur Vorlagen.** Ganze Posenreihen schafft Gemini nicht verlässlich, weil jedes Bild für sich entsteht. Figuren entstehen deshalb nach Paket 7 als Baukasten über 3D-Modelle. Gemini liefert dafür die Vorlagen: eine Figur von vorn, gerade stehend, leere Hände, dann im selben Gespräch abgewandelt („same person, same pose, now wearing …“). Den genauen Ablauf beschreibt Paket 7.
 
 **7. Maßstab in Worten.** Gemini kann keine Pixelmaße einhalten. Bei Gebäuden deshalb das Verhältnis zum Menschen beschreiben, etwa „the door is about as tall as an adult person, the eaves at about 1.5 times a person's height“. Menschen selbst bitte nicht ins Gebäudebild malen.
 
@@ -155,19 +171,12 @@ Ist das Haus gelungen, bitte im selben Gespräch gleich die Varianten aus Punkt 
 | `boden/wiese_sommer.png` | Passt, ist eingebaut. Die übrigen Bodentexturen bitte im selben Maßstab: Grashalme so groß wie hier. |
 | `natur/laub_1_sommer.png` | Passt, ist eingebaut. Weitere Bäume bitte genauso freigestellt, Stammfuß unten in der Mitte. |
 | `haus/stroh_1.png` | Schön gemalt, aber zu sehr Aufbauspiel und zu „aufgesetzt“. Bitte nach den Regeln in Paket 4 neu erzeugen, mit dem neuen Maßstab (Tür knapp eine Menschenhöhe). |
-| `figuren/ritter.png` (Gemini) | Passt und ist eingebaut: freigestellt mit `tools/figur.py`, Magenta wird zur Wappenfarbe, Größe stimmt zu den Häusern. Rüstung, Nasalhelm und Drachenschild passen zu 1194. Zwei Wünsche für die nächsten Bilder: etwas weniger feines Kettengeflecht und kräftigere Umrisse, denn ganz klein wird das Geflecht zu grauem Rauschen. Und das Magenta ruhig etwas reiner (näher an `#FF00FF`), Schmutzflecken auf dem Wappenrock lieber weglassen, sie färben sich nicht mit um. |
+| `figuren/ritter.png` (Gemini) | Bleibt als Übergang, bis der Baukasten aus Paket 7 da ist. Bitte keine weiteren Posen dafür erzeugen, Schwert und Schild sind fest im Bild. Passt und ist eingebaut: freigestellt mit `tools/figur.py`, Magenta wird zur Wappenfarbe, Größe stimmt zu den Häusern. Rüstung, Nasalhelm und Drachenschild passen zu 1194. Zwei Wünsche für die nächsten Bilder: etwas weniger feines Kettengeflecht und kräftigere Umrisse, denn ganz klein wird das Geflecht zu grauem Rauschen. Und das Magenta ruhig etwas reiner (näher an `#FF00FF`), Schmutzflecken auf dem Wappenrock lieber weglassen, sie färben sich nicht mit um. |
 
 **Als Nächstes empfehle ich diese Reihenfolge:**
-1. Die übrigen Posen des Ritters im selben Gespräch mit Gemini, damit Gesicht, Farben und Ausrüstung gleich bleiben. Jeweils Format 1:1, grüner Hintergrund wie beim ersten Bild:
-   - `figuren/ritter_gehen1.png`: „Same character, same angle, same colours and equipment, now walking: left leg forward, right leg back.“
-   - `figuren/ritter_gehen2.png`: „… walking: right leg forward, left leg back.“
-   - `figuren/ritter_schlag.png`: „… striking forward with the sword, sword arm extended, shield held in front.“
-   - `figuren/ritter_hinten.png`: „… seen from behind, walking away from the viewer towards the upper right.“
-   - `figuren/ritter_liegend.png`: „… lying on the ground on his back, defeated, sword beside him.“
-   - Danach `figuren/ritterin.png` und `figuren/ritter_beritten.png` (Paket 7).
-   Bis die Posen da sind, wippt und neigt sich der Ritter beim Gehen und kippt beim Schlag nach vorn.
-2. `haus/stroh_1.png` neu, dann der Rest von Paket 4. Häuser bestimmen das Bild jedes Ortes.
-3. Paket 3, Bäume mit den neuen kahlen Wintervarianten.
+1. **Probestück für den Figuren-Baukasten** (Paket 7): die Vorlage `mann_kleid` mit Gemini, daraus mit Meshy ein 3D-Modell mit Skelett, dazu ein Schwert als 3D-Modell. Daran richte ich die Render-Strecke ein. Erst wenn das im Spiel gut aussieht, kommen die übrigen Teile.
+2. **Probe mit Scenario** für Häuser: ein Stilmodell auf Titelbild, Wiese, Baum und Ritter trainieren, dann `haus/stroh_1.png` nach den Regeln in Paket 4 erzeugen. Gelingt das, folgt der Rest von Paket 4 als Serie.
+3. Paket 3, Bäume mit den kahlen Wintervarianten, ebenfalls mit dem Stilmodell.
 4. Paket 2, Bodentexturen.
 5. Danach nach Lust und Laune: Wahrzeichen (Paket 11), mystische Orte und Gruben (12), Turnier (13).
 
@@ -181,7 +190,7 @@ Ist das Haus gelungen, bitte im selben Gespräch gleich die Varianten aus Punkt 
 | 4 | Häuser, Kirchen, Dorfdinge, Baustellen | 35 | alle Orte |
 | 5 | Burgen-Baukasten, Stadtmauer, Hafen | 25 | Burgen, Städte, Küste |
 | 6 | Eigene Burg im Ausbau | 42 | das Herz des Spiels |
-| 7 | Figuren, Lasten | 42 Bögen, 13 Lasten | alle Menschen |
+| 7 | **neu gefasst:** Figuren als Baukasten, Lasten | 10 Körper, 27 Teile, 3 Pferde, 13 Lasten | alle Menschen |
 | 8 | Tiere | 6 Bögen | Weiden, Wald |
 | 9 | Symbole und Porträts | 66 | Tafeln und Menüs |
 | 10 | Musik (optional) | 7 Stücke | Ton |
@@ -423,6 +432,19 @@ Die Anschlüsse sollen nahtlos aneinanderpassen. Gleich hoch, gleiche Steine, ke
 | `hafen/steg_y.png` | 68 × 40 | same pier, runs from upper right to lower left |
 | `hafen/kran.png` | 60 × 110 | medieval wooden treadwheel harbour crane |
 
+**Neu: Belagerung.** Bei einer Belagerung schließen sich die Tore, und das Trebuchet schlägt eine Bresche in die Mauer. Danach wird sie unter Gerüsten vermauert.
+
+| Datei | 1×-Größe | Motiv |
+| --- | --- | --- |
+| `burg/tor_zu.png` | 84 × 140 | the same town gate tower, arch closed by heavy oak doors with iron bands |
+| `burg/burgtor_zu.png` | 80 × 100 | castle gate between two gate towers, closed oak doors with iron bands |
+| `burg/holztor_zu.png` | 80 × 100 | wooden palisade gate, closed, barred with a beam |
+| `burg/stadtmauer_schaden_1.png` | 68 × 92 | the town wall block with cracks and a few broken merlons |
+| `burg/stadtmauer_schaden_2.png` | 68 × 80 | the same block badly damaged: top broken away in steps, a deep hole, stones at its foot |
+| `burg/bresche.png` | 68 × 40 | a breach in a wall: low stubs of masonry on both sides, a heap of rubble and dressed stones in between, dust |
+| `burg/palisade_bresche.png` | 68 × 40 | broken palisade: snapped and leaning logs, splinters, a gap |
+| `burg/mauer_geruest.png` | 68 × 100 | wall block being repaired, wooden scaffolding, fresh pale stones |
+
 ---
 
 ## Paket 6: Deine eigene Burg im Ausbau
@@ -455,91 +477,85 @@ Für alle Gebäude hier gelten der Haus-Baustein und die englischen Regeln aus P
 
 ---
 
-## Paket 7: Figuren
+## Paket 7: Figuren als Baukasten (neu gefasst)
 
-Alle Menschen kommen als **Bogen** (Sprite-Sheet) mit festem Raster:
-- **8 Spalten**, von links nach rechts:
-  1. Stehen
-  2. bis 5. Gehen (4 Phasen eines Schritts)
-  6. Angriff ausholen
-  7. Angriff (Schlag, Stoß oder Schuss)
-  8. Am Boden liegend (besiegt)
-- **2 Zeilen:**
-  - Zeile 1: Die Figur geht **schräg auf den Betrachter zu, nach links unten**.
-  - Zeile 2: Sie geht **schräg vom Betrachter weg, nach rechts oben** (Rücken zu sehen).
-  - Die übrigen Richtungen erzeugt das Spiel daraus.
-- **Zellgröße (neu, kleinerer Maßstab):**
-  - Zu Fuß 1× 24 × 24, die Figur ist etwa 15 Pixel hoch. Lieferung 8×, also 192 × 192 je Zelle und **1536 × 384** je Bogen. Die Figur füllt etwa zwei Drittel der Zellhöhe.
-  - Beritten 1× 40 × 34, Lieferung 8×, also 320 × 272 je Zelle und **2560 × 544** je Bogen.
-- Die Füße stehen in jeder Zelle auf derselben Höhe, der Fußpunkt liegt mittig im unteren Fünftel.
-- Gleiche Figur, gleiche Farben und gleiche Größe in allen Zellen.
+Alle Menschen im Spiel entstehen aus wenigen Teilen, die das Spiel zusammensetzt und einfärbt. So zeigt jede Figur genau die Rüstung, die Waffe und den Schild, die sie wirklich trägt. Soldaten, Wachen, Bauern und Mönche brauchen keine eigenen Bilder mehr, sie sind dieselben Körper mit anderen Teilen und Farben.
 
-**Stil:** Die Figuren sollen rund und freundlich wirken: etwas größerer Kopf, weiche Formen, gut lesbar auf kleiner Größe. Bitte nicht spitz und nicht kantig.
+### Die Teile
 
-Für die Figuren gilt ein eigener Baustein, **vor das Motiv** gesetzt:
+**1. Körper mit Kleidung oder Rüstung.** Die Rüstung gehört mit in den Körper, weil sie sich um ihn legt. Die Hände sind leer: die rechte greift, am linken Arm sitzt später der Schild.
+
+| Datei | Motiv | im Spiel |
+| --- | --- | --- |
+| `mann_kleid` | man in a simple wool tunic in cyan, brown trousers, leather shoes, belt, bare head with short hair | ohne Rüstung: Bauern, Bürger, Knechte, Wegelagerer |
+| `mann_leicht` | the same man in a quilted gambeson in cyan with a brown leather jerkin over it | Gambeson, Lederwams |
+| `mann_mittel` | the same man in a chainmail hauberk with mail coif, a sleeveless surcoat in magenta, conical helmet with nose guard | Kettenhemd, Schuppenpanzer |
+| `mann_schwer` | the same man in full mail including mail leggings, long surcoat in magenta, flat-topped great helm with eye slits | Kettenrüstung mit Topfhelm |
+| `frau_kleid` | woman in a long wool dress in cyan, apron, plaited hair | Bäuerinnen, Bürgerinnen, Mägde |
+| `frau_leicht`, `frau_mittel`, `frau_schwer` | the same woman as a knight, armour as for the man, long braid | die Ritterin |
+| `kutte` | man in a long hooded robe in cyan with a rope belt, sandals | Mönch, Priester, Einsiedler, Pilger (die Farbe macht den Unterschied) |
+| `kind` | child in a simple tunic in cyan | Kinder |
+
+**2. Kopfbedeckungen** (kleine eigene Teile, sitzen auf dem Kopf von `mann_kleid`, `mann_leicht` und `frau_kleid`): `strohhut`, `kapuze`, `kopftuch`, `filzkappe`, `eisenhut` (steel kettle hat).
+
+**3. Waffen und Werkzeuge** (eigene Teile, das Spiel setzt sie in die Hand):
+- Waffen: `schwert`, `axt`, `kriegshammer`, `knueppel`, `speer`, `bogen`, `armbrust`, `lanze`. Kurz-, Lang- und Ritterschwert sind dasselbe Schwert in drei Größen, Kurz-, Lang- und Eibenbogen ebenso.
+- Werkzeuge: `hacke`, `sichel`, `holzaxt`, `hammer`, `heugabel`, `spitzhacke`, `angel`, `stab`, `eimer`, `korb`, `kreuz`.
+
+**4. Schilde:** `rundschild` (für Holz- und Rundschild), `langschild` (der normannische Langschild), `wappenschild`. Die bemalten Flächen in Magenta.
+
+**5. Pferde:** `klepper`, `zelter`, `schlachtross`. Schabracke und Zaumzeug-Bänder in Magenta. Der Reiter wird aufgesetzt.
+
+### Farben
+- **Magenta `#FF00FF`:** Wappen- oder Fraktionsfarbe (Wappenrock, Schild, Schabracke, Kapuze der Gefolgsleute)
+- **Cyan `#00FFFF`:** die Hauptkleidung. Das Spiel färbt sie je Figur um: beige, grau, grün, braun, rot, schwarz.
+- Alles andere in natürlichen Farben, flach und klar, ohne Schmutzflecken auf den Signalfarben. Sonst keine Pink-, Violett- oder Türkistöne.
+
+### Bewegungen
+Jeder Körper braucht dieselben Bewegungen, das Spiel nimmt sie aus der Bewegungsbibliothek:
+- Kampf: stehen, gehen, schlagen (einhändig), stoßen (Speer), Bogen schießen, Armbrust schießen, getroffen, fallen und liegen
+- Alltag: hacken, mähen, hämmern, Wasser schöpfen, bücken und sammeln, sitzen, knien und beten, betteln, angeln, rufen und winken
+- Beritten: Schritt, Galopp, Lanze einlegen
+
+Alles in **acht Blickrichtungen**.
+
+### Der 3D-Weg, Schritt für Schritt
+1. **Vorlage mit Gemini:** ganze Figur von vorn, gerade stehend, Arme etwas vom Körper weg, leere Hände, einfarbiger Hintergrund. Dann im selben Gespräch abwandeln, damit Gesicht und Körperbau gleich bleiben. Prompt für die erste Vorlage:
 
 ```
-hand-painted isometric character sprite sheet, 8 columns and 2 rows on a strict grid, same character in every cell, row 1 walking diagonally toward the viewer to the lower left, row 2 walking diagonally away to the upper right showing the back, columns: idle, walk 1, walk 2, walk 3, walk 4, attack windup, attack strike, lying defeated on the ground, cute slightly chunky proportions, soft rounded shapes, painterly, thin soft outlines, light from upper left, no cast shadow, no ground, transparent background, medieval 1194
+full body character reference for a 3D model, front view, standing straight, arms held slightly away from the body (A-pose), empty open hands, a medieval English peasant man around 1194, simple wool tunic in flat cyan, brown trousers, leather shoes, leather belt, short brown hair, friendly face, slightly chunky proportions with a slightly larger head, soft rounded shapes, hand-painted look, clear flat colour areas, even soft light, plain light grey background, no shadow, no props
 ```
+   Danach: „same person, same pose, same background, now wearing a quilted gambeson in flat cyan with a brown leather jerkin“ und so weiter für `mann_mittel` und `mann_schwer`.
+2. **In Meshy:** „Image to 3D“ aus der Vorlage, dann das Skelett automatisch setzen lassen (Humanoid). Als **GLB mit Skelett** herunterladen, Bewegungen braucht es nicht, die setze ich in Blender.
+3. **Kopfbedeckungen, Waffen, Werkzeuge, Schilde:** in Meshy mit „Text to 3D“ oder „Image to 3D“, ohne Skelett, als GLB. Beispiel: „a medieval arming sword, straight double-edged blade, simple cross guard, leather grip, round pommel, stylized hand-painted look“.
+4. **Pferde:** „Image to 3D“, Skelett für Vierbeiner.
+5. **Ablage:** `assets/roh/3d/koerper/`, `assets/roh/3d/kopf/`, `assets/roh/3d/waffen/`, `assets/roh/3d/schilde/`, `assets/roh/3d/pferde/`, Dateiname wie in den Listen oben, zum Beispiel `assets/roh/3d/koerper/mann_kleid.glb`. Du kannst sie mir auch einfach hier in den Chat geben.
+6. **Den Rest mache ich:** Ein Blender-Skript stellt die Kamera auf unsere Schrägansicht, setzt die Bewegungen aufs Skelett, hängt Waffe, Schild und Kopfbedeckung an Hand und Kopf, rendert jede Bewegung in acht Richtungen und legt die Haltepunkte fest. Körper und Ausrüstung kommen als getrennte Ebenen heraus, damit das Spiel sie frei kombinieren kann.
 
-Falls Oakgen keine sauberen Bögen schafft, reichen auch Einzelbilder, etwa `ritter_vorn_gehen2.png`. Das Minimum je Figur: Stehen, Gehen in 2 Phasen, Angriff und Liegend, jeweils von vorn. Die Rückansicht ergänze ich dann aus der Vorderansicht.
+**Probestück zuerst:** nur `mann_kleid` als Modell mit Skelett und ein `schwert`. Daran richte ich die Strecke ein. Erst wenn das im Spiel gut aussieht, kommen die übrigen Teile.
 
-**Dein Ritter und dein Gefolge** (Wappenfarbe in Magenta):
+### Wer ist was
+So entstehen die Leute im Land aus den Teilen. Die Liste ist nur zur Orientierung, die Zuordnung mache ich im Spiel.
 
-| Datei | Motiv |
-| --- | --- |
-| `figuren/ritter.png` | knight in chainmail with a magenta surcoat, simple helmet, sword and kite shield with a magenta field |
-| `figuren/ritterin.png` | female knight, same armour, long braid, magenta surcoat, sword and shield |
-| `figuren/ritter_beritten.png` | the same knight riding a brown warhorse with a magenta caparison, lance upright, couched lance in the attack frames |
-| `figuren/ritterin_beritten.png` | the female knight riding a grey warhorse with a magenta caparison |
-| `figuren/knecht.png` | man-at-arms in a padded gambeson with magenta tabard, spear and round shield |
-| `figuren/reisiger.png` | mounted-style soldier on foot, leather jerkin with magenta sash, short sword and round shield |
-| `figuren/schuetze.png` | archer with a short bow, gambeson with magenta hood |
-| `figuren/langbogen.png` | longbowman, tall yew longbow, leather jerkin, magenta hood |
-| `figuren/armbrust.png` | crossbowman, crossbow, padded coat with magenta tabard, steel cap |
-| `figuren/bauernbursche.png` | farm lad with a wooden club, simple tunic with magenta patch |
+| Figur | Körper | Kopf | in der Hand | Farben |
+| --- | --- | --- | --- | --- |
+| dein Ritter, deine Ritterin | je nach Rüstung `mann_…` oder `frau_…` | – | deine Waffe, dein Schild | deine Wappenfarbe |
+| Gefolge | je nach Rüstung | Kapuze oder Eisenhut | seine Waffe | deine Wappenfarbe |
+| normannischer Soldat | `mann_mittel` | – | Speer, Langschild | Rot |
+| Armbrustschütze | `mann_leicht` | Eisenhut | Armbrust | Rot oder Blau |
+| sächsischer Freisasse | `mann_leicht` | Kapuze | Speer, Rundschild | Grün |
+| französischer Sergent | `mann_mittel` | – | Speer, Langschild | Blau |
+| Wegelagerer, Wilddieb | `mann_kleid` | Kapuze | Knüppel oder Bogen | Braun, Grau |
+| Waldleute, Jäger | `mann_leicht` | Kapuze | Bogen | Grün |
+| Söldner | `mann_leicht` | Eisenhut | Axt | Grau |
+| Bauer, Bäuerin | `mann_kleid`, `frau_kleid` | Strohhut, Kopftuch | Hacke, Sichel, Korb | Beige, Braun |
+| Fischer, Bergmann, Hirte | `mann_kleid` | Strohhut, Kapuze | Angel, Spitzhacke, Stab | Braun, Grau |
+| Mönch, Priester, Einsiedler, Pilger | `kutte` | – | Kreuz, Stab | Braun, Schwarz, Grau |
+| Henker | `mann_kleid` | Kapuze | Axt | Schwarz |
+| Händler, Steuereintreiber | `mann_kleid` auf dem Zelter oder Klepper | Filzkappe | – | Blau, Dunkelrot |
 
-**Gegner und Leute im Land:**
-
-| Datei | Motiv |
-| --- | --- |
-| `figuren/wegelagerer.png` | ragged highway robber, brown hood, wooden club |
-| `figuren/wilddieb.png` | poacher, green-brown hood, short bow |
-| `figuren/bandenfuehrer.png` | bandit leader, leather armour, short sword, wooden shield |
-| `figuren/raubritter_beritten.png` | robber knight on a black horse, blackened chainmail, dark surcoat with red trim, long sword |
-| `figuren/soeldner.png` | mercenary with a battle axe, leather armour, scarred |
-| `figuren/soldat.png` | soldier in chainmail, spear, long kite shield, magenta surcoat (the game colours it red for the Normans, blue for the French) |
-| `figuren/armbrust_soldat.png` | soldier with crossbow, gambeson, magenta surcoat |
-| `figuren/chevalier_beritten.png` | french knight on a horse, chainmail, magenta surcoat and caparison, long sword |
-| `figuren/steuereintreiber_beritten.png` | fat tax collector on a horse, rich dark-red robe, money chest on the saddle |
-| `figuren/haendler_beritten.png` | merchant on a horse with saddle bags, blue cloak, fur hat |
-| `figuren/wache.png` | hired caravan guard, gambeson, spear, round shield |
-| `figuren/waldmann.png` | outlaw of the forest in green, longbow, hood |
-| `figuren/bauer.png` | peasant man in a brown tunic, straw hat, carrying a hoe |
-| `figuren/baeuerin.png` | peasant woman, long dress, headscarf, basket |
-| `figuren/moench.png` | monk in a brown habit with a rope belt, hood |
-| `figuren/kind.png` | village child, simple tunic (only idle and walking needed) |
-
-**Neu: weitere Leute im Land.** Für sie gilt ein **Alltags-Bogen** mit 8 Spalten: Stehen, Gehen 1 bis 4, Arbeiten 1 und 2 (die Bewegung ihrer Arbeit), Sitzen. Zwei Zeilen wie oben. Das Werkzeug der Arbeit bitte mitmalen.
-
-| Datei | Motiv |
-| --- | --- |
-| `figuren/jaeger.png` | hunter in green-brown, hood, longbow; work frames: crouching and drawing the bow |
-| `figuren/fischer.png` | fisherman with a wide hat, rod; work frames: casting and waiting |
-| `figuren/bergmann.png` | miner in a dark hooded tunic and leather apron, pickaxe; work frames: swinging the pick |
-| `figuren/bettler.png` | ragged beggar in a patched grey tunic, wooden bowl, some with a crutch; work frames: sitting and holding out the bowl |
-| `figuren/einsiedler.png` | old hermit with a long white beard, brown robe, walking staff; work frames: kneeling in prayer |
-| `figuren/pilger.png` | pilgrim with a wide-brimmed hat, a scallop shell, tall staff and a satchel |
-| `figuren/reisender.png` | traveller in a hooded cloak with a bundle on a stick |
-| `figuren/priester.png` | priest in a black cassock with a wooden cross; work frames: blessing |
-| `figuren/wirt.png` | innkeeper with a white apron and a jug of ale |
-| `figuren/hirte.png` | shepherd with a crook and a straw hat |
-| `figuren/magd.png` | maid with a headscarf and a wooden bucket |
-| `figuren/handwerker.png` | craftsman with a leather apron and a hammer |
-| `figuren/buerger.png`, `figuren/buergerin.png` | townsfolk in coloured wool clothes, plain and tidy |
-| `figuren/haendler.png` | market trader on foot in a coloured tunic and a cap; work frames: calling out and waving |
-| `figuren/henker.png` | executioner in a black hood and dark tunic |
-| `figuren/turnierritter_beritten.png` | tournament knight on a warhorse with a magenta caparison, lance with a magenta pennant; attack frames: lance couched forward |
+### Der 2D-Weg als Notlösung
+Falls der 3D-Weg nicht gefällt: Einzelbilder mit Gemini wie beim Ritter, aber ohne Waffe und Schild, die rechte Hand in Greifhaltung. Je Körper: stehen, gehen 1, gehen 2, schlagen, liegen, jeweils von vorn, Format 1:1, grüner Hintergrund. Die Rückansicht und die übrigen Richtungen fehlen dann, das Spiel spiegelt nur.
 
 **Neu: Lasten zum Auflegen.** Was die Leute tragen, legt das Spiel als kleines Bild auf den Rücken oder in die Hand. Einzelbilder, 1× 16 × 16, Lieferung 8×, Baustein aus Paket 9:
 `last_reisig`, `last_holz`, `last_balken`, `last_sack`, `last_korb`, `last_eimer`, `last_erz`, `last_wild` (deer over the shoulders), `last_hase`, `last_fisch`, `last_heu`, `last_bahre` (stretcher with a shrouded body), `last_kreuz` (processional cross), jeweils als `figuren/<name>.png`.
@@ -548,7 +564,9 @@ Falls Oakgen keine sauberen Bögen schafft, reichen auch Einzelbilder, etwa `rit
 
 ## Paket 8: Tiere
 
-Bögen wie bei den Figuren, aber mit **6 Spalten**:
+**Neu:** Am besten ebenfalls über den 3D-Weg aus Paket 7: jedes Tier als Modell mit Vierbeiner-Skelett in Meshy, als GLB unter `assets/roh/3d/tiere/`. Die Bewegungen und acht Richtungen rendere ich. Falls es doch Bilder werden, gilt das Folgende.
+
+Bögen mit **6 Spalten**:
 1. Stehen
 2. und 3. Gehen
 4. Grasen oder Picken
@@ -762,6 +780,7 @@ Vor einer Stadt oder Burg wird ein Turnierplatz aufgebaut. Die Farben der Ritter
 **Übergabe:**
 - Hier im Chat anhängen oder direkt in den Ordner legen.
 - Gern paketweise, Hauptsache mit den Dateinamen aus diesem Brief.
+- **Neu:** 3D-Modelle als GLB unter `assets/roh/3d/…` (siehe Paket 7). Originale von KI-Bildern gern unter `assets/roh/…` dazulegen, damit ich neu freistellen kann.
 
 **Umfang:** Im Spiel verkleinere und komprimiere ich alles. Die Online-Fassung soll trotzdem schnell laden. Gib mir also lieber zu große als zu kleine Bilder, aber keine über 4096 Pixel.
 
