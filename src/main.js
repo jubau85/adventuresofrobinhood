@@ -537,6 +537,8 @@ function onKey(e) {
   if (panelKeys[k]) { if (k === 'h') togglePanel('help'); else tool(panelKeys[k]); e.preventDefault(); return; }
   if (panelOpen()) return;
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); return; }
+  // Umschalttaste halten: der Held läuft (zu Pferd: Galopp), mit Tasten wie auf einem Weg per Mausklick
+  if (k === 'shift') { keys.add('shift'); return; }
   switch (k) {
     case 'e': interactHere(); break;
     case 'r': toggleRide(); break;
@@ -573,7 +575,9 @@ function readInput() {
 
 function bindInput() {
   window.addEventListener('keydown', onKey);
-  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  window.addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); if (!e.shiftKey) keys.delete('shift'); });
+  // Fenster verliert den Fokus: keine Taste bleibt „hängen“
+  window.addEventListener('blur', () => keys.clear());
   window.addEventListener('blur', () => keys.clear());
   let down = null, lastClick = null;
   viewCanvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
