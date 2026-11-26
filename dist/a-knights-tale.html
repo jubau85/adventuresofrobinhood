@@ -8223,9 +8223,15 @@ const HORSE3D = {
   ross: {'zelle':144,'fusspunkt':[72.0,100.7],'figur_px':60.0,'bewegungen':{'galopp':{'bilder':8,'dauer':0.625},'schritt':{'bilder':8,'dauer':1.0},'stehen':{'bilder':6,'dauer':4.0}},'sattel':{'galopp':[-1.5,-49.5,-2.5,-48.5,-3.0,-48.5,-3.0,-50.0,-3.0,-51.5,-2.0,-52.5,-1.5,-52.5,-1.0,-51.0,0.0,-49.5,0.0,-48.0,0.0,-48.0,0.0,-49.0,0.0,-50.5,0.0,-52.0,0.0,-52.0,0.0,-51.0,1.5,-49.5,2.5,-48.5,3.0,-48.5,3.0,-50.0,3.0,-51.5,2.0,-52.5,1.5,-52.5,1.0,-51.0,2.5,-50.5,3.5,-50.0,4.5,-50.5,4.5,-51.5,4.0,-52.5,3.0,-53.5,2.0,-53.0,1.5,-52.0,1.5,-51.5,2.5,-51.0,3.0,-52.0,3.0,-53.0,3.0,-54.0,2.0,-54.5,1.5,-53.5,1.0,-52.5,0.0,-51.5,0.0,-51.5,0.0,-52.5,0.0,-53.5,0.0,-54.5,0.0,-55.0,0.0,-54.0,0.0,-52.5,-1.5,-51.5,-2.5,-51.0,-3.0,-52.0,-3.0,-53.0,-3.0,-54.0,-2.0,-54.5,-1.5,-53.5,-1.0,-52.5,-2.5,-50.5,-3.5,-50.0,-4.5,-50.5,-4.5,-51.5,-4.0,-52.5,-3.0,-53.5,-2.0,-53.0,-1.5,-52.0],'schritt':[-2.0,-51.0,-2.0,-51.0,-2.0,-50.5,-2.0,-51.0,-2.0,-51.0,-2.5,-51.0,-2.5,-51.0,-2.5,-51.0,0.0,-51.0,0.0,-50.5,0.5,-50.5,0.0,-50.5,0.0,-51.0,0.0,-50.5,-0.5,-50.5,0.0,-50.5,2.0,-51.0,2.5,-51.0,2.5,-51.0,2.5,-51.0,2.0,-51.0,2.0,-51.0,2.0,-50.5,2.0,-51.0,3.0,-52.5,3.0,-52.0,3.0,-52.0,3.0,-52.0,3.0,-52.5,3.0,-52.0,3.0,-52.0,3.0,-52.0,2.0,-53.5,2.0,-53.5,2.0,-53.0,2.0,-53.5,2.0,-53.5,2.5,-53.0,2.5,-53.0,2.5,-53.0,0.0,-54.0,0.0,-53.5,-0.5,-53.5,0.0,-53.5,0.0,-54.0,0.0,-53.5,0.5,-53.5,0.0,-53.5,-2.0,-53.5,-2.5,-53.0,-2.5,-53.0,-2.5,-53.0,-2.0,-53.5,-2.0,-53.5,-2.0,-53.0,-2.0,-53.5,-3.0,-52.5,-3.0,-52.0,-3.0,-52.0,-3.0,-52.0,-3.0,-52.5,-3.0,-52.0,-3.0,-52.0,-3.0,-52.0],'stehen':[-2.0,-51.0,-2.5,-51.0,-2.5,-51.0,-2.5,-51.0,-2.5,-51.0,-2.5,-51.0,0.0,-51.0,0.0,-50.5,-0.5,-50.5,-0.5,-50.5,-0.5,-50.5,0.0,-50.5,2.0,-51.0,2.0,-51.0,2.0,-51.0,2.0,-51.0,2.0,-51.0,2.0,-51.0,3.0,-52.5,3.0,-52.0,3.0,-52.0,3.0,-52.0,3.0,-52.0,3.0,-52.0,2.0,-53.5,2.5,-53.5,2.5,-53.0,2.5,-53.0,2.5,-53.0,2.5,-53.5,0.0,-54.0,0.0,-54.0,0.5,-53.5,0.5,-53.5,0.5,-53.5,0.0,-54.0,-2.0,-53.5,-2.0,-53.5,-2.0,-53.5,-2.0,-53.5,-2.0,-53.5,-2.0,-53.5,-3.0,-52.5,-3.0,-52.5,-3.0,-52.0,-3.0,-52.0,-3.0,-52.0,-3.0,-52.5]}},
 };
 
+// ===== figuren.js =====
+// Held aus Meshy (Edelmann, Bemalungen je Rüstung), gerendert mit tools/sprites.py, gepackt mit tools/sprite_pack.py.
+// Wird beim Einbau der Bögen erzeugt; leer, solange keine Bögen da sind.
+const HERO3D = {};
+
 // ===== render.js =====
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
+
 
 
 
@@ -11232,9 +11238,11 @@ function drawFigure(c, u, x, y) {
   const sc = u.small ? 0.8 : 1.14;
   c.scale((u.facing || 1) * sc, sc);
   // Handgemalte Figur, wo es eine gibt (bisher dein Ritter zu Fuß), sonst gezeichnet
-  const spr = !m && u.kind === 'player' && !u.female ? figSprite('fig_ritter', playerColor()) : null;
-  const f3 = spr ? null : fig3dFor(u, m);
-  const yb = f3 ? drawFig3d(c, u, f3, L) : spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m);
+  // Der Held als 3D-Figur nach seiner Rüstung (Frauen und Gefolge folgen), sonst das gemalte oder gezeichnete Bild
+  const hero = u.kind === 'player' && !u.female && heroReady(heroVariant(u));
+  const spr = !hero && !m && u.kind === 'player' && !u.female ? figSprite('fig_ritter', playerColor()) : null;
+  const f3 = hero || spr ? null : fig3dFor(u, m);
+  const yb = (hero ? drawHero3d(c, u, L, m) : null) ?? (f3 ? drawFig3d(c, u, f3, L) : spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m));
   if (u.flash > 0) {
     c.globalAlpha = Math.min(1, u.flash * 5);
     c.fillStyle = '#ffffff';
@@ -11452,6 +11460,122 @@ function horse3dFor(u, L) {
     x: h.sx * f, y: h.sy, front: dir === 1,
     paint: (c) => { c.save(); c.scale(f, 1); c.drawImage(h.cell, h.x0, h.y0, h.size, h.size); c.restore(); },
   };
+}
+
+// ---------------------------------------------------------------- Held als 3D-Figur (Meshy + tools/sprites.py)
+// Ohne Rüstung ein Edelmann in schwarzem Wams; jede Rüstung ist dieselbe Figur in anderer Bemalung, die
+// Kettenrüstung dazu mit Topfhelm und einem Waffenrock in der Wappenfarbe. Waffe und Schild malt das Spiel
+// an die gerenderten Handpunkte, zu Pferd sitzt die Hüfte auf dem Sattelpunkt.
+const HERO_VARIANT = { gambeson: 'gambeson', lederwams: 'leder', kettenhemd: 'kette', schuppenpanzer: 'schuppe', kettenruestung: 'ritter' };
+function heroVariant(u) { return HERO_VARIANT[u.eq.ruestung] || 'edel'; }
+function heroReady(v) { return !!(HERO3D[v] && ART[`held_${v}_stehen`] && ART[`held_${v}_gehen`] && ART[`held_${v}_reiten`]); }
+function heroCell(v, anim, dir, frame, color) {
+  const key = `held|${v}|${anim}|${dir}|${frame}|${color}`;
+  let cv = fig3dCache.get(key);
+  if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
+  const base = ART[`held_${v}_${anim}`], mask = ART[`held_${v}_${anim}_maske`];
+  if (!base) return null;
+  const C = HERO3D[v].zelle, sx = frame * C, sy = dir * C;
+  cv = makeCanvas(C, C);
+  const g = cv.getContext('2d');
+  g.drawImage(base, sx, sy, C, C, 0, 0, C, C);
+  if (mask) {
+    const tmp = makeCanvas(C, C), tg = tmp.getContext('2d');
+    tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+    tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, C, C);
+    tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+    g.drawImage(tmp, 0, 0);
+  }
+  fig3dCache.set(key, cv);
+  while (fig3dCache.size > 600) fig3dCache.delete(fig3dCache.keys().next().value);
+  return cv;
+}
+// Bewegung und Bild: Hieb, getroffen, laufen oder gehen nach dem Tempo, sonst stehen
+function heroAnim(u, v, m) {
+  const M = HERO3D[v].bewegungen;
+  const pick = (a, p) => { const A = M[a]; return { anim: a, frame: Math.min(A.bilder - 1, Math.max(0, Math.floor(p * A.bilder))) }; };
+  const loop = (a, t) => { const A = M[a]; return { anim: a, frame: ((Math.floor(t * A.bilder) % A.bilder) + A.bilder) % A.bilder }; };
+  if (m) return { anim: 'reiten', frame: 0 };
+  const it = ITEMS[u.eq.waffe];
+  if (u.swing > 0 && M.schlag && !(it && it.ranged)) return pick('schlag', 1 - u.swing / 0.3);
+  if (u.flash > 0.04 && M.getroffen) return pick('getroffen', 1 - u.flash / 0.18);
+  const dt = Math.max(0, Math.min(0.25, G.time - (u._ht ?? G.time)));
+  const d = u._hx === undefined ? 0 : Math.hypot(u.x - u._hx, u.y - u._hy);
+  if (dt > 0) u._hv = (u._hv || 0) * 0.8 + Math.min(d / dt, 8) * 0.2;
+  u._hx = u.x; u._hy = u.y; u._ht = G.time;
+  if (u.moving) {
+    const run = (u._hv || 0) > 1.15 && M.laufen;
+    const a = run ? 'laufen' : 'gehen';
+    u._wp = (u._wp || 0) + dt * Math.max(0.6, (u._hv || 1) / (run ? 1.7 : 1.0)) / M[a].dauer;
+    return loop(a, u._wp);
+  }
+  return loop('stehen', (G.time + (u.id % 13) * 0.37) / M.stehen.dauer);
+}
+function heroPoint(v, anim, dir, frame, which) {
+  const M = HERO3D[v], A = M.bewegungen[anim], arr = M.punkte[`${anim}|${which}`];
+  if (!arr) return null;
+  const i = (dir * A.bilder + frame) * 2;
+  return { x: arr[i] * HERO_K, y: arr[i + 1] * HERO_K };
+}
+const HERO_K = 23.5 / 60;
+function drawHero3d(c, u, L, m) {
+  const v = heroVariant(u);
+  const M = HERO3D[v];
+  const { anim, frame } = heroAnim(u, v, m);
+  const dir = dirIndex(u.dirX ?? 0, u.dirY ?? 1);
+  const cell = heroCell(v, anim, dir, frame, u.tunic || playerColor());
+  if (!cell) return null;
+  const f = u.facing || 1, k = HERO_K, C = M.zelle;
+  c.save();
+  c.scale(f, 1);   // die Richtung steckt im Bild, nicht spiegeln
+  // Zu Pferd: Pferd malen, Reiter mit der Hüfte auf den Sattel
+  let ox = 0, oy = 0, horse = null;
+  if (m) {
+    const kind = u.eq.pferd === 'schlachtross' ? 'ross' : 'pferd';
+    if (horseReady(kind)) {
+      const { anim: ha, phase } = horseGait(u);
+      const color = kind === 'ross' ? (u.tunic || L.tunic || playerColor()) : HORSES[u.eq.pferd] || '#7a5232';
+      horse = horseFrame(kind, ha, dir, phase, color);
+    }
+    if (horse) {
+      const hip = heroPoint(v, 'reiten', dir, 0, 'Hips') || { x: 0, y: -22 };
+      ox = horse.sx - hip.x; oy = horse.sy - hip.y - 1.2;
+      if (dir !== 1) c.drawImage(horse.cell, horse.x0, horse.y0, horse.size, horse.size);
+    }
+  }
+  // Waffe und Schild: von hinten gesehen hinter dem Körper, sonst davor
+  const back = dir >= 4 && dir <= 6;
+  const gear = () => {
+    const sgn = (u.dirX ?? 0) - (u.dirY ?? 1) >= 0 ? 1 : -1;
+    const rh = heroPoint(v, anim, dir, frame, 'RightHand'), lh = heroPoint(v, anim, dir, frame, 'LeftHand');
+    if (u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x, oy + lh.y, sgn);
+    if (rh && (u.eq.waffe || u.lance)) {
+      c.save(); c.translate(ox + rh.x, oy + rh.y); c.scale(sgn, 1); c.translate(-4, 12); drawWeapon(c, u, 0); c.restore();
+    }
+  };
+  if (back) gear();
+  c.drawImage(cell, ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, C * k, C * k);
+  if (!back) gear();
+  if (horse && dir === 1) c.drawImage(horse.cell, horse.x0, horse.y0, horse.size, horse.size);
+  c.restore();
+  const head = heroPoint(v, anim, dir, frame, 'Hips');
+  return (head ? oy + head.y : -10) - 2;
+}
+function drawHeroShield(c, u, L, x, y, sgn) {
+  const it = ITEMS[u.eq.schild];
+  const col = u.tunic || playerColor(), trim = '#d8b54a';
+  c.save(); c.translate(x, y); c.scale(sgn, 1);
+  c.strokeStyle = OUTLINE; c.lineWidth = 0.8;
+  c.fillStyle = it && it.def >= 4 ? shade(col, 1.05) : '#8a6440';
+  if (it && (u.eq.schild === 'rundschild' || u.eq.schild === 'holzschild')) {
+    c.beginPath(); c.ellipse(1.5, 0, 3.6, 4.2, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = '#9aa1a6'; c.beginPath(); c.arc(1.5, 0, 1, 0, Math.PI * 2); c.fill();
+  } else {
+    // Normannischer Lang- oder Wappenschild: oben rund, unten spitz
+    c.beginPath(); c.moveTo(-1.5, -4.5); c.quadraticCurveTo(1.8, -6.2, 5, -4.5); c.lineTo(4.4, 2); c.lineTo(1.75, 7); c.lineTo(-0.9, 2); c.closePath(); c.fill(); c.stroke();
+    if (it && it.def >= 6) { c.fillStyle = trim; c.fillRect(1.2, -4.6, 1.1, 9.5); c.fillRect(-0.6, -2.2, 4.7, 1); }
+  }
+  c.restore();
 }
 
 // ---------------------------------------------------------------- Handgemalte Figuren (assets/figuren)

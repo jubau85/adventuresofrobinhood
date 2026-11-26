@@ -12,6 +12,9 @@ from PIL import Image
 src, dst, name = sys.argv[1:4]
 opt = {sys.argv[i].lstrip('-'): sys.argv[i + 1] for i in range(4, len(sys.argv) - 1, 2)}
 CELL = int(opt.get('zelle', 112))
+# Farbe, die das Spiel umfärbt: Farbton (Grad), Spielraum, Helligkeit, ab der die Maske voll ist
+HUE, HUE_W, HELL = float(opt.get('farbton', 182)), float(opt.get('breite', 26)), float(opt.get('hell', 0.82))
+QUAL = int(opt.get('qualitaet', 90))
 RENAME = dict(p.split('=') for p in opt.get('namen', '').split(',') if '=' in p)
 os.makedirs(dst, exist_ok=True)
 meta = json.load(open(os.path.join(src, 'sprites.json')))
@@ -35,15 +38,17 @@ for old, info in meta['bewegungen'].items():
     a = np.asarray(im).astype(np.float32) / 255
     hue, sat, val = hue_sat(a)
     # Gewicht „Cyan“: Farbton um 180°, kräftig genug gesättigt
-    wgt = np.clip(1 - np.abs(hue - 182) / 26, 0, 1) * np.clip((sat - 0.18) / 0.2, 0, 1) * (val > 0.12)
+    wgt = np.clip(1 - np.abs(hue - HUE) / HUE_W, 0, 1) * np.clip((sat - 0.18) / 0.2, 0, 1) * (val > 0.12)
     gray = val * 0.92
     base = a.copy()
     for c in range(3): base[..., c] = a[..., c] * (1 - wgt) + gray * wgt
     mask = np.zeros_like(a)
-    for c in range(3): mask[..., c] = np.clip(val / 0.82, 0, 1)
+    for c in range(3): mask[..., c] = np.clip(val / HELL, 0, 1)
     mask[..., 3] = wgt * a[..., 3]
-    Image.fromarray((base * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}.webp'), quality=90, method=6)
-    Image.fromarray((mask * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}_maske.webp'), quality=85, method=6)
+    Image.fromarray((base * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}.webp'), quality=QUAL, method=6)
+    # Ohne umzufärbende Fläche keine Maske (spart Platz)
+    if mask[..., 3].max() > 0.05 and 'ohne-maske' not in opt:
+        Image.fromarray((mask * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}_maske.webp'), quality=85, method=6)
     out['bewegungen'][new] = {'bilder': info['bilder'], 'schleife': info['schleife'], 'dauer': info['dauer']}
     # Punkte (z. B. Sattel) je Richtung und Bild, in Zellen-Pixeln der kleinen Fassung
     for key, arr in meta.get('punkte', {}).items():

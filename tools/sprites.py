@@ -12,6 +12,8 @@
 #   --probe              nur ein Bild je Bewegung und Richtung 0, zum schnellen Prüfen
 #   --schleife <name,...> diese Bewegungen laufen im Kreis (letztes Bild = erstes, wird nicht doppelt gerendert)
 #   --punkt <knochen>    Lage dieses Knochens (Kopf) je Richtung und Bild mitschreiben, z. B. der Sattel für den Reiter
+#   --textur <png>       Grundfarbe des Modells durch dieses Bild ersetzen (gleiche UV-Abwicklung, z. B. Meshy-Neubemalung)
+#   --reitpose           zusätzliche Haltung „reiten“: Beine gespreizt nach vorn, Hände halten die Zügel
 #   --helm <glb>         Helm (Ursprung unten, Gesicht nach -Y) passend über den Kopf setzen, fest am Kopfknochen
 #   --punkt <a,b,...>    auch mehrere Knochen, je Name eine Liste
 #   --meter <m>          Körpergröße, an der sich der Maßstab misst (Standard: Höhe des Modells); mit --figur
@@ -114,6 +116,42 @@ if opt.get('waffe'):
         wroot.location = (0, -arm.data.bones[hand].length + palm, 0)
     meshes += wm
 
+# Andere Bemalung, gleiche Form: Bild der Grundfarbe austauschen
+if opt.get('textur'):
+    img = bpy.data.images.load(opt['textur'])
+    n = 0
+    for o in meshes:
+        for m in o.data.materials:
+            if m and m.use_nodes:
+                for nd in m.node_tree.nodes:
+                    if nd.type == 'TEX_IMAGE' and nd.image and any(l.to_socket.name == 'Base Color' for l in nd.outputs[0].links):
+                        nd.image = img; n += 1
+    print('Textur getauscht', n)
+
+# Reithaltung als eigene Bewegung: Oberschenkel nach vorn und etwas nach außen, Unterschenkel hängen,
+# Oberarme leicht vor, Unterarme nach vorn zu den Zügeln
+if opt.get('reitpose') and arm:
+    bpy.context.view_layer.objects.active = arm
+    pbs = arm.pose.bones
+    act = bpy.data.actions.new('reiten'); arm.animation_data_create(); arm.animation_data.action = act
+    for p in pbs: p.rotation_mode = 'QUATERNION'; p.rotation_quaternion = (1, 0, 0, 0); p.location = (0, 0, 0)
+    bpy.context.view_layer.update()
+    def aim(name, d):
+        pb = pbs[name]; rest = pb.bone.matrix_local
+        cur = pb.matrix.copy()
+        rdir = rest.to_3x3() @ Vector((0, 1, 0))
+        q = rdir.rotation_difference(Vector(d).normalized())
+        m = (q.to_matrix() @ rest.to_3x3()).to_4x4(); m.translation = cur.translation
+        pb.matrix = m; bpy.context.view_layer.update()
+    for side, sx in (('Left', 1), ('Right', -1)):
+        aim(f'{side}UpLeg', (0.28 * sx, -0.75, -0.6))
+        aim(f'{side}Leg', (0.06 * sx, 0.12, -1))
+        aim(f'{side}Arm', (0.25 * sx, -0.45, -0.85))
+        aim(f'{side}ForeArm', (-0.1 * sx, -1, -0.25))
+    for f in (0, 1):
+        for p in pbs: p.keyframe_insert('rotation_quaternion', frame=f); p.keyframe_insert('location', frame=f)
+    arm.animation_data.action = None
+
 # Helm über den Kopf: Kopf in der Ruhehaltung ausmessen (Punkte, die am Kopfknochen hängen), Helm darum,
 # dann wie ein starres Teil mit voller Gewichtung am Kopfknochen
 if opt.get('helm') and arm:
@@ -135,7 +173,7 @@ if opt.get('helm') and arm:
     hm = bpy.context.view_layer.objects.active
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     size = max(hhi.x - hlo.x, hhi.y - hlo.y)
-    k = size * float(opt.get('helmweite', 1.18)) / 0.25
+    k = size * float(opt.get('helmweite', 1.08)) / 0.25
     top = hhi.z + 0.02
     bottom = min(hlo.z + (hhi.z - hlo.z) * 0.08, top - 0.32 * k)
     kz = (top - bottom) / 0.32
