@@ -16,6 +16,7 @@ import { questTarget } from './politics.js';
 import { tourneyLayout } from './tournament.js';
 import { gallowsFor } from './justice.js';
 import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weather.js';
+import { abandonedId } from './dynamics.js';
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -305,8 +306,9 @@ function drawHouse(c, b) {
   const dh = Math.min(16, b.h * 0.6);
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.36, 0.64, 0, dh + 1.5, '#6a4c34');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.4, 0.6, 0, dh, '#3d2b1f');
-  windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, b.lit);
-  if (b.wx >= 1.15) windowOn(c, b, 'L', 0.1, 0.26, b.h * 0.42, b.h * 0.72, b.lit);
+  const empty = abandonedId(b.site), lit = b.lit && !empty;
+  windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, lit);
+  if (b.wx >= 1.15) windowOn(c, b, 'L', 0.1, 0.26, b.h * 0.42, b.h * 0.72, lit);
   if (b.flowers && seasonIndex() < 2) {
     faceQuad(c, b.x, b.y, b.wx, b.wy, 'R', 0.34, 0.66, b.h * 0.36, b.h * 0.42, '#6b4a2e');
     const cols = ['#e05a4e', '#f2d65a', '#e8e8f0', '#c27ad6'];
@@ -319,7 +321,7 @@ function drawHouse(c, b) {
   drawGableRoof(c, b.x, b.y, b.wx, b.wy, b.h, b.rh, roof, wall, b.wx >= b.wy);
   if (b.chimney) {
     drawBox(c, b.x + b.wx * 0.2, b.y - b.wy * 0.15, 0.16, 0.16, b.rh * 0.8 + 6, '#857b6e', b.h, 'stone');
-    b.smoke = P(b.x + b.wx * 0.2, b.y - b.wy * 0.15, b.h + b.rh * 0.8 + 6);
+    b.smoke = empty ? null : P(b.x + b.wx * 0.2, b.y - b.wy * 0.15, b.h + b.rh * 0.8 + 6);
   }
   if (b.tavern) drawTavernFront(c, b);
   if (b.dmg > 0) drawDamage(c, b);
@@ -360,10 +362,10 @@ function cachedDraw(c, o, bounds, fn) {
 function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
 function drawHouseFast(c, b) {
   if (b.cons < 1) { drawHouseStage(c, b); return; }
-  if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
+  if (b.dmg > 0 || b.fire > G.time || b.tavern || abandonedId(b.site)) { drawHouse(c, b); return; }
   cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
 }
-function drawChurchFast(c, b) { const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16], (g) => drawChurch(g, b)); }
+function drawChurchFast(c, b) { if (abandonedId(b.site)) { drawChurch(c, b); return; } const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16], (g) => drawChurch(g, b)); }
 
 // Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
 function drawCityWallPiece(c, o) {
@@ -396,6 +398,7 @@ function drawTavernFront(c, b) {
   // Bank und Tisch
   drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.55, 0.9, 0.16, 4, '#7a5636', 0, 'plank');
   drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.85, 0.7, 0.3, 7, '#8a6440', 0, 'plank');
+  if (abandonedId(b.site)) return;
   const mug = P(b.x + 0.2, b.y + b.wy / 2 + 0.85, 7); c.fillStyle = '#c9b48a'; c.fillRect(mug[0] - 1, mug[1] - 3, 2, 3);
   if (darkness() > 0.15) addLight(b.x, b.y + b.wy / 2, 10, 44, 1.1);
 }
@@ -813,6 +816,7 @@ function drawOpenGrave(c, g) {
 
 function drawChurch(c, b) {
   const stone = '#b5ae9f';
+  const dark = abandonedId(b.site);
   const tx = b.x + b.wx / 2 - 0.45, ty = b.y;
   const th = b.abbey ? 88 : 74;
   drawShadow(c, b.x, b.y, b.wx, b.wy, th * 0.8);
@@ -820,7 +824,7 @@ function drawChurch(c, b) {
   const nb = { x: b.x - 0.25, y: b.y, wx: b.wx - 0.5, wy: b.wy };
   for (const u of [0.15, 0.45, 0.75]) {
     faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u - 0.02, u + 0.1, b.h * 0.32, b.h * 0.84, '#6f685c');
-    faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u, u + 0.08, b.h * 0.35, b.h * 0.8, darkness() > 0.2 ? '#ffd27a' : '#41506a');
+    faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u, u + 0.08, b.h * 0.35, b.h * 0.8, darkness() > 0.2 && !dark ? '#ffd27a' : '#41506a');
   }
   drawGableRoof(c, b.x - 0.25, b.y, b.wx - 0.5, b.wy, b.h, 20, ROOFS.tile, stone, true);
   drawBox(c, tx, ty, 1.0, 1.0, th, stone, 0, 'stone');
@@ -832,7 +836,7 @@ function drawChurch(c, b) {
   const [ax, ay] = P(tx, ty, th + 24);
   c.strokeStyle = '#d6ad4c'; c.lineWidth = 1.5;
   c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax, ay - 9); c.moveTo(ax - 3, ay - 6); c.lineTo(ax + 3, ay - 6); c.stroke();
-  if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, b.h * 0.6, 34, 0.7);
+  if (darkness() > 0.2 && !dark) addLight(b.x, b.y + b.wy / 2, b.h * 0.6, 34, 0.7);
 }
 
 // ---------------------------------------------------------------- Wahrzeichen
@@ -1181,7 +1185,7 @@ function drawStall(c, b) {
   for (const [x, y] of [[x0, y1], [x1, y1], [x1, y0]]) { const [a, bb] = P(x, y, 0); c.beginPath(); c.moveTo(a, bb); c.lineTo(a, bb - 16); c.stroke(); }
   drawBox(c, b.x, b.y, 0.8, 0.5, 7, '#8a6a45', 0, 'plank');
   const goods = ['#d9b04a', '#c9483a', '#6f9b45', '#e8e0cc'];
-  for (let k = 0; k < 4; k++) { const p = P(b.x - 0.28 + k * 0.18, b.y + 0.05, 7); c.fillStyle = goods[k]; c.beginPath(); c.arc(p[0], p[1] - 1.5, 1.8, 0, Math.PI * 2); c.fill(); }
+  if (!abandonedId(b.site)) for (let k = 0; k < 4; k++) { const p = P(b.x - 0.28 + k * 0.18, b.y + 0.05, 7); c.fillStyle = goods[k]; c.beginPath(); c.arc(p[0], p[1] - 1.5, 1.8, 0, Math.PI * 2); c.fill(); }
   const col = winterize(b.color);
   poly(c, [P(x0, y0, 20), P(x1, y0, 20), P(x1, y1 + 0.1, 14), P(x0, y1 + 0.1, 14)], col);
   for (let k = 0; k < 4; k += 2) poly(c, [P(x0 + (k / 4) * 0.8, y0, 20), P(x0 + ((k + 1) / 4) * 0.8, y0, 20), P(x0 + ((k + 1) / 4) * 0.8, y1 + 0.1, 14), P(x0 + (k / 4) * 0.8, y1 + 0.1, 14)], 'rgba(255,255,255,0.35)');
@@ -3626,7 +3630,7 @@ export function render() {
     const sp = toScreen(s.x, s.y);
     const yy = sp.y - (s.type === 'spieler' || s.type === 'burg' ? 125 : 72) * z;
     ctx.font = `600 ${Math.round(13 + z * 2)}px "IM Fell English SC", Georgia, serif`;
-    const label = s.name;
+    const label = abandonedId(s.id) ? `${s.name} · verlassen` : s.name;
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = 'rgba(28,20,14,0.72)';
     ctx.fillRect(sp.x - tw / 2 - 10, yy - 14, tw + 20, 20);
@@ -3780,7 +3784,7 @@ export function drawMap(c, w, h, opts = {}) {
   for (const s of order) {
     const q = miniPos(s.x, s.y, v);
     if (q.x < -20 || q.y < -20 || q.x > w + 20 || q.y > h + 20) continue;
-    const col = s.faction ? FACTIONS[s.faction].color : '#ffd65a';
+    const col = abandonedId(s.id) ? '#7a7468' : s.faction ? FACTIONS[s.faction].color : '#ffd65a';
     const r = big ? (s.type === 'stadt' || s.type === 'spieler' ? 4.5 : 3.5) : 3;
     if (s.type === 'einsiedelei') {
       // Mystischer Ort: kleiner heller Stern

@@ -41,6 +41,10 @@ export function siteHouses(id) {
 
 export function isBlighted(s) { return !!s && (G.s.blight[s.id] || 0) > G.s.day; }
 
+// Nach einer Plünderung ist ein Ort verlassen: niemand wohnt dort, kein Licht, kein Rauch, kein Markt
+export function isAbandoned(s) { return !!s && !!G.s && !!G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day; }
+export function abandonedId(id) { return !!G.s && !!G.s.abandoned && (G.s.abandoned[id] || 0) > G.s.day; }
+
 // Neues Spiel: manche Bauplätze sind schon halb bebaut, ein paar alte Häuser verfallen
 export function initDynamics() {
   G.s.cons = {}; G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {};
@@ -58,7 +62,7 @@ export function initDynamics() {
 // Gespeicherten Zustand auf die frisch erzeugte Welt übertragen
 export function applyCons() {
   if (!G.s.cons) initDynamics();
-  G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {};
+  G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {}; G.s.abandoned = G.s.abandoned || {};
   for (const b of G.world.buildings) {
     if (b.kind !== 'house') continue;
     const v = G.s.cons[b.idx];
@@ -157,8 +161,12 @@ export function dailyDynamics() {
     if (until > G.s.day) continue;
     delete G.s.blight[id];
     const s = G.world.sites.find((x) => x.id === id);
-    if (s) note(s, `In ${s.name} fasst man wieder Mut. Es wird wieder gebaut.`, 'good');
+    if (!s) continue;
+    if (G.s.abandoned && G.s.abandoned[id]) { delete G.s.abandoned[id]; if (G.repopulate) G.repopulate(s); note(s, `Nach ${s.name} kehren die ersten Leute zurück. Bald wird dort wieder gebaut.`, 'good'); }
+    else note(s, `In ${s.name} fasst man wieder Mut. Es wird wieder gebaut.`, 'good');
   }
+  // Wer noch in einem verlassenen Ort herumsteht, ist längst geflohen
+  if (G.peasants && G.peasants.some((v) => v.home && abandonedId(v.home.id) && !v.flee)) G.peasants = G.peasants.filter((v) => !(v.home && abandonedId(v.home.id)));
   for (const [id, n] of Object.entries(G.s.slain)) {
     const s = G.world.sites.find((x) => x.id === id);
     if (!s || isBlighted(s) || n <= 0) { if (n <= 0) delete G.s.slain[id]; continue; }
@@ -204,7 +212,20 @@ export function updateDynamics(dt) {
 const RAID_GUARDS = { dorf: 4, markt: 6, halle: 6, burg: 10, stadt: 10, abtei: 3 };
 const RAID_GOLD = { dorf: [30, 70], markt: [70, 150], halle: [50, 110], burg: [100, 200], stadt: [150, 300], abtei: [90, 180] };
 
-export function canRaid(s) { return !!s && !!RAID_GUARDS[s.type] && !G.raid && !(G.siege && G.siege.site === s); }
+// Warum ein Überfall gerade nicht geht (oder null, wenn er geht)
+const RAID_PAUSE = 4;
+export function raidBlock(s) {
+  if (!s || !RAID_GUARDS[s.type]) return 'Hier gibt es nichts zu überfallen.';
+  if (G.raid) return 'Du bist schon mitten in einem Überfall.';
+  if (G.siege && G.siege.site === s) return 'Der Ort wird gerade belagert.';
+  if (isAbandoned(s)) return `${s.name} ist verlassen. Hier gibt es nichts mehr zu holen.`;
+  if (isBlighted(s)) return `In ${s.name} haben sich die Leute verbarrikadiert, die Wachen sind verdoppelt. Bis Tag ${G.s.blight[s.id]} ist hier nichts zu machen.`;
+  const last = G.s.lastRaid;
+  if (last !== undefined && G.s.day < last + RAID_PAUSE) return `Nach deinem letzten Überfall ist das ganze Land gewarnt. Frühestens am Tag ${last + RAID_PAUSE} kannst du wieder zuschlagen.`;
+  return null;
+}
+export function canRaid(s) { return !raidBlock(s); }
+export function raidable(s) { return !!s && !!RAID_GUARDS[s.type]; }
 export function raidVictim(t) { return t.kind === 'peasant' && !!G.raid && t.home === G.raid.site && !t.hidden && !t.dead; }
 
 export function startRaid(s) {
@@ -219,6 +240,7 @@ export function startRaid(s) {
   if (!g) return false;
   g.faction = s.faction; g.engaged = true; g.provoked = true; g.raid = s.id; g.wait = 99999; g.path = null;
   G.raid = { site: s, group: g, t: 0 };
+  G.s.lastRaid = G.s.day;
   for (const v of G.peasants) if (v.home === s && !v.funeral) { v.task = null; v.act = null; v.carry = null; }
   G.s.blight[s.id] = Math.max(G.s.blight[s.id] || 0, G.s.day + 10);
   log(`Du überfällst ${s.name}! Die Glocken läuten Sturm, die Leute fliehen in ihre Häuser.`, 'bad');
@@ -257,8 +279,14 @@ function plunder(s) {
   for (const h of hs.slice(0, randInt(2, 4))) hurt(h, rand(0.5, 1), true);
   G.s.blight[s.id] = G.s.day + 12 + (G.s.slain[s.id] || 0) * 2;
   G.s.raided[s.id] = G.s.day;
+  // Die Bewohner fliehen, der Ort steht leer, bis die Brache vorbei ist
+  if (!G.s.abandoned) G.s.abandoned = {};
+  G.s.abandoned[s.id] = G.s.blight[s.id];
+  if (G.evacuate) G.evacuate(s);
+  const tr = G.s.tourney;
+  if (tr && tr.site === s.id && !tr.done) { tr.done = true; log(`Das Turnier in ${s.name} fällt aus.`, 'bad'); }
   G.s.flags.raids = (G.s.flags.raids || 0) + 1;
-  log(`Ihr plündert ${s.name}: ${loot.join(', ')}. Rauch steigt über den Dächern auf. Hier wird so bald niemand mehr bauen.`, 'bad');
+  log(`Ihr plündert ${s.name}: ${loot.join(', ')}. Rauch steigt über den Dächern auf, die Bewohner fliehen mit dem, was sie tragen können. ${s.name} ist verlassen.`, 'bad');
 }
 
 // Ein Bewohner fällt: Der Ort trauert und verödet länger
@@ -300,6 +328,7 @@ export function atone(s) {
   if (G.s.gold < cost || !isBlighted(s)) return false;
   G.s.gold -= cost;
   delete G.s.blight[s.id];
+  if (G.s.abandoned && G.s.abandoned[s.id]) { delete G.s.abandoned[s.id]; if (G.repopulate) G.repopulate(s); }
   log(`Du zahlst ${cost} Gold Sühne an ${s.name} und lässt Messen für die Toten lesen. Langsam kehrt das Leben zurück.`, 'good');
   changeRep(s.faction, 10);
   changeRep('kirche', 4);

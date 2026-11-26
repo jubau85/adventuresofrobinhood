@@ -93,7 +93,7 @@ export function startSiege(target = null, armyType = null, scale = null) {
   if (G.siege) return false;
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
-    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
+    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
       && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85);
     if (!cand.length) return false;
     target = pick(cand);

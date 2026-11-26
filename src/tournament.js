@@ -11,6 +11,7 @@ import { isWalkable, landAt } from './world.js';
 import { hourOf, passHours } from './sim.js';
 import { changeRep, addRenown } from './politics.js';
 import { makeVillager } from './life.js';
+import { isBlighted } from './dynamics.js';
 
 const KNIGHT_NAMES = [
   'Sir Baldwin de Montclair', 'Sir Aymer de Rochefort', 'Sir Gilbert of Wycombe', 'Sir Raoul le Hardi', 'Sir Thurstan of Holderness',
@@ -51,7 +52,7 @@ function findLists(s) {
 
 function announce() {
   const p = G.s.player, land = landAt(G.world, p.x, p.y);
-  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
+  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s) && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
   if (!cand.length) return;
   if (!G.s.flags.tourneys) { const ashby = cand.find((s) => s.id === 'ashby'); if (ashby) cand = [ashby]; }
   for (let tries = 0; tries < 6; tries++) {
@@ -79,7 +80,7 @@ export function cheatTourney() {
   const h = hourOf();
   if (h > 9.6) passHours(24 - h + 9.6);
   else passHours(9.6 - h);
-  const cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s)).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
   for (const s of cand.slice(0, 8)) {
     const lists = findLists(s);
     if (!lists) continue;

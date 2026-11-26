@@ -22,7 +22,7 @@ import { buffActive } from './life.js';
 import { drawMap, miniToWorld } from './render.js';
 import { landAt } from './world.js';
 import {
-  canRaid, startRaid, isBlighted, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
+  canRaid, raidBlock, raidable, startRaid, isBlighted, isAbandoned, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
 } from './dynamics.js';
 import { tourneyAt, canJoin, joinTourney } from './tournament.js';
 import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
@@ -194,6 +194,7 @@ function questCard(q, buttons) {
 function townPanel() {
   const site = G.ui.arg;
   if (site.type === 'einsiedelei') return hermitPanel(site);
+  if (isAbandoned(site)) return abandonedPanel(site);
   const f = site.faction;
   const town = G.s.towns[site.id];
   const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
@@ -238,6 +239,16 @@ function townInfo(site) {
       ${raidAction(site)}
     </div>
   </div>`;
+}
+
+// Ein geplünderter Ort: leer, kein Markt, kein Gasthaus. Mit Sühne kehren die Leute früher zurück.
+function abandonedPanel(site) {
+  const back = G.s.abandoned[site.id];
+  return {
+    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · verlassen`, tabs: [],
+    body: `<div class="notice bad"><p>Die Türen stehen offen, die Herdstellen sind kalt. Seit deinem Überfall wohnt in ${esc(site.name)} niemand mehr. Markt, Gasthaus und Werkstätten sind verlassen.</p><p>Erst um Tag ${back} wagen sich die ersten Leute zurück.</p></div>
+      <div class="actions">${blightActions(site)}${site.port ? harbourActions(site) : ''}</div>`,
+  };
 }
 
 // Bautätigkeit im Ort
@@ -309,8 +320,9 @@ function blightActions(site) {
 }
 
 function raidAction(site) {
-  if (!canRaid(site)) return '';
-  return `<h3>Gewalt</h3><div class="action"><div><b>Ort überfallen</b><p>Die Besatzung stellt sich dir, die Leute fliehen in ihre Häuser. Bei einem Sieg plünderst du Gold und Waren, Häuser gehen in Flammen auf. Danach wird hier lange nichts mehr gebaut.</p></div><button class="btn danger" data-act="raid">Überfallen</button></div>`;
+  if (!raidable(site) || isAbandoned(site)) return '';
+  const why = raidBlock(site);
+  return `<h3>Gewalt</h3><div class="action"><div><b>Ort überfallen</b><p>Die Besatzung stellt sich dir, die Leute fliehen in ihre Häuser. Bei einem Sieg plünderst du Gold und Waren, Häuser gehen in Flammen auf, und die Bewohner verlassen den Ort. Danach ist das ganze Land für einige Tage gewarnt.</p>${why ? `<p class="muted">${esc(why)}</p>` : ''}</div><button class="btn danger" data-act="raid" ${why ? 'disabled' : ''}>Überfallen</button></div>`;
 }
 
 // Gasthaus: Übernachten mit Gefolge

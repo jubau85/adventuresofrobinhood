@@ -518,7 +518,7 @@ const FACTIONS = {
     ally: 'Verwundete heilen doppelt so schnell, alle zwei Tage +1 Ruhm.',
   },
   gilde: {
-    name: 'Kaufmannsgilde', short: 'Gilde', color: '#3d6fa3', rivals: ['waldleute'],
+    name: 'Kaufmannsgilde', short: 'Gilde', color: '#2a7f7a', rivals: ['waldleute'],
     desc: 'Die Händler der Städte. Ihnen ist gleich, wer herrscht, solange die Straßen sicher sind.',
     ally: 'Bessere Preise auf allen Märkten, +15 Gold am Tag aus Handelsanteilen.',
   },
@@ -4280,9 +4280,22 @@ function siteSpots(s) {
 function spawnVillagers() {
   G.peasants = [];
   resetLife();
-  const lvl = G.s.castle.level;
   const homes = G.world.sites.concat(G.world.farms || [], G.world.camps || []);
   for (const site of homes) {
+    // Ein geplünderter Ort bleibt leer, bis die Leute zurückkehren
+    if (isAbandoned(site)) continue;
+    let stall = 0;
+    for (const role of rolesFor(site)) G.peasants.push(makeVillager(site, role, role === 'haendler' ? stall++ : 0));
+  }
+  G.addVillager = addVillager;
+  G.evacuate = evacuate;
+  G.repopulate = repopulate;
+}
+
+// Wer in einem Ort lebt: Grundrollen je Ortstyp, mehr Leute in großen Orten, Bettler, abzüglich der Getöteten
+function rolesFor(site) {
+  const lvl = G.s.castle.level;
+  {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
@@ -4300,10 +4313,33 @@ function spawnVillagers() {
     // Wer bei einem Überfall umkam, fehlt, bis neue Leute zuziehen
     const lost = (G.s.slain && G.s.slain[site.id]) || 0;
     if (lost) roles = roles.slice(0, Math.max(1, roles.length - lost));
-    let stall = 0;
-    for (const role of roles) G.peasants.push(makeVillager(site, role, role === 'haendler' ? stall++ : 0));
+    return roles;
   }
-  G.addVillager = addVillager;
+}
+
+// Nach der Plünderung: Alle fliehen aus dem Ort und verschwinden im Umland
+function evacuate(site) {
+  for (const v of G.peasants) {
+    if (v.home !== site || v.dead) continue;
+    const a = Math.random() * Math.PI * 2, r = (site.clear || 6) + 6 + Math.random() * 4;
+    v.flee = { x: site.x + Math.cos(a) * r, y: site.y + Math.sin(a) * r, t: 0 };
+    v.task = null; v.act = null; v.funeral = null; v.spectator = null;
+    v.hidden = false; v.inside = false;
+    if (v.door) { v.x = v.door.x; v.y = v.door.y; }
+    if (Math.random() < 0.25) v.say = { text: pick(['Weg hier, nur weg!', 'Nehmt die Kinder!', 'Gott verfluche Euch!', 'Alles verloren …']), t: 0, dur: 3 };
+  }
+}
+
+// Die Leute kehren zurück: Sie kommen von außen und gehen in ihre Häuser
+function repopulate(site) {
+  let stall = 0;
+  for (const role of rolesFor(site)) {
+    const v = makeVillager(site, role, role === 'haendler' ? stall++ : 0);
+    const a = Math.random() * Math.PI * 2, r = (site.clear || 6) + 4 + Math.random() * 3;
+    placeNear(v, site.x + Math.cos(a) * r, site.y + Math.sin(a) * r, 1.5);
+    G.peasants.push(v);
+  }
+  rebuildUnits();
 }
 
 function makeVillager(site, role, stall = 0) {
@@ -4531,6 +4567,13 @@ function chooseTask(v) {
 }
 
 function updateVillager(v, dt) {
+  if (v.flee) {
+    // Auf der Flucht: rennen, bis sie außer Sicht sind
+    v.flee.t += dt;
+    chaseTo(v, v.flee.x, v.flee.y, dt, 0.3, 1.7);
+    if (Math.hypot(v.flee.x - v.x, v.flee.y - v.y) < 0.6 || v.flee.t > 18) { v.dead = true; v.hidden = true; }
+    return;
+  }
   if (v.funeral || v.spectator || v.execution) return;
   const h = hourOf(), ph = phase(h);
   if (ph === 'nacht') {
@@ -4912,7 +4955,7 @@ function startSiege(target = null, armyType = null, scale = null) {
   if (G.siege) return false;
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
-    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
+    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
       && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85);
     if (!cand.length) return false;
     target = pick(cand);
@@ -5111,6 +5154,10 @@ function siteHouses(id) {
 
 function isBlighted(s) { return !!s && (G.s.blight[s.id] || 0) > G.s.day; }
 
+// Nach einer Plünderung ist ein Ort verlassen: niemand wohnt dort, kein Licht, kein Rauch, kein Markt
+function isAbandoned(s) { return !!s && !!G.s && !!G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day; }
+function abandonedId(id) { return !!G.s && !!G.s.abandoned && (G.s.abandoned[id] || 0) > G.s.day; }
+
 // Neues Spiel: manche Bauplätze sind schon halb bebaut, ein paar alte Häuser verfallen
 function initDynamics() {
   G.s.cons = {}; G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {};
@@ -5128,7 +5175,7 @@ function initDynamics() {
 // Gespeicherten Zustand auf die frisch erzeugte Welt übertragen
 function applyCons() {
   if (!G.s.cons) initDynamics();
-  G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {};
+  G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {}; G.s.abandoned = G.s.abandoned || {};
   for (const b of G.world.buildings) {
     if (b.kind !== 'house') continue;
     const v = G.s.cons[b.idx];
@@ -5227,8 +5274,12 @@ function dailyDynamics() {
     if (until > G.s.day) continue;
     delete G.s.blight[id];
     const s = G.world.sites.find((x) => x.id === id);
-    if (s) note(s, `In ${s.name} fasst man wieder Mut. Es wird wieder gebaut.`, 'good');
+    if (!s) continue;
+    if (G.s.abandoned && G.s.abandoned[id]) { delete G.s.abandoned[id]; if (G.repopulate) G.repopulate(s); note(s, `Nach ${s.name} kehren die ersten Leute zurück. Bald wird dort wieder gebaut.`, 'good'); }
+    else note(s, `In ${s.name} fasst man wieder Mut. Es wird wieder gebaut.`, 'good');
   }
+  // Wer noch in einem verlassenen Ort herumsteht, ist längst geflohen
+  if (G.peasants && G.peasants.some((v) => v.home && abandonedId(v.home.id) && !v.flee)) G.peasants = G.peasants.filter((v) => !(v.home && abandonedId(v.home.id)));
   for (const [id, n] of Object.entries(G.s.slain)) {
     const s = G.world.sites.find((x) => x.id === id);
     if (!s || isBlighted(s) || n <= 0) { if (n <= 0) delete G.s.slain[id]; continue; }
@@ -5274,7 +5325,20 @@ function updateDynamics(dt) {
 const RAID_GUARDS = { dorf: 4, markt: 6, halle: 6, burg: 10, stadt: 10, abtei: 3 };
 const RAID_GOLD = { dorf: [30, 70], markt: [70, 150], halle: [50, 110], burg: [100, 200], stadt: [150, 300], abtei: [90, 180] };
 
-function canRaid(s) { return !!s && !!RAID_GUARDS[s.type] && !G.raid && !(G.siege && G.siege.site === s); }
+// Warum ein Überfall gerade nicht geht (oder null, wenn er geht)
+const RAID_PAUSE = 4;
+function raidBlock(s) {
+  if (!s || !RAID_GUARDS[s.type]) return 'Hier gibt es nichts zu überfallen.';
+  if (G.raid) return 'Du bist schon mitten in einem Überfall.';
+  if (G.siege && G.siege.site === s) return 'Der Ort wird gerade belagert.';
+  if (isAbandoned(s)) return `${s.name} ist verlassen. Hier gibt es nichts mehr zu holen.`;
+  if (isBlighted(s)) return `In ${s.name} haben sich die Leute verbarrikadiert, die Wachen sind verdoppelt. Bis Tag ${G.s.blight[s.id]} ist hier nichts zu machen.`;
+  const last = G.s.lastRaid;
+  if (last !== undefined && G.s.day < last + RAID_PAUSE) return `Nach deinem letzten Überfall ist das ganze Land gewarnt. Frühestens am Tag ${last + RAID_PAUSE} kannst du wieder zuschlagen.`;
+  return null;
+}
+function canRaid(s) { return !raidBlock(s); }
+function raidable(s) { return !!s && !!RAID_GUARDS[s.type]; }
 function raidVictim(t) { return t.kind === 'peasant' && !!G.raid && t.home === G.raid.site && !t.hidden && !t.dead; }
 
 function startRaid(s) {
@@ -5289,6 +5353,7 @@ function startRaid(s) {
   if (!g) return false;
   g.faction = s.faction; g.engaged = true; g.provoked = true; g.raid = s.id; g.wait = 99999; g.path = null;
   G.raid = { site: s, group: g, t: 0 };
+  G.s.lastRaid = G.s.day;
   for (const v of G.peasants) if (v.home === s && !v.funeral) { v.task = null; v.act = null; v.carry = null; }
   G.s.blight[s.id] = Math.max(G.s.blight[s.id] || 0, G.s.day + 10);
   log(`Du überfällst ${s.name}! Die Glocken läuten Sturm, die Leute fliehen in ihre Häuser.`, 'bad');
@@ -5327,8 +5392,14 @@ function plunder(s) {
   for (const h of hs.slice(0, randInt(2, 4))) hurt(h, rand(0.5, 1), true);
   G.s.blight[s.id] = G.s.day + 12 + (G.s.slain[s.id] || 0) * 2;
   G.s.raided[s.id] = G.s.day;
+  // Die Bewohner fliehen, der Ort steht leer, bis die Brache vorbei ist
+  if (!G.s.abandoned) G.s.abandoned = {};
+  G.s.abandoned[s.id] = G.s.blight[s.id];
+  if (G.evacuate) G.evacuate(s);
+  const tr = G.s.tourney;
+  if (tr && tr.site === s.id && !tr.done) { tr.done = true; log(`Das Turnier in ${s.name} fällt aus.`, 'bad'); }
   G.s.flags.raids = (G.s.flags.raids || 0) + 1;
-  log(`Ihr plündert ${s.name}: ${loot.join(', ')}. Rauch steigt über den Dächern auf. Hier wird so bald niemand mehr bauen.`, 'bad');
+  log(`Ihr plündert ${s.name}: ${loot.join(', ')}. Rauch steigt über den Dächern auf, die Bewohner fliehen mit dem, was sie tragen können. ${s.name} ist verlassen.`, 'bad');
 }
 
 // Ein Bewohner fällt: Der Ort trauert und verödet länger
@@ -5370,6 +5441,7 @@ function atone(s) {
   if (G.s.gold < cost || !isBlighted(s)) return false;
   G.s.gold -= cost;
   delete G.s.blight[s.id];
+  if (G.s.abandoned && G.s.abandoned[s.id]) { delete G.s.abandoned[s.id]; if (G.repopulate) G.repopulate(s); }
   log(`Du zahlst ${cost} Gold Sühne an ${s.name} und lässt Messen für die Toten lesen. Langsam kehrt das Leben zurück.`, 'good');
   changeRep(s.faction, 10);
   changeRep('kirche', 4);
@@ -5380,6 +5452,7 @@ function atone(s) {
 // Turniere: Herolde kündigen ein Turnier in einer Stadt oder Burg an. Am Turniertag stehen vor
 // dem Ort Schranken, Tribüne und Zelte, das Volk jubelt, Ritter tjosten gegeneinander.
 // Wer ein Pferd hat und das Startgeld zahlt, reitet mit: Die Lanze im rechten Moment senken.
+
 
 
 
@@ -5430,7 +5503,7 @@ function findLists(s) {
 
 function announce() {
   const p = G.s.player, land = landAt(G.world, p.x, p.y);
-  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
+  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s) && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
   if (!cand.length) return;
   if (!G.s.flags.tourneys) { const ashby = cand.find((s) => s.id === 'ashby'); if (ashby) cand = [ashby]; }
   for (let tries = 0; tries < 6; tries++) {
@@ -5458,7 +5531,7 @@ function cheatTourney() {
   const h = hourOf();
   if (h > 9.6) passHours(24 - h + 9.6);
   else passHours(9.6 - h);
-  const cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && !isBlighted(s)).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
   for (const s of cand.slice(0, 8)) {
     const lists = findLists(s);
     if (!lists) continue;
@@ -7231,6 +7304,7 @@ function weatherKind() { return (G.s && G.s.weather && G.s.weather.kind) || 'kla
 
 
 
+
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
 let chunksVisible = 24;
@@ -7519,8 +7593,9 @@ function drawHouse(c, b) {
   const dh = Math.min(16, b.h * 0.6);
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.36, 0.64, 0, dh + 1.5, '#6a4c34');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.4, 0.6, 0, dh, '#3d2b1f');
-  windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, b.lit);
-  if (b.wx >= 1.15) windowOn(c, b, 'L', 0.1, 0.26, b.h * 0.42, b.h * 0.72, b.lit);
+  const empty = abandonedId(b.site), lit = b.lit && !empty;
+  windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, lit);
+  if (b.wx >= 1.15) windowOn(c, b, 'L', 0.1, 0.26, b.h * 0.42, b.h * 0.72, lit);
   if (b.flowers && seasonIndex() < 2) {
     faceQuad(c, b.x, b.y, b.wx, b.wy, 'R', 0.34, 0.66, b.h * 0.36, b.h * 0.42, '#6b4a2e');
     const cols = ['#e05a4e', '#f2d65a', '#e8e8f0', '#c27ad6'];
@@ -7533,7 +7608,7 @@ function drawHouse(c, b) {
   drawGableRoof(c, b.x, b.y, b.wx, b.wy, b.h, b.rh, roof, wall, b.wx >= b.wy);
   if (b.chimney) {
     drawBox(c, b.x + b.wx * 0.2, b.y - b.wy * 0.15, 0.16, 0.16, b.rh * 0.8 + 6, '#857b6e', b.h, 'stone');
-    b.smoke = P(b.x + b.wx * 0.2, b.y - b.wy * 0.15, b.h + b.rh * 0.8 + 6);
+    b.smoke = empty ? null : P(b.x + b.wx * 0.2, b.y - b.wy * 0.15, b.h + b.rh * 0.8 + 6);
   }
   if (b.tavern) drawTavernFront(c, b);
   if (b.dmg > 0) drawDamage(c, b);
@@ -7574,10 +7649,10 @@ function cachedDraw(c, o, bounds, fn) {
 function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
 function drawHouseFast(c, b) {
   if (b.cons < 1) { drawHouseStage(c, b); return; }
-  if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
+  if (b.dmg > 0 || b.fire > G.time || b.tavern || abandonedId(b.site)) { drawHouse(c, b); return; }
   cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
 }
-function drawChurchFast(c, b) { const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16], (g) => drawChurch(g, b)); }
+function drawChurchFast(c, b) { if (abandonedId(b.site)) { drawChurch(c, b); return; } const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16], (g) => drawChurch(g, b)); }
 
 // Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
 function drawCityWallPiece(c, o) {
@@ -7610,6 +7685,7 @@ function drawTavernFront(c, b) {
   // Bank und Tisch
   drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.55, 0.9, 0.16, 4, '#7a5636', 0, 'plank');
   drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.85, 0.7, 0.3, 7, '#8a6440', 0, 'plank');
+  if (abandonedId(b.site)) return;
   const mug = P(b.x + 0.2, b.y + b.wy / 2 + 0.85, 7); c.fillStyle = '#c9b48a'; c.fillRect(mug[0] - 1, mug[1] - 3, 2, 3);
   if (darkness() > 0.15) addLight(b.x, b.y + b.wy / 2, 10, 44, 1.1);
 }
@@ -8027,6 +8103,7 @@ function drawOpenGrave(c, g) {
 
 function drawChurch(c, b) {
   const stone = '#b5ae9f';
+  const dark = abandonedId(b.site);
   const tx = b.x + b.wx / 2 - 0.45, ty = b.y;
   const th = b.abbey ? 88 : 74;
   drawShadow(c, b.x, b.y, b.wx, b.wy, th * 0.8);
@@ -8034,7 +8111,7 @@ function drawChurch(c, b) {
   const nb = { x: b.x - 0.25, y: b.y, wx: b.wx - 0.5, wy: b.wy };
   for (const u of [0.15, 0.45, 0.75]) {
     faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u - 0.02, u + 0.1, b.h * 0.32, b.h * 0.84, '#6f685c');
-    faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u, u + 0.08, b.h * 0.35, b.h * 0.8, darkness() > 0.2 ? '#ffd27a' : '#41506a');
+    faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u, u + 0.08, b.h * 0.35, b.h * 0.8, darkness() > 0.2 && !dark ? '#ffd27a' : '#41506a');
   }
   drawGableRoof(c, b.x - 0.25, b.y, b.wx - 0.5, b.wy, b.h, 20, ROOFS.tile, stone, true);
   drawBox(c, tx, ty, 1.0, 1.0, th, stone, 0, 'stone');
@@ -8046,7 +8123,7 @@ function drawChurch(c, b) {
   const [ax, ay] = P(tx, ty, th + 24);
   c.strokeStyle = '#d6ad4c'; c.lineWidth = 1.5;
   c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax, ay - 9); c.moveTo(ax - 3, ay - 6); c.lineTo(ax + 3, ay - 6); c.stroke();
-  if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, b.h * 0.6, 34, 0.7);
+  if (darkness() > 0.2 && !dark) addLight(b.x, b.y + b.wy / 2, b.h * 0.6, 34, 0.7);
 }
 
 // ---------------------------------------------------------------- Wahrzeichen
@@ -8395,7 +8472,7 @@ function drawStall(c, b) {
   for (const [x, y] of [[x0, y1], [x1, y1], [x1, y0]]) { const [a, bb] = P(x, y, 0); c.beginPath(); c.moveTo(a, bb); c.lineTo(a, bb - 16); c.stroke(); }
   drawBox(c, b.x, b.y, 0.8, 0.5, 7, '#8a6a45', 0, 'plank');
   const goods = ['#d9b04a', '#c9483a', '#6f9b45', '#e8e0cc'];
-  for (let k = 0; k < 4; k++) { const p = P(b.x - 0.28 + k * 0.18, b.y + 0.05, 7); c.fillStyle = goods[k]; c.beginPath(); c.arc(p[0], p[1] - 1.5, 1.8, 0, Math.PI * 2); c.fill(); }
+  if (!abandonedId(b.site)) for (let k = 0; k < 4; k++) { const p = P(b.x - 0.28 + k * 0.18, b.y + 0.05, 7); c.fillStyle = goods[k]; c.beginPath(); c.arc(p[0], p[1] - 1.5, 1.8, 0, Math.PI * 2); c.fill(); }
   const col = winterize(b.color);
   poly(c, [P(x0, y0, 20), P(x1, y0, 20), P(x1, y1 + 0.1, 14), P(x0, y1 + 0.1, 14)], col);
   for (let k = 0; k < 4; k += 2) poly(c, [P(x0 + (k / 4) * 0.8, y0, 20), P(x0 + ((k + 1) / 4) * 0.8, y0, 20), P(x0 + ((k + 1) / 4) * 0.8, y1 + 0.1, 14), P(x0 + (k / 4) * 0.8, y1 + 0.1, 14)], 'rgba(255,255,255,0.35)');
@@ -10840,7 +10917,7 @@ function render() {
     const sp = toScreen(s.x, s.y);
     const yy = sp.y - (s.type === 'spieler' || s.type === 'burg' ? 125 : 72) * z;
     ctx.font = `600 ${Math.round(13 + z * 2)}px "IM Fell English SC", Georgia, serif`;
-    const label = s.name;
+    const label = abandonedId(s.id) ? `${s.name} · verlassen` : s.name;
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = 'rgba(28,20,14,0.72)';
     ctx.fillRect(sp.x - tw / 2 - 10, yy - 14, tw + 20, 20);
@@ -10994,7 +11071,7 @@ function drawMap(c, w, h, opts = {}) {
   for (const s of order) {
     const q = miniPos(s.x, s.y, v);
     if (q.x < -20 || q.y < -20 || q.x > w + 20 || q.y > h + 20) continue;
-    const col = s.faction ? FACTIONS[s.faction].color : '#ffd65a';
+    const col = abandonedId(s.id) ? '#7a7468' : s.faction ? FACTIONS[s.faction].color : '#ffd65a';
     const r = big ? (s.type === 'stadt' || s.type === 'spieler' ? 4.5 : 3.5) : 3;
     if (s.type === 'einsiedelei') {
       // Mystischer Ort: kleiner heller Stern
@@ -11772,6 +11849,7 @@ function questCard(q, buttons) {
 function townPanel() {
   const site = G.ui.arg;
   if (site.type === 'einsiedelei') return hermitPanel(site);
+  if (isAbandoned(site)) return abandonedPanel(site);
   const f = site.faction;
   const town = G.s.towns[site.id];
   const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
@@ -11816,6 +11894,16 @@ function townInfo(site) {
       ${raidAction(site)}
     </div>
   </div>`;
+}
+
+// Ein geplünderter Ort: leer, kein Markt, kein Gasthaus. Mit Sühne kehren die Leute früher zurück.
+function abandonedPanel(site) {
+  const back = G.s.abandoned[site.id];
+  return {
+    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · verlassen`, tabs: [],
+    body: `<div class="notice bad"><p>Die Türen stehen offen, die Herdstellen sind kalt. Seit deinem Überfall wohnt in ${esc(site.name)} niemand mehr. Markt, Gasthaus und Werkstätten sind verlassen.</p><p>Erst um Tag ${back} wagen sich die ersten Leute zurück.</p></div>
+      <div class="actions">${blightActions(site)}${site.port ? harbourActions(site) : ''}</div>`,
+  };
 }
 
 // Bautätigkeit im Ort
@@ -11887,8 +11975,9 @@ function blightActions(site) {
 }
 
 function raidAction(site) {
-  if (!canRaid(site)) return '';
-  return `<h3>Gewalt</h3><div class="action"><div><b>Ort überfallen</b><p>Die Besatzung stellt sich dir, die Leute fliehen in ihre Häuser. Bei einem Sieg plünderst du Gold und Waren, Häuser gehen in Flammen auf. Danach wird hier lange nichts mehr gebaut.</p></div><button class="btn danger" data-act="raid">Überfallen</button></div>`;
+  if (!raidable(site) || isAbandoned(site)) return '';
+  const why = raidBlock(site);
+  return `<h3>Gewalt</h3><div class="action"><div><b>Ort überfallen</b><p>Die Besatzung stellt sich dir, die Leute fliehen in ihre Häuser. Bei einem Sieg plünderst du Gold und Waren, Häuser gehen in Flammen auf, und die Bewohner verlassen den Ort. Danach ist das ganze Land für einige Tage gewarnt.</p>${why ? `<p class="muted">${esc(why)}</p>` : ''}</div><button class="btn danger" data-act="raid" ${why ? 'disabled' : ''}>Überfallen</button></div>`;
 }
 
 // Gasthaus: Übernachten mit Gefolge

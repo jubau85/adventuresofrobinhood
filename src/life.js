@@ -9,7 +9,7 @@ import { isWalkable } from './world.js';
 import { rand, pick } from './rng.js';
 import { makeUnit, placeNear, chaseTo, rebuildUnits } from './units.js';
 import { hourOf, seasonIndex } from './sim.js';
-import { standing, underConstruction, isBlighted, burningIn, douse, siteHouses, workOn } from './dynamics.js';
+import { standing, underConstruction, isBlighted, isAbandoned, burningIn, douse, siteHouses, workOn } from './dynamics.js';
 import { takeAnimal } from './animals.js';
 import { watchSpot } from './tournament.js';
 import { hangWatch } from './justice.js';
@@ -145,9 +145,22 @@ function siteSpots(s) {
 export function spawnVillagers() {
   G.peasants = [];
   resetLife();
-  const lvl = G.s.castle.level;
   const homes = G.world.sites.concat(G.world.farms || [], G.world.camps || []);
   for (const site of homes) {
+    // Ein geplünderter Ort bleibt leer, bis die Leute zurückkehren
+    if (isAbandoned(site)) continue;
+    let stall = 0;
+    for (const role of rolesFor(site)) G.peasants.push(makeVillager(site, role, role === 'haendler' ? stall++ : 0));
+  }
+  G.addVillager = addVillager;
+  G.evacuate = evacuate;
+  G.repopulate = repopulate;
+}
+
+// Wer in einem Ort lebt: Grundrollen je Ortstyp, mehr Leute in großen Orten, Bettler, abzüglich der Getöteten
+function rolesFor(site) {
+  const lvl = G.s.castle.level;
+  {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
@@ -165,10 +178,33 @@ export function spawnVillagers() {
     // Wer bei einem Überfall umkam, fehlt, bis neue Leute zuziehen
     const lost = (G.s.slain && G.s.slain[site.id]) || 0;
     if (lost) roles = roles.slice(0, Math.max(1, roles.length - lost));
-    let stall = 0;
-    for (const role of roles) G.peasants.push(makeVillager(site, role, role === 'haendler' ? stall++ : 0));
+    return roles;
   }
-  G.addVillager = addVillager;
+}
+
+// Nach der Plünderung: Alle fliehen aus dem Ort und verschwinden im Umland
+export function evacuate(site) {
+  for (const v of G.peasants) {
+    if (v.home !== site || v.dead) continue;
+    const a = Math.random() * Math.PI * 2, r = (site.clear || 6) + 6 + Math.random() * 4;
+    v.flee = { x: site.x + Math.cos(a) * r, y: site.y + Math.sin(a) * r, t: 0 };
+    v.task = null; v.act = null; v.funeral = null; v.spectator = null;
+    v.hidden = false; v.inside = false;
+    if (v.door) { v.x = v.door.x; v.y = v.door.y; }
+    if (Math.random() < 0.25) v.say = { text: pick(['Weg hier, nur weg!', 'Nehmt die Kinder!', 'Gott verfluche Euch!', 'Alles verloren …']), t: 0, dur: 3 };
+  }
+}
+
+// Die Leute kehren zurück: Sie kommen von außen und gehen in ihre Häuser
+export function repopulate(site) {
+  let stall = 0;
+  for (const role of rolesFor(site)) {
+    const v = makeVillager(site, role, role === 'haendler' ? stall++ : 0);
+    const a = Math.random() * Math.PI * 2, r = (site.clear || 6) + 4 + Math.random() * 3;
+    placeNear(v, site.x + Math.cos(a) * r, site.y + Math.sin(a) * r, 1.5);
+    G.peasants.push(v);
+  }
+  rebuildUnits();
 }
 
 export function makeVillager(site, role, stall = 0) {
@@ -396,6 +432,13 @@ function chooseTask(v) {
 }
 
 export function updateVillager(v, dt) {
+  if (v.flee) {
+    // Auf der Flucht: rennen, bis sie außer Sicht sind
+    v.flee.t += dt;
+    chaseTo(v, v.flee.x, v.flee.y, dt, 0.3, 1.7);
+    if (Math.hypot(v.flee.x - v.x, v.flee.y - v.y) < 0.6 || v.flee.t > 18) { v.dead = true; v.hidden = true; }
+    return;
+  }
   if (v.funeral || v.spectator || v.execution) return;
   const h = hourOf(), ph = phase(h);
   if (ph === 'nacht') {
