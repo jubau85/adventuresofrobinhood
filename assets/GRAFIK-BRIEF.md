@@ -16,7 +16,7 @@ Dieser Brief beschreibt alle Grafiken, die das Spiel braucht. Er ist so geschrie
 - der kahle Winter vor dem ersten Schnee und das schrittweise Tauwetter
 - drei neue Burggebäude (Hospiz, Schafzucht, Felder) und neue Waren (Blei, Zinn, Silber)
 
-Die neuen Pakete 11 bis 13 und die Ergänzungen in den alten Paketen sind mit **neu** markiert.
+Die neuen Pakete 11 bis 13 und die Ergänzungen in den alten Paketen sind mit **neu** markiert. Wer mit **Gemini** arbeitet, liest zuerst den Abschnitt „Mit Gemini erzeugen“.
 
 ---
 
@@ -92,6 +92,58 @@ text, letters, watermark, logo, frame, border, ground plane, grass base, pedesta
 3. Danach den Rest des Pakets.
 
 Was noch fehlt, zeichnet das Spiel weiter selbst. Du kannst also stückweise liefern.
+
+---
+
+## Mit Gemini erzeugen (neu)
+
+Gemini (am besten in Google AI Studio, dort lassen sich Seitenverhältnis und Download in voller Größe einstellen) arbeitet etwas anders als Oakgen. Diese Punkte gehen vor die Regeln oben:
+
+**1. Kein transparenter Hintergrund.** Gemini liefert Bilder ohne Alpha-Kanal. Deshalb immer einen **einfarbigen, flachen Hintergrund** verlangen, den ich ausstanze. Ich stanze mit Toleranz aus, ein paar Prozent daneben ist kein Problem.
+- Reingrün `#00FF00` für fast alles
+- Magenta `#FF00FF`, wenn das Motiv selbst grün ist (Bäume, Büsche, Gras, grün gekleidete Jäger und Waldleute)
+- Reinblau `#0000FF`, wenn Grün **und** Magenta im Motiv vorkommen (zum Beispiel ein Turnierzelt in Wappenfarbe auf Gras)
+- Ausdrücklich dazuschreiben: kein Farbverlauf, kein Boden, kein Schatten auf dem Hintergrund.
+
+**2. Kein Negativ-Prompt.** Gemini hat kein eigenes Feld dafür. Den Negativ-Prompt bitte als Satz ans Ende hängen: „Avoid: …“.
+
+**3. Ein gutes Bild als Vorbild mitgeben.** Gemini hält einen Stil am besten, wenn man ein Bild anhängt. Die eingebauten Probestücke (`natur/laub_1_sommer.png`, `boden/wiese_sommer.jpg`) als Stilvorlage anhängen und dazuschreiben: „Match the painting style, brush strokes, outlines and lighting of the attached image.“ Sobald das erste Haus passt, dient es als Vorlage für alle weiteren Häuser.
+
+**4. Varianten durch Bearbeiten statt neu erzeugen.** Das ist Geminis Stärke. Erst das Grundbild erzeugen, dann im selben Gespräch abwandeln, zum Beispiel:
+- „Keep exactly the same tree, camera angle and style. Show it bare in early winter, no leaves, no snow.“ → `_kahl`
+- „Same tree, now with snow on the branches.“ → `_winter`
+- „Keep exactly the same cottage, angle and style. Show it as a burnt-out ruin: roof gone, blackened wall stubs, charred fallen beams, ash.“ → `haus/brandruine.png`
+- „Same spot, but the cottage is only begun: rubble foundation and the first oak frame posts, a pile of timber beside it, no walls, no roof.“ → `haus/rohbau_1.png`
+
+So passen Jahreszeiten, Baustufen und Ruinen genau zusammen.
+
+**5. Seitenverhältnis wählen statt Pixel.** Gemini erzeugt feste Formate. Bitte das Format nehmen, das der 1×-Größe am nächsten kommt: Häuser und Bäume meist 1:1 oder 3:4, Türme 9:16, Tribüne, Mauern und lange Gebäude 16:9. Auf die genaue Pixelzahl kommt es nicht an, ich skaliere.
+
+**6. Figuren als Einzelbilder statt Bögen.** Ein sauberes Raster mit 8 × 2 Zellen schafft Gemini kaum. Deshalb jede Pose als eigenes Bild, Format 1:1, die Figur groß in der Mitte. Erst die stehende Figur erzeugen, dann im selben Gespräch: „Same character, same angle, now walking with the left leg forward“ und so weiter. Die Bögen setze ich daraus zusammen.
+- Dateinamen: `figuren/<name>_<pose>.png`, Rückansicht mit `_hinten`, zum Beispiel `ritter_gehen1.png`, `ritter_gehen1_hinten.png`.
+- Posen: `stehen`, `gehen1` bis `gehen4`, `ausholen`, `schlag`, `liegend`, bei Alltagsleuten zusätzlich `arbeit1`, `arbeit2`, `sitzen`.
+- Mindestens nötig: `stehen`, `gehen1`, `gehen2`, `schlag`, `liegend`, jeweils von vorn. Den Rest ergänze ich.
+- Die Figuren werden im Spiel sehr klein. Bitte dazuschreiben: „bold simple shapes and clear colour areas, readable when shrunk to a tiny size“.
+
+**7. Maßstab in Worten.** Gemini kann keine Pixelmaße einhalten. Bei Gebäuden deshalb das Verhältnis zum Menschen beschreiben, etwa „the door is about as tall as an adult person, the eaves at about 1.5 times a person's height“. Menschen selbst bitte nicht ins Gebäudebild malen.
+
+**Fertiger Prompt für das erste Probestück** (`haus/stroh_1.png`, Format 1:1, Laubbaum als Stilvorlage anhängen):
+
+```
+Create a hand-painted isometric game asset of a small English peasant cottage from around 1194. Match the painting style, brush strokes, outlines and lighting of the attached image.
+
+Camera and format: true 2:1 isometric projection, camera about 30 degrees above the ground, the front corner of the footprint points straight down, we see the roof, the lit left wall and the shaded right wall. Light from the upper left. The cottage is centered, fully visible, with a small empty margin. Background: one flat solid pure green colour (#00FF00), no gradient, no floor, no shadow on the background.
+
+Style: soft rounded organic shapes, slightly irregular hand-crafted edges, warm painterly texture with visible brush strokes, thin soft dark-brown outlines, muted earthy palette of straw, limewash, oak and moss.
+
+The cottage: low limewashed wattle-and-daub walls, a huge thick weathered thatched hipped roof sweeping down almost to head height with deep rounded eaves, curved cruck timbers visible on the gable end, a smoke hole at the top of the thatch and no chimney, a small unglazed window with a wooden shutter, a low plank door about as tall as an adult person. It sits on a small irregular patch of trampled earth with grass tufts and a puddle that fades softly into the background, nettles and long grass against the walls, mud splashes at the wall base. Low and wide proportions: the eaves at about 1.5 times the height of an adult, the ridge at about 3.5 times.
+
+Avoid: text, letters, watermark, frame, people, animals, flower boxes, brick chimney, glass windows, tall straight box walls, bright clean colours, toy-like cartoon look, any floor or shadow on the green background.
+```
+
+Ist das Haus gelungen, bitte im selben Gespräch gleich die Varianten aus Punkt 4 erzeugen: Bauplatz, Rohbau 1 bis 3 und Brandruine.
+
+**Hinweis für Steam:** Steam verlangt beim Einreichen eine Angabe, ob Inhalte mit KI erzeugt wurden, und eine kurze Beschreibung dazu. Gemini-Bilder tragen außerdem ein unsichtbares Wasserzeichen (SynthID). Beides spricht nicht gegen die Bilder, man muss es nur angeben.
 
 ---
 
