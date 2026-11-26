@@ -72,7 +72,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 0.75 : 1) : (G.view.w < 720 ? 0.9 : 1.15);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.1 : 1.6) : (G.view.w < 720 ? 1.1 : 1.4);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -353,7 +353,8 @@ function setGfx(mode, quiet = false) {
 G.setGfx = setGfx;
 G.cycleGfx = () => setGfx(GFX_MODES[(GFX_MODES.indexOf(G.gfx) + 1) % GFX_MODES.length]);
 
-function zoom(f) { G.cam.zoom = Math.max(0.55, Math.min(1.8, G.cam.zoom * f)); }
+// Zoom von der Übersicht (0,45) bis ganz nah (4): Figuren füllen dann gut ein Zehntel der Bildhöhe
+function zoom(f) { G.cam.zoom = Math.max(0.45, Math.min(4, G.cam.zoom * f)); }
 
 function togglePanel(kind) {
   if (G.ui.panel === kind) closePanel();
@@ -450,7 +451,7 @@ function bindInput() {
     viewCanvas.style.cursor = (u && u.group) || an ? 'crosshair' : 'pointer';
   });
   viewCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  viewCanvas.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+  viewCanvas.addEventListener('wheel', (e) => { e.preventDefault(); const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; zoom(Math.exp(-Math.max(-120, Math.min(120, d)) * 0.0016)); }, { passive: false });
   mini.addEventListener('click', () => tool('map'));
   byId('prompt').addEventListener('click', () => {
     if (!G.started || panelOpen() || dialogOpen()) return;

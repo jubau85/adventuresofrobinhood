@@ -300,6 +300,59 @@ function drawHouse(c, b) {
   if (b.dmg > 0) drawDamage(c, b);
 }
 
+// ---------------------------------------------------------------- Bild-Zwischenspeicher
+// Ruhende Bauten werden einmal in ein Bild gezeichnet und dann nur noch kopiert. Ganz nah
+// (oder bei Brand und Gerüst) wird direkt gezeichnet, damit alles scharf und lebendig bleibt.
+const partCache = new Map();
+let cacheScale = 1, cacheOn = true, cacheUsed = 0, cacheMax = 400;
+function cachedDraw(c, o, bounds, fn) {
+  if (!cacheOn) { fn(c); return; }
+  cacheUsed++;
+  const key = `${seasonIndex()}|${darkness() > 0.2 ? 1 : 0}|${cacheScale}`;
+  let e = partCache.get(o);
+  const ax = isoX(o.x, o.y), ay = isoY(o.x, o.y);
+  if (!e || e.key !== key) {
+    const [xmin, xmax, ymin, ymax] = bounds;
+    const sc = cacheScale;
+    const cv = makeCanvas(Math.max(1, Math.ceil((xmax - xmin) * sc)), Math.max(1, Math.ceil((ymax - ymin) * sc)));
+    const g = cv.getContext('2d');
+    g.setTransform(sc, 0, 0, sc, (-ax - xmin) * sc, (-ay - ymin) * sc);
+    const bz = baseZ; baseZ = 0;
+    const l0 = lights.length;
+    fn(g);
+    const ls = lights.splice(l0);
+    baseZ = bz;
+    e = { cv, key, xmin, ymin, sc, lights: ls, smoke: o.smoke ? [o.smoke[0], o.smoke[1]] : null };
+    if (o.smoke) o.smoke = null;
+  } else partCache.delete(o);
+  partCache.set(o, e);
+  while (partCache.size > cacheMax) partCache.delete(partCache.keys().next().value);
+  c.drawImage(e.cv, ax + e.xmin, ay - baseZ + e.ymin, e.cv.width / e.sc, e.cv.height / e.sc);
+  for (const l of e.lights) lights.push({ ...l, z: l.z + baseZ });
+  if (e.smoke) o.smoke = [e.smoke[0], e.smoke[1] - baseZ];
+}
+
+function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
+function drawHouseFast(c, b) {
+  if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
+  cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
+}
+function drawChurchFast(c, b) { const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 130 : 115), half / 2 + 16], (g) => drawChurch(g, b)); }
+
+// Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
+function drawCityWallPiece(c, o) {
+  const col = '#b9b1a1';
+  if (o.tower) {
+    drawShadow(c, o.x, o.y, 1.3, 1.3, 50, 0.18);
+    drawBox(c, o.x, o.y, 1.25, 1.25, o.gate ? 46 : 40, col, 0, 'stone');
+    drawMerlons(c, o.x, o.y, 1.25, 1.25, o.gate ? 46 : 40, col);
+    if (o.gate) banner(c, o.x, o.y, 46, o.color);
+    return;
+  }
+  drawBox(c, o.x, o.y, 1.0, 1.0, 28, col, 0, 'stone');
+  drawMerlons(c, o.x, o.y, 1.0, 1.0, 28, col, 0.16);
+}
+
 // Wirtshaus: Ausleger mit Schild, Bänke und Tisch vor der Tür
 function drawTavernFront(c, b) {
   const [ax, ay] = P(b.x + b.wx / 2, b.y + b.wy / 2, b.h * 0.85);
@@ -1041,7 +1094,7 @@ function buildStaticParts() {
   const parts = [];
   for (const b of W.buildings) {
     const f = {
-      house: drawHouse, church: drawChurch, longhall: drawLonghall, tent: drawTent, stall: drawStall,
+      house: drawHouseFast, church: drawChurchFast, longhall: drawLonghall, tent: drawTent, stall: drawStall,
       well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
       landmark: drawLandmark, stonehenge: drawStonehenge,
     }[b.kind];
@@ -1049,6 +1102,17 @@ function buildStaticParts() {
     if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
   }
   for (const s of W.sites) {
+    if (s.cityWall) {
+      const N = W.N, isOpen = (x, y) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE || t === T.WATER; };
+      const ring = s.cityWall;
+      ring.forEach(([x, y], k) => {
+        if (isOpen(x, y)) return;
+        const prev = ring[(k - 1 + ring.length) % ring.length], next = ring[(k + 1) % ring.length];
+        const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
+        const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
+        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -96 : -66, 26], (g) => drawCityWallPiece(g, o)) });
+      });
+    }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
     if (s.cemetery) {
@@ -1766,7 +1830,7 @@ function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width 
 
 function makeDeciduous(season, v) {
   const w = 64, h = 84;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(1000 + v * 17);
   g.fillStyle = '#5a4030';
   g.fillRect(w / 2 - 3, h - 30, 6, 28);
@@ -1783,7 +1847,7 @@ function makeDeciduous(season, v) {
     branch(w / 2, h - 28, -Math.PI / 2, 16, 4);
     g.fillStyle = 'rgba(250,252,252,0.9)';
     for (let k = 0; k < 12; k++) g.fillRect(w / 2 - 16 + r() * 32, 14 + r() * 30, 3, 1.5);
-    return { cvs: cv, ax: w / 2, ay: h - 3 };
+    return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
   }
   const sets = [
     ['#4f8a34', '#6aa344', '#94c862', '#35612a'],
@@ -1810,12 +1874,12 @@ function makeDeciduous(season, v) {
   for (let k = 0; k < 40; k++) g.fillRect(cx - 18 + r() * 36, cy - 14 + r() * 28, 1.5, 1.5);
   if (season === 0 && v === 0) { g.fillStyle = '#f6e6f0'; for (let k = 0; k < 14; k++) g.fillRect(cx - 14 + r() * 28, cy - 12 + r() * 22, 2, 2); }
   if (season === 1 && v === 2) { g.fillStyle = '#c9302a'; for (let k = 0; k < 8; k++) { g.beginPath(); g.arc(cx - 12 + r() * 24, cy - 8 + r() * 20, 1.6, 0, Math.PI * 2); g.fill(); } }
-  return { cvs: cv, ax: w / 2, ay: h - 3 };
+  return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
 }
 
 function makeConifer(season, v) {
   const w = 44, h = 92;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(2000 + v * 13);
   g.fillStyle = '#4a3428';
   g.fillRect(w / 2 - 2.5, h - 16, 5, 14);
@@ -1836,12 +1900,12 @@ function makeConifer(season, v) {
       g.beginPath(); g.moveTo(w / 2 - half * 0.75, by - 5); g.lineTo(w / 2, top + 1); g.lineTo(w / 2 + half * 0.6, by - 6); g.lineTo(w / 2, top + 8); g.closePath(); g.fill();
     }
   }
-  return { cvs: cv, ax: w / 2, ay: h - 3 };
+  return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
 }
 
 function makeBush(season, v) {
   const w = 34, h = 26;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(4000 + v * 11);
   const cols = [['#4c8232', '#68a043', '#8cc25c'], ['#3f7a2c', '#55923a', '#77b04e'], ['#8a6a2a', '#b08a34', '#d0aa4a'], ['#5a6650', '#6e7a62', '#eef2f2']][season];
   const blobs = [];
@@ -1856,12 +1920,12 @@ function makeBush(season, v) {
   for (const [x, y, rr] of blobs.slice(0, 3)) { g.beginPath(); g.arc(x - 2, y - 3, rr * 0.3, 0, Math.PI * 2); g.fill(); }
   if (season < 2 && v === 1) { g.fillStyle = '#c9302a'; for (let k = 0; k < 6; k++) g.fillRect(w / 2 - 9 + r() * 18, 10 + r() * 8, 2, 2); }
   if (season === 0 && v === 2) { g.fillStyle = '#f8f0d8'; for (let k = 0; k < 7; k++) g.fillRect(w / 2 - 9 + r() * 18, 9 + r() * 9, 2, 2); }
-  return { cvs: cv, ax: w / 2, ay: h - 4 };
+  return { cvs: cv, ax: w / 2, ay: h - 4, k: 1 / SPR };
 }
 
 function makeRock(season, v) {
   const w = 40, h = 30;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(3000 + v * 7);
   const pts = [];
   for (let k = 0; k < 7; k++) { const a = Math.PI + (k / 6) * Math.PI; pts.push([20 + Math.cos(a) * (12 + r() * 6), 24 + Math.sin(a) * (10 + r() * 8)]); }
@@ -1873,7 +1937,7 @@ function makeRock(season, v) {
   g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(0, 4)) g.lineTo(p[0], p[1]); g.lineTo(20, 22); g.closePath(); g.fill();
   g.fillStyle = season === 3 ? 'rgba(250,252,252,0.95)' : 'rgba(110,140,70,0.55)';
   g.beginPath(); g.ellipse(17, 13, 8, 3.5, 0, 0, Math.PI * 2); g.fill();
-  return { cvs: cv, ax: 20, ay: 25 };
+  return { cvs: cv, ax: 20, ay: 25, k: 1 / SPR };
 }
 
 // Gemalte Laubbäume (Frühling und Sommer), drei Spielarten durch leichte Farbverschiebung
@@ -1888,6 +1952,7 @@ function artTree(season, v) {
   return { cvs: cv, ax: (im.width / 2) * k, ay: im.height * 0.893 * k, k };
 }
 
+const SPR = 3;
 function ensureSprites() {
   const s = seasonIndex();
   if (sprites && spriteSeason === s) return;
@@ -2088,26 +2153,29 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   }
 }
 
-function renderChunk(cx, cy) {
+function renderChunk(cx, cy, cs = 1) {
   const W = G.world;
   const season = seasonIndex();
   const pal = PAL[season];
-  const cvs = makeCanvas(CHUNK * TW, CHUNK * TH + PAD_TOP + 4);
+  const cvs = makeCanvas((CHUNK * TW) * cs, (CHUNK * TH + PAD_TOP + 4) * cs);
   const c = cvs.getContext('2d');
+  c.scale(cs, cs);
   const x0 = cx * CHUNK, y0 = cy * CHUNK;
   const ox = -isoX(x0, y0 + CHUNK), oy = -isoY(x0, y0) + PAD_TOP;
   const noise = getPatchNoise();
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise);
-  return { cvs, x: -ox, y: -oy };
+  return { cvs, x: -ox, y: -oy, s: cs, w: cvs.width / cs, h: cvs.height / cs };
 }
 
-function getChunk(cx, cy) {
-  const key = cy * G.world.CN + cx;
+// Je näher die Kamera, desto feiner werden die Kacheln gerendert (Speicher bleibt begrenzt)
+function getChunk(cx, cy, cs = 1) {
+  const key = (cy * G.world.CN + cx) * 8 + cs;
   let ch = chunkCache.get(key);
   if (ch) { chunkCache.delete(key); chunkCache.set(key, ch); return ch; }
-  ch = renderChunk(cx, cy);
+  ch = renderChunk(cx, cy, cs);
   chunkCache.set(key, ch);
-  if (chunkCache.size > 240) chunkCache.delete(chunkCache.keys().next().value);
+  const max = Math.max(24, Math.floor(260 / (cs * cs)));
+  while (chunkCache.size > max) chunkCache.delete(chunkCache.keys().next().value);
   return ch;
 }
 
@@ -2799,10 +2867,16 @@ export function render() {
   const cy0 = Math.max(0, Math.floor(minY / CHUNK)), cy1 = Math.min(CN - 1, Math.floor(maxY / CHUNK));
   const isoL = cam.x - w / 2 / z - 80, isoR = cam.x + w / 2 / z + 80, isoT = cam.y - h / 2 / z - 140, isoB = cam.y + h / 2 / z + 120;
 
+  const cs = low ? 1 : Math.max(1, Math.min(4, Math.ceil(z * dpr - 0.15)));
+  cacheOn = low || z * dpr <= 2.6;
+  cacheScale = low ? 1 : Math.max(1, Math.min(2, Math.ceil(z * dpr - 0.15)));
+  // Platz für alles, was im letzten Bild zu sehen war, plus Reserve (kein ständiges Neuzeichnen)
+  cacheMax = Math.max(Math.floor(300 / (cacheScale * cacheScale)), Math.ceil(cacheUsed * 1.3) + 20);
+  cacheUsed = 0;
   for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
-    const ch = getChunk(cx, cy);
-    if (ch.x > isoR || ch.x + ch.cvs.width < isoL || ch.y > isoB || ch.y + ch.cvs.height < isoT) continue;
-    wc.drawImage(ch.cvs, ch.x, ch.y);
+    const ch = getChunk(cx, cy, cs);
+    if (ch.x > isoR || ch.x + ch.w < isoL || ch.y > isoB || ch.y + ch.h < isoT) continue;
+    wc.drawImage(ch.cvs, ch.x, ch.y, ch.w, ch.h);
   }
   drawSlab(wc, minX, maxX, minY, maxY);
   drawWaterShimmer(wc, minX, maxX, minY, maxY);

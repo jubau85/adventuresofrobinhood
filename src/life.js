@@ -101,7 +101,12 @@ export function spawnVillagers() {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
-    if ((site.houses || 0) > 18) roles = roles.concat(['buerger', 'buerger', 'haendler', 'magd', 'kind', 'buerger']);
+    // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
+    if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
+      const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
+      const pool = ['buerger', 'magd', 'handwerker', 'buerger', 'haendler', 'kind', 'buerger', 'wache', 'magd', 'bauer'];
+      for (let k = 0; k < Math.min(60, Math.floor(nh / 5)); k++) roles = roles.concat(pool[k % pool.length]);
+    }
     let stall = 0;
     for (const role of roles) {
       const o = dress(role, site);

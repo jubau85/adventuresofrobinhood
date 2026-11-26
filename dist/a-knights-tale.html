@@ -830,9 +830,9 @@ const SETTLEMENTS = [
   // ---------------- England (in Yorkshire etwas auseinandergezogen, damit jeder Ort Platz hat)
   { id: 'ashcombe', name: 'Ashcombe', type: 'spieler', faction: null, clear: 11, realm: 'en', lon: -1.81, lat: 53.62, produces: [], demands: [],
     desc: 'Dein Erbe: ein verfallener Burgstall am Rand der Pennines. Der Vogt hat dir nur die Steine gelassen.' },
-  { id: 'york', name: 'York', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -0.95, lat: 54.05, houses: 20, landmarks: [{ kind: 'kathedrale', name: 'York Minster', len: 4.2, westTowers: 2, central: 'turm' }, { kind: 'motte', name: 'Burghügel von York', wooden: true }], produces: ['wolle', 'bier', 'salz'], demands: ['eisen', 'holz', 'wein', 'fleisch', 'felle'],
+  { id: 'york', name: 'York', type: 'stadt', cityR: 15, faction: 'gilde', clear: 8, realm: 'en', lon: -0.95, lat: 54.05, landmarks: [{ kind: 'kathedrale', name: 'York Minster', len: 4.2, westTowers: 2, central: 'turm' }, { kind: 'motte', name: 'Burghügel von York', wooden: true }], produces: ['wolle', 'bier', 'salz'], demands: ['eisen', 'holz', 'wein', 'fleisch', 'felle'],
     desc: 'Die größte Stadt des Nordens. Flämische Wollhändler, Zünfte und ein Erzbischof, der überall mitredet.' },
-  { id: 'london', name: 'London', type: 'stadt', faction: 'gilde', clear: 9, realm: 'en', lon: -0.10, lat: 51.51, port: true, houses: 26, landmarks: [{ kind: 'tower', name: 'Tower von London', near: 'dock' }, { kind: 'kathedrale', name: 'St Paul\'s', len: 4.6, spire: true }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'fleisch', 'felle', 'holz'],
+  { id: 'london', name: 'London', type: 'stadt', cityR: 22, faction: 'gilde', clear: 9, realm: 'en', lon: -0.10, lat: 51.51, port: true, landmarks: [{ kind: 'tower', name: 'Tower von London', near: 'dock' }, { kind: 'kathedrale', name: 'St Paul\'s', len: 4.6, spire: true }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'fleisch', 'felle', 'holz'],
     desc: 'Die reichste Stadt des Reiches, mit dem Tower und dem Hafen an der Themse. Von hier segeln die Wollschiffe nach Brügge.' },
   { id: 'nottingham', name: 'Nottingham', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -1.18, lat: 52.91, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
     desc: 'Die Burg des Sheriffs auf dem Sandsteinfelsen. Prinz Johns Leute halten sie noch immer.' },
@@ -916,7 +916,7 @@ const SETTLEMENTS = [
     desc: 'Fischerhafen an der Spitze des Cotentin. Hier landen die Könige von England.' },
   { id: 'caen', name: 'Caen', type: 'burg', faction: 'normannen', clear: 8, realm: 'nd', lon: -0.36, lat: 49.18, produces: ['stein', 'getreide'], demands: ['wein', 'wolle', 'eisen'],
     desc: 'Die Burg des Eroberers. Der Kalkstein von Caen steckt in halb England.' },
-  { id: 'rouen', name: 'Rouen', type: 'stadt', faction: 'normannen', clear: 8, realm: 'nd', lon: 1.10, lat: 49.44, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Rouen', len: 4.2, westTowers: 2, central: 'spitze' }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
+  { id: 'rouen', name: 'Rouen', type: 'stadt', cityR: 14, faction: 'normannen', clear: 8, realm: 'nd', lon: 1.10, lat: 49.44, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Rouen', len: 4.2, westTowers: 2, central: 'spitze' }], produces: ['wein', 'salz', 'eisen'], demands: ['wolle', 'getreide', 'holz', 'fleisch'],
     desc: 'Hauptstadt der Normandie an der Seine. Richards Seneschall hält sie gegen König Philipp.' },
   { id: 'montstmichel', name: 'Mont-Saint-Michel', type: 'abtei', faction: 'kirche', clear: 6, realm: 'nd', lon: -1.48, lat: 48.60, landmarks: [{ kind: 'kathedrale', name: 'Abtei auf dem Felsen', len: 3.2, central: 'spitze', rock: true }], produces: ['salz', 'wolle'], demands: ['wein', 'getreide', 'holz'],
     desc: 'Die Abtei auf dem Felsen im Watt. Bei Flut ist sie eine Insel.' },
@@ -929,7 +929,7 @@ const SETTLEMENTS = [
   // ---------------- Frankreich und Flandern
   { id: 'calais', name: 'Calais', type: 'dorf', faction: 'gilde', clear: 6, realm: 'fl', lon: 1.86, lat: 50.93, port: true, produces: ['salz', 'fleisch'], demands: ['wolle', 'bier', 'holz'],
     desc: 'Ein Fischerort an der engsten Stelle des Kanals. Bei klarem Wetter sieht man die Felsen von Dover.' },
-  { id: 'brugge', name: 'Brügge', type: 'stadt', faction: 'gilde', clear: 8, realm: 'fl', lon: 3.22, lat: 51.20, port: true, landmarks: [{ kind: 'tuchhalle', name: 'Tuchhalle mit Belfried', belfry: true }], produces: ['wein', 'eisen', 'salz'], demands: ['wolle', 'getreide', 'felle'],
+  { id: 'brugge', name: 'Brügge', type: 'stadt', cityR: 14, faction: 'gilde', clear: 8, realm: 'fl', lon: 3.22, lat: 51.20, port: true, landmarks: [{ kind: 'tuchhalle', name: 'Tuchhalle mit Belfried', belfry: true }], produces: ['wein', 'eisen', 'salz'], demands: ['wolle', 'getreide', 'felle'],
     desc: 'Die flämische Handelsstadt lebt von englischer Wolle. Die Tuchhallen sind voller Kaufleute aus aller Welt.' },
   { id: 'gent', name: 'Gent', type: 'markt', faction: 'gilde', clear: 7, realm: 'fl', lon: 3.72, lat: 51.05, landmarks: [{ kind: 'tower', name: 'Gravensteen', grey: true }], produces: ['wolle', 'bier'], demands: ['getreide', 'fleisch', 'holz'],
     desc: 'Die Weberstadt an der Schelde. Ihre Tuche gehen bis nach Konstantinopel.' },
@@ -937,7 +937,7 @@ const SETTLEMENTS = [
     desc: 'Marktstadt an der Somme. König Philipp hat sie erst vor wenigen Jahren an sich gezogen.' },
   { id: 'gisors', name: 'Gisors', type: 'burg', faction: 'franken', clear: 7, realm: 'fr', lon: 1.78, lat: 49.28, castleLevel: 3, produces: ['stein', 'eisen'], demands: ['getreide', 'wein', 'fleisch'],
     desc: 'Die umkämpfte Grenzburg im Vexin. Seit dem letzten Jahr wehen hier die Lilien.' },
-  { id: 'paris', name: 'Paris', type: 'stadt', faction: 'franken', clear: 9, realm: 'fr', lon: 2.35, lat: 48.86, houses: 24, landmarks: [{ kind: 'kathedrale', name: 'Notre-Dame (im Bau)', len: 4.4, westTowers: 2, central: 'reiter', scaffold: true, unfinished: true }, { kind: 'rundturm', name: 'Der neue Louvre (im Bau)', scaffold: true }], produces: ['wein', 'getreide', 'eisen'], demands: ['wolle', 'holz', 'salz', 'fleisch', 'felle'],
+  { id: 'paris', name: 'Paris', type: 'stadt', cityR: 20, faction: 'franken', clear: 9, realm: 'fr', lon: 2.35, lat: 48.86, landmarks: [{ kind: 'kathedrale', name: 'Notre-Dame (im Bau)', len: 4.4, westTowers: 2, central: 'reiter', scaffold: true, unfinished: true }, { kind: 'rundturm', name: 'Der neue Louvre (im Bau)', scaffold: true }], produces: ['wein', 'getreide', 'eisen'], demands: ['wolle', 'holz', 'salz', 'fleisch', 'felle'],
     desc: 'König Philipps Hauptstadt. An der Seine baut man eine neue Kathedrale und eine Mauer um die ganze Stadt.' },
   { id: 'chartres', name: 'Chartres', type: 'abtei', faction: 'kirche', clear: 7, realm: 'fr', lon: 1.49, lat: 48.45, landmarks: [{ kind: 'kathedrale', name: 'Dom von Chartres (abgebrannt)', len: 4.2, westTowers: 2, burned: true, scaffold: true }], produces: ['getreide', 'wein'], demands: ['stein', 'holz', 'eisen'],
     desc: 'Der Dom ist in diesem Jahr abgebrannt. Jetzt sucht der Bischof Steine, Holz und Spender.' },
@@ -1479,6 +1479,7 @@ function buildStaticWalls(W) {
   const N = W.N;
   W.blockStatic = new Uint8Array(N * N);
   for (const s of W.sites) {
+    if (s.cityWall) blockTiles(W, W.blockStatic, s.cityWall);
     if (s.type === 'burg') blockTiles(W, W.blockStatic, wallRing(W, s, 4));
     if (s.palisade) {
       const list = [];
@@ -1862,13 +1863,20 @@ function siteGap(a, b) {
   const lager = a.type === 'lager' || b.type === 'lager';
   if (a.type === 'spieler' || b.type === 'spieler') return lager ? 18 : 26;
   if (lager) return 16;
-  return a.clear + b.clear + 6;
+  return a.clear + b.clear + 2;
+}
+
+// Größe eines Ortes in Feldern (Radius): Großstädte füllen mehrere Bildschirme
+function siteRadius(def) {
+  if (def.type === 'stadt') return def.cityR || 13;
+  return def.clear + ({ markt: 2, dorf: 2, burg: 2, abtei: 1, halle: 1 }[def.type] || 0);
 }
 
 // Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse)
 function placeSettlements(W, rng) {
   const N = W.N;
-  for (const def of SETTLEMENTS) {
+  for (const def0 of SETTLEMENTS) {
+    const def = { ...def0, clear: siteRadius(def0) };
     const g = geoToTile(def.lon, def.lat);
     const gx = Math.floor(g.x), gy = Math.floor(g.y);
     const near = nearestWalkableTile(W, gx, gy);
@@ -1885,7 +1893,7 @@ function placeSettlements(W, rng) {
           const i = y * N + x;
           if (W.tiles[i] === T.WATER || W.landId[i] !== home) continue;
           if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < siteGap(s, def))) continue;
-          const waterR = def.port ? (def.type === 'burg' || def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : Math.max(4, def.clear - 2);
+          const waterR = def.port ? (def.type === 'burg' || def.type === 'stadt' ? 5 : 4) : def.type === 'lager' ? 3 : def.type === 'stadt' || def.type === 'markt' ? 4 : Math.min(6, Math.max(4, def.clear - 2));
           if (countAround(W, x, y, waterR, T.WATER) > 0) continue;
           let score = Math.hypot(ox, oy);
           if (strict && def.port) {
@@ -2178,6 +2186,109 @@ function placeCemetery(W, s) {
   }
 }
 
+// ---------------------------------------------------------------- Städte
+// Marktplatz in der Mitte, Hauptstraßen zu den Toren, Ringgassen, Häuserzeilen, Pfarrkirchen,
+// Brunnen, Gasthäuser und Schmieden. Große Städte haben eine Mauer mit Toren an den Straßen.
+function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
+  const N = W.N, R = s.clear - 1, cx = s.x, cy = s.y;
+  const walled = R >= 12;
+  const streets = new Set();
+  const inCity = (x, y) => Math.hypot(x + 0.5 - cx, y + 0.5 - cy) < R - (walled ? 0.9 : 0);
+  const street = (x, y, bridge = false) => {
+    x = Math.floor(x); y = Math.floor(y);
+    if (x < 2 || y < 2 || x >= N - 2 || y >= N - 2 || !inCity(x, y)) return false;
+    const i = y * N + x, t = W.tiles[i];
+    if (t === T.WATER) { if (!bridge || W.sea[i]) return false; W.tiles[i] = T.BRIDGE; }
+    else if (t !== T.BRIDGE) W.tiles[i] = T.ROAD;
+    streets.add(i);
+    return true;
+  };
+  // Marktplatz
+  for (let y = Math.floor(cy - 2.6); y <= cy + 2.6; y++) for (let x = Math.floor(cx - 2.6); x <= cx + 2.6; x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) < 2.6) street(x, y);
+  // Hauptstraßen strahlenförmig, leicht geschwungen, über Flüsse mit Brücken
+  const rays = Math.max(6, Math.round(R / 2.2));
+  const a0 = rng() * Math.PI;
+  for (let k = 0; k < rays; k++) {
+    const a = a0 + (k / rays) * Math.PI * 2 + (rng() - 0.5) * 0.25;
+    const bend = (rng() - 0.5) * 0.04;
+    for (let r = 2.4; r < R + 2; r += 0.4) {
+      const aa = a + bend * r;
+      street(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r, k % 2 === 0);
+    }
+  }
+  // Ringgassen
+  for (const f of R >= 12 ? [0.42, 0.68, 0.9] : [0.5, 0.85]) {
+    const rr = R * f;
+    for (let a = 0; a < Math.PI * 2; a += 0.35 / rr) street(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+  // Stadtmauer: Ring knapp außerhalb, Straßen bleiben als Tore offen
+  if (walled) {
+    s.cityWall = [];
+    const seen = new Set();
+    for (let a = 0; a < Math.PI * 2; a += 0.3 / R) {
+      const x = Math.floor(cx + Math.cos(a) * R), y = Math.floor(cy + Math.sin(a) * R);
+      const i = y * N + x;
+      if (seen.has(i) || x < 1 || y < 1 || x >= N - 1 || y >= N - 1) continue;
+      seen.add(i);
+      if (W.tiles[i] === T.WATER) continue;
+      s.cityWall.push([x, y]);
+    }
+  }
+  // Wahrzeichen und Kirchen
+  if (!hasCathedral) add({ kind: 'church', x: cx - 3.2, y: cy - 3.4, wx: 2.6, wy: 1.2, h: 30, big: true });
+  // Marktstände rund um den Platz, Brunnen in der Mitte
+  for (let k = 0; k < 6 + Math.floor(R / 4); k++) {
+    const a = (k / (6 + Math.floor(R / 4))) * Math.PI * 2 + 0.3, r = 1.6 + (k % 2) * 0.6;
+    add({ kind: 'stall', x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#7d2a52', '#e8e0cc']), noCost: true, wx: 0.8, wy: 0.6 });
+  }
+  add({ kind: 'well', x: cx + 0.15, y: cy - 0.25, wx: 0.6, wy: 0.6, noCost: true });
+  // Pfarrkirchen in den Vierteln
+  for (let k = 0; k < Math.floor(R / 5); k++) {
+    for (let tries = 0; tries < 80; tries++) {
+      const a = rng() * Math.PI * 2, r = R * (0.35 + rng() * 0.5);
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      if (!footprintFree(W, x, y, 2.0, 1.0, 0.25)) continue;
+      add({ kind: 'church', x, y, wx: 2.0, wy: 1.0, h: 24, big: false });
+      break;
+    }
+  }
+  // Brunnen, Gasthäuser und Schmieden in den Vierteln
+  for (let k = 0; k < Math.floor(R / 4); k++) {
+    for (let tries = 0; tries < 40; tries++) {
+      const a = rng() * Math.PI * 2, r = R * (0.3 + rng() * 0.55);
+      const x = Math.floor(cx + Math.cos(a) * r) + 0.5, y = Math.floor(cy + Math.sin(a) * r) + 0.5;
+      if (W.tiles[Math.floor(y) * N + Math.floor(x)] !== T.ROAD || !freeSpot(W, x + 0.6, y, 0.9)) continue;
+      add({ kind: 'well', x: x + 0.6, y, wx: 0.6, wy: 0.6, noCost: true });
+      break;
+    }
+  }
+  for (let k = 0; k < 1 + Math.floor(R / 7); k++) tavern(3, R * 0.8);
+  for (let k = 0; k < 1 + Math.floor(R / 6); k++) smithy();
+  // Häuserzeilen entlang der Gassen, die Längsseite zur Straße
+  const list = [...streets];
+  for (let k = list.length - 1; k > 0; k--) { const j = Math.floor(rng() * (k + 1)); [list[k], list[j]] = [list[j], list[k]]; }
+  for (const i of list) {
+    const x = i % N, y = (i / N) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (rng() > 0.78) continue;
+      const hx = x + dx, hy = y + dy;
+      if (!inCity(hx, hy) || Math.hypot(hx + 0.5 - cx, hy + 0.5 - cy) < 3.2) continue;
+      const t = W.tiles[hy * N + hx];
+      if (t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
+      const px = hx + 0.5 - dx * 0.08, py = hy + 0.5 - dy * 0.08;
+      if (!freeSpot(W, px, py, 1.02)) continue;
+      const alongX = dy !== 0;
+      const big = rng() < 0.3;
+      props(add(house(px, py, {
+        wx: alongX ? 0.95 + rng() * 0.25 : 0.8 + rng() * 0.12, wy: alongX ? 0.8 + rng() * 0.12 : 0.95 + rng() * 0.25,
+        h: big ? 22 + rng() * 8 : 15 + rng() * 8, rh: 11 + rng() * 5,
+        roof: rng() < 0.3 ? 'tile' : rng() < 0.12 ? 'slate' : 'thatch',
+        wall: rpick(rng, ['timber', 'timber', 'plaster', 'stone', 'timber', 'plaster']),
+      })));
+    }
+  }
+}
+
 const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [2.4, 2.2], motte: [3.2, 3.2], rundturm: [2.4, 2.4], tuchhalle: [3.4, 1.6], tor: [5.5, 5.5] };
 
 // Wahrzeichen zuerst setzen, die Häuser ordnen sich darum herum
@@ -2214,7 +2325,7 @@ function genBuildings(W, s, rng) {
   const house = (x, y, o = {}) => ({
     kind: 'house', x, y,
     wx: o.wx ?? 0.9 + rng() * 0.5, wy: o.wy ?? 0.8 + rng() * 0.4,
-    h: o.h ?? 13 + rng() * 8, rh: o.rh ?? 11 + rng() * 6,
+    h: (o.h ?? 13 + rng() * 8) * 1.2, rh: (o.rh ?? 11 + rng() * 6) * 1.2,
     wall: o.wall ?? rpick(rng, ['plaster', 'timber', 'timber']),
     roof: o.roof ?? 'thatch', chimney: rng() < 0.45, lit: rng() < 0.75,
   });
@@ -2249,7 +2360,7 @@ function genBuildings(W, s, rng) {
   const smithy = () => {
     if (!['stadt', 'markt', 'dorf', 'halle', 'burg'].includes(s.type)) return;
     for (let k = 0; k < 40; k++) {
-      const a = rng() * Math.PI * 2, r = 3 + rng() * 3;
+      const a = rng() * Math.PI * 2, r = 3 + rng() * Math.max(3, s.clear * 0.6);
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
       if (!freeSpot(W, x, y, 1.7) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       add({ kind: 'house', x, y, wx: 1.0, wy: 0.9, h: 13, rh: 10, wall: 'timber', roof: 'thatch', chimney: true, lit: true, smithy: true });
@@ -2258,30 +2369,28 @@ function genBuildings(W, s, rng) {
     }
   };
   // Wirtshaus mit Schild, Bänken und Fässern
-  const tavern = () => {
+  const tavern = (rMin = s.type === 'burg' ? 6.4 : 2.4, rSpan = 2.4) => {
     if (!['stadt', 'markt', 'dorf', 'halle', 'burg'].includes(s.type)) return;
     for (let k = 0; k < 60; k++) {
-      const a = rng() * Math.PI * 2, r = (s.type === 'burg' ? 6.4 : 2.4) + rng() * 2.4;
+      const a = rng() * Math.PI * 2, r = rMin + rng() * rSpan;
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
       if (!freeSpot(W, x, y, 2.1) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       if (s.type === 'burg' && Math.hypot(x - s.x, y - s.y) < 5.8) continue;
       add({ kind: 'house', x, y, wx: 1.5, wy: 1.1, h: 17, rh: 12, wall: 'timber', roof: 'thatch', chimney: true, lit: true, tavern: true, sign: rpick(rng, TAVERN_SIGNS) });
       W.buildings.push({ kind: 'prop', prop: 'fass', x: x + 0.95, y: y - 0.2, v: rng(), site: s.id });
-      s.tavern = { x, y: y + 0.85, name: `Gasthaus ${rpick(rng, TAVERN_NAMES)}` };
+      if (!s.tavern) s.tavern = { x, y: y + 0.85, name: `Gasthaus ${rpick(rng, TAVERN_NAMES)}` };
+      (s.taverns || (s.taverns = [])).push({ x, y: y + 0.85 });
       return;
     }
   };
-  tavern();
+  if (s.type !== 'stadt') tavern();
   switch (s.type) {
     case 'stadt':
-      if (!hasCathedral) add({ kind: 'church', x: s.x - 2.5, y: s.y - 2.5, wx: 2.6, wy: 1.2, h: 30, big: true });
-      for (let k = 0; k < 4; k++) add({ kind: 'stall', x: s.x + Math.cos(k * 1.57 + 0.4) * 1.7, y: s.y + Math.sin(k * 1.57 + 0.4) * 1.7, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c']), noCost: true, wx: 0.8, wy: 0.6 });
-      add({ kind: 'well', x: s.x + 0.2, y: s.y - 0.3, wx: 0.6, wy: 0.6, noCost: true });
-      smithy();
-      ring(s.houses || 16, 2.6, Math.max(6.5, s.clear - 0.6), (x, y) => house(x, y, { roof: rng() < 0.35 ? 'tile' : 'thatch', wall: rpick(rng, ['timber', 'plaster', 'stone', 'timber']), h: 15 + rng() * 9 }));
+      genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral);
       break;
     case 'markt':
       smithy();
+      ring(9, 6, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
       ring(7, 2.5, 5.5, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
       for (let k = 0; k < 5; k++) add({ kind: 'tent', x: s.x + 3 + k * 1.15, y: s.y - 3.6, wx: 0.9, wy: 0.9, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#e8e0cc', '#5b8a3c']), noCost: true });
       add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, noCost: true });
@@ -2289,7 +2398,7 @@ function genBuildings(W, s, rng) {
       add({ kind: 'stall', x: s.x - 1.3, y: s.y + 0.9, color: '#d6ad4c', noCost: true, wx: 0.8, wy: 0.6 });
       break;
     case 'dorf':
-      ring(5 + Math.floor(rng() * 3), 1.8, 4.8, (x, y) => house(x, y));
+      ring(8 + Math.floor(rng() * 4), 1.8, s.clear - 0.8, (x, y) => house(x, y));
       smithy();
       add({ kind: 'well', x: s.x + 0.9, y: s.y + 0.7, wx: 0.6, wy: 0.6, noCost: true });
       break;
@@ -2300,14 +2409,14 @@ function genBuildings(W, s, rng) {
       break;
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
-      ring(6, 6.2, 7.8, (x, y) => house(x, y));
+      ring(12, 6.2, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;
     case 'abtei':
       if (!hasCathedral) add({ kind: 'church', x: s.x - 0.5, y: s.y - 1.8, wx: 3.2, wy: 1.3, h: 34, big: true, abbey: true });
       add({ kind: 'house', x: s.x + 2.2, y: s.y - 1.2, wx: 1.0, wy: 2.2, h: 18, rh: 12, wall: 'stone', roof: 'tile', lit: true });
       add({ kind: 'house', x: s.x - 2.6, y: s.y + 1.4, wx: 2.0, wy: 1.0, h: 16, rh: 10, wall: 'stone', roof: 'tile', lit: true });
-      ring(3, 3.5, 5.2, (x, y) => house(x, y));
+      ring(7, 3.5, s.clear - 0.5, (x, y) => house(x, y));
       add({ kind: 'well', x: s.x + 0.4, y: s.y + 1.1, wx: 0.6, wy: 0.6, noCost: true });
       break;
     case 'lager':
@@ -2361,7 +2470,7 @@ function addFarms(W, rng) {
 
 function genFarm(W, f, rng) {
   const add = (b) => { b.site = f.id; W.buildings.push(b); if (b.wx && !b.noCost) markCost(W, b); return b; };
-  add({ kind: 'house', x: f.x, y: f.y, wx: 1.1 + rng() * 0.4, wy: 0.9 + rng() * 0.3, h: 12 + rng() * 4, rh: 12 + rng() * 4, wall: rpick(rng, ['plaster', 'timber', 'timber', 'wood']), roof: 'thatch', chimney: false, lit: rng() < 0.8 });
+  add({ kind: 'house', x: f.x, y: f.y, wx: 1.1 + rng() * 0.4, wy: 0.9 + rng() * 0.3, h: (12 + rng() * 4) * 1.2, rh: (12 + rng() * 4) * 1.2, wall: rpick(rng, ['plaster', 'timber', 'timber', 'wood']), roof: 'thatch', chimney: false, lit: rng() < 0.8 });
   if (rng() < 0.55 && freeSpot(W, f.x + 1.8, f.y - 0.6, 1.2)) add({ kind: 'house', x: f.x + 1.8, y: f.y - 0.6, wx: 1.3, wy: 0.9, h: 11, rh: 12, wall: 'wood', roof: 'thatch', chimney: false, lit: false });
   const kinds = ['heu', 'holzstapel', 'beet', 'karren', 'heu', 'beet'];
   const n = 1 + Math.floor(rng() * 3);
@@ -3857,7 +3966,12 @@ function spawnVillagers() {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
-    if ((site.houses || 0) > 18) roles = roles.concat(['buerger', 'buerger', 'haendler', 'magd', 'kind', 'buerger']);
+    // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
+    if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
+      const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
+      const pool = ['buerger', 'magd', 'handwerker', 'buerger', 'haendler', 'kind', 'buerger', 'wache', 'magd', 'bauer'];
+      for (let k = 0; k < Math.min(60, Math.floor(nh / 5)); k++) roles = roles.concat(pool[k % pool.length]);
+    }
     let stall = 0;
     for (const role of roles) {
       const o = dress(role, site);
@@ -5519,6 +5633,59 @@ function drawHouse(c, b) {
   if (b.dmg > 0) drawDamage(c, b);
 }
 
+// ---------------------------------------------------------------- Bild-Zwischenspeicher
+// Ruhende Bauten werden einmal in ein Bild gezeichnet und dann nur noch kopiert. Ganz nah
+// (oder bei Brand und Gerüst) wird direkt gezeichnet, damit alles scharf und lebendig bleibt.
+const partCache = new Map();
+let cacheScale = 1, cacheOn = true, cacheUsed = 0, cacheMax = 400;
+function cachedDraw(c, o, bounds, fn) {
+  if (!cacheOn) { fn(c); return; }
+  cacheUsed++;
+  const key = `${seasonIndex()}|${darkness() > 0.2 ? 1 : 0}|${cacheScale}`;
+  let e = partCache.get(o);
+  const ax = isoX(o.x, o.y), ay = isoY(o.x, o.y);
+  if (!e || e.key !== key) {
+    const [xmin, xmax, ymin, ymax] = bounds;
+    const sc = cacheScale;
+    const cv = makeCanvas(Math.max(1, Math.ceil((xmax - xmin) * sc)), Math.max(1, Math.ceil((ymax - ymin) * sc)));
+    const g = cv.getContext('2d');
+    g.setTransform(sc, 0, 0, sc, (-ax - xmin) * sc, (-ay - ymin) * sc);
+    const bz = baseZ; baseZ = 0;
+    const l0 = lights.length;
+    fn(g);
+    const ls = lights.splice(l0);
+    baseZ = bz;
+    e = { cv, key, xmin, ymin, sc, lights: ls, smoke: o.smoke ? [o.smoke[0], o.smoke[1]] : null };
+    if (o.smoke) o.smoke = null;
+  } else partCache.delete(o);
+  partCache.set(o, e);
+  while (partCache.size > cacheMax) partCache.delete(partCache.keys().next().value);
+  c.drawImage(e.cv, ax + e.xmin, ay - baseZ + e.ymin, e.cv.width / e.sc, e.cv.height / e.sc);
+  for (const l of e.lights) lights.push({ ...l, z: l.z + baseZ });
+  if (e.smoke) o.smoke = [e.smoke[0], e.smoke[1] - baseZ];
+}
+
+function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
+function drawHouseFast(c, b) {
+  if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
+  cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
+}
+function drawChurchFast(c, b) { const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 130 : 115), half / 2 + 16], (g) => drawChurch(g, b)); }
+
+// Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
+function drawCityWallPiece(c, o) {
+  const col = '#b9b1a1';
+  if (o.tower) {
+    drawShadow(c, o.x, o.y, 1.3, 1.3, 50, 0.18);
+    drawBox(c, o.x, o.y, 1.25, 1.25, o.gate ? 46 : 40, col, 0, 'stone');
+    drawMerlons(c, o.x, o.y, 1.25, 1.25, o.gate ? 46 : 40, col);
+    if (o.gate) banner(c, o.x, o.y, 46, o.color);
+    return;
+  }
+  drawBox(c, o.x, o.y, 1.0, 1.0, 28, col, 0, 'stone');
+  drawMerlons(c, o.x, o.y, 1.0, 1.0, 28, col, 0.16);
+}
+
 // Wirtshaus: Ausleger mit Schild, Bänke und Tisch vor der Tür
 function drawTavernFront(c, b) {
   const [ax, ay] = P(b.x + b.wx / 2, b.y + b.wy / 2, b.h * 0.85);
@@ -6260,7 +6427,7 @@ function buildStaticParts() {
   const parts = [];
   for (const b of W.buildings) {
     const f = {
-      house: drawHouse, church: drawChurch, longhall: drawLonghall, tent: drawTent, stall: drawStall,
+      house: drawHouseFast, church: drawChurchFast, longhall: drawLonghall, tent: drawTent, stall: drawStall,
       well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
       landmark: drawLandmark, stonehenge: drawStonehenge,
     }[b.kind];
@@ -6268,6 +6435,17 @@ function buildStaticParts() {
     if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
   }
   for (const s of W.sites) {
+    if (s.cityWall) {
+      const N = W.N, isOpen = (x, y) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE || t === T.WATER; };
+      const ring = s.cityWall;
+      ring.forEach(([x, y], k) => {
+        if (isOpen(x, y)) return;
+        const prev = ring[(k - 1 + ring.length) % ring.length], next = ring[(k + 1) % ring.length];
+        const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
+        const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
+        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -96 : -66, 26], (g) => drawCityWallPiece(g, o)) });
+      });
+    }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
     if (s.cemetery) {
@@ -6985,7 +7163,7 @@ function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width 
 
 function makeDeciduous(season, v) {
   const w = 64, h = 84;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(1000 + v * 17);
   g.fillStyle = '#5a4030';
   g.fillRect(w / 2 - 3, h - 30, 6, 28);
@@ -7002,7 +7180,7 @@ function makeDeciduous(season, v) {
     branch(w / 2, h - 28, -Math.PI / 2, 16, 4);
     g.fillStyle = 'rgba(250,252,252,0.9)';
     for (let k = 0; k < 12; k++) g.fillRect(w / 2 - 16 + r() * 32, 14 + r() * 30, 3, 1.5);
-    return { cvs: cv, ax: w / 2, ay: h - 3 };
+    return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
   }
   const sets = [
     ['#4f8a34', '#6aa344', '#94c862', '#35612a'],
@@ -7029,12 +7207,12 @@ function makeDeciduous(season, v) {
   for (let k = 0; k < 40; k++) g.fillRect(cx - 18 + r() * 36, cy - 14 + r() * 28, 1.5, 1.5);
   if (season === 0 && v === 0) { g.fillStyle = '#f6e6f0'; for (let k = 0; k < 14; k++) g.fillRect(cx - 14 + r() * 28, cy - 12 + r() * 22, 2, 2); }
   if (season === 1 && v === 2) { g.fillStyle = '#c9302a'; for (let k = 0; k < 8; k++) { g.beginPath(); g.arc(cx - 12 + r() * 24, cy - 8 + r() * 20, 1.6, 0, Math.PI * 2); g.fill(); } }
-  return { cvs: cv, ax: w / 2, ay: h - 3 };
+  return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
 }
 
 function makeConifer(season, v) {
   const w = 44, h = 92;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(2000 + v * 13);
   g.fillStyle = '#4a3428';
   g.fillRect(w / 2 - 2.5, h - 16, 5, 14);
@@ -7055,12 +7233,12 @@ function makeConifer(season, v) {
       g.beginPath(); g.moveTo(w / 2 - half * 0.75, by - 5); g.lineTo(w / 2, top + 1); g.lineTo(w / 2 + half * 0.6, by - 6); g.lineTo(w / 2, top + 8); g.closePath(); g.fill();
     }
   }
-  return { cvs: cv, ax: w / 2, ay: h - 3 };
+  return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
 }
 
 function makeBush(season, v) {
   const w = 34, h = 26;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(4000 + v * 11);
   const cols = [['#4c8232', '#68a043', '#8cc25c'], ['#3f7a2c', '#55923a', '#77b04e'], ['#8a6a2a', '#b08a34', '#d0aa4a'], ['#5a6650', '#6e7a62', '#eef2f2']][season];
   const blobs = [];
@@ -7075,12 +7253,12 @@ function makeBush(season, v) {
   for (const [x, y, rr] of blobs.slice(0, 3)) { g.beginPath(); g.arc(x - 2, y - 3, rr * 0.3, 0, Math.PI * 2); g.fill(); }
   if (season < 2 && v === 1) { g.fillStyle = '#c9302a'; for (let k = 0; k < 6; k++) g.fillRect(w / 2 - 9 + r() * 18, 10 + r() * 8, 2, 2); }
   if (season === 0 && v === 2) { g.fillStyle = '#f8f0d8'; for (let k = 0; k < 7; k++) g.fillRect(w / 2 - 9 + r() * 18, 9 + r() * 9, 2, 2); }
-  return { cvs: cv, ax: w / 2, ay: h - 4 };
+  return { cvs: cv, ax: w / 2, ay: h - 4, k: 1 / SPR };
 }
 
 function makeRock(season, v) {
   const w = 40, h = 30;
-  const cv = makeCanvas(w, h), g = cv.getContext('2d');
+  const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(3000 + v * 7);
   const pts = [];
   for (let k = 0; k < 7; k++) { const a = Math.PI + (k / 6) * Math.PI; pts.push([20 + Math.cos(a) * (12 + r() * 6), 24 + Math.sin(a) * (10 + r() * 8)]); }
@@ -7092,7 +7270,7 @@ function makeRock(season, v) {
   g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(0, 4)) g.lineTo(p[0], p[1]); g.lineTo(20, 22); g.closePath(); g.fill();
   g.fillStyle = season === 3 ? 'rgba(250,252,252,0.95)' : 'rgba(110,140,70,0.55)';
   g.beginPath(); g.ellipse(17, 13, 8, 3.5, 0, 0, Math.PI * 2); g.fill();
-  return { cvs: cv, ax: 20, ay: 25 };
+  return { cvs: cv, ax: 20, ay: 25, k: 1 / SPR };
 }
 
 // Gemalte Laubbäume (Frühling und Sommer), drei Spielarten durch leichte Farbverschiebung
@@ -7107,6 +7285,7 @@ function artTree(season, v) {
   return { cvs: cv, ax: (im.width / 2) * k, ay: im.height * 0.893 * k, k };
 }
 
+const SPR = 3;
 function ensureSprites() {
   const s = seasonIndex();
   if (sprites && spriteSeason === s) return;
@@ -7307,26 +7486,29 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   }
 }
 
-function renderChunk(cx, cy) {
+function renderChunk(cx, cy, cs = 1) {
   const W = G.world;
   const season = seasonIndex();
   const pal = PAL[season];
-  const cvs = makeCanvas(CHUNK * TW, CHUNK * TH + PAD_TOP + 4);
+  const cvs = makeCanvas((CHUNK * TW) * cs, (CHUNK * TH + PAD_TOP + 4) * cs);
   const c = cvs.getContext('2d');
+  c.scale(cs, cs);
   const x0 = cx * CHUNK, y0 = cy * CHUNK;
   const ox = -isoX(x0, y0 + CHUNK), oy = -isoY(x0, y0) + PAD_TOP;
   const noise = getPatchNoise();
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise);
-  return { cvs, x: -ox, y: -oy };
+  return { cvs, x: -ox, y: -oy, s: cs, w: cvs.width / cs, h: cvs.height / cs };
 }
 
-function getChunk(cx, cy) {
-  const key = cy * G.world.CN + cx;
+// Je näher die Kamera, desto feiner werden die Kacheln gerendert (Speicher bleibt begrenzt)
+function getChunk(cx, cy, cs = 1) {
+  const key = (cy * G.world.CN + cx) * 8 + cs;
   let ch = chunkCache.get(key);
   if (ch) { chunkCache.delete(key); chunkCache.set(key, ch); return ch; }
-  ch = renderChunk(cx, cy);
+  ch = renderChunk(cx, cy, cs);
   chunkCache.set(key, ch);
-  if (chunkCache.size > 240) chunkCache.delete(chunkCache.keys().next().value);
+  const max = Math.max(24, Math.floor(260 / (cs * cs)));
+  while (chunkCache.size > max) chunkCache.delete(chunkCache.keys().next().value);
   return ch;
 }
 
@@ -8018,10 +8200,16 @@ function render() {
   const cy0 = Math.max(0, Math.floor(minY / CHUNK)), cy1 = Math.min(CN - 1, Math.floor(maxY / CHUNK));
   const isoL = cam.x - w / 2 / z - 80, isoR = cam.x + w / 2 / z + 80, isoT = cam.y - h / 2 / z - 140, isoB = cam.y + h / 2 / z + 120;
 
+  const cs = low ? 1 : Math.max(1, Math.min(4, Math.ceil(z * dpr - 0.15)));
+  cacheOn = low || z * dpr <= 2.6;
+  cacheScale = low ? 1 : Math.max(1, Math.min(2, Math.ceil(z * dpr - 0.15)));
+  // Platz für alles, was im letzten Bild zu sehen war, plus Reserve (kein ständiges Neuzeichnen)
+  cacheMax = Math.max(Math.floor(300 / (cacheScale * cacheScale)), Math.ceil(cacheUsed * 1.3) + 20);
+  cacheUsed = 0;
   for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
-    const ch = getChunk(cx, cy);
-    if (ch.x > isoR || ch.x + ch.cvs.width < isoL || ch.y > isoB || ch.y + ch.cvs.height < isoT) continue;
-    wc.drawImage(ch.cvs, ch.x, ch.y);
+    const ch = getChunk(cx, cy, cs);
+    if (ch.x > isoR || ch.x + ch.w < isoL || ch.y > isoB || ch.y + ch.h < isoT) continue;
+    wc.drawImage(ch.cvs, ch.x, ch.y, ch.w, ch.h);
   }
   drawSlab(wc, minX, maxX, minY, maxY);
   drawWaterShimmer(wc, minX, maxX, minY, maxY);
@@ -9780,7 +9968,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 0.75 : 1) : (G.view.w < 720 ? 0.9 : 1.15);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.1 : 1.6) : (G.view.w < 720 ? 1.1 : 1.4);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
@@ -10061,7 +10249,8 @@ function setGfx(mode, quiet = false) {
 G.setGfx = setGfx;
 G.cycleGfx = () => setGfx(GFX_MODES[(GFX_MODES.indexOf(G.gfx) + 1) % GFX_MODES.length]);
 
-function zoom(f) { G.cam.zoom = Math.max(0.55, Math.min(1.8, G.cam.zoom * f)); }
+// Zoom von der Übersicht (0,45) bis ganz nah (4): Figuren füllen dann gut ein Zehntel der Bildhöhe
+function zoom(f) { G.cam.zoom = Math.max(0.45, Math.min(4, G.cam.zoom * f)); }
 
 function togglePanel(kind) {
   if (G.ui.panel === kind) closePanel();
@@ -10158,7 +10347,7 @@ function bindInput() {
     viewCanvas.style.cursor = (u && u.group) || an ? 'crosshair' : 'pointer';
   });
   viewCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  viewCanvas.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+  viewCanvas.addEventListener('wheel', (e) => { e.preventDefault(); const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; zoom(Math.exp(-Math.max(-120, Math.min(120, d)) * 0.0016)); }, { passive: false });
   mini.addEventListener('click', () => tool('map'));
   byId('prompt').addEventListener('click', () => {
     if (!G.started || panelOpen() || dialogOpen()) return;

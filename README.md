@@ -30,6 +30,8 @@ node tools/build.mjs
 - **Karte von England und Frankreich:** 512 × 512 Felder, ein Feld sind etwa 1,6 km. Die Küsten von England, Wales, Nordfrankreich, Flandern und der Ostrand Irlands, dazu Wight, Man und die Kanalinseln. Echte Flüsse (Themse, Severn, Trent, Ouse, Seine, Marne, Oise, Somme, Schelde und andere), Bergland an den richtigen Stellen (Pennines, Lake District, Snowdonia, Dartmoor, Ardennen) und die alten Wälder (Sherwood, Barnsdale, New Forest, Weald, Fontainebleau).
 - **63 Orte an ihren historischen Stellen**, über ganz England, Wales, die Normandie, Frankreich und Flandern verteilt: von Carlisle, Scarborough und Keswick im Norden über Pembroke, Cardiff und Bodmin im Westen bis Colchester, Battle, Rennes, Ypern und Provins. Dazu die Schauplätze aus *Ivanhoe* in Yorkshire. Straßen und Brücken verbinden die Orte auf jeder Landmasse.
 - **Wahrzeichen:** der Tower von London und St Paul's, die Kathedralen von Canterbury, York, Lincoln, Durham, Ely, Winchester, Hereford, Reims, Laon, Rouen und Chartres (frisch abgebrannt), Notre-Dame und der neue Louvre im Bau, Mont-Saint-Michel auf seinem Felsen, der Gravensteen in Gent, die Tuchhallen von Brügge, Ypern, Troyes und Provins, der Burghügel von York und Glastonbury Tor.
+- **Große Städte:** London füllt bei normalem Zoom mehrere Bildschirme: eine Stadtmauer mit Toren, Strahlen- und Ringgassen, rund 180 Häuser in Zeilen entlang der Gassen, mehrere Pfarrkirchen, Brunnen, Gasthäuser und Schmieden, der Markt in der Mitte und die Themse mit Kai und Brücke. Paris, York, Rouen und Brügge sind ähnlich angelegt, kleinere Orte entsprechend kleiner. Jede Stadt hat ihr eigenes Leben, mit Bewohnern je nach Größe.
+- **Feiner Zoom:** Mit dem Mausrad stufenlos von der Übersicht (0,45) bis ganz nah heran (4). Standard ist eine nahe Ansicht, in der eine Kate etwa doppelt so hoch ist wie eine Figur.
 - **Sehenswürdigkeiten:** Stonehenge und der Hadrianswall. Wer sie zum ersten Mal besucht, gewinnt Ruhm.
 - **Einzelhöfe:** Über das Land verstreut liegen Gehöfte mit Äckern, Vieh und Bauern.
 - **Schlachten:** Ab und zu ziehen zwei Heere zu je 50 Mann heran, etwa Prinz Johns Heer gegen die Getreuen König Richards oder König Philipps Heer gegen das normannische Aufgebot. Du kannst zusehen oder auf einer Seite eingreifen. Bei knapper Bildrate werden die Heere automatisch kleiner.
@@ -75,7 +77,7 @@ node tools/build.mjs
 | F oder 1 2 3 | Gefolge: folgen, halten, angreifen |
 | T | Zeitraffer |
 | I J P M | Gefolge, Aufträge, Politik, Karte |
-| Mausrad | Zoom |
+| Mausrad, + − | Stufenlos zoomen |
 | G | Grafik wechseln: klar, Pixel, Retro |
 | L | Musik an und aus |
 | Esc | Schließen und Menü |
