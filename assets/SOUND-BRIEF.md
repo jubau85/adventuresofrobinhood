@@ -261,4 +261,4 @@ Die Zahl in Klammern ist die Anzahl der Varianten. Ohne Zahl reicht eine.
 - Für die Online-Fassung wandle ich alles in kleine Dateien um.
 - Fehlt eine Datei, bleibt es wie heute: selbst erzeugte Musik und Stille.
 
-**Umfang:** 14 Musikstücke, 10 kurze Stücke, 18 Ambiente-Schleifen und rund 75 Geräusche, mit Varianten etwa 170 Dateien.
+**Umfang:** 14 Musikstücke, 10 kurze Stücke, 18 Ambiente-Schleifen und 80 Geräusche, mit allen Varianten gut 200 Dateien.

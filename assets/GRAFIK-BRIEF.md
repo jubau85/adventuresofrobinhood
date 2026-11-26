@@ -193,7 +193,7 @@ Ist das Haus gelungen, bitte im selben Gespräch gleich die Varianten aus Punkt 
 | 7 | **neu gefasst:** Figuren als Baukasten, Lasten | 10 Körper, 27 Teile, 3 Pferde, 13 Lasten | alle Menschen |
 | 8 | Tiere | 6 Bögen | Weiden, Wald |
 | 9 | Symbole und Porträts | 66 | Tafeln und Menüs |
-| 10 | Musik und Geräusche: siehe `SOUND-BRIEF.md` | etwa 170 Dateien | Ton |
+| 10 | Musik und Geräusche: siehe `SOUND-BRIEF.md` | gut 200 Dateien | Ton |
 | 11 | **neu:** Wahrzeichen | 15 | Kathedralen, Tower, Tuchhallen, Stonehenge |
 | 12 | **neu:** Mystische Orte, Gruben, Lagerfeuer, Galgen, Friedhof | 23 | Land zwischen den Orten |
 | 13 | **neu:** Turnier | 4 | Turnierplatz |
