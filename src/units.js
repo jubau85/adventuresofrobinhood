@@ -17,6 +17,7 @@ import { spawnVillagers, updateVillager, updateSayings, buffActive } from './lif
 import { countDead, updateSiege } from './siege.js';
 import { raidVictim, villagerKilled } from './dynamics.js';
 import { companionWatch } from './tournament.js';
+import { cheatOn } from './cheats.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -291,6 +292,7 @@ function attack(u, t) {
 
 function applyHit(a, t) {
   if (t.dead) return;
+  if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
   const { dmg, crit } = calcDamage(a, t);
   t.hp -= dmg;
   t.flash = 0.18;

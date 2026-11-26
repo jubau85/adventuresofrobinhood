@@ -7,9 +7,10 @@ import { G, log } from './state.js';
 import { T } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { isWalkable, landAt } from './world.js';
-import { hourOf } from './sim.js';
+import { hourOf, passHours } from './sim.js';
 import { makeVillager } from './life.js';
-import { makeNpc, spawnGroup, rebuildUnits, chaseTo } from './units.js';
+import { makeNpc, spawnGroup, rebuildUnits, chaseTo, partyMembers } from './units.js';
+import { isoX, isoY } from './iso.js';
 import { changeRep, addRenown } from './politics.js';
 import { DEFENDER_NPC, countDead } from './siege.js';
 import { isBlighted } from './dynamics.js';
@@ -60,6 +61,24 @@ export function dailyJustice() {
   const hh = { site: s.id, day: G.s.day, hour: randInt(11, 15), crime, who, name: pick(CONDEMNED_NAMES), done: false };
   G.s.hanging = hh;
   if (Math.hypot(s.x - p.x, s.y - p.y) < 45) log(`Ausrufer in ${s.name}: Heute zur ${hh.hour}. Stunde wird ein ${who} am Galgen gehängt.`);
+}
+
+// Testmodus: Hinrichtung am nächsten Galgen, jetzt gleich, du stehst schon davor
+export function cheatHanging() {
+  const p = G.s.player, land = landAt(G.world, p.x, p.y);
+  if (hourOf() >= 17.5 || hourOf() < 8) passHours(((11 - hourOf()) + 24) % 24);
+  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && gallowsFor(s)).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const s = cand[0];
+  if (!s) { log('Kein Galgen in der Nähe.', 'bad'); return false; }
+  if (G.exec) endExec();
+  const [crime, who] = pick(CRIMES);
+  G.s.hanging = { site: s.id, day: G.s.day, hour: Math.floor(hourOf()), crime, who, name: pick(CONDEMNED_NAMES), done: false };
+  const g = gallowsFor(s);
+  p.x = g.x + 1.5; p.y = g.y + 4; p.path = null;
+  for (const c of partyMembers()) { c.x = p.x + 0.6; c.y = p.y + 0.4; }
+  G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - 12;
+  log(`Testmodus: Gleich wird am Galgen von ${s.name} ein ${who} gehängt.`, 'gold');
+  return true;
 }
 
 // Ohne Zuschauer geschieht es trotzdem, der Tote wird begraben

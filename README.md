@@ -70,6 +70,7 @@ node tools/build.mjs
 - **Kampf um die Burg:** Innerhalb deiner Mauern kämpfst du je nach Burgstufe besser, die Wachtürme schießen auf Feinde in Reichweite.
 - **Fraktionen im Streit:** Banden überfallen Händler, Sachsen und Normannen und Franzosen bekämpfen einander. Befreundete Trupps kommen dir zu Hilfe, verfeindete schließen sich deinen Angreifern an.
 - **Politik:** Sechs Fraktionen (Sachsen, Normannen, Kirche, Gilde, Waldleute und die Krone Frankreichs) mit Rivalitäten. Als Freund der Franzosen fährst du umsonst über den Kanal und kannst Armbrustschützen anwerben. Aufträge, Geschenke und Überfälle verschieben das Ansehen. Verbündete gewähren Vorteile, Feinde überfallen deine Burg.
+- **Testmodus (F9 oder Menü):** Schalter für unendlich Gold, unendlich Rohstoffe und Vorräte, Unverwundbarkeit für dich und dein Gefolge, sofortiges Bauen und Sofortreise per Klick auf der Karte. Dazu Knöpfe für Zeit, Wetter und Schneedecke, ein Turnier heute, eine Hinrichtung, ein Feuer, eine Belagerung, eine Schlacht, beste Ausrüstung, Stufe und Ruhm, vollen Burgausbau und Ansehen. In der Kopfleiste steht dann „Testmodus“.
 - **Speichern:** Automatisch jeden Morgen im Browser, dazu manuell über das Menü.
 
 ## Steuerung
@@ -89,6 +90,7 @@ node tools/build.mjs
 | G | Grafik wechseln: klar, Pixel, Retro |
 | L | Musik an und aus |
 | Esc | Schließen und Menü |
+| F9 | Testmodus (Cheats) |
 
 ## Aufbau des Codes
 
@@ -104,6 +106,7 @@ node tools/build.mjs
 | `src/tournament.js` | Turniere: Ankündigung, Turnierplatz, Tjost, Zielleiste |
 | `src/justice.js` | Galgen und Hinrichtungen, Befreien |
 | `src/weather.js` | Wetter, Schneedecke, fließende Jahreszeiten |
+| `src/cheats.js` | Testmodus: Cheats und Ereignisknöpfe |
 | `src/economy.js` | Märkte, Preise, Ladung, Ausrüstungshandel |
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |

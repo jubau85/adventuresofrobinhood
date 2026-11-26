@@ -10,6 +10,7 @@ import { setPlayerWalls } from './world.js';
 import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
 import { startSiege } from './siege.js';
+import { cheatOn } from './cheats.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
@@ -69,13 +70,14 @@ export function startBuild(id) {
     if (need > 0) G.s.cargo[k] -= need;
   }
   G.s.castle.construction = { id, level: info.next, done: G.s.day + info.lv.days };
+  if (cheatOn('build')) { G.s.castle.construction.done = G.s.day; finishConstruction(); return true; }
   const nm = id === 'burg' ? info.lv.name : `${info.def.name} Stufe ${info.next}`;
   log(`Baubeginn: ${nm}. Fertig an Tag ${G.s.castle.construction.done}.`, 'gold');
   G.castleDirty = true;
   return true;
 }
 
-function finishConstruction() {
+export function finishConstruction() {
   const c = G.s.castle.construction;
   if (!c || G.s.day < c.done) return;
   if (c.id === 'burg') {

@@ -5,9 +5,10 @@
 import { G, log, homeName, playerColor } from './state.js';
 import { FACTIONS, T } from './data.js';
 import { rand, randInt, pick, clamp } from './rng.js';
-import { makeUnit, rebuildUnits } from './units.js';
+import { makeUnit, rebuildUnits, partyMembers } from './units.js';
+import { isoX, isoY } from './iso.js';
 import { isWalkable, landAt } from './world.js';
-import { hourOf } from './sim.js';
+import { hourOf, passHours } from './sim.js';
 import { changeRep, addRenown } from './politics.js';
 import { makeVillager } from './life.js';
 
@@ -70,6 +71,34 @@ function announce() {
     log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold.`, 'gold');
     return;
   }
+}
+
+// Testmodus: Turnier beim nächsten Ort, heute ab der zehnten Stunde, du stehst schon an den Schranken
+export function cheatTourney() {
+  const p = G.s.player, land = landAt(G.world, p.x, p.y);
+  const h = hourOf();
+  if (h > 9.6) passHours(24 - h + 9.6);
+  else passHours(9.6 - h);
+  const cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  for (const s of cand.slice(0, 8)) {
+    const lists = findLists(s);
+    if (!lists) continue;
+    if (G.tour) endTour();
+    const names = KNIGHT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 8);
+    const cols = KNIGHT_COLS.slice().sort(() => Math.random() - 0.5);
+    G.s.tourney = {
+      site: s.id, day: G.s.day, lx: lists.lx, ly: lists.ly, prize: 200, fee: 25,
+      knights: names.map((name, i) => ({ name, col: cols[i % cols.length], skill: Math.round(rand(0.3, 0.85) * 100) / 100 })),
+      joined: false, done: false,
+    };
+    p.x = lists.lx + 1; p.y = lists.ly + 3.2; p.path = null;
+    for (const c of partyMembers()) { c.x = p.x + 0.6; c.y = p.y + 0.4; }
+    G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - 12;
+    log(`Testmodus: Heute zur zehnten Stunde ist Turnier vor ${s.name}. Melde dich in ${s.name} an (E) oder schau zu.`, 'gold');
+    return true;
+  }
+  log('Kein Ort für ein Turnier in der Nähe.', 'bad');
+  return false;
 }
 
 export function dailyTourney() {

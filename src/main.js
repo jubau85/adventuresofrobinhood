@@ -18,6 +18,7 @@ import { applyDamage, startSiege, siegeStatus } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
 import { initWeather, updateWeather } from './weather.js';
+import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
 import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
 import {
@@ -417,6 +418,7 @@ function onKey(e) {
   }
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (k === 'escape') { if (panelOpen()) closePanel(); else openPanel('menu'); e.preventDefault(); return; }
+  if (k === 'f9') { togglePanel('cheat'); e.preventDefault(); return; }
   const panelKeys = { i: 'party', j: 'quests', p: 'politics', m: 'map', h: 'help' };
   if (panelKeys[k]) { if (k === 'h') togglePanel('help'); else tool(panelKeys[k]); e.preventDefault(); return; }
   if (panelOpen()) return;
@@ -512,6 +514,7 @@ function step(dt) {
   updateDynamics(dt);
   updateTourney(dt);
   updateJustice(dt);
+  updateCheats();
 }
 
 function updateFx(dt) {

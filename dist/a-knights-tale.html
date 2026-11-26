@@ -364,6 +364,11 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 }
 
 .buff { color: #9fd67a; font-weight: 600; }
+
+/* Testmodus */
+.cheat-toggles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); margin-bottom: 6px; }
+.cheat-toggles .btn { text-align: left; }
+.cheat-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 </style>
 </head>
 <body>
@@ -2595,6 +2600,7 @@ function placeTrees(W, rng) {
 
 
 
+
 // ---------------------------------------------------------------- Werte
 function computeStats(u) {
   const c = CLASSES[u.cls];
@@ -2868,6 +2874,7 @@ function attack(u, t) {
 
 function applyHit(a, t) {
   if (t.dead) return;
+  if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
   const { dmg, crit } = calcDamage(a, t);
   t.hp -= dmg;
   t.flash = 0.18;
@@ -5103,6 +5110,7 @@ function atone(s) {
 
 
 
+
 const KNIGHT_NAMES = [
   'Sir Baldwin de Montclair', 'Sir Aymer de Rochefort', 'Sir Gilbert of Wycombe', 'Sir Raoul le Hardi', 'Sir Thurstan of Holderness',
   'Sir Walerand de Brioude', 'Sir Hugh of Ravenscar', 'Sir Odo de Ferrières', 'Sir Alard of Kendal', 'Sir Ivo de Mortain',
@@ -5162,6 +5170,34 @@ function announce() {
     log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold.`, 'gold');
     return;
   }
+}
+
+// Testmodus: Turnier beim nächsten Ort, heute ab der zehnten Stunde, du stehst schon an den Schranken
+function cheatTourney() {
+  const p = G.s.player, land = landAt(G.world, p.x, p.y);
+  const h = hourOf();
+  if (h > 9.6) passHours(24 - h + 9.6);
+  else passHours(9.6 - h);
+  const cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  for (const s of cand.slice(0, 8)) {
+    const lists = findLists(s);
+    if (!lists) continue;
+    if (G.tour) endTour();
+    const names = KNIGHT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 8);
+    const cols = KNIGHT_COLS.slice().sort(() => Math.random() - 0.5);
+    G.s.tourney = {
+      site: s.id, day: G.s.day, lx: lists.lx, ly: lists.ly, prize: 200, fee: 25,
+      knights: names.map((name, i) => ({ name, col: cols[i % cols.length], skill: Math.round(rand(0.3, 0.85) * 100) / 100 })),
+      joined: false, done: false,
+    };
+    p.x = lists.lx + 1; p.y = lists.ly + 3.2; p.path = null;
+    for (const c of partyMembers()) { c.x = p.x + 0.6; c.y = p.y + 0.4; }
+    G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - 12;
+    log(`Testmodus: Heute zur zehnten Stunde ist Turnier vor ${s.name}. Melde dich in ${s.name} an (E) oder schau zu.`, 'gold');
+    return true;
+  }
+  log('Kein Ort für ein Turnier in der Nähe.', 'bad');
+  return false;
 }
 
 function dailyTourney() {
@@ -5578,6 +5614,7 @@ function tourneyLayout() {
 
 
 
+
 const GALLOWS_TYPES = { burg: 1, stadt: 1, markt: 1 };
 const CRIMES = [['Wilderei im Forst des Königs', 'Wilderer'], ['Diebstahl', 'Dieb'], ['Viehdiebstahl', 'Viehdieb'], ['Straßenraub', 'Wegelagerer']];
 const CONDEMNED_NAMES = ['Wat Tyler', 'Hob der Lange', 'Will Scathlock', 'Dickon Miller', 'Jack Straw', 'Ned Fletcher', 'Tom Hogg', 'Alan Swift', 'Gib Turner', 'Hal Wood'];
@@ -5624,6 +5661,24 @@ function dailyJustice() {
   const hh = { site: s.id, day: G.s.day, hour: randInt(11, 15), crime, who, name: pick(CONDEMNED_NAMES), done: false };
   G.s.hanging = hh;
   if (Math.hypot(s.x - p.x, s.y - p.y) < 45) log(`Ausrufer in ${s.name}: Heute zur ${hh.hour}. Stunde wird ein ${who} am Galgen gehängt.`);
+}
+
+// Testmodus: Hinrichtung am nächsten Galgen, jetzt gleich, du stehst schon davor
+function cheatHanging() {
+  const p = G.s.player, land = landAt(G.world, p.x, p.y);
+  if (hourOf() >= 17.5 || hourOf() < 8) passHours(((11 - hourOf()) + 24) % 24);
+  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && gallowsFor(s)).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const s = cand[0];
+  if (!s) { log('Kein Galgen in der Nähe.', 'bad'); return false; }
+  if (G.exec) endExec();
+  const [crime, who] = pick(CRIMES);
+  G.s.hanging = { site: s.id, day: G.s.day, hour: Math.floor(hourOf()), crime, who, name: pick(CONDEMNED_NAMES), done: false };
+  const g = gallowsFor(s);
+  p.x = g.x + 1.5; p.y = g.y + 4; p.path = null;
+  for (const c of partyMembers()) { c.x = p.x + 0.6; c.y = p.y + 0.4; }
+  G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - 12;
+  log(`Testmodus: Gleich wird am Galgen von ${s.name} ein ${who} gehängt.`, 'gold');
+  return true;
 }
 
 // Ohne Zuschauer geschieht es trotzdem, der Tote wird begraben
@@ -5774,6 +5829,126 @@ function rescueCondemned(u) {
   addRenown(3);
   rebuildUnits();
   return true;
+}
+
+// ===== cheats.js =====
+// Testmodus: Cheats zum Ausprobieren. Unendlich Gold und Rohstoffe, unverwundbar, sofort bauen,
+// Sofortreise über die Karte, dazu Knöpfe, die Ereignisse sofort auslösen. Taste F9 oder Menü.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const CHEATS = {
+  gold: 'Unendlich Gold',
+  res: 'Unendlich Rohstoffe und Vorräte',
+  god: 'Unverwundbar (du und dein Gefolge)',
+  build: 'Sofort bauen',
+  reise: 'Sofortreise über die Karte',
+};
+
+function cheatOn(k) { return !!(G.s && G.s.cheat && G.s.cheat[k]); }
+function anyCheat() { return !!(G.s && G.s.cheat && Object.values(G.s.cheat).some(Boolean)); }
+
+function toggleCheat(k) {
+  if (!CHEATS[k]) return;
+  if (!G.s.cheat) G.s.cheat = {};
+  G.s.cheat[k] = !G.s.cheat[k];
+  log(`Testmodus: ${CHEATS[k]} ${G.s.cheat[k] ? 'an' : 'aus'}.`, 'gold');
+  if (G.s.cheat[k] && k === 'build' && G.s.castle.construction) { G.s.castle.construction.done = G.s.day; finishConstruction(); }
+  updateCheats();
+}
+
+// Jedes Bild: Kasse und Lager auffüllen, Lebenspunkte voll halten
+function updateCheats() {
+  const c = G.s && G.s.cheat;
+  if (!c) return;
+  if (c.gold && G.s.gold < 99999) G.s.gold = 99999;
+  if (c.res) { const st = G.s.castle.storage; for (const g of GOOD_IDS) if ((st[g] || 0) < 999) st[g] = 999; }
+  if (c.god) { const p = G.s.player; p.hp = p.st.maxHp; for (const u of partyMembers()) u.hp = u.st.maxHp; }
+}
+
+// Sofortreise: Held und Gefolge stehen sofort am Ziel, auch jenseits des Meeres
+function teleport(target, site) {
+  const p = G.s.player;
+  const dy = site ? (site.type === 'spieler' ? 2.6 : 1.4) : 0;
+  placeNear(p, target.x, target.y + dy, 1.2);
+  p.path = null; p.attackTarget = null; p.huntTarget = null;
+  G.pendingSite = null;
+  for (const c of partyMembers()) placeNear(c, p.x, p.y, 1.5);
+  G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y) - 12;
+  log(`Sofortreise: Du bist ${site ? `in ${site.name}` : 'am Ziel'}.`, 'gold');
+}
+
+const setWeather = (kind) => { G.s.weather = { kind, int: 0.85, until: G.s.day * 24 + (G.s.time / DAY_LEN) * 24 + 8 }; };
+
+const CHEAT_ACTIONS = {
+  h6: () => passHours(6),
+  tag: () => passHours(24),
+  saison: () => passHours((DAYS_PER_SEASON - ((G.s.day - 1) % DAYS_PER_SEASON)) * 24),
+  klar: () => setWeather('klar'),
+  regen: () => setWeather('regen'),
+  nebel: () => setWeather('nebel'),
+  schnee: () => setWeather('schnee'),
+  snow0: () => { G.s.snow = 0; },
+  snow50: () => { G.s.snow = 0.5; },
+  snow100: () => { G.s.snow = 1; },
+  turnier: () => cheatTourney(),
+  galgen: () => cheatHanging(),
+  feuer: () => {
+    const p = G.s.player;
+    let best = null, bd = 16;
+    for (const s of G.world.sites) {
+      if (Math.abs(s.x - p.x) > 40 || Math.abs(s.y - p.y) > 40) continue;
+      for (const b of siteHouses(s.id)) {
+        const d = Math.hypot(b.x - p.x, b.y - p.y);
+        if (d < bd && standing(b) && !b.tavern && !(b.fire > G.time)) { bd = d; best = b; }
+      }
+    }
+    if (best) { igniteHouse(best, 60); log('Testmodus: Ein Haus in deiner Nähe brennt.', 'bad'); } else log('Kein Haus in der Nähe.', 'bad');
+  },
+  belagerung: () => { if (!startSiege()) log('Gerade lässt sich keine Belagerung beginnen: Es läuft schon eine, oder keine passende Burg oder Stadt liegt in Reichweite.', 'bad'); },
+  schlacht: () => { if (!startBattle()) log('Gerade lässt sich keine Schlacht beginnen.', 'bad'); },
+  ruhm: () => addRenown(50),
+  stufe: () => { for (const u of [G.s.player, ...partyMembers()]) grantXp(u, xpNeeded(u.level) - u.xp); },
+  ausruestung: () => {
+    const p = G.s.player;
+    p.eq = { waffe: 'ritterschwert', ruestung: 'kettenruestung', schild: 'wappenschild', pferd: 'schlachtross' };
+    computeStats(p); p.hp = p.st.maxHp; p.mounted = true;
+    log('Testmodus: Ritterschwert, Kettenrüstung, Wappenschild und Schlachtross.', 'gold');
+  },
+  burg: () => {
+    const cs = G.s.castle;
+    cs.level = BUILDINGS.burg.levels.length - 1;
+    for (const id of BUILDING_IDS) if (id !== 'burg') cs.b[id] = BUILDINGS[id].levels.length - 1;
+    cs.construction = null;
+    setPlayerWalls(G.world, true);
+    refreshCastleHerd();
+    spawnPeasants(); rebuildUnits();
+    G.castleDirty = true;
+    log(`Testmodus: ${castleSite().name} ist voll ausgebaut.`, 'gold');
+  },
+  repplus: () => { for (const f of FACTION_IDS) changeRep(f, 25); },
+  repminus: () => { for (const f of FACTION_IDS) changeRep(f, -25); },
+};
+
+function cheatDo(id) {
+  const f = CHEAT_ACTIONS[id];
+  if (!f) return;
+  if (!G.s.cheat) G.s.cheat = {};
+  G.s.cheat.used = true;
+  f();
+  updateCheats();
 }
 
 // ===== economy.js =====
@@ -6152,6 +6327,7 @@ function giveGift(site) {
 
 
 
+
 function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
 function bLevel(id) { return id === 'burg' ? G.s.castle.level : G.s.castle.b[id] || 0; }
@@ -6210,6 +6386,7 @@ function startBuild(id) {
     if (need > 0) G.s.cargo[k] -= need;
   }
   G.s.castle.construction = { id, level: info.next, done: G.s.day + info.lv.days };
+  if (cheatOn('build')) { G.s.castle.construction.done = G.s.day; finishConstruction(); return true; }
   const nm = id === 'burg' ? info.lv.name : `${info.def.name} Stufe ${info.next}`;
   log(`Baubeginn: ${nm}. Fertig an Tag ${G.s.castle.construction.done}.`, 'gold');
   G.castleDirty = true;
@@ -10785,6 +10962,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -10807,7 +10985,7 @@ function updateHUD() {
   set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${wn ? ` · ${wn}` : ''}${buffActive() ? ' · ausgeruht' : ''}`);
   set('hud-clock', clockText());
   const mode = byId('hud-mode');
-  const label = G.fast ? 'Zeitraffer' : '';
+  const label = [G.fast ? 'Zeitraffer' : '', anyCheat() ? 'Testmodus' : ''].filter(Boolean).join(' · ');
   mode.hidden = !label;
   set('hud-mode', label);
   set('order-label', { folgen: 'Folgen', halten: 'Halten', angriff: 'Angriff' }[s.order]);
@@ -10852,7 +11030,7 @@ function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c' };
 
 function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -10885,7 +11063,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -11386,6 +11564,7 @@ function mapPanel() {
 
 // Reise über die Karte. Liegt das Ziel jenseits des Meeres, geht es zum passenden Hafen.
 function travelTo(target, site) {
+  if (cheatOn('reise')) { teleport(target, site); closePanel(); return; }
   const p = G.s.player, W = G.world;
   const here = landAt(W, p.x, p.y), there = landAt(W, target.x, target.y);
   if (there && here && there !== here) {
@@ -11424,9 +11603,25 @@ function menuPanel() {
       </div>
       <button class="btn" data-act="music">Musik ${G.musicOn && G.musicOn() ? 'ausschalten' : 'einschalten'}</button>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
+      <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
     <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>`,
+  };
+}
+
+// Testmodus: Schalter und Knöpfe für Ereignisse
+function cheatPanel() {
+  const c = G.s.cheat || {};
+  const toggles = Object.entries(CHEATS).map(([k, label]) => `<button class="btn${c[k] ? ' primary' : ''}" data-act="cheat" data-c="${k}" aria-pressed="${!!c[k]}">${c[k] ? '✓ ' : ''}${esc(label)}</button>`).join('');
+  const grp = (title, items) => `<h3>${title}</h3><div class="cheat-btns">${items.map(([id, label]) => `<button class="btn sm" data-act="cheatdo" data-do="${id}">${esc(label)}</button>`).join('')}</div>`;
+  return {
+    title: 'Testmodus', sub: 'Cheats zum Ausprobieren. Taste F9 öffnet und schließt diese Tafel.', tabs: [],
+    body: `<div class="cheat-toggles">${toggles}</div>
+      ${grp('Zeit und Wetter', [['h6', '+6 Stunden'], ['tag', '+1 Tag'], ['saison', 'Nächste Jahreszeit'], ['klar', 'Klar'], ['regen', 'Regen'], ['nebel', 'Nebel'], ['schnee', 'Schneefall'], ['snow0', 'Kein Schnee'], ['snow50', 'Halbe Schneedecke'], ['snow100', 'Volle Schneedecke']])}
+      ${grp('Ereignisse', [['turnier', 'Turnier heute'], ['galgen', 'Hinrichtung jetzt'], ['feuer', 'Feuer in der Nähe'], ['belagerung', 'Belagerung starten'], ['schlacht', 'Schlacht starten']])}
+      ${grp('Held und Burg', [['ausruestung', 'Beste Ausrüstung'], ['stufe', 'Stufe +1 (alle)'], ['ruhm', 'Ruhm +50'], ['burg', 'Burg voll ausbauen'], ['repplus', 'Ansehen +25 (alle)'], ['repminus', 'Ansehen −25 (alle)']])}
+      <p class="hint">Mit Sofortreise bringt dich ein Klick auf der Karte (M) sofort ans Ziel, auch übers Meer. Der Testmodus wird mit dem Spielstand gespeichert.</p>`,
   };
 }
 
@@ -11449,6 +11644,7 @@ function helpPanel() {
         <dt>L</dt><dd>Musik an und aus</dd>
         <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
+        <dt>F9</dt><dd>Testmodus mit Cheats</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
         <li>In ${esc(homeName())} zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
@@ -11561,6 +11757,9 @@ const ACTIONS = {
   save: () => { if (G.saveGame) G.saveGame(false); },
   loadgame: () => { if (G.loadGame) confirmDialog('Den letzten Spielstand laden? Nicht gespeicherter Fortschritt geht verloren.', 'Laden', () => { G.loadGame(); closePanel(); }); },
   help: () => openPanel('help'),
+  cheats: () => openPanel('cheat'),
+  cheat: (d) => { toggleCheat(d.c); updateHUD(); },
+  cheatdo: (d) => { cheatDo(d.do); updateHUD(); },
   music: () => { if (G.toggleMusic) G.toggleMusic(); },
   gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
@@ -11666,6 +11865,7 @@ function saveSummary(data = readSave()) {
 
 // ===== main.js =====
 // Einstieg: Spielstart, Hauptschleife, Eingabe, Kamera.
+
 
 
 
@@ -12079,6 +12279,7 @@ function onKey(e) {
   }
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (k === 'escape') { if (panelOpen()) closePanel(); else openPanel('menu'); e.preventDefault(); return; }
+  if (k === 'f9') { togglePanel('cheat'); e.preventDefault(); return; }
   const panelKeys = { i: 'party', j: 'quests', p: 'politics', m: 'map', h: 'help' };
   if (panelKeys[k]) { if (k === 'h') togglePanel('help'); else tool(panelKeys[k]); e.preventDefault(); return; }
   if (panelOpen()) return;
@@ -12174,6 +12375,7 @@ function step(dt) {
   updateDynamics(dt);
   updateTourney(dt);
   updateJustice(dt);
+  updateCheats();
 }
 
 function updateFx(dt) {

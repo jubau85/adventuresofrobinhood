@@ -356,3 +356,8 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 }
 
 .buff { color: #9fd67a; font-weight: 600; }
+
+/* Testmodus */
+.cheat-toggles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); margin-bottom: 6px; }
+.cheat-toggles .btn { text-align: left; }
+.cheat-btns { display: flex; flex-wrap: wrap; gap: 6px; }

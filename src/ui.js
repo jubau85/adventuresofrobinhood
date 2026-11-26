@@ -26,6 +26,7 @@ import {
 } from './dynamics.js';
 import { tourneyAt, canJoin, joinTourney } from './tournament.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
+import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
 
 export function byId(id) { return document.getElementById(id); }
 
@@ -49,7 +50,7 @@ export function updateHUD() {
   set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${wn ? ` · ${wn}` : ''}${buffActive() ? ' · ausgeruht' : ''}`);
   set('hud-clock', clockText());
   const mode = byId('hud-mode');
-  const label = G.fast ? 'Zeitraffer' : '';
+  const label = [G.fast ? 'Zeitraffer' : '', anyCheat() ? 'Testmodus' : ''].filter(Boolean).join(' · ');
   mode.hidden = !label;
   set('hud-mode', label);
   set('order-label', { folgen: 'Folgen', halten: 'Halten', angriff: 'Angriff' }[s.order]);
@@ -94,7 +95,7 @@ export function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c' };
 
 export function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -127,7 +128,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -628,6 +629,7 @@ function mapPanel() {
 
 // Reise über die Karte. Liegt das Ziel jenseits des Meeres, geht es zum passenden Hafen.
 function travelTo(target, site) {
+  if (cheatOn('reise')) { teleport(target, site); closePanel(); return; }
   const p = G.s.player, W = G.world;
   const here = landAt(W, p.x, p.y), there = landAt(W, target.x, target.y);
   if (there && here && there !== here) {
@@ -666,9 +668,25 @@ function menuPanel() {
       </div>
       <button class="btn" data-act="music">Musik ${G.musicOn && G.musicOn() ? 'ausschalten' : 'einschalten'}</button>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
+      <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
     <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>`,
+  };
+}
+
+// Testmodus: Schalter und Knöpfe für Ereignisse
+function cheatPanel() {
+  const c = G.s.cheat || {};
+  const toggles = Object.entries(CHEATS).map(([k, label]) => `<button class="btn${c[k] ? ' primary' : ''}" data-act="cheat" data-c="${k}" aria-pressed="${!!c[k]}">${c[k] ? '✓ ' : ''}${esc(label)}</button>`).join('');
+  const grp = (title, items) => `<h3>${title}</h3><div class="cheat-btns">${items.map(([id, label]) => `<button class="btn sm" data-act="cheatdo" data-do="${id}">${esc(label)}</button>`).join('')}</div>`;
+  return {
+    title: 'Testmodus', sub: 'Cheats zum Ausprobieren. Taste F9 öffnet und schließt diese Tafel.', tabs: [],
+    body: `<div class="cheat-toggles">${toggles}</div>
+      ${grp('Zeit und Wetter', [['h6', '+6 Stunden'], ['tag', '+1 Tag'], ['saison', 'Nächste Jahreszeit'], ['klar', 'Klar'], ['regen', 'Regen'], ['nebel', 'Nebel'], ['schnee', 'Schneefall'], ['snow0', 'Kein Schnee'], ['snow50', 'Halbe Schneedecke'], ['snow100', 'Volle Schneedecke']])}
+      ${grp('Ereignisse', [['turnier', 'Turnier heute'], ['galgen', 'Hinrichtung jetzt'], ['feuer', 'Feuer in der Nähe'], ['belagerung', 'Belagerung starten'], ['schlacht', 'Schlacht starten']])}
+      ${grp('Held und Burg', [['ausruestung', 'Beste Ausrüstung'], ['stufe', 'Stufe +1 (alle)'], ['ruhm', 'Ruhm +50'], ['burg', 'Burg voll ausbauen'], ['repplus', 'Ansehen +25 (alle)'], ['repminus', 'Ansehen −25 (alle)']])}
+      <p class="hint">Mit Sofortreise bringt dich ein Klick auf der Karte (M) sofort ans Ziel, auch übers Meer. Der Testmodus wird mit dem Spielstand gespeichert.</p>`,
   };
 }
 
@@ -691,6 +709,7 @@ function helpPanel() {
         <dt>L</dt><dd>Musik an und aus</dd>
         <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
+        <dt>F9</dt><dd>Testmodus mit Cheats</dd>
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
         <li>In ${esc(homeName())} zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
@@ -803,6 +822,9 @@ const ACTIONS = {
   save: () => { if (G.saveGame) G.saveGame(false); },
   loadgame: () => { if (G.loadGame) confirmDialog('Den letzten Spielstand laden? Nicht gespeicherter Fortschritt geht verloren.', 'Laden', () => { G.loadGame(); closePanel(); }); },
   help: () => openPanel('help'),
+  cheats: () => openPanel('cheat'),
+  cheat: (d) => { toggleCheat(d.c); updateHUD(); },
+  cheatdo: (d) => { cheatDo(d.do); updateHUD(); },
   music: () => { if (G.toggleMusic) G.toggleMusic(); },
   gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
