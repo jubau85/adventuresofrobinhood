@@ -1222,6 +1222,11 @@ function drawWallRuin(c, o) {
 
 function drawLonghall(c, b) {
   drawShadow(c, b.x, b.y, b.wx, b.wy, b.h + 18);
+  // Gemalte Holzhalle mit Schindeldach und geschnitzten Giebeln (Paket 5), so groß wie die Grundfläche
+  if (p5(c, 'burg_holzhalle', b.x, b.y, Math.min(b.wx / 2.3, b.wy / 1.05))) {
+    if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, 6, 40, 1);
+    return;
+  }
   drawBox(c, b.x, b.y, b.wx, b.wy, b.h, WALLS.wood, 0, 'plank');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.42, 0.58, 0, 14, '#6a4c34');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.45, 0.55, 0, 13, '#2e2016');
@@ -1494,6 +1499,32 @@ function p5(c, id, x, y, sc = 1, flip = false, color = null, z = 0) {
 // Schadensstufe eines Mauerstücks: 1–3 nach dem Schaden, 4 wenn die Bresche offen ist
 function dmgStage(hit) { if (!hit) return 0; if (hit.gone) return 4; return Math.min(3, 1 + Math.floor(hit.dmg * 3)); }
 const p5dmg = (base, st) => (st ? `${base}_schaden_${st}` : base);
+// Steinmauer mit den Zinnen immer außen. Geliefert sind die x-Mauer von außen (Zinnen vorn) und die y-Mauer von innen
+// (Zinnen hinten). Gespiegelt wird aus der einen die andere Achse (Spiegeln vertauscht x und y der Schrägansicht):
+// die y-Mauer von außen (Ostseite) und die x-Mauer von innen (Nordseite). Das Licht kommt von links, darum wird die
+// gespiegelte Ansicht an die Helligkeit ihrer neuen Seite angeglichen.
+const WALL_MIRROR = { x: ['y_aussen', 0.76], y: ['x_innen', 1.3] };
+function mirrorWall(id) {
+  const m = /^burg_stein_mauer_(x|y)((?:_schaden_\d)?)$/.exec(id);
+  const im = m && ART[id], a = m && P5[id];
+  if (!im || !a) return;
+  const [view, f] = WALL_MIRROR[m[1]];
+  const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
+  g.translate(im.width, 0); g.scale(-1, 1); g.drawImage(im, 0, 0);
+  try {
+    const d = g.getImageData(0, 0, cv.width, cv.height), px = d.data;
+    for (let i = 0; i < px.length; i += 4) { px[i] = Math.min(255, px[i] * f); px[i + 1] = Math.min(255, px[i + 1] * f); px[i + 2] = Math.min(255, px[i + 2] * f); }
+    g.putImageData(d, 0, 0);
+  } catch (e) { /* ohne Pixelzugriff bleibt die Helligkeit */ }
+  const nid = `burg_stein_mauer_${view}${m[2]}`;
+  P5[nid] = [im.width * a[2] - a[0], a[1], a[2]];
+  ART[nid] = cv;
+}
+// Ansicht je Seite: Süden und Osten zeigen die Außenseite, Norden und Westen die Innenseite (Zinnen hinten = außen)
+const wallView = (s) => (s.along === 'x' ? (s.front ? 'x' : 'x_innen') : s.front ? 'y_aussen' : 'y');
+// Die Bilder stehen mit ihrer sichtbaren Vorderkante auf dem Fußpunkt; um halbe Mauerstärke zum Betrachter gerückt,
+// läuft die Mauermitte genau durch die Mitte der Ecktürme
+const WALL_HALF = 0.14;
 // Tor einer Burg geschlossen? Bei Belagerung oder wenn du das Tor deiner Burg geschlossen hast
 function castleGateClosed(site) {
   const sg = G.siege;
@@ -1589,7 +1620,8 @@ function castlePieces(site, level, bannerCol) {
     add(s.x, s.y, (c) => {
       const wx = s.along === 'x' ? 1.02 : 0.5, wy = s.along === 'y' ? 1.02 : 0.5;
       const hit = wallHit(site, s.x, s.y);
-      if (p5(c, p5dmg(`burg_stein_mauer_${s.along}`, dmgStage(hit)), s.x, s.y, level >= 3 ? 1.1 : 1)) { if (hit && hit.repair) drawScaffold(c, s.x, s.y, wx + 0.3, wy + 0.3, wh + 18); return; }
+      const ax = s.x + (s.along === 'y' ? WALL_HALF : 0), ay = s.y + (s.along === 'x' ? WALL_HALF : 0);
+      if (p5(c, p5dmg(`burg_stein_mauer_${wallView(s)}`, dmgStage(hit)), ax, ay, level >= 3 ? 1.1 : 1)) { if (hit && hit.repair) drawScaffold(c, s.x, s.y, wx + 0.3, wy + 0.3, wh + 18); return; }
       if (hit) { drawWallRuined(c, s.x, s.y, wx, wy, wh, stone, hit); return; }
       drawBox(c, s.x, s.y, wx, wy, wh, stone, 0, 'stone');
       for (const k of [-0.25, 0.25]) {
@@ -1652,21 +1684,37 @@ function castlePieces(site, level, bannerCol) {
   return parts;
 }
 
+// Runder Pfahl mit Spitze und Bastband: Licht von links, Schatten rechts
+function drawStake(c, x, y, h, k) {
+  const [px, py0] = P(x, y, 0), py = py0 + 1;
+  const w = 4.6 + (k % 3) * 0.3, tip = h > 12 ? 6 + (k % 2) : 0;
+  c.fillStyle = '#7d5634'; c.fillRect(px - w, py - h, 2 * w, h);
+  c.fillStyle = '#9c7249'; c.fillRect(px - w, py - h, w * 0.85, h);
+  c.fillStyle = '#5a3c24'; c.fillRect(px + w * 0.4, py - h, w * 0.6, h);
+  c.beginPath(); c.ellipse(px, py, w, w * 0.45, 0, 0, Math.PI); c.fill();
+  if (tip) {
+    c.fillStyle = '#b48858'; c.beginPath(); c.moveTo(px - w, py - h); c.lineTo(px, py - h - tip); c.lineTo(px, py - h + 1); c.closePath(); c.fill();
+    c.fillStyle = '#7a5230'; c.beginPath(); c.moveTo(px + w, py - h); c.lineTo(px, py - h - tip); c.lineTo(px, py - h + 1); c.closePath(); c.fill();
+  } else { c.fillStyle = '#c8a070'; c.beginPath(); c.ellipse(px, py - h, w, w * 0.45, 0, 0, Math.PI * 2); c.fill(); }
+  c.strokeStyle = 'rgba(214,190,130,0.8)'; c.lineWidth = 1.1;
+  for (const f of [0.3, 0.75]) if (h * f < h - 2) { c.beginPath(); c.ellipse(px, py - h * f, w, w * 0.45, 0, 0.15, Math.PI - 0.15); c.stroke(); }
+}
+
 function palisadeRing(site, r) {
   const parts = [];
-  const wood = '#8a6440';
   const z0 = groundZ(G.world, site.x, site.y);
-  const n = Math.round(Math.PI * 2 * r / 0.36);
+  // Pfähle dicht an dicht, damit sie als Wand lesen
+  const n = Math.round(Math.PI * 2 * r / 0.27);
   for (let k = 0; k < n; k++) {
     const a = (k / n) * Math.PI * 2;
     if (Math.abs(a - Math.PI * 0.5) < 0.28) continue;
     const x = site.x + Math.cos(a) * r, y = site.y + Math.sin(a) * r;
+    const h0 = 22 + hash2(k, site.tx, 71) * 4;
     parts.push({ x, y, d: x + y, z: z0, f: (c) => {
       const hit = wallHit(site, x, y);
-      if (!hit) { drawBox(c, x, y, 0.22, 0.22, 20, wood); drawPyramid(c, x, y, 0.22, 0.22, 20, 5, wood); return; }
-      if (hit.gone) { if (k % 2) drawBox(c, x, y, 0.22, 0.22, 4, '#5a4030'); return; }
-      const h = 20 * (1 - 0.6 * hit.dmg * (k % 2 ? 1 : 0.4));
-      drawBox(c, x, y, 0.22, 0.22, h, '#7a5a3a');
+      if (!hit) { drawStake(c, x, y, h0, k); return; }
+      if (hit.gone) { if (k % 2) drawStake(c, x, y, 4, k); return; }
+      drawStake(c, x, y, h0 * (1 - 0.6 * hit.dmg * (k % 2 ? 1 : 0.4)), k);
       if (hit.repair && k % 3 === 0) drawScaffold(c, x, y, 0.5, 0.5, 24);
     } });
   }
@@ -2721,6 +2769,69 @@ function tileColor(t, pal, hv) {
 
 // Helligkeit eines Hangs: Licht kommt von links oben
 function slopeLight(dhdx, dhdy) { return 1 + Math.max(-0.32, Math.min(0.2, (dhdx - dhdy) / 34)); }
+// Licht an jeder Kachelecke aus den Höhen ringsum (geglättetes Gefälle wie ein Sobel-Filter). Zwischen den Ecken
+// verläuft das Licht, so wirken Hügel rund statt kantig.
+let vlightOf = null, vlight = null;
+function vertexLight(W) {
+  if (vlightOf === W.vh) return vlight;
+  const M = W.M, vh = W.vh, L = new Float32Array(M * M);
+  const h = (x, y) => vh[Math.max(0, Math.min(M - 1, y)) * M + Math.max(0, Math.min(M - 1, x))];
+  for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) {
+    let dx = 0, dy = 0;
+    for (let k = -1; k <= 1; k++) {
+      const w = k ? 1 : 2;
+      dx += w * (h(x + 1, y + k) - h(x - 1, y + k));
+      dy += w * (h(x + k, y + 1) - h(x + k, y - 1));
+    }
+    L[y * M + x] = slopeLight(dx / 8, dy / 8);
+  }
+  vlightOf = vh; vlight = L;
+  return L;
+}
+// Verlauf über ein Dreieck, dessen Wert an den drei Ecken v0..v2 liegt: ein Wert, der im Dreieck linear verläuft,
+// ist genau ein linearer Verlauf der Leinwand. stops(lo, hi) liefert die Farbhalte von lo (0) bis hi (1).
+function triFill(c, p0, p1, p2, v0, v1, v2, colorOf, strokeToo = false) {
+  const lo = Math.min(v0, v1, v2), hi = Math.max(v0, v1, v2);
+  let style;
+  if (hi - lo < 0.004) style = colorOf((lo + hi) / 2);
+  else {
+    const x1 = p1[0] - p0[0], y1 = p1[1] - p0[1], x2 = p2[0] - p0[0], y2 = p2[1] - p0[1];
+    const det = x1 * y2 - x2 * y1;
+    if (Math.abs(det) < 1e-6) style = colorOf((lo + hi) / 2);
+    else {
+      const d1 = v1 - v0, d2 = v2 - v0;
+      const a = (d1 * y2 - d2 * y1) / det, b = (x1 * d2 - x2 * d1) / det, g2 = a * a + b * b;
+      const s0 = (lo - v0) / g2, s1 = (hi - v0) / g2;
+      style = c.createLinearGradient(p0[0] + a * s0, p0[1] + b * s0, p0[0] + a * s1, p0[1] + b * s1);
+      gradStops(style, lo, hi, colorOf);
+    }
+  }
+  c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.closePath();
+  c.fillStyle = style; c.fill();
+  if (strokeToo) { c.strokeStyle = style; c.stroke(); }
+}
+// Farbhalte für den Verlauf von lo bis hi; Knicke der Farbfunktion (colorOf.knots) bekommen eigene Halte
+function gradStops(g, lo, hi, colorOf) {
+  const span = hi - lo;
+  g.addColorStop(0, colorOf(lo, 1));
+  for (const k of colorOf.knots || []) if (k > lo && k < hi) { const o = (k - lo) / span; g.addColorStop(o, colorOf(k, -1)); g.addColorStop(o, colorOf(k, 1)); }
+  g.addColorStop(1, colorOf(hi, -1));
+}
+// Hangschatten über dem gemalten Boden: Lichtseite warm aufgehellt, Schattenseite dunkler (höchstens max),
+// im Schnee mit kühlem, bläulichem Schatten statt grünlichem
+function makeSlopeTint(lite, dark, max) {
+  // Farben in 1/400-Schritten vorrätig halten, statt bei jeder Kachel neue Texte zu bauen
+  const L = [], D = [];
+  for (let k = 0; k <= 400; k++) { const a = Math.min(max, k / 400).toFixed(4); L.push(`rgba(${lite},${a})`); D.push(`rgba(${dark},${a})`); }
+  const f = (v, side = 0) => {
+    const d = v - 1, k = Math.min(400, Math.round(Math.abs(d) * 1.1 * 400));
+    return d > 0 || (d === 0 && side > 0) ? L[k] : D[k];
+  };
+  f.knots = [1, 1 + max / 1.1, 1 - max / 1.1];
+  return f;
+}
+const slopeTint = makeSlopeTint('255,246,216', '28,36,16', 0.3);
+const slopeTintSnow = makeSlopeTint('255,252,240', '58,74,110', 0.26);
 
 // Gemalte Böden als Muster: ein Bild deckt 4 × 4 Kacheln, schräg wie der Boden
 const GRASS_TILES = 4;
@@ -2789,7 +2900,10 @@ function roadTex(W, i, j, look) {
 }
 
 let tileSnow = 0;
-function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
+let texBatch = null;
+// Boden in zwei Durchgängen: erst Grundfarbe und gemalter Boden aller Kacheln (phase 1), dann Licht, Jahreszeit und
+// Kleinkram darüber (phase 2) – so überdecken die Kanten der Nachbarkachel keinen Schatten mehr und es bleiben keine Fugen
+function drawTile(c, W, i, j, ox, oy, pal, season, noise, phase = 1) {
   const M = W.M, vh = W.vh, N = W.N;
   const t = W.tiles[j * N + i];
   const hT = vh[j * M + i], hR = vh[j * M + i + 1], hB = vh[(j + 1) * M + i + 1], hL = vh[(j + 1) * M + i];
@@ -2804,34 +2918,50 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   const isWater = t === T.WATER || t === T.BRIDGE;
   const base = tileColor(t === T.ROAD ? T.GRASS : t, pal, pn);
   const varF = isWater ? 0.97 + pn * 0.06 : 0.9 + pn * 0.16 + (h1 - 0.5) * 0.04;
-  const fL = isWater ? 1 : slopeLight(hB - hL, hL - hT), fR = isWater ? 1 : slopeLight(hR - hT, hB - hR);
-  const cL = shade(base, varF * fL), cR = shade(base, varF * fR);
-  c.lineWidth = 0.9;
-  c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
-  c.fillStyle = cL; c.fill(); c.strokeStyle = cL; c.stroke();
-  c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath();
-  c.fillStyle = cR; c.fill(); c.strokeStyle = cR; c.stroke();
+  // Licht an den vier Ecken; dazwischen verläuft es weich (Wasser bleibt flach)
+  const VL = isWater ? null : vertexLight(W);
+  const lT = VL ? VL[j * M + i] : 1, lR = VL ? VL[j * M + i + 1] : 1, lB = VL ? VL[(j + 1) * M + i + 1] : 1, lL = VL ? VL[(j + 1) * M + i] : 1;
+  const baseOf = (f) => shade(base, varF * f);
   // Gemalter Boden: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
   const texId = groundTex(W, t, season, i, j);
   const grassArt = texId ? texPattern(c, texId, ox, oy) : null;
+  if (phase === 1) {
+    c.lineWidth = 0.9;
+    if (grassArt && !isWater && texBatch) {
+      // Unter deckendem gemaltem Boden reicht eine glatte Grundfarbe; den Boden selbst füllt renderChunk für alle
+      // Kacheln mit demselben Bild in einem Zug (ein einziger Pfad hat keine Fugen zwischen den Kacheln)
+      c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
+      c.fillStyle = c.strokeStyle = baseOf(1); c.fill(); c.stroke();
+      let q = texBatch.get(texId);
+      if (!q) texBatch.set(texId, (q = []));
+      q.push(Tp, Rp, Bp, Lp);
+      return;
+    }
+    triFill(c, Tp, Bp, Lp, lT, lB, lL, baseOf, true);
+    triFill(c, Tp, Rp, Bp, lT, lR, lB, baseOf, true);
+    if (grassArt) {
+      c.save();
+      c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
+      if (isWater) c.globalAlpha = 0.85;
+      c.fillStyle = grassArt; c.fill();
+      c.restore();
+    }
+    return;
+  }
   if (grassArt) {
     c.save();
-    c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
-    if (isWater) c.globalAlpha = 0.85;
-    c.fillStyle = grassArt; c.fill();
     // Farbe der Jahreszeit darüber: Sommerwiese im Herbst und Winter stärker, eigene Herbst- und Winterbilder nur leicht;
     // kahler Winter nimmt die Herbstbilder, matter und kälter
     const own = texId !== 'wiese_sommer' || season === 1;
     c.globalAlpha = isWater ? 0 : own ? (season === 4 ? 0.42 : season === 3 ? 0.08 : 0.14) : season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
-    c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
-    c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
-    // Hänge auch auf der gemalten Wiese sichtbar machen: Lichtseite heller, Schattenseite dunkler
-    for (const [f, a, b2] of [[fL, Bp, Lp], [fR, Rp, Bp]]) {
-      const d = f - 1;
-      if (Math.abs(d) < 0.015) continue;
-      c.globalAlpha = Math.min(0.3, Math.abs(d) * 1.1);
-      c.fillStyle = d > 0 ? '#fff6d8' : '#1c2410';
-      c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(a[0], a[1]); c.lineTo(b2[0], b2[1]); c.closePath(); c.fill();
+    // (den Hang zeichnet der Lichtverlauf darunter, die Farbe der Jahreszeit liegt eben darüber)
+    if (c.globalAlpha > 0) { c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = baseOf(1); c.fill(); }
+    // Hänge auch auf der gemalten Wiese sichtbar machen: Lichtseite heller, Schattenseite dunkler, weich verlaufend
+    if (!isWater && Math.max(Math.abs(lT - 1), Math.abs(lR - 1), Math.abs(lB - 1), Math.abs(lL - 1)) > 0.01) {
+      c.globalAlpha = 1;
+      const tint = season === 3 ? slopeTintSnow : slopeTint;
+      triFill(c, Tp, Bp, Lp, lT, lB, lL, tint);
+      triFill(c, Tp, Rp, Bp, lT, lR, lB, tint);
     }
     c.restore();
   }
@@ -3020,7 +3150,15 @@ function renderChunk(cx, cy, cs = 1) {
   const x0 = cx * CHUNK, y0 = cy * CHUNK;
   const ox = -isoX(x0, y0 + CHUNK), oy = -isoY(x0, y0) + PAD_TOP;
   const noise = getPatchNoise();
-  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise);
+  texBatch = new Map();
+  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise, 1);
+  for (const [id, q] of texBatch) {
+    c.beginPath();
+    for (let k = 0; k < q.length; k += 4) { c.moveTo(q[k][0], q[k][1]); c.lineTo(q[k + 1][0], q[k + 1][1]); c.lineTo(q[k + 2][0], q[k + 2][1]); c.lineTo(q[k + 3][0], q[k + 3][1]); c.closePath(); }
+    c.fillStyle = texPattern(c, id, ox, oy); c.fill();
+  }
+  texBatch = null;
+  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise, 2);
   drawRoads(c, W, x0, y0, ox, oy, pal, season);
   return { cvs, x: -ox, y: -oy, s: cs, w: cvs.width / cs, h: cvs.height / cs };
 }
@@ -3549,7 +3687,7 @@ function drawModel3d(c, u, L, m, key) {
   c.save();
   c.scale(f, 1);   // die Richtung steckt im Bild, nicht spiegeln
   // Zu Pferd: Pferd malen, Reiter mit der Hüfte auf den Sattel
-  let ox = 0, oy = 0, horse = null;
+  let ox = 0, oy = 0, horse = null, near = null;
   if (m) {
     const kind = u.eq.pferd === 'schlachtross' ? 'ross' : 'pferd';
     if (horseReady(kind)) {
@@ -3561,6 +3699,10 @@ function drawModel3d(c, u, L, m, key) {
       const hip = pt('Hips') || { x: 0, y: -22 };
       // Das Hüftgelenk liegt rund 9 cm über der Sitzfläche
       ox = horse.sx - hip.x; oy = horse.sy - hip.y - 0.09 * FIG3D_H / 1.8;
+      // Das abgewandte Bein hängt hinter dem Pferdeleib: erst den ganzen Reiter, dann das Pferd, darüber den Reiter
+      // ohne dieses Bein (reiten_nah). So schaut es nur unter dem Bauch hervor, wie es sein soll.
+      near = modelHas(key, 'reiten_nah') ? modelCell(key, 'reiten_nah', dir, frame, color) : null;
+      if (near) c.drawImage(lodOf(cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
       paintHorse(c, horse);
     }
   }
@@ -3576,7 +3718,7 @@ function drawModel3d(c, u, L, m, key) {
     if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim);
   };
   if (back) gear();
-  c.drawImage(lodOf(cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
+  c.drawImage(lodOf(near || cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
   if (!back) gear();
   if (horse) paintHorseHead(c, horse);
   c.restore();
@@ -4293,6 +4435,7 @@ onArt((id) => {
   if (/^(laub|nadel|busch|fels|schilf|baum|wildblumen)/.test(id)) sprites = null;
   if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee|fels|sand|kies|klippe|pflaster|schlamm)/.test(id)) { chunkCache.clear(); minimapBase = null; }
   // Burgteile: die festen Teile neu zusammenstellen (Tore und Hallen fragen beim Aufbau, ob es ein Bild gibt)
+  if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
   if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
 });
 

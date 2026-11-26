@@ -14,6 +14,8 @@
 #   --punkt <knochen>    Lage dieses Knochens (Kopf) je Richtung und Bild mitschreiben, z. B. der Sattel für den Reiter
 #   --textur <png>       Grundfarbe des Modells durch dieses Bild ersetzen (gleiche UV-Abwicklung, z. B. Meshy-Neubemalung)
 #   --reitpose           zusätzliche Haltung „reiten“: Beine gespreizt nach vorn, Hände halten die Zügel
+#   --fernbein 1         die Reithaltung als „reiten_nah“: das vom Betrachter abgewandte Bein ausgeblendet (Holdout).
+#                        Das Spiel malt erst den ganzen Reiter, dann das Pferd, dann diesen Bogen darüber.
 #   --helm <glb>         Helm (Ursprung unten, Gesicht nach -Y) passend über den Kopf setzen, fest am Kopfknochen
 #   --punkt <a,b,...>    auch mehrere Knochen, je Name eine Liste
 #   --bereich name=a:b,… nur diesen Teil der Bewegung (Anteile 0…1), z. B. die Endhaltung eines Hinsetzens (0.97:1)
@@ -193,6 +195,35 @@ if opt.get('helm') and arm:
     meshes.append(hm)
     print('Helm', [round(x, 3) for x in hlo], [round(x, 3) for x in hhi], 'Maß', round(k, 2), round(kz, 2))
 
+# Abgewandtes Bein: je Netz die Flächen, die überwiegend an den Beinknochen einer Seite hängen, und ein Holdout-Material,
+# das sie im Bild durchsichtig macht (sie verdecken dabei weiter, was hinter ihnen liegt)
+LEGS = {}
+if opt.get('fernbein') and arm:
+    hold = bpy.data.materials.new('fernbein'); hold.use_nodes = True
+    nt = hold.node_tree; nt.nodes.clear()
+    nt.links.new(nt.nodes.new('ShaderNodeHoldout').outputs[0], nt.nodes.new('ShaderNodeOutputMaterial').inputs['Surface'])
+    for o in meshes:
+        if o.type != 'MESH' or not o.vertex_groups: continue
+        o.data.materials.append(hold)
+        hi = len(o.data.materials) - 1
+        orig = [p.material_index for p in o.data.polygons]
+        for side in ('Left', 'Right'):
+            gi = {g.index for g in o.vertex_groups if g.name.startswith(side) and any(t in g.name for t in ('UpLeg', 'Leg', 'Foot', 'Toe'))}
+            if not gi: continue
+            w = [sum(g.weight for g in v.groups if g.group in gi) for v in o.data.vertices]
+            faces = [p.index for p in o.data.polygons if sum(w[i] for i in p.vertices) / len(p.vertices) > 0.5]
+            LEGS.setdefault(side, []).append((o, faces, hi, orig))
+    print('Beinflächen', {k: sum(len(f) for _, f, _, _ in v) for k, v in LEGS.items()})
+def hide_far_leg():
+    # Welche Hüfte liegt weiter weg von der Kamera? Deren Bein ausblenden, das andere zeigen
+    bpy.context.view_layer.update()
+    fwd = (cam.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
+    depth = {s: fwd.dot(arm.matrix_world @ arm.pose.bones[f'{s}UpLeg'].head) for s in ('Left', 'Right')}
+    far = max(depth, key=depth.get)
+    for side, lst in LEGS.items():
+        for o, faces, hi, orig in lst:
+            for i in faces: o.data.polygons[i].material_index = hi if side == far else orig[i]
+
 # Kamera: orthografisch, 30° von oben, um 45° gedreht – genau die 2:1-Schrägansicht des Spiels
 cam = bpy.data.objects.new('kamera', bpy.data.cameras.new('kamera')); sc.collection.objects.link(cam); sc.camera = cam
 cam.data.type = 'ORTHO'
@@ -255,6 +286,8 @@ for act in acts:
     parts = act.name.split('|') if act else ['statisch']
     name = parts[1] if len(parts) >= 3 else parts[-1]
     if act and ONLY and name not in ONLY and act.name not in ONLY: continue
+    far_leg = bool(LEGS) and name == 'reiten'
+    if far_leg: name = 'reiten_nah'; FRAMES.setdefault(name, FRAMES.get('reiten', 1))
     if opt.get('punkt'):
         for pn in opt['punkt'].split(','): meta.setdefault('punkte', {})[name if ',' not in opt['punkt'] else f'{name}|{pn}'] = []
     if act:
@@ -287,6 +320,7 @@ for act in acts:
                     px_, py_, _ = world_to_camera_view(sc, cam, pw)
                     key = name if ',' not in opt['punkt'] else f'{name}|{pn}'
                     meta.setdefault('punkte', {}).setdefault(key, []).append([round(px_ * CELL, 1), round((1 - py_) * CELL, 1)])
+            if far_leg: hide_far_leg()
             r.filepath = tmp
             bpy.ops.render.render(write_still=True)
             im = bpy.data.images.load(tmp, check_existing=False)

@@ -1,6 +1,6 @@
 # Packt gerenderte Sprite-Bögen (tools/sprites.py) für das Spiel:
 #   python3 tools/sprite_pack.py <ordner> <ziel-ordner> <name> [--zelle 112] [--namen alt=neu,...] [--zuschnitt 1]
-#     [--qualitaet 90] [--maske-qualitaet 85] [--alpha 100]
+#     [--qualitaet 90] [--maske-qualitaet 85] [--alpha 100] [--nur bewegung,...]
 # --zuschnitt 1 schneidet den leeren Rand ab, der in allen Bildern aller Bewegungen frei bleibt; die Zellen sind dann
 # breite × hoehe statt zelle × zelle (spart Speicher, wenn in voller Größe gepackt wird).
 # Je Bewegung zwei WebP-Bilder (bei --zelle 112 und 224er-Renderings in halber Größe):
@@ -51,7 +51,10 @@ def hue_sat(a):
     s = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
     return h, s, mx
 
+# --nur a,b: nur diese Bewegungen schreiben (der Zuschnitt gilt weiter für alle, damit die Zellen zusammenpassen)
+NUR = set(x for x in opt.get('nur', '').split(',') if x)
 for old, info in meta['bewegungen'].items():
+    if NUR and old not in NUR: continue
     new = RENAME.get(old, old)
     im = Image.open(os.path.join(src, f'{old}.png')).convert('RGBA')
     cols, rows = im.size[0] // Z, im.size[1] // Z

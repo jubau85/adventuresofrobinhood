@@ -511,8 +511,10 @@ export function updateUnits(dt) {
     if (u.combatT > 0) u.combatT -= dt;
     u.run = wantsRun(u);
     u.catchUp = false;
-    // Wer auf einer neu gebauten Mauer steht, wird daneben gesetzt
-    if (!u.hidden && !isWalkable(G.world, u.x, u.y)) {
+    // Wer auf einer neu gebauten Mauer steht, wird daneben gesetzt. Nicht die Turnierritter (und du in den Schranken):
+    // Sie reiten feste Wege um Schranke und Zelte, ihr Wartepunkt vor dem Zelt liegt auf einem gesperrten Feld.
+    const scripted = u.tourney || (u === p && G.tour && G.tour.lock);
+    if (!u.hidden && !scripted && !isWalkable(G.world, u.x, u.y)) {
       const n = nearestWalkable(G.world, Math.floor(u.x), Math.floor(u.y), 4);
       if (n) { u.x = n.x + 0.5; u.y = n.y + 0.5; u.chase = null; }
     }

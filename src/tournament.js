@@ -23,7 +23,7 @@ const KNIGHT_NAMES = [
 ];
 const KNIGHT_COLS = ['#9a2f2a', '#2c4f86', '#3f6b2f', '#5e2f6e', '#a8791f', '#2b2a2e', '#1f6a6a', '#b34a1a', '#6a6a6a', '#8a2a5a', '#c9a227', '#3a3a7a'];
 const HOST_TYPES = { stadt: 1, burg: 1, markt: 1 };
-const PASS_T = 3.4;           // Sekunden je Durchgang
+const PASS_T = 5.2;           // Sekunden je Durchgang (gemessener Galopp, nicht gehetzt)
 const IMPACT = 0.585;         // Anteil des Durchgangs bis zum Zusammenprall
 const LANE = 0.55;            // Abstand der Bahnen von der Schranke
 
@@ -346,9 +346,9 @@ function updateMatch(t, m, dt) {
     for (const k of [m.a, m.b]) {
       const s = laneStart(t, m, k), u = k.u;
       const d = Math.hypot(s.x - u.x, s.y - u.y);
-      if (d > 0.15) { ready = false; rideTo(u, s.x, s.y, dt, k.player ? 5 : 3.5); } else { u.moving = false; face(u, s.dir, 0); }
+      if (d > 0.15) { ready = false; rideRoute(t, u, s.x, s.y, dt, k.player ? 2.6 : 2.1); } else { u.moving = false; u.tRoute = null; face(u, s.dir, 0); }
     }
-    if (ready || m.t > 9) { m.phase = 'anlauf'; m.t = 0; A.lanceBroken = false; B.lanceBroken = false; if (m.player) startAim(t, m); }
+    if (ready || m.t > 30) { m.phase = 'anlauf'; m.t = 0; A.lanceBroken = false; B.lanceBroken = false; if (m.player) startAim(t, m); }
     return;
   }
   if (m.phase === 'anlauf') {
@@ -373,7 +373,7 @@ function updateMatch(t, m, dt) {
   }
   if (m.phase === 'wenden') {
     // Am Bahnende wenden die Pferde im Bogen nach außen, weg von der Schranke
-    const dur = m.player ? 1.6 : 1.0, q = Math.min(1, m.t / (dur * 0.8));
+    const dur = m.player ? 2.8 : 2.4, q = Math.min(1, m.t / (dur * 0.8));
     for (const kn of [m.a, m.b]) {
       const s = laneStart(t, m, kn), u = kn.u, out = kn === m.a ? -1 : 1;
       face(u, -s.dir * Math.cos(Math.PI * q), out * Math.sin(Math.PI * q));
@@ -392,7 +392,7 @@ function face(u, dx, dy) {
 }
 
 function rideTo(u, x, y, dt, v) {
-  u.run = v > 3;
+  u.run = v > 2.4;
   const dx = x - u.x, dy = y - u.y, d = Math.hypot(dx, dy);
   const step = Math.min(d, v * dt);
   u.x += (dx / d) * step; u.y += (dy / d) * step;
@@ -406,8 +406,40 @@ function idleKnight(k, dt) {
   const u = k.u;
   if (k.out) { u.lance = false; }
   const d = Math.hypot(k.tent.x - u.x, k.tent.y - u.y);
-  if (d > 0.2) rideTo(u, k.tent.x, k.tent.y, dt, 2.2);
-  else { u.moving = false; u.mounted = !k.out; }
+  if (d > 0.2) rideRoute(G.tour, u, k.tent.x, k.tent.y, dt, k.out && !u.mounted ? 1.2 : 1.6);
+  else { u.moving = false; u.tRoute = null; u.mounted = !k.out; }
+}
+
+// Wege über den Platz: Die Schranke reicht 6,05 Felder weit, an ihren Enden stehen Fahnen (6,4), dahinter die Zelte
+// (ab 7,95). Wer auf die andere Seite muss, reitet zwischen Fahne und Zelten um das Ende herum, nie durch die Schranke.
+const END_X = 7.15, BAND = 0.4;
+function crossesBarrier(ax, ay, bx, by) {
+  if ((ay < -BAND && by < -BAND) || (ay > BAND && by > BAND)) return false;
+  for (let k = 0; k <= 16; k++) {
+    const f = k / 16, x = ax + (bx - ax) * f, y = ay + (by - ay) * f;
+    if (Math.abs(y) <= BAND && Math.abs(x) < END_X - 0.25) return true;
+  }
+  return false;
+}
+function routeTo(t, u, x, y) {
+  const r = u.tRoute;
+  if (r && r.x === x && r.y === y) return r;
+  const ax = u.x - t.lx, ay = u.y - t.ly, bx = x - t.lx, by = y - t.ly;
+  const pts = [];
+  if (crossesBarrier(ax, ay, bx, by)) {
+    const sg = ax + bx >= 0 ? 1 : -1, sa = ay < 0 ? -1 : 1, sb = by < 0 ? -1 : 1;
+    if (Math.abs(ax) < END_X - 0.1) pts.push({ x: t.lx + sg * END_X, y: t.ly + sa * 0.62 });
+    pts.push({ x: t.lx + sg * END_X, y: t.ly + sb * 0.62 });
+  }
+  pts.push({ x, y });
+  return (u.tRoute = { x, y, pts });
+}
+function rideRoute(t, u, x, y, dt, v) {
+  if (!t) { rideTo(u, x, y, dt, v); return; }
+  const r = routeTo(t, u, x, y);
+  let p = r.pts[0];
+  while (r.pts.length > 1 && Math.hypot(p.x - u.x, p.y - u.y) < 0.15) { r.pts.shift(); p = r.pts[0]; }
+  rideTo(u, p.x, p.y, dt, v);
 }
 
 // ---------------------------------------------------------------- Zielen (dein Durchgang)
@@ -513,7 +545,8 @@ function endMatch(t, m) {
   }
   for (const k of [m.a, m.b]) { if (!k.player) { k.u.lanceDown = false; k.u.mounted = true; } }
   t.match = null;
-  t.pauseT = 2.5;
+  t.pauseT = 4;
+  for (const k of [m.a, m.b]) k.u.tRoute = null;
 }
 
 function crown(t, k) {

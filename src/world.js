@@ -1131,9 +1131,13 @@ function placeDocks(W) {
   }
 }
 
+// Halbmesser der Palisade um eine sächsische Halle
+const PALISADE_R = 4.5;
 function addFields(W, s, rng) {
   const n = { dorf: 4, halle: 3, abtei: 3, spieler: 3, stadt: 3, markt: 2, burg: 2 }[s.type] || 0;
   const N = W.N;
+  // Äcker bleiben außerhalb der Palisade (mit einem Streifen Platz davor)
+  const keepR = s.type === 'halle' ? PALISADE_R + 1.4 : 0;
   for (let k = 0; k < n; k++) {
     const a = rng() * Math.PI * 2;
     const r = (s.type === 'spieler' ? 11 : 5.5) + rng() * 3;
@@ -1142,6 +1146,7 @@ function addFields(W, s, rng) {
     for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) {
       if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1) continue;
       const i = y * N + x;
+      if (keepR && Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y) < keepR) continue;
       if (W.tiles[i] === T.GRASS) W.tiles[i] = T.FIELD;
     }
   }
@@ -1501,7 +1506,7 @@ function genBuildings(W, s, rng) {
       tavern(2.4, 1.2);
       if (!s.tavern) tavern(5.6, 2.5);
       ring(3, 2.2, 3.4, (x, y) => house(x, y, { wall: 'wood' }), 1.7);
-      s.palisade = 4.5;
+      s.palisade = PALISADE_R;
       break;
     }
     case 'burg':
