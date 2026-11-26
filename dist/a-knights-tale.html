@@ -257,6 +257,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .legend .ring { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 50%; border: 2px solid #c9a21a; vertical-align: -1px; }
 .legend .ev { display: inline-block; width: 12px; height: 12px; margin-right: 5px; border-radius: 50%; background: #1d140c; border: 2px solid #ff6a4a; vertical-align: -1px; }
 .legend .ev.gold { border-color: #ffd65a; }
+.actions.gate { margin-bottom: 14px; }
 .events { max-width: 760px; margin: 10px auto 0; display: grid; gap: 6px; }
 .events .action p { margin: 0; }
 .menu { display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
@@ -5092,6 +5093,12 @@ function setupWalls(sg) {
     seen.add(i);
     (W.block[i] || inBreach(x, y) ? wall : open).push([x, y]);
   }
+  // Deine Burg: Das Tor liegt auf den Straßenfeldern im Ring, auch wenn du es schon geschlossen hast
+  if (s.type === 'spieler') {
+    const gt = homeGateTiles(), isGate = ([x, y]) => gt.some((g) => g[0] === x && g[1] === y);
+    for (let k = wall.length - 1; k >= 0; k--) if (isGate(wall[k])) wall.splice(k, 1);
+    open.length = 0; open.push(...gt);
+  }
   if (!wall.length) return;
   let inside;
   if (wb.square) inside = (x, y) => Math.abs(x - s.x) < 3.4 && Math.abs(y - s.y) < 3.4;
@@ -5126,8 +5133,14 @@ function closeGates(sg) {
   if (!w || sg.gatesClosed) return;
   sg.gatesClosed = true;
   for (const [x, y] of w.gates) W.block[y * W.N + x] = 1;
+  stepAside(sg.site);
+}
+
+// Wer in einem gerade geschlossenen Tor steht, tritt beiseite
+function stepAside(site) {
+  const W = G.world;
   for (const u of G.units) {
-    if (u.dead || isWalkable(W, u.x, u.y) || Math.hypot(u.x - sg.site.x, u.y - sg.site.y) > 20) continue;
+    if (u.dead || isWalkable(W, u.x, u.y) || Math.hypot(u.x - site.x, u.y - site.y) > 20) continue;
     const q = nearestWalkable(W, Math.floor(u.x), Math.floor(u.y), 3);
     if (q) { u.x = q.x + 0.5; u.y = q.y + 0.5; u.path = null; }
   }
@@ -5137,7 +5150,31 @@ function openGates(sg) {
   const w = sg.walls, W = G.world;
   if (!w || !sg.gatesClosed) return;
   sg.gatesClosed = false;
+  if (sg.site.type === 'spieler' && homeGateClosed()) return;
   for (const [x, y] of w.gates) W.block[y * W.N + x] = 0;
+}
+
+// ---------------------------------------------------------------- Burgtor von deiner Burg
+// Ab der Holzburg lässt sich das Tor schließen. Zu bleibt es, bis du es wieder öffnest, auch über das Speichern hinaus.
+function homeSite() { return G.world.sites.find((x) => x.type === 'spieler'); }
+function hasHomeGate() { return !!G.s && G.s.castle.level >= 1; }
+function homeGateClosed() { return hasHomeGate() && !!G.s.gateClosed; }
+function homeGateTiles() {
+  const W = G.world, N = W.N;
+  return wallRing(W, homeSite(), 4).filter(([x, y]) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE; });
+}
+function insideHome(x, y) { const s = homeSite(); return Math.abs(x - s.x) < 3.4 && Math.abs(y - s.y) < 3.4; }
+
+function setHomeGate(closed) {
+  if (!hasHomeGate()) return false;
+  const W = G.world, N = W.N, sg = G.siege, sieged = !!sg && sg.site.type === 'spieler' && !!sg.walls;
+  G.s.gateClosed = !!closed;
+  for (const [x, y] of homeGateTiles()) W.block[y * N + x] = closed ? 1 : 0;
+  if (closed) stepAside(homeSite());
+  if (sieged) sg.gatesClosed = !!closed;
+  log(closed ? `Das Tor von ${homeName()} schlägt zu, die Riegel fallen. Durch die Pforte (E) kommst du weiter hinein und hinaus.`
+    : sieged ? `Das Tor von ${homeName()} steht offen, mitten in der Belagerung! Jetzt können die Angreifer durchs Tor.` : `Das Tor von ${homeName()} steht wieder offen.`, closed ? 'good' : sieged ? 'bad' : '');
+  return true;
 }
 
 // Nach dem Neuaufbau der Sperrkarte (Burgausbau, Laden): Breschen offen, Tore der laufenden Belagerung zu
@@ -5146,6 +5183,7 @@ function applyWallState() {
   if (!W || !G.s) return;
   const N = W.N;
   for (const st of Object.values(G.s.walls || {})) if (st.open) for (const [x, y] of st.tiles) W.block[y * N + x] = 0;
+  if (homeGateClosed()) for (const [x, y] of homeGateTiles()) W.block[y * N + x] = 1;
   const sg = G.siege;
   if (sg && sg.walls && sg.gatesClosed) for (const [x, y] of sg.walls.gates) W.block[y * N + x] = 1;
 }
@@ -5250,27 +5288,48 @@ function raiseDefenders(sg) {
   return g;
 }
 
-// Pforte im Tor: Wer zur Stadt hält, wird eingelassen oder hinausgelassen
+// Pforte im Tor: Wer zur Stadt hält, wird eingelassen oder hinausgelassen. An deiner Burg immer.
 function posternNear() {
-  const sg = G.siege;
-  if (!sg || !sg.walls || !sg.gatesClosed) return null;
-  const p = G.s.player, s = sg.site;
-  if (s.type !== 'spieler' && (sg.side === 'att' || isHostileFaction(s.faction))) return null;
-  for (const [x, y] of sg.walls.gates) {
-    if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y) };
+  const p = G.s.player, sg = G.siege;
+  if (sg && sg.walls && sg.gatesClosed && (sg.site.type === 'spieler' || (sg.side !== 'att' && !isHostileFaction(sg.site.faction)))) {
+    for (const [x, y] of sg.walls.gates) {
+      if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y), site: sg.site };
+    }
+  }
+  if (homeGateClosed()) {
+    for (const [x, y] of homeGateTiles()) {
+      if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: insideHome(p.x, p.y), site: homeSite() };
+    }
   }
   return null;
 }
 function usePostern() {
   const pf = posternNear();
   if (!pf) return false;
-  const s = G.siege.site, p = G.s.player;
+  const s = pf.site, p = G.s.player;
   const dx = s.x - pf.x, dy = s.y - pf.y, l = Math.hypot(dx, dy) || 1, k = pf.inside ? -1.8 : 1.8;
   const to = walkPt(pf.x + (dx / l) * k, pf.y + (dy / l) * k);
   p.x = to.x; p.y = to.y; p.path = null; p.attackTarget = null;
   for (const c of partyMembers()) { c.x = to.x + rand(-0.4, 0.4); c.y = to.y + rand(-0.4, 0.4); c.path = null; c.chase = null; }
-  log(pf.inside ? 'Die Wachen öffnen die Pforte einen Spalt und lassen dich hinaus.' : 'Die Wachen öffnen die Pforte einen Spalt und lassen dich ein. Hinter dir fällt der Riegel.', 'good');
+  const own = s.type === 'spieler';
+  log(pf.inside ? `${own ? 'Deine Wachen' : 'Die Wachen'} öffnen die Pforte einen Spalt und lassen dich hinaus.` : `${own ? 'Deine Wachen' : 'Die Wachen'} öffnen die Pforte einen Spalt und lassen dich ein. Hinter dir fällt der Riegel.`, 'good');
   return true;
+}
+
+// Ziel hinter einem geschlossenen Tor: erst zur Pforte, von dort weiter. Gibt den Punkt vor der Pforte zurück.
+function posternRoute(tx, ty) {
+  const p = G.s.player, sg = G.siege;
+  const gates = [];
+  if (sg && sg.walls && sg.gatesClosed && (sg.site.type === 'spieler' || (sg.side !== 'att' && !isHostileFaction(sg.site.faction)))) gates.push({ site: sg.site, tiles: sg.walls.gates, inside: sg.walls.inside });
+  if (homeGateClosed()) gates.push({ site: homeSite(), tiles: homeGateTiles(), inside: insideHome });
+  for (const g of gates) {
+    const pin = g.inside(p.x, p.y), tin = g.inside(tx, ty);
+    if (pin === tin || !g.tiles.length) continue;
+    const [gx, gy] = g.tiles[Math.floor(g.tiles.length / 2)];
+    const x = gx + 0.5, y = gy + 0.5, dx = g.site.x - x, dy = g.site.y - y, l = Math.hypot(dx, dy) || 1, k = pin ? 1.5 : -1.5;
+    return walkPt(x + (dx / l) * k, y + (dy / l) * k);
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- Ablauf
@@ -7346,6 +7405,7 @@ function castleDefense() {
   let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')];
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
+  if (homeGateClosed()) d += 10;
   return Math.round(d);
 }
 
@@ -7353,7 +7413,7 @@ function dailyBalance() {
   const lvl = G.s.castle.level;
   const income = [
     ['Pacht der Bauern', 20 + lvl * 15],
-    ['Marktgeld', [0, 15, 35, 60][bLevel('markt')]],
+    ['Marktgeld', homeGateClosed() ? 0 : [0, 15, 35, 60][bLevel('markt')]],
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);
@@ -7697,6 +7757,7 @@ function weatherKind() { return (G.s && G.s.weather && G.s.weather.kind) || 'kla
 // ===== render.js =====
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
+
 
 
 
@@ -8144,8 +8205,19 @@ function drawClosedGate(c, x, y, wx, wy, h) {
 
 // Tore der laufenden Belagerung als Objekte für die Tiefensortierung
 function siegeGateParts() {
-  const sg = G.siege;
+  const sg = G.siege, W = G.world;
+  // Deine Burg mit geschlossenem Tor, auch ohne Belagerung
+  if (homeGateClosed() && !(sg && sg.site.type === 'spieler' && sg.gatesClosed)) {
+    const s = homeSite(), lvl = G.s.castle.level, x = s.x, y = s.y + 4, h = lvl >= 2 ? (lvl >= 3 ? 36 : 26) : 22;
+    const part = { x, y, d: x + y, z: groundZ(W, x, y), f: (c) => drawClosedGate(c, x, y, 1.7, 0.42, h), box: [x - 0.85, x + 0.85, y - 0.21, y + 0.21], big: true };
+    if (!sg || !sg.walls || !sg.gatesClosed) return [part];
+    return [part, ...siegeGatePartsFor(sg)];
+  }
   if (!sg || !sg.walls || !sg.gatesClosed) return [];
+  return siegeGatePartsFor(sg);
+}
+
+function siegeGatePartsFor(sg) {
   const s = sg.site, W = G.world, out = [];
   if (sg.walls.square) {
     const lvl = s.type === 'spieler' ? G.s.castle.level : s.castleLevel || 0;
@@ -12841,7 +12913,7 @@ function castlePanel() {
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
-    case 'ausbau': body = castleBuild(); break;
+    case 'ausbau': body = gateAction() + castleBuild(); break;
     case 'halle': body = castleHall(); break;
     case 'gefolge': body = partyView(true); break;
     case 'lager': body = castleStore(); break;
@@ -12851,6 +12923,16 @@ function castlePanel() {
   }
   const cb = CASTLE_BONUS[G.s.castle.level];
   return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+}
+
+// Burgtor: von Hand öffnen und schließen
+function gateAction() {
+  if (!hasHomeGate()) return `<div class="actions gate"><div class="action"><div><b>Burgtor</b><p>Die Ruine hat noch kein Tor. Ab der Holzburg kannst du es schließen.</p></div></div></div>`;
+  const closed = homeGateClosed();
+  const txt = closed
+    ? 'Niemand kommt durchs Tor, du selbst gehst durch die Pforte (E), oder du klickst einfach ein Ziel an. Verteidigung +10, aber Händler bleiben draußen: kein Marktgeld.'
+    : 'Ein geschlossenes Tor hält Räuber und Plünderer ab: Verteidigung +10. Dafür bleiben Händler draußen, das Marktgeld fällt weg. In der Nähe der Burg schaltet auch die Taste B das Tor.';
+  return `<div class="actions gate"><div class="action"><div><b>Burgtor: ${closed ? 'geschlossen' : 'offen'}</b><p>${txt}</p></div><button class="btn${closed ? '' : ' primary'}" data-act="tor">${closed ? 'Öffnen' : 'Schließen'}</button></div></div>`;
 }
 
 function castleBuild() {
@@ -13181,7 +13263,8 @@ function helpPanel() {
       <div><h3>Steuerung</h3><dl class="keys">
         <dt>Klick</dt><dd>Gehen, Gegner angreifen, Orte ansteuern</dd>
         <dt>W A S D</dt><dd>Direkt laufen</dd>
-        <dt>E</dt><dd>Siedlung oder Burg betreten</dd>
+        <dt>E</dt><dd>Siedlung oder Burg betreten, durch die Pforte eines geschlossenen Tors</dd>
+        <dt>B</dt><dd>Burgtor deiner Burg schließen oder öffnen (in der Nähe, ab der Holzburg)</dd>
         <dt>R</dt><dd>Auf- und absitzen</dd>
         <dt>Leertaste</dt><dd>Nächsten Feind angreifen, beim Tjost die Lanze senken</dd>
         <dt>Klick auf Bettler</dt><dd>Almosen geben (3 Gold)</dd>
@@ -13208,6 +13291,7 @@ function helpPanel() {
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
         <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> schließen sich die Tore, die Besatzung bezieht Stellung hinter der Mauer, und das Trebuchet schlägt eine <b>Bresche</b>. Durch sie stürmen die Angreifer. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben. Sind dir Normannen oder Sachsen feindlich, ziehen sie auch gegen deine Burg. Durch die <b>Pforte</b> am Tor (<kbd>E</kbd>) kommst du hinein.</li>
+        <li>Ab der Holzburg kannst du das <b>Burgtor</b> selbst schließen: in der Burgtafel unter Ausbau oder mit <kbd>B</kbd> in der Nähe der Burg. Geschlossen gibt es +10 Verteidigung, aber kein Marktgeld. Du selbst gehst durch die Pforte, ein Klick aufs Ziel genügt.</li>
         <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (durch die Pforte hinein, gemeinsam die Bresche halten, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
@@ -13247,6 +13331,14 @@ const ACTIONS = {
     confirmDialog(`Wirklich gegen ${sg.site.name} ziehen? Die ${FACTIONS[sg.site.faction].name} werden dir das übel nehmen (Ansehen −8 sofort, −6, wenn die Stadt fällt), und die Besatzung greift dich an.`, 'Dienen', () => { joinSiege('att'); refreshPanel(); });
   },
   ssturm: () => callStorm(),
+  tor: () => {
+    const sg = G.siege;
+    if (homeGateClosed() && sg && sg.site.type === 'spieler' && sg.stage !== 'anmarsch') {
+      confirmDialog('Das Tor mitten in der Belagerung öffnen? Dann können die Angreifer durchs Tor herein.', 'Öffnen', () => { setHomeGate(false); refreshPanel(); });
+      return;
+    }
+    setHomeGate(!homeGateClosed());
+  },
   lease: () => leaseMine(G.ui.arg),
   hrat: () => hermitAdvice(G.ui.arg),
   hsegen: () => hermitBless(G.ui.arg),
@@ -13659,6 +13751,7 @@ function nearestSite() {
 // E oder Klick auf die Statuszeile: Ort betreten, sonst ins Feldlager einer Belagerung
 function interactHere() {
   if (posternNear()) { usePostern(); return; }
+  G.pendingPostern = null;
   const s = nearestSite();
   if (s) enterSite(s);
   else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
@@ -13682,6 +13775,14 @@ function checkNearSite() {
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
+  const pp = G.pendingPostern;
+  if (pp && posternNear()) {
+    G.pendingPostern = null;
+    usePostern();
+    if (setPlayerPath(pp.x, pp.y)) G.pendingSite = pp.site;
+    return;
+  }
+  if (pp && !G.s.player.path) G.pendingPostern = null;
   const pf = posternNear();
   if (pf) {
     showPrompt(`<kbd>E</kbd> ${pf.inside ? 'Durch die Pforte hinaus' : 'An die Pforte klopfen und hinein'}${battleText(' · ')}`);
@@ -13809,10 +13910,28 @@ function clickWorld(px, py) {
     if (Math.hypot(site.x - p.x, site.y - p.y) < interactRadius(site)) { enterSite(site); return; }
     tx = site.x; ty = site.y + (site.type === 'spieler' ? 2.6 : 0.6);
   }
+  G.pendingPostern = null;
   if (setPlayerPath(tx, ty)) {
     G.pendingSite = site;
     G.clickMarker = { x: tx, y: ty, t: 0 };
+  } else {
+    // Ziel hinter einem geschlossenen Tor: zur Pforte, hindurch, dann weiter
+    const pt = posternRoute(tx, ty);
+    if (pt && setPlayerPath(pt.x, pt.y)) { G.pendingPostern = { x: tx, y: ty, site }; G.pendingSite = null; G.clickMarker = { x: tx, y: ty, t: 0 }; }
   }
+}
+
+// Burgtor deiner Burg öffnen oder schließen (Taste B), nur in der Nähe der Burg
+function toggleHomeGate() {
+  if (!hasHomeGate()) { log(`${homeName()} hat noch kein Tor. Ab der Holzburg lässt es sich schließen.`); return; }
+  const s = homeSite(), p = G.s.player;
+  if (Math.hypot(s.x - p.x, s.y - p.y) > 16) { log(`Das Tor von ${homeName()} lässt sich nur vor Ort schließen oder öffnen.`); return; }
+  const sg = G.siege;
+  if (homeGateClosed() && sg && sg.site.type === 'spieler' && sg.stage !== 'anmarsch') {
+    confirmDialog('Das Tor mitten in der Belagerung öffnen? Dann können die Angreifer durchs Tor herein.', 'Öffnen', () => setHomeGate(false));
+    return;
+  }
+  setHomeGate(!homeGateClosed());
 }
 
 function toggleRide() {
@@ -13905,6 +14024,7 @@ function onKey(e) {
     case 't': toggleFast(); break;
     case 'l': toggleMusic(); break;
     case 'g': G.cycleGfx(); break;
+    case 'b': toggleHomeGate(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
     default: return;

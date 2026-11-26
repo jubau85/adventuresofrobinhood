@@ -17,6 +17,7 @@ import { tourneyLayout } from './tournament.js';
 import { gallowsFor } from './justice.js';
 import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weather.js';
 import { abandonedId } from './dynamics.js';
+import { homeGateClosed, homeSite } from './siege.js';
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -447,8 +448,19 @@ function drawClosedGate(c, x, y, wx, wy, h) {
 
 // Tore der laufenden Belagerung als Objekte für die Tiefensortierung
 function siegeGateParts() {
-  const sg = G.siege;
+  const sg = G.siege, W = G.world;
+  // Deine Burg mit geschlossenem Tor, auch ohne Belagerung
+  if (homeGateClosed() && !(sg && sg.site.type === 'spieler' && sg.gatesClosed)) {
+    const s = homeSite(), lvl = G.s.castle.level, x = s.x, y = s.y + 4, h = lvl >= 2 ? (lvl >= 3 ? 36 : 26) : 22;
+    const part = { x, y, d: x + y, z: groundZ(W, x, y), f: (c) => drawClosedGate(c, x, y, 1.7, 0.42, h), box: [x - 0.85, x + 0.85, y - 0.21, y + 0.21], big: true };
+    if (!sg || !sg.walls || !sg.gatesClosed) return [part];
+    return [part, ...siegeGatePartsFor(sg)];
+  }
   if (!sg || !sg.walls || !sg.gatesClosed) return [];
+  return siegeGatePartsFor(sg);
+}
+
+function siegeGatePartsFor(sg) {
   const s = sg.site, W = G.world, out = [];
   if (sg.walls.square) {
     const lvl = s.type === 'spieler' ? G.s.castle.level : s.castleLevel || 0;

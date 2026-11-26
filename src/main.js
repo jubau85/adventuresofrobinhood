@@ -14,7 +14,7 @@ import {
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
 import { castleSite, castleBonusAt, dailyBalance, dailyCastle } from './castle.js';
-import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern } from './siege.js';
+import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
 import { initWeather, updateWeather } from './weather.js';
@@ -217,6 +217,7 @@ function nearestSite() {
 // E oder Klick auf die Statuszeile: Ort betreten, sonst ins Feldlager einer Belagerung
 function interactHere() {
   if (posternNear()) { usePostern(); return; }
+  G.pendingPostern = null;
   const s = nearestSite();
   if (s) enterSite(s);
   else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
@@ -240,6 +241,14 @@ function checkNearSite() {
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
+  const pp = G.pendingPostern;
+  if (pp && posternNear()) {
+    G.pendingPostern = null;
+    usePostern();
+    if (setPlayerPath(pp.x, pp.y)) G.pendingSite = pp.site;
+    return;
+  }
+  if (pp && !G.s.player.path) G.pendingPostern = null;
   const pf = posternNear();
   if (pf) {
     showPrompt(`<kbd>E</kbd> ${pf.inside ? 'Durch die Pforte hinaus' : 'An die Pforte klopfen und hinein'}${battleText(' · ')}`);
@@ -367,10 +376,28 @@ function clickWorld(px, py) {
     if (Math.hypot(site.x - p.x, site.y - p.y) < interactRadius(site)) { enterSite(site); return; }
     tx = site.x; ty = site.y + (site.type === 'spieler' ? 2.6 : 0.6);
   }
+  G.pendingPostern = null;
   if (setPlayerPath(tx, ty)) {
     G.pendingSite = site;
     G.clickMarker = { x: tx, y: ty, t: 0 };
+  } else {
+    // Ziel hinter einem geschlossenen Tor: zur Pforte, hindurch, dann weiter
+    const pt = posternRoute(tx, ty);
+    if (pt && setPlayerPath(pt.x, pt.y)) { G.pendingPostern = { x: tx, y: ty, site }; G.pendingSite = null; G.clickMarker = { x: tx, y: ty, t: 0 }; }
   }
+}
+
+// Burgtor deiner Burg öffnen oder schließen (Taste B), nur in der Nähe der Burg
+function toggleHomeGate() {
+  if (!hasHomeGate()) { log(`${homeName()} hat noch kein Tor. Ab der Holzburg lässt es sich schließen.`); return; }
+  const s = homeSite(), p = G.s.player;
+  if (Math.hypot(s.x - p.x, s.y - p.y) > 16) { log(`Das Tor von ${homeName()} lässt sich nur vor Ort schließen oder öffnen.`); return; }
+  const sg = G.siege;
+  if (homeGateClosed() && sg && sg.site.type === 'spieler' && sg.stage !== 'anmarsch') {
+    confirmDialog('Das Tor mitten in der Belagerung öffnen? Dann können die Angreifer durchs Tor herein.', 'Öffnen', () => setHomeGate(false));
+    return;
+  }
+  setHomeGate(!homeGateClosed());
 }
 
 function toggleRide() {
@@ -463,6 +490,7 @@ function onKey(e) {
     case 't': toggleFast(); break;
     case 'l': toggleMusic(); break;
     case 'g': G.cycleGfx(); break;
+    case 'b': toggleHomeGate(); break;
     case '+': case '=': zoom(1.15); break;
     case '-': zoom(1 / 1.15); break;
     default: return;

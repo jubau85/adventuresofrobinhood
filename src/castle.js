@@ -9,7 +9,7 @@ import { cargoUsed } from './economy.js';
 import { setPlayerWalls } from './world.js';
 import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
-import { startSiege } from './siege.js';
+import { startSiege, homeGateClosed } from './siege.js';
 import { cheatOn } from './cheats.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
@@ -170,6 +170,7 @@ export function castleDefense() {
   let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')];
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
+  if (homeGateClosed()) d += 10;
   return Math.round(d);
 }
 
@@ -177,7 +178,7 @@ export function dailyBalance() {
   const lvl = G.s.castle.level;
   const income = [
     ['Pacht der Bauern', 20 + lvl * 15],
-    ['Marktgeld', [0, 15, 35, 60][bLevel('markt')]],
+    ['Marktgeld', homeGateClosed() ? 0 : [0, 15, 35, 60][bLevel('markt')]],
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);

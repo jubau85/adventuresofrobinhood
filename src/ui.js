@@ -25,7 +25,7 @@ import {
   canRaid, raidBlock, raidable, startRaid, isBlighted, isAbandoned, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
 } from './dynamics.js';
 import { tourneyAt, canJoin, joinTourney } from './tournament.js';
-import { siegeAt, siegeStatus, sideBlock, sideOffer, joinSiege, canCallStorm, callStorm } from './siege.js';
+import { siegeAt, siegeStatus, sideBlock, sideOffer, joinSiege, canCallStorm, callStorm, hasHomeGate, homeGateClosed, setHomeGate } from './siege.js';
 import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
@@ -466,7 +466,7 @@ function castlePanel() {
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
-    case 'ausbau': body = castleBuild(); break;
+    case 'ausbau': body = gateAction() + castleBuild(); break;
     case 'halle': body = castleHall(); break;
     case 'gefolge': body = partyView(true); break;
     case 'lager': body = castleStore(); break;
@@ -476,6 +476,16 @@ function castlePanel() {
   }
   const cb = CASTLE_BONUS[G.s.castle.level];
   return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+}
+
+// Burgtor: von Hand öffnen und schließen
+function gateAction() {
+  if (!hasHomeGate()) return `<div class="actions gate"><div class="action"><div><b>Burgtor</b><p>Die Ruine hat noch kein Tor. Ab der Holzburg kannst du es schließen.</p></div></div></div>`;
+  const closed = homeGateClosed();
+  const txt = closed
+    ? 'Niemand kommt durchs Tor, du selbst gehst durch die Pforte (E), oder du klickst einfach ein Ziel an. Verteidigung +10, aber Händler bleiben draußen: kein Marktgeld.'
+    : 'Ein geschlossenes Tor hält Räuber und Plünderer ab: Verteidigung +10. Dafür bleiben Händler draußen, das Marktgeld fällt weg. In der Nähe der Burg schaltet auch die Taste B das Tor.';
+  return `<div class="actions gate"><div class="action"><div><b>Burgtor: ${closed ? 'geschlossen' : 'offen'}</b><p>${txt}</p></div><button class="btn${closed ? '' : ' primary'}" data-act="tor">${closed ? 'Öffnen' : 'Schließen'}</button></div></div>`;
 }
 
 function castleBuild() {
@@ -806,7 +816,8 @@ function helpPanel() {
       <div><h3>Steuerung</h3><dl class="keys">
         <dt>Klick</dt><dd>Gehen, Gegner angreifen, Orte ansteuern</dd>
         <dt>W A S D</dt><dd>Direkt laufen</dd>
-        <dt>E</dt><dd>Siedlung oder Burg betreten</dd>
+        <dt>E</dt><dd>Siedlung oder Burg betreten, durch die Pforte eines geschlossenen Tors</dd>
+        <dt>B</dt><dd>Burgtor deiner Burg schließen oder öffnen (in der Nähe, ab der Holzburg)</dd>
         <dt>R</dt><dd>Auf- und absitzen</dd>
         <dt>Leertaste</dt><dd>Nächsten Feind angreifen, beim Tjost die Lanze senken</dd>
         <dt>Klick auf Bettler</dt><dd>Almosen geben (3 Gold)</dd>
@@ -833,6 +844,7 @@ function helpPanel() {
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
         <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> schließen sich die Tore, die Besatzung bezieht Stellung hinter der Mauer, und das Trebuchet schlägt eine <b>Bresche</b>. Durch sie stürmen die Angreifer. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben. Sind dir Normannen oder Sachsen feindlich, ziehen sie auch gegen deine Burg. Durch die <b>Pforte</b> am Tor (<kbd>E</kbd>) kommst du hinein.</li>
+        <li>Ab der Holzburg kannst du das <b>Burgtor</b> selbst schließen: in der Burgtafel unter Ausbau oder mit <kbd>B</kbd> in der Nähe der Burg. Geschlossen gibt es +10 Verteidigung, aber kein Marktgeld. Du selbst gehst durch die Pforte, ein Klick aufs Ziel genügt.</li>
         <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (durch die Pforte hinein, gemeinsam die Bresche halten, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
@@ -872,6 +884,14 @@ const ACTIONS = {
     confirmDialog(`Wirklich gegen ${sg.site.name} ziehen? Die ${FACTIONS[sg.site.faction].name} werden dir das übel nehmen (Ansehen −8 sofort, −6, wenn die Stadt fällt), und die Besatzung greift dich an.`, 'Dienen', () => { joinSiege('att'); refreshPanel(); });
   },
   ssturm: () => callStorm(),
+  tor: () => {
+    const sg = G.siege;
+    if (homeGateClosed() && sg && sg.site.type === 'spieler' && sg.stage !== 'anmarsch') {
+      confirmDialog('Das Tor mitten in der Belagerung öffnen? Dann können die Angreifer durchs Tor herein.', 'Öffnen', () => { setHomeGate(false); refreshPanel(); });
+      return;
+    }
+    setHomeGate(!homeGateClosed());
+  },
   lease: () => leaseMine(G.ui.arg),
   hrat: () => hermitAdvice(G.ui.arg),
   hsegen: () => hermitBless(G.ui.arg),

@@ -187,6 +187,12 @@ function setupWalls(sg) {
     seen.add(i);
     (W.block[i] || inBreach(x, y) ? wall : open).push([x, y]);
   }
+  // Deine Burg: Das Tor liegt auf den Straßenfeldern im Ring, auch wenn du es schon geschlossen hast
+  if (s.type === 'spieler') {
+    const gt = homeGateTiles(), isGate = ([x, y]) => gt.some((g) => g[0] === x && g[1] === y);
+    for (let k = wall.length - 1; k >= 0; k--) if (isGate(wall[k])) wall.splice(k, 1);
+    open.length = 0; open.push(...gt);
+  }
   if (!wall.length) return;
   let inside;
   if (wb.square) inside = (x, y) => Math.abs(x - s.x) < 3.4 && Math.abs(y - s.y) < 3.4;
@@ -221,8 +227,14 @@ function closeGates(sg) {
   if (!w || sg.gatesClosed) return;
   sg.gatesClosed = true;
   for (const [x, y] of w.gates) W.block[y * W.N + x] = 1;
+  stepAside(sg.site);
+}
+
+// Wer in einem gerade geschlossenen Tor steht, tritt beiseite
+function stepAside(site) {
+  const W = G.world;
   for (const u of G.units) {
-    if (u.dead || isWalkable(W, u.x, u.y) || Math.hypot(u.x - sg.site.x, u.y - sg.site.y) > 20) continue;
+    if (u.dead || isWalkable(W, u.x, u.y) || Math.hypot(u.x - site.x, u.y - site.y) > 20) continue;
     const q = nearestWalkable(W, Math.floor(u.x), Math.floor(u.y), 3);
     if (q) { u.x = q.x + 0.5; u.y = q.y + 0.5; u.path = null; }
   }
@@ -232,7 +244,31 @@ function openGates(sg) {
   const w = sg.walls, W = G.world;
   if (!w || !sg.gatesClosed) return;
   sg.gatesClosed = false;
+  if (sg.site.type === 'spieler' && homeGateClosed()) return;
   for (const [x, y] of w.gates) W.block[y * W.N + x] = 0;
+}
+
+// ---------------------------------------------------------------- Burgtor von deiner Burg
+// Ab der Holzburg lässt sich das Tor schließen. Zu bleibt es, bis du es wieder öffnest, auch über das Speichern hinaus.
+export function homeSite() { return G.world.sites.find((x) => x.type === 'spieler'); }
+export function hasHomeGate() { return !!G.s && G.s.castle.level >= 1; }
+export function homeGateClosed() { return hasHomeGate() && !!G.s.gateClosed; }
+export function homeGateTiles() {
+  const W = G.world, N = W.N;
+  return wallRing(W, homeSite(), 4).filter(([x, y]) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE; });
+}
+function insideHome(x, y) { const s = homeSite(); return Math.abs(x - s.x) < 3.4 && Math.abs(y - s.y) < 3.4; }
+
+export function setHomeGate(closed) {
+  if (!hasHomeGate()) return false;
+  const W = G.world, N = W.N, sg = G.siege, sieged = !!sg && sg.site.type === 'spieler' && !!sg.walls;
+  G.s.gateClosed = !!closed;
+  for (const [x, y] of homeGateTiles()) W.block[y * N + x] = closed ? 1 : 0;
+  if (closed) stepAside(homeSite());
+  if (sieged) sg.gatesClosed = !!closed;
+  log(closed ? `Das Tor von ${homeName()} schlägt zu, die Riegel fallen. Durch die Pforte (E) kommst du weiter hinein und hinaus.`
+    : sieged ? `Das Tor von ${homeName()} steht offen, mitten in der Belagerung! Jetzt können die Angreifer durchs Tor.` : `Das Tor von ${homeName()} steht wieder offen.`, closed ? 'good' : sieged ? 'bad' : '');
+  return true;
 }
 
 // Nach dem Neuaufbau der Sperrkarte (Burgausbau, Laden): Breschen offen, Tore der laufenden Belagerung zu
@@ -241,6 +277,7 @@ export function applyWallState() {
   if (!W || !G.s) return;
   const N = W.N;
   for (const st of Object.values(G.s.walls || {})) if (st.open) for (const [x, y] of st.tiles) W.block[y * N + x] = 0;
+  if (homeGateClosed()) for (const [x, y] of homeGateTiles()) W.block[y * N + x] = 1;
   const sg = G.siege;
   if (sg && sg.walls && sg.gatesClosed) for (const [x, y] of sg.walls.gates) W.block[y * N + x] = 1;
 }
@@ -345,27 +382,48 @@ function raiseDefenders(sg) {
   return g;
 }
 
-// Pforte im Tor: Wer zur Stadt hält, wird eingelassen oder hinausgelassen
+// Pforte im Tor: Wer zur Stadt hält, wird eingelassen oder hinausgelassen. An deiner Burg immer.
 export function posternNear() {
-  const sg = G.siege;
-  if (!sg || !sg.walls || !sg.gatesClosed) return null;
-  const p = G.s.player, s = sg.site;
-  if (s.type !== 'spieler' && (sg.side === 'att' || isHostileFaction(s.faction))) return null;
-  for (const [x, y] of sg.walls.gates) {
-    if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y) };
+  const p = G.s.player, sg = G.siege;
+  if (sg && sg.walls && sg.gatesClosed && (sg.site.type === 'spieler' || (sg.side !== 'att' && !isHostileFaction(sg.site.faction)))) {
+    for (const [x, y] of sg.walls.gates) {
+      if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y), site: sg.site };
+    }
+  }
+  if (homeGateClosed()) {
+    for (const [x, y] of homeGateTiles()) {
+      if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 2.4) return { x: x + 0.5, y: y + 0.5, inside: insideHome(p.x, p.y), site: homeSite() };
+    }
   }
   return null;
 }
 export function usePostern() {
   const pf = posternNear();
   if (!pf) return false;
-  const s = G.siege.site, p = G.s.player;
+  const s = pf.site, p = G.s.player;
   const dx = s.x - pf.x, dy = s.y - pf.y, l = Math.hypot(dx, dy) || 1, k = pf.inside ? -1.8 : 1.8;
   const to = walkPt(pf.x + (dx / l) * k, pf.y + (dy / l) * k);
   p.x = to.x; p.y = to.y; p.path = null; p.attackTarget = null;
   for (const c of partyMembers()) { c.x = to.x + rand(-0.4, 0.4); c.y = to.y + rand(-0.4, 0.4); c.path = null; c.chase = null; }
-  log(pf.inside ? 'Die Wachen öffnen die Pforte einen Spalt und lassen dich hinaus.' : 'Die Wachen öffnen die Pforte einen Spalt und lassen dich ein. Hinter dir fällt der Riegel.', 'good');
+  const own = s.type === 'spieler';
+  log(pf.inside ? `${own ? 'Deine Wachen' : 'Die Wachen'} öffnen die Pforte einen Spalt und lassen dich hinaus.` : `${own ? 'Deine Wachen' : 'Die Wachen'} öffnen die Pforte einen Spalt und lassen dich ein. Hinter dir fällt der Riegel.`, 'good');
   return true;
+}
+
+// Ziel hinter einem geschlossenen Tor: erst zur Pforte, von dort weiter. Gibt den Punkt vor der Pforte zurück.
+export function posternRoute(tx, ty) {
+  const p = G.s.player, sg = G.siege;
+  const gates = [];
+  if (sg && sg.walls && sg.gatesClosed && (sg.site.type === 'spieler' || (sg.side !== 'att' && !isHostileFaction(sg.site.faction)))) gates.push({ site: sg.site, tiles: sg.walls.gates, inside: sg.walls.inside });
+  if (homeGateClosed()) gates.push({ site: homeSite(), tiles: homeGateTiles(), inside: insideHome });
+  for (const g of gates) {
+    const pin = g.inside(p.x, p.y), tin = g.inside(tx, ty);
+    if (pin === tin || !g.tiles.length) continue;
+    const [gx, gy] = g.tiles[Math.floor(g.tiles.length / 2)];
+    const x = gx + 0.5, y = gy + 0.5, dx = g.site.x - x, dy = g.site.y - y, l = Math.hypot(dx, dy) || 1, k = pin ? 1.5 : -1.5;
+    return walkPt(x + (dx / l) * k, y + (dy / l) * k);
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- Ablauf
