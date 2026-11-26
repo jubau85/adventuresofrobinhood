@@ -1615,12 +1615,29 @@ function generateWorld(seed) {
   for (const s of W.sites) placeCemetery(W, s);
   // Feste Nummer je Gebäude: Schäden werden darüber gespeichert
   W.buildings.forEach((b, i) => { b.idx = i; });
+  assignPlots(W);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
   addWallRuinObjs(W);
   buildStaticWalls(W);
   return W;
+}
+
+// Bauplätze: Einige Häuser am Ortsrand stehen am Anfang noch nicht. Dort wird im Lauf des
+// Spiels gebaut (siehe dynamics.js). Eigener Zufall je Ort, damit der Rest der Welt gleich bleibt.
+const PLOT_TYPES = { stadt: 1, markt: 1, dorf: 1, burg: 1, halle: 1 };
+function assignPlots(W) {
+  for (const s of W.sites) {
+    if (!PLOT_TYPES[s.type]) continue;
+    const hs = W.buildings.filter((b) => b.site === s.id && b.kind === 'house' && !b.tavern && !b.smithy);
+    if (hs.length < 4) continue;
+    hs.sort((a, b) => Math.hypot(b.x - s.x, b.y - s.y) - Math.hypot(a.x - s.x, a.y - s.y));
+    const outer = hs.slice(0, Math.max(3, Math.ceil(hs.length * 0.4)));
+    const rng = mulberry32((W.seed ^ (s.x * 7919 + s.y * 104729)) >>> 0);
+    const n = Math.max(1, Math.min(14, Math.round(hs.length * 0.09)));
+    for (let k = 0; k < n && outer.length; k++) outer.splice(Math.floor(rng() * outer.length), 1)[0].plot = true;
+  }
 }
 
 // Landmasse an einer Stelle (0 = Meer). Gruppen und Wege bleiben auf ihrer Landmasse.
@@ -2576,6 +2593,8 @@ function placeTrees(W, rng) {
 
 
 
+
+
 // ---------------------------------------------------------------- Werte
 function computeStats(u) {
   const c = CLASSES[u.cls];
@@ -2705,7 +2724,9 @@ function rebuildUnits() {
   const list = [G.s.player];
   for (const c of partyMembers()) { c.dead = false; list.push(c); }
   for (const g of G.groups) for (const m of g.members) list.push(m);
+  if (G.peasants.some((v) => v.dead)) G.peasants = G.peasants.filter((v) => !v.dead);
   for (const p of G.peasants) list.push(p);
+  for (const e of G.extras || []) list.push(e);
   G.units = list;
 }
 
@@ -2796,7 +2817,7 @@ function groupHostile(g) {
 
 function isEnemy(a, b) {
   if (b.dead || a.dead) return false;
-  if (a.team === 'player') return !!(b.group && b.group.engaged);
+  if (a.team === 'player') return !!(b.group && b.group.engaged) || raidVictim(b);
   const ga = a.group;
   if (!ga) return false;
   if (ga.engaged && b.team === 'player') return true;
@@ -2881,7 +2902,8 @@ function updateProjectiles(dt) {
     if (p.t >= p.dur) {
       const tg = p.target;
       if (p.animal) {
-        if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) hitAnimal(tg, p.dmg, p.att);
+        if (p.npcHunt) { if (!tg.dead) takeAnimal(tg); }
+        else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) hitAnimal(tg, p.dmg, p.att);
       } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg);
       G.projectiles.splice(i, 1);
     }
@@ -2917,6 +2939,7 @@ function unitDown(t, killer) {
   G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25 });
   const g = t.group;
   countDead(t);
+  if (t.kind === 'peasant') { villagerKilled(t); return; }
   // Erfahrung nur für Kämpfe, an denen du beteiligt bist
   if ((killer && killer.team === 'player') || (g && g.engaged)) {
     const xp = 6 + t.level * 6;
@@ -3057,8 +3080,10 @@ function updateUnits(dt) {
 
 function updatePlayer(p, dt) {
   if (p.dead) return;
+  if (G.tour && G.tour.lock) return;
   const inp = G.input;
-  if (p.attackTarget && (p.attackTarget.dead || !p.attackTarget.group || !p.attackTarget.group.engaged)) p.attackTarget = null;
+  const at = p.attackTarget;
+  if (at && (at.dead || ((!at.group || !at.group.engaged) && !raidVictim(at)))) p.attackTarget = null;
   if (p.huntTarget && (p.huntTarget.dead || !p.st.ranged)) p.huntTarget = null;
   if (inp.dx || inp.dy) {
     p.path = null; p.attackTarget = null; p.huntTarget = null; G.pendingSite = null;
@@ -3104,6 +3129,8 @@ function engage(u, enemy, dt) {
 function updateCompanion(u, k, dt) {
   const p = G.s.player;
   const order = G.s.order;
+  const watch = companionWatch(k);
+  if (watch) { u.mounted = false; chaseTo(u, watch.x, watch.y, dt, 0.3); return; }
   u.mounted = p.mounted && !!u.st.horse;
   let enemy = null;
   if (order === 'halten') enemy = nearestEnemy(u, u.st.range + 1.5);
@@ -3146,7 +3173,7 @@ function updateGroupMember(m, g, k, dt) {
 
 function separate() {
   const p = G.s.player;
-  const list = G.units.filter((o) => !o.dead && !o.hidden && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) <= 31);
+  const list = G.units.filter((o) => !o.dead && !o.hidden && !o.noSep && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) <= 31);
   for (let i = 0; i < list.length; i++) {
     const a = list[i];
     for (let j = i + 1; j < list.length; j++) {
@@ -3797,6 +3824,15 @@ function hitAnimal(a, dmg, shooter) {
   if (a.hp <= 0) killAnimal(a);
 }
 
+// Ein Jäger aus dem Dorf erlegt ein Tier: kein Ertrag für dich, nur ein Tier weniger im Wald
+function takeAnimal(a) {
+  if (a.dead) return;
+  a.dead = true;
+  G.animals = G.animals.filter((x) => x !== a);
+  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, t: 0, dur: 3 });
+  if (G.s.player.huntTarget === a) G.s.player.huntTarget = null;
+}
+
 function killAnimal(a) {
   const info = ANIMAL_INFO[a.kind];
   a.dead = true;
@@ -3875,14 +3911,19 @@ function updateAnimals(dt) {
 
 
 
+
+
+
+
+
 // Rollen je Ortstyp (der Rest der Bewohner ergibt sich daraus)
 const ROLES = {
-  stadt: ['haendler', 'haendler', 'haendler', 'haendler', 'magd', 'magd', 'handwerker', 'handwerker', 'buerger', 'buerger', 'buerger', 'buerger', 'kind', 'kind', 'moench', 'wache', 'priester', 'wirt'],
-  markt: ['haendler', 'haendler', 'haendler', 'magd', 'bauer', 'bauer', 'handwerker', 'buerger', 'buerger', 'kind', 'priester', 'wirt'],
-  dorf: ['bauer', 'bauer', 'bauer', 'baeuerin', 'magd', 'handwerker', 'hirte', 'kind', 'kind', 'priester', 'wirt'],
-  halle: ['bauer', 'bauer', 'magd', 'baeuerin', 'handwerker', 'wache', 'kind', 'priester', 'wirt'],
-  abtei: ['moench', 'moench', 'moench', 'moench', 'moench', 'bauer', 'magd'],
-  burg: ['wache', 'wache', 'wache', 'handwerker', 'magd', 'bauer', 'bauer', 'priester', 'wirt'],
+  stadt: ['haendler', 'haendler', 'haendler', 'haendler', 'magd', 'magd', 'handwerker', 'handwerker', 'buerger', 'buerger', 'buerger', 'buerger', 'kind', 'kind', 'moench', 'wache', 'priester', 'wirt', 'fischer'],
+  markt: ['haendler', 'haendler', 'haendler', 'magd', 'bauer', 'bauer', 'handwerker', 'buerger', 'buerger', 'kind', 'priester', 'wirt', 'fischer'],
+  dorf: ['bauer', 'bauer', 'bauer', 'baeuerin', 'magd', 'handwerker', 'hirte', 'kind', 'kind', 'priester', 'wirt', 'jaeger', 'fischer'],
+  halle: ['bauer', 'bauer', 'magd', 'baeuerin', 'handwerker', 'wache', 'kind', 'priester', 'wirt', 'jaeger', 'jaeger'],
+  abtei: ['moench', 'moench', 'moench', 'moench', 'moench', 'bauer', 'magd', 'fischer'],
+  burg: ['wache', 'wache', 'wache', 'handwerker', 'magd', 'bauer', 'bauer', 'priester', 'wirt', 'jaeger'],
   lager: ['waldmann', 'waldmann', 'holzer'],
   hof: ['bauer', 'baeuerin'],
 };
@@ -3890,6 +3931,7 @@ const ROLES = {
 const NAMES = {
   haendler: 'Händler', magd: 'Magd', handwerker: 'Handwerker', buerger: 'Bürger', kind: 'Kind', moench: 'Mönch', wache: 'Wache',
   bauer: 'Bauer', baeuerin: 'Bäuerin', hirte: 'Hirte', waldmann: 'Waldmann', holzer: 'Holzfäller', priester: 'Priester', wirt: 'Wirt',
+  jaeger: 'Jäger', fischer: 'Fischer', bettler: 'Bettler',
 };
 
 const MERCHANT_COLS = ['#3d6fa3', '#a33b32', '#5e2f6e', '#3f6b2f', '#a8791f'];
@@ -3908,6 +3950,9 @@ function dress(role, site) {
     case 'kind': o.small = true; o.female = Math.random() < 0.5; break;
     case 'wache': o.tunic = site.faction ? FACTIONS[site.faction].color : '#556b7d'; o.helm = true; o.tool = 'speer'; break;
     case 'waldmann': case 'holzer': o.look = 'wald'; o.tunic = null; break;
+    case 'jaeger': o.tunic = pick(['#4a5a2a', '#5a5a32', '#4e4a2c']); o.cap = '#3e4a22'; o.bow = true; break;
+    case 'fischer': o.tunic = pick(['#5a6a7a', '#6a6a5a', '#4a5a6a']); o.hat = '#8a7a5a'; break;
+    case 'bettler': o.tunic = pick(['#7a7062', '#6e6658', '#857a66']); o.patches = true; o.crutch = Math.random() < 0.4; o.female = Math.random() < 0.3; if (o.female) o.scarf = '#a89a80'; break;
     default: break;
   }
   return o;
@@ -3923,7 +3968,7 @@ function siteSpots(s) {
   const bs = W.buildings.filter((b) => b.site === s.id);
   const sp = { houses: [], stalls: [], wells: [], anvils: [], wood: [], hay: [], gardens: [], fields: [], church: null, fire: null, water: null, sheep: null };
   for (const b of bs) {
-    if (b.kind === 'house' || b.kind === 'longhall') sp.houses.push({ x: b.x - 0.15, y: b.y + b.wy / 2 + 0.3 });
+    if (b.kind === 'house' || b.kind === 'longhall') sp.houses.push({ x: b.x - 0.15, y: b.y + b.wy / 2 + 0.3, b });
     else if (b.kind === 'stall' || b.kind === 'tent') sp.stalls.push({ x: b.x, y: b.y, front: { x: b.x + 0.05, y: b.y + 0.62 }, back: { x: b.x, y: b.y - 0.5 } });
     else if (b.kind === 'well') sp.wells.push({ x: b.x + 0.45, y: b.y + 0.35 });
     else if (b.kind === 'fire') sp.fire = { x: b.x, y: b.y };
@@ -3952,6 +3997,36 @@ function siteSpots(s) {
     }
   }
   if (s.type === 'burg' || s.type === 'spieler') sp.gate = [{ x: s.x + 0.4, y: s.y + 5.4 }, { x: s.x + 0.4, y: s.y + 2.5 }];
+  // Bettler: vor den Toren der Stadtmauer, am Burgtor, an der Kirchentür oder am Markt
+  sp.beg = [];
+  if (s.cityWall) {
+    const ring = s.cityWall, open = (x, y) => { const t2 = W.tiles[y * N + x]; return t2 === T.ROAD || t2 === T.BRIDGE; };
+    ring.forEach(([x, y]) => {
+      if (!open(x, y)) return;
+      const dx = x + 0.5 - s.x, dy = y + 0.5 - s.y, d = Math.hypot(dx, dy) || 1;
+      for (const side of [-1, 1]) {
+        const bx = x + 0.5 + (dx / d) * 1.6 + (-dy / d) * side * 0.95, by = y + 0.5 + (dy / d) * 1.6 + (dx / d) * side * 0.95;
+        if (isWalkable(W, bx, by) && W.tiles[Math.floor(by) * N + Math.floor(bx)] !== T.ROAD) sp.beg.push({ x: bx, y: by });
+      }
+    });
+  }
+  if (!sp.beg.length && sp.gate) sp.beg.push({ x: sp.gate[0].x - 0.9, y: sp.gate[0].y + 0.4 }, { x: sp.gate[0].x + 0.9, y: sp.gate[0].y + 0.5 });
+  if (sp.church) sp.beg.push({ x: sp.church.x + 0.7, y: sp.church.y + 0.3 });
+  if (!sp.beg.length && sp.stalls.length) sp.beg.push({ x: sp.stalls[0].front.x + 0.8, y: sp.stalls[0].front.y + 0.4 });
+  // Bäume am Ortsrand: Reisig sammeln, Holz schlagen, auf Wild lauern
+  sp.trees = []; sp.forest = [];
+  const CN = W.CN, CH = N / CN, TR = R + 12;
+  for (let cy = Math.max(0, Math.floor((s.y - TR) / CH)); cy <= Math.min(CN - 1, Math.floor((s.y + TR) / CH)); cy++) {
+    for (let cx = Math.max(0, Math.floor((s.x - TR) / CH)); cx <= Math.min(CN - 1, Math.floor((s.x + TR) / CH)); cx++) {
+      for (const o of W.chunkObjs[cy * CN + cx]) {
+        if (o.kind !== 'laub' && o.kind !== 'nadel') continue;
+        const d = Math.hypot(o.x - s.x, o.y - s.y), spot = { x: o.x + 0.35, y: o.y + 0.45 };
+        if (!isWalkable(W, spot.x, spot.y)) continue;
+        if (d < R + 6 && sp.trees.length < 30) sp.trees.push(spot);
+        else if (d >= R + 4 && d < TR && sp.forest.length < 30) sp.forest.push(spot);
+      }
+    }
+  }
   spotCache.set(s.id, sp);
   return sp;
 }
@@ -3966,25 +4041,43 @@ function spawnVillagers() {
     let roles = ROLES[site.type] || [];
     if (site.type === 'spieler') roles = ['bauer', 'bauer', 'magd', 'handwerker', 'kind', 'bauer', 'magd', 'wache', 'baeuerin', 'kind'].slice(0, 1 + lvl * 3);
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
+    if (site.type === 'hof' && Math.random() < 0.25) roles = roles.concat('jaeger');
     // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
     if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
       const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
       const pool = ['buerger', 'magd', 'handwerker', 'buerger', 'haendler', 'kind', 'buerger', 'wache', 'magd', 'bauer'];
       for (let k = 0; k < Math.min(60, Math.floor(nh / 5)); k++) roles = roles.concat(pool[k % pool.length]);
     }
+    // Bettler vor den Toren großer Orte, an Burgtoren und Kirchen
+    const beggars = { stadt: 1 + Math.floor(((site.cityR || 8) - 6) / 4), markt: 1, burg: 1, abtei: 1 }[site.type] || 0;
+    for (let k = 0; k < beggars; k++) roles = roles.concat('bettler');
+    // Wer bei einem Überfall umkam, fehlt, bis neue Leute zuziehen
+    const lost = (G.s.slain && G.s.slain[site.id]) || 0;
+    if (lost) roles = roles.slice(0, Math.max(1, roles.length - lost));
     let stall = 0;
-    for (const role of roles) {
-      const o = dress(role, site);
-      const v = makeUnit(o);
-      for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool']) if (o[k]) v[k] = o[k];
-      v.role = role; v.home = site; v.task = null;
-      v.hair = pick(HAIR);
-      if (role === 'haendler') v.stall = stall++;
-      placeNear(v, site.x, site.y, Math.min(4, (site.clear || 3) - 1));
-      v.sayT = rand(4, 30);
-      G.peasants.push(v);
-    }
+    for (const role of roles) G.peasants.push(makeVillager(site, role, role === 'haendler' ? stall++ : 0));
   }
+  G.addVillager = addVillager;
+}
+
+function makeVillager(site, role, stall = 0) {
+  const o = dress(role, site);
+  const v = makeUnit(o);
+  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch']) if (o[k]) v[k] = o[k];
+  v.role = role; v.home = site; v.task = null;
+  v.hair = pick(HAIR);
+  v.stall = stall;
+  placeNear(v, site.x, site.y, Math.min(4, (site.clear || 3) - 1));
+  v.sayT = rand(4, 30);
+  return v;
+}
+
+// Neue Leute ziehen zu (nach einem Überfall)
+function addVillager(site) {
+  const pool = (ROLES[site.type] || ['bauer']).filter((r) => r !== 'priester' && r !== 'wirt');
+  const v = makeVillager(site, pick(pool), Math.floor(Math.random() * 4));
+  G.peasants.push(v);
+  rebuildUnits();
 }
 
 // ---------------------------------------------------------------- Tagesablauf
@@ -4016,29 +4109,69 @@ function wander(v, s, r) {
 
 function chooseTask(v) {
   const s = v.home, sp = siteSpots(s), h = hourOf(), ph = phase(h), se = seasonIndex();
-  const house = () => (sp.houses.length ? pick(sp.houses) : wander(v, s, 3));
+  const house = () => { const hs = sp.houses.filter((q) => !q.b || standing(q.b)); return hs.length ? pick(hs) : wander(v, s, 3); };
+  const door = () => (v.door && (!v.door.b || standing(v.door.b)) ? v.door : (v.door = house()));
   const r = Math.max(2.5, (s.clear || 3) - 1.5);
   v.carry = v.task && v.task.then === 'drop' ? null : v.carry;
+  // Überfall: alle fliehen in die Häuser
+  if (G.raid && G.raid.site === s) {
+    goTo(v, door(), 'heim', 9999, null, 1.7);
+    if (Math.random() < 0.3) v.say = { text: pick(['Hilfe! Räuber!', 'Rettet euch!', 'Holt die Kinder ins Haus!', 'Gnade, Herr, Gnade!']), t: 0, dur: 3 };
+    return;
+  }
   // Während einer Belagerung verkriechen sich alle in den Häusern
-  if (G.siege && G.siege.site === s && G.siege.stage !== 'anmarsch') { goTo(v, v.door || (v.door = house()), 'heim', 9999, null, 1.4); return; }
+  if (G.siege && G.siege.site === s && G.siege.stage !== 'anmarsch') { goTo(v, door(), 'heim', 9999, null, 1.4); return; }
+  // Feuer! Eimer am Brunnen oder am Wasser füllen und aufs Feuer schütten
+  const fb = burningIn(s);
+  if (fb && !['kind', 'priester', 'wache', 'wirt'].includes(v.role) && Math.hypot(fb.x - v.x, fb.y - v.y) < 15
+    && G.peasants.filter((o) => o.task && (o.task.douse === fb || o.task.fireB === fb)).length < 12) {
+    const src = sp.wells.length ? near(sp.wells, v) : sp.water;
+    if (src && Math.hypot(src.x - fb.x, src.y - fb.y) < 25) { goTo(v, src, 'schoepfen', rand(0.8, 1.6), null, 1.6); v.task.fireB = fb; return; }
+    v.carry = 'eimer';
+    goTo(v, { x: fb.x + rand(-0.5, 0.5), y: fb.y + fb.wy / 2 + 0.5 }, 'loeschen', rand(1.2, 2), null, 1.6); v.task.douse = fb; return;
+  }
+  // Bettler sitzen den ganzen Tag an ihrem Platz
+  if (v.role === 'bettler') {
+    if (!v.begSpot) v.begSpot = sp.beg.length ? sp.beg[v.id % sp.beg.length] : wander(v, s, 2);
+    goTo(v, v.begSpot, 'betteln', rand(40, 90), null, 0.6);
+    return;
+  }
+  // Hinrichtung am Galgen: viele schauen zu
+  const hw = v.role !== 'wache' && v.role !== 'wirt' && v.role !== 'bettler' && Math.random() < 0.65 ? hangWatch(s) : null;
+  if (hw) { goTo(v, hw, Math.random() < 0.3 ? 'beten' : 'stehen', rand(30, 60)); return; }
+  // Turnier vor den Toren: viele gehen zuschauen
+  const ws = (ph === 'arbeit' || ph === 'mittag') && v.role !== 'wache' && v.role !== 'wirt' && Math.random() < 0.45 ? watchSpot(s) : null;
+  if (ws) { goTo(v, ws, Math.random() < 0.6 ? 'jubeln' : 'stehen', rand(25, 50)); return; }
+  // Bei Regen und Schneetreiben bleibt man lieber drinnen
+  if (precip() > 0.6 && !['wache', 'bettler', 'fischer'].includes(v.role) && Math.random() < 0.3) { goTo(v, door(), 'heim', 9999, null, 1.3); v.task.hideFor = rand(20, 50); return; }
+  // Nach einem Überfall bleiben viele lieber im Haus
+  if (isBlighted(s) && v.role !== 'wache' && Math.random() < 0.4) { goTo(v, door(), 'heim', 9999, null, 0.9); v.task.hideFor = rand(25, 70); return; }
   const tav = s.tavern;
   if (v.role === 'wirt' && tav && h < 22) { goTo(v, { x: tav.x + 0.5, y: tav.y + 0.15 }, 'verkaufen', rand(30, 60)); return; }
   if (ph === 'abend' && h >= 20) {
     if (tav && Math.random() < 0.35 && v.role !== 'kind' && v.role !== 'moench') { goTo(v, { x: tav.x + rand(-1, 1.4), y: tav.y + rand(0.1, 1.1) }, 'trinken', rand(25, 50)); return; }
-    goTo(v, v.door || (v.door = house()), 'heim', 9999); return;
+    goTo(v, door(), 'heim', 9999); return;
   }
   if (ph === 'abend' && tav && Math.random() < 0.45 && v.role !== 'kind' && v.role !== 'moench' && v.role !== 'priester') {
     goTo(v, { x: tav.x + rand(-1, 1.4), y: tav.y + rand(0.1, 1.1) }, 'trinken', rand(20, 45)); return;
   }
   if (ph === 'mittag' && tav && Math.random() < 0.2 && v.role !== 'kind') { goTo(v, { x: tav.x + rand(-1, 1.4), y: tav.y + rand(0.1, 1.1) }, 'trinken', rand(12, 22)); return; }
   // Beschädigte Häuser werden wieder aufgebaut
-  if (ph === 'arbeit' && ['handwerker', 'bauer', 'baeuerin', 'magd', 'buerger'].includes(v.role)) {
-    const pool = s.type === 'spieler' ? (s.villageSpots || []) : G.world.buildings.filter((b) => b.site === s.id);
-    const broken = pool.filter((b) => b.dmg > 0 && !(b.fire > G.time));
+  // Beschädigte Häuser ausbessern und neue bauen
+  if (ph === 'arbeit' && ['handwerker', 'bauer', 'baeuerin', 'magd', 'buerger'].includes(v.role) && !isBlighted(s)) {
+    const pool = s.type === 'spieler' ? (s.villageSpots || []) : siteHouses(s.id);
+    const broken = pool.filter((b) => ((b.dmg > 0 && standing(b)) || underConstruction(b)) && !(b.fire > G.time));
     if (broken.length && Math.random() < (v.role === 'handwerker' ? 0.85 : 0.5)) {
       const b = pick(broken);
-      const spot = { x: b.x + rand(-0.4, 0.4), y: b.y + b.wy / 2 + 0.35 };
-      goTo(v, spot, Math.random() < 0.7 ? 'hammer' : 'axt', rand(18, 32), Math.random() < 0.3 ? 'holz' : null);
+      const spot = { x: b.x + rand(-0.45, 0.45), y: b.y + b.wy / 2 + 0.38 };
+      const fetch = underConstruction(b) && Math.random() < 0.4 && (sp.wood.length || sp.trees.length);
+      if (fetch) {
+        // Balken holen und zur Baustelle tragen
+        goTo(v, pick(sp.wood.length ? sp.wood : sp.trees), 'axt', rand(4, 8));
+        v.task.next = { spot, act: 'abladen', dur: rand(2, 3), carry: 'balken', speed: 0.8, props: { repair: b, dropAfter: true } };
+        return;
+      }
+      goTo(v, spot, Math.random() < 0.7 ? 'hammer' : 'axt', rand(18, 32));
       v.task.repair = b;
       return;
     }
@@ -4061,18 +4194,29 @@ function chooseTask(v) {
   if (ph === 'abend') {
     if (v.role === 'moench' && sp.church) { goTo(v, sp.church, 'beten', rand(15, 30)); return; }
     if (Math.random() < 0.5) { goTo(v, wander(v, s, 2.5), 'reden', rand(8, 18)); return; }
-    goTo(v, v.door || (v.door = house()), 'stehen', rand(6, 14)); return;
+    goTo(v, door(), 'stehen', rand(6, 14)); return;
   }
   // Arbeitszeit
   switch (v.role) {
+    case 'fischer':
+      if (sp.water) { goTo(v, sp.water, 'angeln', rand(25, 45), Math.random() < 0.65 ? 'fisch' : null); return; }
+      // ohne Wasser arbeitet der Fischer wie ein Bauer
+    // falls through
     case 'bauer': case 'baeuerin':
-      if (sp.water && Math.random() < 0.12) { goTo(v, sp.water, 'angeln', rand(20, 40), Math.random() < 0.5 ? 'fisch' : null); return; }
-      if (se < 3 && sp.fields.length && (v.role === 'bauer' || Math.random() < 0.4)) { goTo(v, pick(sp.fields), se === 2 ? 'sichel' : 'hacke', rand(14, 30), Math.random() < 0.4 ? (se === 2 ? 'heu' : 'sack') : null); return; }
+      if (sp.water && Math.random() < 0.08) { goTo(v, sp.water, 'angeln', rand(20, 40), Math.random() < 0.5 ? 'fisch' : null); return; }
+      if (sp.trees.length && Math.random() < (se >= 2 ? 0.28 : 0.1)) { goTo(v, pick(sp.trees), 'sammeln', rand(10, 18), 'reisig'); return; }
+      if (se < 3 && sp.fields.length && (v.role !== 'baeuerin' || Math.random() < 0.4)) {
+        const act = se === 0 && Math.random() < 0.55 ? 'saeen' : se === 2 ? 'sichel' : 'hacke';
+        goTo(v, pick(sp.fields), act, rand(14, 30), act === 'saeen' ? null : Math.random() < 0.4 ? (se === 2 ? 'heu' : 'sack') : null);
+        if (act === 'saeen') v.carry = 'saatsack';
+        return;
+      }
       if (v.role === 'baeuerin' && sp.gardens.length) { goTo(v, pick(sp.gardens), 'jaeten', rand(10, 20)); return; }
       if (sp.wood.length && Math.random() < 0.6) { goTo(v, pick(sp.wood), 'axt', rand(10, 20), 'holz'); return; }
       if (sp.hay.length) { goTo(v, pick(sp.hay), 'gabel', rand(8, 16)); return; }
       goTo(v, wander(v, s, r), 'stehen', rand(4, 10)); return;
     case 'magd':
+      if (sp.trees.length && Math.random() < (se >= 2 ? 0.25 : 0.1)) { goTo(v, pick(sp.trees), 'sammeln', rand(10, 16), 'reisig'); return; }
       if (sp.wells.length && Math.random() < 0.45) { goTo(v, near(sp.wells, v), 'eimer', rand(5, 9), 'eimer'); return; }
       if (sp.stalls.length && Math.random() < 0.5) { goTo(v, pick(sp.stalls).front, 'kaufen', rand(6, 12), 'korb'); return; }
       goTo(v, house(), 'besen', rand(8, 16)); return;
@@ -4093,7 +4237,13 @@ function chooseTask(v) {
       if (sp.fields.length) { goTo(v, pick(sp.fields), 'hacke', rand(12, 24)); return; }
       goTo(v, wander(v, s, r * 0.7), 'stehen', rand(6, 12), null, 0.8); return;
     case 'kind':
+      if (sp.trees.length && Math.random() < 0.04) { goTo(v, pick(sp.trees), 'sammeln', rand(6, 10), 'reisig'); return; }
       goTo(v, wander(v, s, Math.min(4, r)), 'spielen', rand(1, 3), null, 1.5); return;
+    case 'jaeger':
+      // Auf der Pirsch am Waldrand, mit etwas Glück mit Wild zurück
+      if (sp.forest.length && Math.random() < 0.8) { goTo(v, pick(sp.forest), 'pirschen', rand(14, 28), null, 0.85); v.task.hunt = true; return; }
+      if (sp.trees.length) { goTo(v, pick(sp.trees), 'sammeln', rand(8, 14), 'reisig'); return; }
+      goTo(v, wander(v, s, r), 'stehen', rand(5, 10)); return;
     case 'wache':
       if (sp.gate) { goTo(v, pick(sp.gate), 'wache', rand(12, 24)); return; }
       goTo(v, wander(v, s, r), 'wache', rand(10, 20)); return;
@@ -4113,11 +4263,12 @@ function chooseTask(v) {
 }
 
 function updateVillager(v, dt) {
-  if (v.funeral) return;
+  if (v.funeral || v.spectator || v.execution) return;
   const h = hourOf(), ph = phase(h);
   if (ph === 'nacht') { v.hidden = true; v.inside = true; v.task = null; v.act = null; v.carry = null; return; }
   if (v.inside) {
     if (ph === 'abend' && h >= 20) return;
+    if ((v.hideUntil || 0) > G.time || (G.raid && G.raid.site === v.home)) return;
     v.inside = false; v.hidden = false;
     if (v.door) { v.x = v.door.x; v.y = v.door.y; }
   }
@@ -4129,7 +4280,7 @@ function updateVillager(v, dt) {
     chaseTo(v, t.x, t.y, dt, 0.18, 0.55 * t.speed);
     if (Math.hypot(t.x - v.x, t.y - v.y) < 0.3 || t.t > 25) {
       t.kind = 'work'; t.t = 0;
-      if (t.act === 'heim') { v.hidden = true; v.inside = true; v.task = null; return; }
+      if (t.act === 'heim') { v.hidden = true; v.inside = true; v.hideUntil = t.hideFor ? G.time + t.hideFor : 0; v.task = null; return; }
       // Blickrichtung zum Arbeitsplatz
       if (t.act === 'verkaufen') v.facing = -1;
     }
@@ -4141,7 +4292,24 @@ function updateVillager(v, dt) {
   if (t.act === 'spielen') { v.task = null; return; }
   if (t.t >= t.dur) {
     v.act = null;
-    if (t.repair) repairBuilding(t.repair, 0.15);
+    if (t.repair) workOn(t.repair);
+    if (t.dropAfter || t.act === 'saeen') v.carry = null;
+    if (t.douse) { douse(t.douse); v.carry = null; v.task = null; return; }
+    if (t.fireB) {
+      const b = t.fireB;
+      v.carry = 'eimer';
+      goTo(v, { x: b.x + rand(-0.5, 0.5), y: b.y + b.wy / 2 + 0.5 }, 'loeschen', rand(1.2, 2), null, 1.6);
+      v.task.douse = b;
+      return;
+    }
+    if (t.hunt && huntShot(v, t)) return;
+    if (t.next) {
+      const n = t.next;
+      if (n.carry !== undefined) v.carry = n.carry;
+      goTo(v, n.spot, n.act, n.dur, n.then || null, n.speed || 1);
+      Object.assign(v.task, n.props || {});
+      return;
+    }
     if (t.then && t.then !== 'drop') {
       v.carry = t.then;
       const sp = siteSpots(v.home);
@@ -4152,6 +4320,23 @@ function updateVillager(v, dt) {
     if (t.then === 'drop') v.carry = null;
     v.task = null;
   }
+}
+
+// Jäger: Liegt ein Hirsch in Schussweite, fliegt ein Pfeil. Sonst gibt es vielleicht einen Hasen aus der Schlinge.
+function huntShot(v, t) {
+  let deer = null, bd = 10;
+  for (const a of G.animals || []) {
+    if (a.kind !== 'hirsch' || a.dead) continue;
+    const d = Math.hypot(a.x - v.x, a.y - v.y);
+    if (d < bd) { bd = d; deer = a; }
+  }
+  if (!deer || Math.random() < 0.35) { if (Math.random() < 0.4) t.then = 'hase'; return false; }
+  const sx = (deer.x - v.x) - (deer.y - v.y);
+  v.facing = sx >= 0 ? 1 : -1;
+  G.projectiles.push({ x: v.x, y: v.y, tx: deer.x, ty: deer.y, target: deer, att: v, t: 0, dur: Math.max(0.2, bd / 15), animal: true, npcHunt: true, dmg: 99 });
+  v.task = { kind: 'walk', x: deer.x + 0.3, y: deer.y + 0.2, act: 'sammeln', dur: 2, then: 'wild', t: 0, speed: 0.9 };
+  v.say = { text: pick(['Getroffen!', 'Der Braten für Sonntag!', 'Leise jetzt …']), t: 0, dur: 2.6 };
+  return true;
 }
 
 // ---------------------------------------------------------------- Sprüche
@@ -4167,10 +4352,23 @@ const SAYINGS = {
   hirte: ['Brav, brav.', 'Ein Lamm fehlt mir.', 'Der Wolf war wieder da.'],
   waldmann: ['Pst. Nicht so laut.', 'Der Sheriff soll kommen.', 'Wildbret schmeckt am besten, wenn es dem König gehört.'],
   holzer: ['Holz! Achtung!', 'Gutes Eichenholz.'],
+  jaeger: ['Pst! Da drüben im Unterholz …', 'Ein Hirsch, so groß wie ein Pferd, sag ich Euch.', 'Der Förster darf mich nicht sehen.'],
+  fischer: ['Heute beißen sie gut.', 'Hecht zum Abendessen!', 'Ruhig, sonst verscheucht Ihr die Fische.'],
 };
 
 function sayFor(v) {
   const s = v.home;
+  const t = v.task;
+  if (t && (t.douse || t.fireB)) return pick(['Feuer! Feuer!', 'Wasser, schnell!', 'Bildet eine Kette!', 'Rettet das Vieh!', 'Noch ein Eimer!']);
+  if (isBlighted(s)) {
+    const pp = G.s.player;
+    if (Math.hypot(v.x - pp.x, v.y - pp.y) < 4) return pick(['Ihr habt genug Unheil angerichtet.', 'Bitte, Herr, verschont uns.', 'Wer soll das alles wieder aufbauen?', 'Geht! Geht einfach.']);
+    return pick(['Es hat doch keinen Sinn mehr.', 'Wann kommen sie wieder?', 'Gott steh uns bei.', 'Mein Nachbar liegt jetzt auf dem Friedhof.']);
+  }
+  if (t && t.repair && underConstruction(t.repair)) return pick(['Hebt an! Noch ein Balken!', 'Bis zum Herbst steht das Dach.', 'Ein neues Haus für meine Tochter und ihren Mann.', 'Wer hat den Mörtel gesehen?']);
+  if (v.carry === 'reisig') return pick(['Ein kalter Winter steht bevor.', 'Für den Herd, für den Herd.', 'Das Reisig wird jedes Jahr weniger.']);
+  if (v.carry === 'wild') return pick(['Heute gibt es Wildbret!', 'Schwer, der Bursche.']);
+  if (v.role === 'bettler') return pick(['Ein Almosen, um Christi willen!', 'Habt Erbarmen, Herr!', 'Ein Pfennig für einen alten Kreuzfahrer …', 'Gott vergelt\'s jedem, der gibt!', 'Seit dem Brand hab ich nichts mehr.']);
   if (v.act === 'trinken') return pick(['Noch ein Bier, Wirt!', '♪ Hey ho, der Krug ist leer ♪', 'Prost!', 'Habt Ihr von der Schlacht gehört?', 'Der Wirt panscht das Bier, sag ich euch.', '♪ Als König Richard übers Meer ... ♪']);
   if (v.role === 'wirt') return pick(['Herein, herein! Warmes Essen und weiche Betten!', 'Frisches Bier aus dem Fass!', 'Ein Bett für die Nacht, Herr?']);
   if (v.role === 'priester') return pick(['Der Herr sei mit Euch.', 'Vergesst die Messe am Sonntag nicht.', 'Betet für die Toten.']);
@@ -4203,9 +4401,26 @@ function updateSayings(dt) {
     if (Math.abs(v.x - p.x) > 10 || Math.abs(v.y - p.y) > 10) continue;
     v.sayT -= dt;
     if (v.sayT > 0 || active >= 3) continue;
-    v.sayT = rand(14, 40);
-    if (v.role === 'haendler' || Math.random() < 0.6) { v.say = { text: sayFor(v), t: 0, dur: 3.6 }; active++; }
+    v.sayT = v.role === 'bettler' && Math.hypot(v.x - p.x, v.y - p.y) < 4.5 ? rand(5, 10) : rand(14, 40);
+    if (v.role === 'haendler' || v.role === 'bettler' || Math.random() < 0.6) { v.say = { text: sayFor(v), t: 0, dur: 3.6 }; active++; }
   }
+}
+
+// ---------------------------------------------------------------- Almosen
+// Drei Gold für einen Bettler: Die Kirche sieht es gern, und Bettler wissen allerhand.
+const ALMS = 3;
+function giveAlms(v) {
+  if (G.s.gold < ALMS) { log('Du hast nicht einmal ein paar Münzen übrig.', 'bad'); return false; }
+  G.s.gold -= ALMS;
+  G.s.alms = (G.s.alms || 0) + 1;
+  G.fx.push({ kind: 'text', x: v.x, y: v.y, text: `−${ALMS} Gold`, color: '#ffd84a', t: 0, dur: 1.4 });
+  const title = G.s.player.female ? 'Herrin' : 'Herr';
+  if (Math.random() < 0.3 && G.rumor) v.say = { text: `Gott segne Euch! Ein Rat für Euch: ${G.rumor(v.home)}`, t: 0, dur: 7 };
+  else v.say = { text: pick([`Gott vergelt's, ${title}!`, `Der Herr segne Euch, ${title}!`, 'Möge der Himmel Euch beschützen!', 'Heute Abend gibt es Brot!']), t: 0, dur: 3.4 };
+  v.sayT = rand(20, 40);
+  if (G.s.almsDay !== G.s.day) { G.s.almsDay = G.s.day; changeRep('kirche', 1); }
+  if (G.s.alms % 5 === 0) addRenown(1);
+  return true;
 }
 
 // ---------------------------------------------------------------- Wirtshaus
@@ -4335,7 +4550,7 @@ const ATTACKER = {
 const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'] };
 
 // ---------------------------------------------------------------- Schäden und Reparatur
-function siteBuildings(siteId) { return G.world.buildings.filter((b) => b.site === siteId && b.kind === 'house'); }
+function siteBuildings(siteId) { return G.world.buildings.filter((b) => b.site === siteId && b.kind === 'house' && !(b.cons < 1)); }
 
 function damageBuilding(b, amount) {
   if (!b) return;
@@ -4368,11 +4583,16 @@ function applyDamage() {
 }
 
 // Jeden Tag bauen die Leute weiter, auch wenn du nicht hinsiehst
+// In verödeten Orten repariert niemand, ausgebrannte Häuser stürzen ein (dynamics.js)
 function dailyRepairs() {
   for (const k of Object.keys(G.s.damage || {})) {
     const b = buildingByKey(k);
-    if (b) repairBuilding(b, 0.22);
-    else delete G.s.damage[k];
+    if (!b) { delete G.s.damage[k]; continue; }
+    if (typeof b.idx === 'number') {
+      const s = G.world.sites.find((x) => x.id === b.site);
+      if ((s && (G.s.blight[s.id] || 0) > G.s.day) || b.dmg >= 0.9) continue;
+    }
+    repairBuilding(b, 0.22);
   }
 }
 
@@ -4558,6 +4778,1002 @@ function siegeStatus() {
   const sg = G.siege;
   if (!sg) return null;
   return { name: sg.site.type === 'spieler' ? homeName() : sg.site.name, stage: sg.stage, att: sg.army.members.length, def: sg.def ? sg.def.members.length : 0, x: sg.site.x, y: sg.site.y, army: GROUP_TYPES[sg.army.type].name };
+}
+
+// ===== dynamics.js =====
+// Bauen und Verfall: Die Welt erneuert sich ständig. Auf Bauplätzen entstehen neue Häuser,
+// anderswo brennt eines ab, verfällt oder wird vom Sturm abgedeckt und später neu errichtet.
+// Wer einen Ort überfällt, legt ihn lahm: Dort wird eine Weile nichts gebaut, die Leute haben Angst.
+
+
+
+
+
+
+
+
+
+
+const GROWING = { stadt: 1, markt: 1, dorf: 1, burg: 1, halle: 1 };
+
+// ---------------------------------------------------------------- Zustand eines Hauses
+// b.cons: nicht gesetzt oder 1 = steht, 0 bis 1 = im Bau, -1 = Ruine, -2 = leerer Bauplatz
+function standing(b) { return !(b.cons < 1); }
+function underConstruction(b) { return b.cons >= 0 && b.cons < 1; }
+
+function setCons(b, v) {
+  if (!b.plot && v >= 1) { b.cons = undefined; delete G.s.cons[b.idx]; return; }
+  b.cons = v;
+  if (b.plot && v === -2) delete G.s.cons[b.idx];
+  else G.s.cons[b.idx] = Math.round(v * 1000) / 1000;
+}
+
+// Häuser je Ort, einmal je Welt gesammelt
+let hcache = null, hworld = null;
+function siteHouses(id) {
+  if (hworld !== G.world) {
+    hcache = new Map(); hworld = G.world;
+    for (const b of G.world.buildings) {
+      if (b.kind !== 'house' || !b.site) continue;
+      if (!hcache.has(b.site)) hcache.set(b.site, []);
+      hcache.get(b.site).push(b);
+    }
+  }
+  return hcache.get(id) || [];
+}
+
+function isBlighted(s) { return !!s && (G.s.blight[s.id] || 0) > G.s.day; }
+
+// Neues Spiel: manche Bauplätze sind schon halb bebaut, ein paar alte Häuser verfallen
+function initDynamics() {
+  G.s.cons = {}; G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {};
+  for (const b of G.world.buildings) {
+    if (b.kind !== 'house' || !b.site) continue;
+    if (b.plot) {
+      const r = Math.random();
+      if (r < 0.4) G.s.cons[b.idx] = Math.round(rand(0.05, 0.9) * 1000) / 1000;
+      else if (r < 0.62) G.s.cons[b.idx] = 1;
+    } else if (!b.tavern && Math.random() < 0.012) G.s.cons[b.idx] = -1;
+    else if (!b.tavern && Math.random() < 0.04) G.s.damage[b.idx] = Math.round(rand(0.15, 0.45) * 100) / 100;
+  }
+}
+
+// Gespeicherten Zustand auf die frisch erzeugte Welt übertragen
+function applyCons() {
+  if (!G.s.cons) initDynamics();
+  G.s.blight = G.s.blight || {}; G.s.slain = G.s.slain || {}; G.s.raided = G.s.raided || {};
+  for (const b of G.world.buildings) {
+    if (b.kind !== 'house') continue;
+    const v = G.s.cons[b.idx];
+    b.cons = v !== undefined ? v : b.plot ? -2 : undefined;
+  }
+  G.fires = [];
+  G.raid = null;
+}
+
+function hurt(b, amount, fire = false) {
+  b.dmg = Math.min(1, (b.dmg || 0) + amount);
+  G.s.damage[b.idx] = Math.round(b.dmg * 100) / 100;
+  if (fire) igniteHouse(b, rand(40, 70));
+}
+
+function igniteHouse(b, dur = 55) {
+  b.fire = G.time + dur;
+  // Alle in der Nähe lassen alles stehen und liegen
+  for (const v of G.peasants || []) if (v.home && v.home.id === b.site && !v.funeral && !v.hidden && v.role !== 'kind') v.task = null;
+  b.dmg = Math.max(b.dmg || 0, 0.12);
+  G.s.damage[b.idx] = Math.round(b.dmg * 100) / 100;
+  if (!G.fires) G.fires = [];
+  if (!G.fires.some((f) => f.b === b)) G.fires.push({ b, s: G.world.sites.find((s) => s.id === b.site), doused: 0 });
+}
+
+// Eimer Wasser aufs Feuer: jeder Eimer verkürzt den Brand
+function douse(b) {
+  if (!(b.fire > G.time)) return;
+  b.fire -= 6;
+  const f = G.fires && G.fires.find((x) => x.b === b);
+  if (f) f.doused++;
+  G.fx.push({ kind: 'staub', x: b.x + rand(-0.3, 0.3), y: b.y + b.wy / 2, t: 0, dur: 0.9, col: '#e8eef2' });
+}
+
+// Ein Bewohner arbeitet an einem Haus: Baustelle wächst, Schaden wird ausgebessert
+function workOn(b) {
+  if (underConstruction(b)) setCons(b, Math.min(0.98, b.cons + 0.012));
+  else repairBuilding(b, 0.15);
+}
+
+function burningIn(s) {
+  if (!G.fires) return null;
+  const f = G.fires.find((x) => x.s === s && x.b.fire > G.time);
+  return f ? f.b : null;
+}
+
+// ---------------------------------------------------------------- Der tägliche Kreislauf
+function dailyDynamics() {
+  const p = G.s.player;
+  let notes = 0;
+  const note = (s, text, kind = 'info') => {
+    if (notes < 2 && Math.hypot(s.x - p.x, s.y - p.y) < 45) { log(text, kind); notes++; }
+  };
+  for (const s of G.world.sites) {
+    if (!GROWING[s.type]) continue;
+    const hs = siteHouses(s.id);
+    if (!hs.length) continue;
+    const blight = isBlighted(s), sieged = G.siege && G.siege.site === s;
+    const calm = !blight && !sieged;
+    // Ausgebrannte Häuser stürzen ein und werden später neu gebaut
+    for (const b of hs) {
+      if (standing(b) && b.dmg >= 0.9 && !(b.fire > G.time)) {
+        b.dmg = 0; delete G.s.damage[b.idx];
+        setCons(b, -1);
+        note(s, `In ${s.name} ist ein ausgebranntes Haus eingestürzt.`);
+      }
+    }
+    // Baufortschritt
+    let building = 0;
+    for (const b of hs) {
+      if (!underConstruction(b)) continue;
+      if (!calm) { building++; continue; }
+      const v = b.cons + rand(0.1, 0.2) * (b.helped ? 1.8 : 1);
+      if (v >= 1) { b.helped = false; setCons(b, 1); note(s, `In ${s.name} ist ein neues Haus fertig geworden.`, 'good'); } else { setCons(b, v); building++; }
+    }
+    // Neue Baustellen: zuerst die Ruinen, dann freie Bauplätze
+    if (calm && building < 1 + Math.floor(hs.length / 30) && Math.random() < 0.15 + hs.length / 300) {
+      const ruins = hs.filter((b) => b.cons === -1), empty = hs.filter((b) => b.cons === -2);
+      const b = ruins.length && (Math.random() < 0.7 || !empty.length) ? pick(ruins) : empty.length ? pick(empty) : null;
+      if (b) { const was = b.cons; setCons(b, 0.02); note(s, was === -1 ? `In ${s.name} räumt man eine Brandstelle und baut neu.` : `In ${s.name} wird ein neues Haus gebaut.`); }
+    }
+    // Unglück und Verfall: Feuer, Sturm, Alter. In verödeten Orten verfällt mehr.
+    if (Math.random() < (0.08 + hs.length * 0.0015) * (blight ? 2.5 : 1)) {
+      const cand = hs.filter((b) => standing(b) && !b.tavern && !b.smithy && !(b.fire > G.time));
+      if (cand.length) {
+        const b = pick(cand), r = Math.random();
+        if (r < 0.35) { hurt(b, rand(0.55, 1), true); note(s, `In ${s.name} ist ein Feuer ausgebrochen.`, 'bad'); }
+        else if (r < 0.55) { b.dmg = 0; delete G.s.damage[b.idx]; setCons(b, -1); note(s, `In ${s.name} wird ein baufälliges Haus abgerissen.`); }
+        else if (r < 0.75) { hurt(b, rand(0.2, 0.35)); note(s, `Ein Sturm hat in ${s.name} ein Dach abgedeckt.`); }
+        else hurt(b, rand(0.15, 0.3));
+      }
+    }
+  }
+  // Verödete Orte fassen wieder Mut, Getötete werden langsam ersetzt
+  for (const [id, until] of Object.entries(G.s.blight)) {
+    if (until > G.s.day) continue;
+    delete G.s.blight[id];
+    const s = G.world.sites.find((x) => x.id === id);
+    if (s) note(s, `In ${s.name} fasst man wieder Mut. Es wird wieder gebaut.`, 'good');
+  }
+  for (const [id, n] of Object.entries(G.s.slain)) {
+    const s = G.world.sites.find((x) => x.id === id);
+    if (!s || isBlighted(s) || n <= 0) { if (n <= 0) delete G.s.slain[id]; continue; }
+    G.s.slain[id] = n - 1;
+    if (G.addVillager) G.addVillager(s);
+  }
+}
+
+// ---------------------------------------------------------------- Brände in deiner Nähe
+let fireT = 90;
+function updateDynamics(dt) {
+  const p = G.s.player;
+  if (!G.fires) G.fires = [];
+  // Hin und wieder bricht dort, wo du gerade bist, ein Feuer aus
+  fireT -= dt;
+  if (fireT <= 0) {
+    fireT = rand(140, 300);
+    const h = hourOf();
+    const s = G.world.sites.find((x) => GROWING[x.type] && Math.hypot(x.x - p.x, x.y - p.y) < (x.clear || 6) + 3);
+    if (s && h > 7 && h < 20 && !G.siege && !G.raid && !isBlighted(s) && Math.random() < 0.55) {
+      const cand = siteHouses(s.id).filter((b) => standing(b) && !b.tavern && !(b.fire > G.time) && Math.hypot(b.x - p.x, b.y - p.y) < 11);
+      if (cand.length) {
+        const b = pick(cand);
+        igniteHouse(b, rand(45, 65));
+        log(`Feuer in ${s.name}! Die Leute laufen mit Eimern herbei.`, 'bad');
+      }
+    }
+  }
+  for (let i = G.fires.length - 1; i >= 0; i--) {
+    const f = G.fires[i], b = f.b;
+    if (b.fire > G.time && Math.abs(b.x - p.x) + Math.abs(b.y - p.y) < 70) {
+      b.dmg = Math.min(1, (b.dmg || 0) + dt * 0.006);
+      G.s.damage[b.idx] = Math.round(b.dmg * 100) / 100;
+      continue;
+    }
+    G.fires.splice(i, 1);
+    if (f.doused >= 3 && f.s && Math.hypot(b.x - p.x, b.y - p.y) < 25) log(`Das Feuer in ${f.s.name} ist gelöscht.`, 'good');
+  }
+  if (G.raid) updateRaid(dt);
+}
+
+// ---------------------------------------------------------------- Überfall auf einen Ort
+const RAID_GUARDS = { dorf: 4, markt: 6, halle: 6, burg: 10, stadt: 10, abtei: 3 };
+const RAID_GOLD = { dorf: [30, 70], markt: [70, 150], halle: [50, 110], burg: [100, 200], stadt: [150, 300], abtei: [90, 180] };
+
+function canRaid(s) { return !!s && !!RAID_GUARDS[s.type] && !G.raid && !(G.siege && G.siege.site === s); }
+function raidVictim(t) { return t.kind === 'peasant' && !!G.raid && t.home === G.raid.site && !t.hidden && !t.dead; }
+
+function startRaid(s) {
+  if (!canRaid(s)) return false;
+  const types = DEFENDER_NPC[s.faction] || ['wache'];
+  const n = Math.round(RAID_GUARDS[s.type] * ((G.fpsAvg || 60) >= 40 ? 1 : 0.7)) + Math.floor(G.s.day / 15);
+  const walled = s.type === 'burg' || s.palisade;
+  const pos = walled ? { x: s.x + 0.4, y: s.y + 2.2 } : { x: s.x, y: s.y + 1 };
+  const members = [];
+  for (let k = 0; k < n; k++) members.push(makeNpc(k % 3 === 2 ? types[1] || types[0] : types[0], pos.x + rand(-1, 1), pos.y + rand(-1, 1), Math.floor(G.s.day / 10)));
+  const g = spawnGroup('verteidiger', { pos, membersUnits: members });
+  if (!g) return false;
+  g.faction = s.faction; g.engaged = true; g.provoked = true; g.raid = s.id; g.wait = 99999; g.path = null;
+  G.raid = { site: s, group: g, t: 0 };
+  for (const v of G.peasants) if (v.home === s && !v.funeral) { v.task = null; v.act = null; v.carry = null; }
+  G.s.blight[s.id] = Math.max(G.s.blight[s.id] || 0, G.s.day + 10);
+  log(`Du überfällst ${s.name}! Die Glocken läuten Sturm, die Leute fliehen in ihre Häuser.`, 'bad');
+  changeRep(s.faction, s.type === 'abtei' ? -35 : -25);
+  if (s.faction !== 'kirche') changeRep('kirche', -6);
+  for (const r of FACTIONS[s.faction].rivals) changeRep(r, 3);
+  rebuildUnits();
+  return true;
+}
+
+function updateRaid(dt) {
+  const r = G.raid, s = r.site, p = G.s.player;
+  r.t += dt;
+  const g = r.group;
+  if (!G.groups.includes(g) || !g.members.length) { plunder(s); G.raid = null; return; }
+  if (p.dead || Math.hypot(p.x - s.x, p.y - s.y) > (s.clear || 6) + 22) {
+    log(`Du ziehst dich aus ${s.name} zurück. Die Besatzung schließt die Tore.`);
+    removeGroup(g);
+    G.raid = null;
+    rebuildUnits();
+  }
+}
+
+function plunder(s) {
+  const [a, b] = RAID_GOLD[s.type];
+  const recent = (G.s.raided[s.id] || -99) > G.s.day - 20;
+  const gold = Math.round(randInt(a, b) * (recent ? 0.35 : 1));
+  G.s.gold += gold;
+  const loot = [`${gold} Gold`];
+  for (const good of (s.produces || []).slice(0, 2)) {
+    const n = Math.min(randInt(3, 8), cargoFree());
+    if (n > 0 && !recent) { addCargo(good, n); loot.push(`${n} ${GOODS[good].name}`); }
+  }
+  // Ein paar Häuser gehen in Flammen auf
+  const hs = siteHouses(s.id).filter((h) => standing(h) && !(h.fire > G.time)).sort((x, y) => Math.hypot(x.x - s.x, x.y - s.y) - Math.hypot(y.x - s.x, y.y - s.y));
+  for (const h of hs.slice(0, randInt(2, 4))) hurt(h, rand(0.5, 1), true);
+  G.s.blight[s.id] = G.s.day + 12 + (G.s.slain[s.id] || 0) * 2;
+  G.s.raided[s.id] = G.s.day;
+  G.s.flags.raids = (G.s.flags.raids || 0) + 1;
+  log(`Ihr plündert ${s.name}: ${loot.join(', ')}. Rauch steigt über den Dächern auf. Hier wird so bald niemand mehr bauen.`, 'bad');
+}
+
+// Ein Bewohner fällt: Der Ort trauert und verödet länger
+function villagerKilled(v) {
+  const s = v.home;
+  if (!s) return;
+  G.s.slain[s.id] = (G.s.slain[s.id] || 0) + 1;
+  G.s.blight[s.id] = Math.max(G.s.blight[s.id] || 0, G.s.day + 10) + 2;
+  if (s.faction) changeRep(s.faction, -3);
+  changeRep('kirche', -1);
+}
+
+// ---------------------------------------------------------------- Stiften und Sühne
+function rebuildNeed(s) {
+  return siteHouses(s.id).filter((b) => b.cons === -1 || underConstruction(b) || (standing(b) && b.dmg > 0)).length;
+}
+function donateCost(s) { return 30 + 12 * Math.min(10, rebuildNeed(s)); }
+function canDonate(s) { return GROWING[s.type] && !isBlighted(s) && rebuildNeed(s) > 0 && (G.s.towns[s.id].donateDay || -9) < G.s.day - 2; }
+
+function donate(s) {
+  const cost = donateCost(s);
+  if (G.s.gold < cost || !canDonate(s)) return false;
+  G.s.gold -= cost;
+  G.s.towns[s.id].donateDay = G.s.day;
+  for (const b of siteHouses(s.id)) {
+    if (underConstruction(b)) { b.helped = true; setCons(b, Math.min(0.97, b.cons + 0.35)); }
+    else if (b.cons === -1) { b.helped = true; setCons(b, 0.2); }
+    else if (standing(b) && b.dmg > 0) { b.dmg = Math.max(0, b.dmg - 0.5); if (b.dmg <= 0.001) { b.dmg = 0; delete G.s.damage[b.idx]; } else G.s.damage[b.idx] = b.dmg; }
+  }
+  log(`Du stiftest ${cost} Gold für den Wiederaufbau von ${s.name}. Zimmerleute und Dachdecker machen sich ans Werk.`, 'good');
+  changeRep(s.faction, 4);
+  if (s.faction !== 'kirche') changeRep('kirche', 1);
+  return true;
+}
+
+function atoneCost(s) { return 120 + 25 * (G.s.slain[s.id] || 0); }
+function atone(s) {
+  const cost = atoneCost(s);
+  if (G.s.gold < cost || !isBlighted(s)) return false;
+  G.s.gold -= cost;
+  delete G.s.blight[s.id];
+  log(`Du zahlst ${cost} Gold Sühne an ${s.name} und lässt Messen für die Toten lesen. Langsam kehrt das Leben zurück.`, 'good');
+  changeRep(s.faction, 10);
+  changeRep('kirche', 4);
+  return true;
+}
+
+// ===== tournament.js =====
+// Turniere: Herolde kündigen ein Turnier in einer Stadt oder Burg an. Am Turniertag stehen vor
+// dem Ort Schranken, Tribüne und Zelte, das Volk jubelt, Ritter tjosten gegeneinander.
+// Wer ein Pferd hat und das Startgeld zahlt, reitet mit: Die Lanze im rechten Moment senken.
+
+
+
+
+
+
+
+
+
+
+const KNIGHT_NAMES = [
+  'Sir Baldwin de Montclair', 'Sir Aymer de Rochefort', 'Sir Gilbert of Wycombe', 'Sir Raoul le Hardi', 'Sir Thurstan of Holderness',
+  'Sir Walerand de Brioude', 'Sir Hugh of Ravenscar', 'Sir Odo de Ferrières', 'Sir Alard of Kendal', 'Sir Ivo de Mortain',
+  'Sir Godric Eisenhand', 'Sir Enguerrand de Sancerre', 'Der Schwarze Ritter', 'Der Ritter mit dem Falken', 'Sir Hamelin of Lewes',
+  'Sir Bertran de Born', 'Sir Robert Lackland', 'Sir Fulk le Brun', 'Sir Osric of Whitby', 'Sir Amaury de Craon',
+];
+const KNIGHT_COLS = ['#9a2f2a', '#2c4f86', '#3f6b2f', '#5e2f6e', '#a8791f', '#2b2a2e', '#1f6a6a', '#b34a1a', '#6a6a6a', '#8a2a5a', '#c9a227', '#3a3a7a'];
+const HOST_TYPES = { stadt: 1, burg: 1, markt: 1 };
+const PASS_T = 3.4;           // Sekunden je Durchgang
+const IMPACT = 0.585;         // Anteil des Durchgangs bis zum Zusammenprall
+const LANE = 0.55;            // Abstand der Bahnen von der Schranke
+
+const ease = (k) => 0.35 * k * k + 0.65 * k;
+const akk = (n) => n.replace(/^Der /, 'den ');
+
+// ---------------------------------------------------------------- Ankündigung
+function findLists(s) {
+  const W = G.world, N = W.N;
+  const free = (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (xi < 2 || yi < 2 || xi >= N - 2 || yi >= N - 2) return false;
+    const t = W.tiles[yi * N + xi];
+    return isWalkable(W, x, y) && t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && landAt(W, x, y) === s.land;
+  };
+  const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 40 && Math.abs(b.y - s.y) < 40 && b.kind !== 'prop');
+  for (let k = 0; k < 160; k++) {
+    const a = (k * 2.399) % (Math.PI * 2), r = (s.clear || 7) + 5 + (k % 9);
+    const lx = Math.round(s.x + Math.cos(a) * r) + 0.5, ly = Math.round(s.y + Math.sin(a) * r) + 0.5;
+    let ok = true;
+    for (let y = ly - 3.5; y <= ly + 3.5 && ok; y += 1) for (let x = lx - 8; x <= lx + 8 && ok; x += 1) if (!free(x, y)) ok = false;
+    if (!ok) continue;
+    if (near.some((b) => Math.abs(b.x - lx) < 9.5 && Math.abs(b.y - ly) < 4.5)) continue;
+    return { lx, ly };
+  }
+  return null;
+}
+
+function announce() {
+  const p = G.s.player, land = landAt(G.world, p.x, p.y);
+  let cand = G.world.sites.filter((s) => HOST_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) > 12 && Math.hypot(s.x - p.x, s.y - p.y) < 130);
+  if (!cand.length) return;
+  if (!G.s.flags.tourneys) { const ashby = cand.find((s) => s.id === 'ashby'); if (ashby) cand = [ashby]; }
+  for (let tries = 0; tries < 6; tries++) {
+    const s = pick(cand);
+    const lists = findLists(s);
+    if (!lists) continue;
+    const day = G.s.day + randInt(3, 5);
+    const big = s.type === 'stadt' ? 1.5 : s.type === 'burg' ? 1.2 : 1;
+    const names = KNIGHT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 8);
+    const cols = KNIGHT_COLS.slice().sort(() => Math.random() - 0.5);
+    G.s.tourney = {
+      site: s.id, day, lx: lists.lx, ly: lists.ly, prize: Math.round(randInt(140, 220) * big / 10) * 10, fee: Math.round(randInt(20, 35) * big),
+      knights: names.map((name, i) => ({ name, col: cols[i % cols.length], skill: Math.round(rand(0.3, 0.85) * 100) / 100 })),
+      joined: false, done: false,
+    };
+    G.s.flags.tourneys = (G.s.flags.tourneys || 0) + 1;
+    log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold.`, 'gold');
+    return;
+  }
+}
+
+function dailyTourney() {
+  const tr = G.s.tourney;
+  if (tr && G.s.day > tr.day) {
+    if (!tr.done) finishUnseen(tr);
+    G.s.tourney = null;
+    G.s.lastTourney = G.s.day;
+    endTour();
+  }
+  if (!G.s.tourney && G.s.day >= 3 && G.s.day - (G.s.lastTourney || 0) >= 5 && Math.random() < 0.3) announce();
+}
+
+// Ohne dich: Ein Sieger wird ausgelost, nach Können gewichtet
+function finishUnseen(tr) {
+  const s = G.world.sites.find((x) => x.id === tr.site);
+  if (tr.joined) { log(`Du bist nicht zum Turnier in ${s.name} erschienen. Das Startgeld ist verfallen.`, 'bad'); }
+  const w = tr.knights.slice().sort((a, b) => (b.skill + Math.random() * 0.5) - (a.skill + Math.random() * 0.5))[0];
+  const p = G.s.player;
+  if (Math.hypot(s.x - p.x, s.y - p.y) < 120) log(`${w.name} hat das Turnier von ${s.name} gewonnen, heißt es.`);
+  tr.done = true;
+}
+
+// ---------------------------------------------------------------- Anmelden
+function tourneyAt(site) { const tr = G.s.tourney; return tr && tr.site === site.id && !tr.done ? tr : null; }
+function canJoin(tr) { return !!G.s.player.eq.pferd && !tr.joined && G.s.gold >= tr.fee && !(G.tour && G.tour.stage !== 'warten'); }
+function joinTourney() {
+  const tr = G.s.tourney;
+  if (!tr || !canJoin(tr)) return false;
+  G.s.gold -= tr.fee;
+  tr.joined = true;
+  // Der schwächste Ritter tritt für dich zurück
+  let weak = 0;
+  tr.knights.forEach((k, i) => { if (k.skill < tr.knights[weak].skill) weak = i; });
+  tr.knights.splice(weak, 1);
+  tr.knights.unshift({ name: G.s.player.name, col: playerColor(), player: true, skill: 0 });
+  log(`Du trägst dich in die Turnierliste ein. Sei am Tag ${tr.day} ab der zehnten Stunde bei den Schranken.`, 'good');
+  if (G.tour) { endTour(); }
+  return true;
+}
+
+// ---------------------------------------------------------------- Ablauf am Turniertag
+// G.tour lebt nur, solange du in der Nähe bist, und wird nicht gespeichert.
+function setupTour(tr) {
+  const s = G.world.sites.find((x) => x.id === tr.site);
+  const t = { tr, site: s, lx: tr.lx, ly: tr.ly, stage: 'warten', t: 0, knights: [], spectators: [], match: null, queue: [], round: 0, lock: false, aim: null, cheer: 0 };
+  // Ritter an ihren Zelten
+  tr.knights.forEach((k, i) => {
+    let u;
+    if (k.player) u = G.s.player;
+    else {
+      u = makeUnit({ kind: 'npc', cls: 'ritter', name: k.name, level: 3 + Math.round(k.skill * 6), eq: { waffe: 'langschwert', ruestung: 'kettenruestung', schild: 'wappenschild', pferd: 'schlachtross' }, x: 0, y: 0 });
+      u.lookObj = { tunic: k.col, trim: '#e8d9a8' };
+      u.mounted = true; u.noSep = true; u.tourney = true;
+    }
+    const tent = tentSpot(t, i);
+    if (!k.player) { u.x = tent.x; u.y = tent.y; u.facing = tent.x < t.lx ? 1 : -1; }
+    t.knights.push({ ...k, u, out: false, tent });
+  });
+  G.extras = t.knights.filter((k) => !k.player).map((k) => k.u);
+  // Zuschauer vor der Tribüne und an den Seiten
+  const n = (G.fpsAvg || 60) >= 40 ? 26 : 14;
+  const roles = ['buerger', 'bauer', 'magd', 'buerger', 'kind', 'baeuerin', 'haendler', 'handwerker'];
+  for (let k = 0; k < n; k++) {
+    const front = k % 3 !== 2;
+    const spot = front ? { x: t.lx - 5 + rand(0, 10), y: t.ly + 1.9 + rand(0, 1.3) } : { x: t.lx + (k % 2 ? -1 : 1) * rand(5.6, 7.5), y: t.ly + rand(-0.6, 2.2) };
+    if (!isWalkable(G.world, spot.x, spot.y)) continue;
+    const v = makeVillager(s, roles[k % roles.length]);
+    v.x = spot.x + rand(-2, 2); v.y = spot.y + rand(1, 3);
+    v.spectator = spot; v.noSep = true;
+    G.peasants.push(v);
+    t.spectators.push(v);
+  }
+  G.tour = t;
+  rebuildUnits();
+}
+
+function tentSpot(t, i) {
+  const side = i % 2 === 0 ? -1 : 1, row = Math.floor(i / 2);
+  return { x: t.lx + side * (7.6 + (row % 2) * 0.9), y: t.ly - 1.6 + row * 1.15 };
+}
+
+function endTour() {
+  const t = G.tour;
+  if (!t) return;
+  G.peasants = G.peasants.filter((v) => !v.spectator);
+  G.extras = [];
+  const p = G.s.player;
+  p.lance = false; p.lanceDown = false; p.lanceBroken = false;
+  G.tour = null;
+  rebuildUnits();
+}
+
+function updateTourney(dt) {
+  const tr = G.s.tourney, p = G.s.player;
+  if (!tr || tr.done) { if (G.tour) endTour(); return; }
+  const near = Math.hypot(tr.lx - p.x, tr.ly - p.y) < 70;
+  if (!G.tour) {
+    if (G.s.day === tr.day && near && hourOf() >= 8 && hourOf() < 21) setupTour(tr);
+    return;
+  }
+  const t = G.tour;
+  if (!near) { endTour(); return; }
+  t.t += dt;
+  if (t.cheer > 0) t.cheer -= dt;
+  for (const v of t.spectators) updateSpectator(v, t, dt);
+  if (t.stage === 'warten') {
+    for (const k of t.knights) if (!k.player) idleKnight(k, dt);
+    if (hourOf() >= 10) {
+      t.stage = 'tjost'; t.t = 0;
+      t.queue = pairs(t.knights);
+      log(`Fanfaren! Das Turnier von ${t.site.name} beginnt. ${t.knights.length} Ritter reiten in die Schranken.`, 'gold');
+      shout(t, ['Hurra!', 'Es geht los!', 'Seht nur die Banner!']);
+    }
+    return;
+  }
+  if (t.stage === 'tjost') {
+    for (const k of t.knights) if (!k.player && (!t.match || (t.match.a !== k && t.match.b !== k))) idleKnight(k, dt);
+    if (!t.match) {
+      if (t.pauseT > 0) { t.pauseT -= dt; return; }
+      if (!t.queue.length) {
+        const alive = t.knights.filter((k) => !k.out);
+        if (alive.length <= 1) { crown(t, alive[0]); return; }
+        t.round++;
+        t.queue = pairs(alive);
+      }
+      startMatch(t, t.queue.shift());
+      return;
+    }
+    updateMatch(t, t.match, dt);
+    return;
+  }
+  if (t.stage === 'ende') {
+    for (const k of t.knights) if (!k.player) idleKnight(k, dt);
+    if (t.t > 30) { tr.done = true; endTour(); }
+  }
+}
+
+function pairs(list) {
+  const out = [];
+  for (let i = 0; i + 1 < list.length; i += 2) out.push([list[i], list[i + 1]]);
+  return out;
+}
+
+const ROUND_NAME = ['Erste Runde', 'Halbfinale', 'Finale'];
+function startMatch(t, [a, b]) {
+  const p = G.s.player;
+  const withPlayer = a.player || b.player;
+  if (withPlayer && Math.hypot(p.x - t.lx, p.y - t.ly) > 30) {
+    // Nicht da: kampflos verloren
+    const other = a.player ? b : a, me = a.player ? a : b;
+    me.out = true;
+    log(`Der Herold ruft deinen Namen, doch du bist nicht bei den Schranken. ${other.name} kommt kampflos weiter.`, 'bad');
+    return;
+  }
+  const m = { a, b, pass: 0, ptsA: 0, ptsB: 0, phase: 'aufstellen', t: 0, dirA: 1, player: withPlayer };
+  t.match = m;
+  if (withPlayer) {
+    t.lock = true;
+    p.path = null; p.attackTarget = null; p.huntTarget = null;
+    p.mounted = true; p.lance = true; p.lanceDown = false; p.lanceBroken = false;
+    const foe = a.player ? b : a;
+    log(`${ROUND_NAME[Math.min(2, t.round)]}: Du gegen ${foe.name}. Senke die Lanze im richtigen Moment (Leertaste oder Klick)!`, 'gold');
+  } else if (t.round === 2 || t.knights.filter((k) => !k.out).length === 2) log(`Das Finale: ${a.name} gegen ${b.name}!`, 'gold');
+  for (const k of [a, b]) { k.u.lance = true; k.u.lanceDown = false; k.u.lanceBroken = false; k.u.mounted = true; }
+}
+
+function laneStart(t, m, k) {
+  // Reiter A beginnt links auf der Nordbahn, B rechts auf der Südbahn; nach jedem Durchgang wenden sie
+  const isA = k === m.a, dir = isA ? m.dirA : -m.dirA;
+  return { x: t.lx - dir * 5.4, y: t.ly + (isA ? -LANE : LANE), dir };
+}
+
+function updateMatch(t, m, dt) {
+  m.t += dt;
+  const A = m.a.u, B = m.b.u;
+  if (m.phase === 'aufstellen') {
+    let ready = true;
+    for (const k of [m.a, m.b]) {
+      const s = laneStart(t, m, k), u = k.u;
+      const d = Math.hypot(s.x - u.x, s.y - u.y);
+      if (d > 0.15) { ready = false; rideTo(u, s.x, s.y, dt, k.player ? 5 : 3.5); } else { u.moving = false; u.facing = s.dir; }
+    }
+    if (ready || m.t > 9) { m.phase = 'anlauf'; m.t = 0; A.lanceBroken = false; B.lanceBroken = false; if (m.player) startAim(t, m); }
+    return;
+  }
+  if (m.phase === 'anlauf') {
+    const dur = m.player ? PASS_T : PASS_T * 0.85;
+    const k = Math.min(1, m.t / dur), e = ease(k);
+    for (const kn of [m.a, m.b]) {
+      const s = laneStart(t, m, kn), u = kn.u;
+      u.x = s.x + s.dir * 10.8 * e; u.y = s.y; u.facing = s.dir; u.moving = true; u.anim += dt * (0.6 + k);
+      u.lanceDown = k > 0.22;
+    }
+    if (t.aim) t.aim.m = Math.min(1, k / IMPACT);
+    if (!m.hit && k >= IMPACT) { m.hit = true; resolvePass(t, m); }
+    if (k >= 1) {
+      for (const kn of [m.a, m.b]) { kn.u.moving = false; kn.u.lanceDown = false; }
+      m.pass++; m.hit = false; m.dirA = -m.dirA;
+      const a = m.ptsA, b = m.ptsB;
+      const decided = m.unhorsed || (m.pass >= 3 && a !== b) || m.pass >= 5;
+      if (decided) { endMatch(t, m); return; }
+      m.phase = 'wenden'; m.t = 0;
+    }
+    return;
+  }
+  if (m.phase === 'wenden') {
+    for (const kn of [m.a, m.b]) kn.u.anim += dt * 0.3;
+    if (m.t > (m.player ? 1.6 : 1.0)) { m.phase = 'anlauf'; m.t = 0; if (m.player) startAim(t, m); }
+  }
+}
+
+function rideTo(u, x, y, dt, v) {
+  const dx = x - u.x, dy = y - u.y, d = Math.hypot(dx, dy);
+  const step = Math.min(d, v * dt);
+  u.x += (dx / d) * step; u.y += (dy / d) * step;
+  u.moving = true; u.anim += dt;
+  const sx = dx - dy;
+  if (Math.abs(sx) > 0.02) u.facing = sx > 0 ? 1 : -1;
+}
+
+function idleKnight(k, dt) {
+  const u = k.u;
+  if (k.out) { u.lance = false; }
+  const d = Math.hypot(k.tent.x - u.x, k.tent.y - u.y);
+  if (d > 0.2) rideTo(u, k.tent.x, k.tent.y, dt, 2.2);
+  else { u.moving = false; u.mounted = !k.out; }
+}
+
+// ---------------------------------------------------------------- Zielen (dein Durchgang)
+function playerZone() {
+  const p = G.s.player;
+  const horse = p.eq.pferd === 'schlachtross' ? 0.05 : p.eq.pferd === 'klepper' ? 0 : 0.025;
+  return clamp(0.11 + p.level * 0.012 + horse, 0.11, 0.3);
+}
+
+function startAim(t) {
+  t.aim = { m: 0, c: rand(0.78, 0.88), w: playerZone(), pressed: null };
+}
+
+function joustPress() {
+  const t = G.tour;
+  if (!t || !t.aim || t.aim.pressed !== null) return false;
+  t.aim.pressed = t.aim.m;
+  return true;
+}
+
+function aimQuality(aim) {
+  if (!aim || aim.pressed === null) return { q: 0, why: 'Die Lanze kam nicht herunter!' };
+  const d = Math.abs(aim.pressed - aim.c);
+  if (d > aim.w / 2) return { q: 0, why: aim.pressed < aim.c ? 'Zu früh gesenkt!' : 'Zu spät gesenkt!' };
+  return { q: 1 - d / (aim.w / 2), why: null };
+}
+
+// ---------------------------------------------------------------- Zusammenprall
+function stability(k) {
+  if (!k.player) return k.skill * 0.6;
+  const p = G.s.player;
+  return clamp(p.st.def / 40 + (p.st.horse ? p.st.horse.def / 10 : 0) + p.level * 0.02, 0, 0.6);
+}
+
+function strike(q, foeStab) {
+  if (q <= 0.05) return 'verfehlt';
+  if (q < 0.45) return 'treffer';
+  if (q < 0.8) return Math.random() < 0.65 ? 'bruch' : 'treffer';
+  return Math.random() < 0.45 + (q - 0.8) * 1.5 - foeStab * 0.3 ? 'abwurf' : 'bruch';
+}
+
+const PTS = { verfehlt: 0, treffer: 1, bruch: 2, abwurf: 3 };
+const SHOUT = { verfehlt: 'Verfehlt', treffer: 'Treffer!', bruch: 'Lanzenbruch!', abwurf: 'Abgeworfen!' };
+
+function resolvePass(t, m) {
+  let qa, qb, why = null;
+  const qNpc = (k) => clamp(k.skill + rand(-0.38, 0.22), 0, 1);
+  if (m.a.player) { const r = aimQuality(t.aim); qa = r.q; why = r.why; } else qa = qNpc(m.a);
+  if (m.b.player) { const r = aimQuality(t.aim); qb = r.q; why = r.why; } else qb = qNpc(m.b);
+  t.aim = null;
+  const ra = strike(qa, stability(m.b)), rb = strike(qb, stability(m.a));
+  m.ptsA += Math.min(2, PTS[ra]); m.ptsB += Math.min(2, PTS[rb]);
+  const A = m.a.u, B = m.b.u;
+  const fxText = (u, text, col) => G.fx.push({ kind: 'text', x: u.x, y: u.y - 0.2, text, color: col, t: 0, dur: 1.6 });
+  fxText(B, SHOUT[ra], ra === 'verfehlt' ? '#e8dcc8' : '#ffd84a');
+  fxText(A, SHOUT[rb], rb === 'verfehlt' ? '#e8dcc8' : '#ffd84a');
+  if (why) G.fx.push({ kind: 'text', x: G.s.player.x, y: G.s.player.y + 0.6, text: why, color: '#ff9a80', t: -0.4, dur: 1.8 });
+  if (ra === 'bruch' || ra === 'abwurf') { A.lanceBroken = true; splinter(t.lx, t.ly); }
+  if (rb === 'bruch' || rb === 'abwurf') { B.lanceBroken = true; splinter(t.lx, t.ly); }
+  if (ra === 'abwurf') unhorse(m.b, m);
+  if (rb === 'abwurf') unhorse(m.a, m);
+  if (ra !== 'verfehlt' || rb !== 'verfehlt') { t.cheer = 2.2; shout(t, ra === 'abwurf' || rb === 'abwurf' ? ['Aaah!', 'Er fällt!', 'Was für ein Stoß!'] : ['Hurra!', 'Gut getroffen!', 'Noch einmal!']); }
+}
+
+function splinter(x, y) {
+  for (let k = 0; k < 7; k++) G.fx.push({ kind: 'splitter', x, y, vx: rand(-2.2, 2.2), vy: rand(-1.4, 1.4), z0: 18, t: 0, dur: 0.8 });
+}
+
+function unhorse(k, m) {
+  const u = k.u;
+  m.unhorsed = m.unhorsed || k;
+  u.mounted = false; u.lance = false;
+  G.fx.push({ kind: 'staub', x: u.x, y: u.y, t: 0, dur: 1.2 });
+  G.fx.push({ kind: 'pferd', x: u.x, y: u.y, vx: (u.facing || 1) * 2.2, vy: -(u.facing || 1) * 2.2, col: k.player ? '#7a5232' : '#3a2a22', look: k.player ? null : u.lookObj, t: 0, dur: 3 });
+  u.y += k === m.a ? -0.7 : 0.7;
+  if (k.player) {
+    const p = G.s.player;
+    p.hp = Math.max(1, Math.round(p.hp - p.st.maxHp * 0.25));
+    log('Du wirst aus dem Sattel gehoben und landest hart im Sand!', 'bad');
+  }
+}
+
+function endMatch(t, m) {
+  let win, lose;
+  if (m.unhorsed) { lose = m.unhorsed; win = lose === m.a ? m.b : m.a; }
+  else if (m.ptsA !== m.ptsB) { win = m.ptsA > m.ptsB ? m.a : m.b; lose = win === m.a ? m.b : m.a; }
+  else { win = Math.random() < 0.5 ? m.a : m.b; lose = win === m.a ? m.b : m.a; m.lot = true; }
+  lose.out = true;
+  const score = `${Math.max(m.ptsA, m.ptsB)}:${Math.min(m.ptsA, m.ptsB)}${m.lot ? ', das Los entscheidet' : ''}`;
+  if (win.player) log(`Du besiegst ${akk(lose.name)}${m.unhorsed ? ' und hebst ihn aus dem Sattel' : ` nach Punkten (${score})`}!`, 'good');
+  else if (lose.player) {
+    log(`${win.name} besiegt dich${m.unhorsed ? '' : ` nach Punkten (${score})`}. Für dich ist das Turnier vorbei.`, 'bad');
+    const r = t.round;
+    if (r >= 1) { addRenown(r >= 2 ? 6 : 3); }
+    if (r >= 2) { const prize = Math.round(t.tr.prize / 3); G.s.gold += prize; log(`Als Zweiter erhältst du ${prize} Gold.`, 'good'); }
+  } else if (Math.hypot(G.s.player.x - t.lx, G.s.player.y - t.ly) < 40) log(`${win.name} schlägt ${akk(lose.name)}${m.unhorsed ? ' aus dem Sattel' : ` (${score})`}.`);
+  if (m.player) {
+    t.lock = false;
+    const p = G.s.player;
+    p.lance = false; p.lanceDown = false; p.mounted = !!p.st.horse;
+    p.x = t.lx + rand(-1, 1); p.y = t.ly + 2.4;
+  }
+  for (const k of [m.a, m.b]) { if (!k.player) { k.u.lanceDown = false; k.u.mounted = true; } }
+  t.match = null;
+  t.pauseT = 2.5;
+}
+
+function crown(t, k) {
+  t.stage = 'ende'; t.t = 0;
+  const s = t.site;
+  if (!k) { t.tr.done = true; return; }
+  if (k.player) {
+    const prize = t.tr.prize;
+    G.s.gold += prize;
+    log(`Du gewinnst das Turnier von ${s.name}! Die Menge jubelt, die Herolde rufen deinen Namen. Preis: ${prize} Gold.`, 'gold');
+    addRenown(20);
+    if (s.faction) changeRep(s.faction, 8);
+    G.s.flags.champion = (G.s.flags.champion || 0) + 1;
+    G.celebrate = { label: `Turniersieger von ${s.name}`, t0: G.time, x: G.s.player.x, y: G.s.player.y };
+  } else log(`${k.name} gewinnt das Turnier von ${s.name}!`, 'gold');
+  t.cheer = 6;
+  shout(t, [`Hoch lebe ${k.player ? G.s.player.name : k.name}!`, 'Ein Champion!', 'Hurra! Hurra!']);
+}
+
+// ---------------------------------------------------------------- Zuschauer
+function updateSpectator(v, t, dt) {
+  const s = v.spectator;
+  const d = Math.hypot(s.x - v.x, s.y - v.y);
+  if (d > 0.2) { const dx = s.x - v.x, dy = s.y - v.y; v.x += (dx / d) * Math.min(d, 1.4 * dt); v.y += (dy / d) * Math.min(d, 1.4 * dt); v.moving = true; v.anim += dt; v.act = null; return; }
+  v.moving = false;
+  const sx = (t.lx - v.x) - (t.ly - v.y);
+  v.facing = sx >= 0 ? 1 : -1;
+  v.act = t.cheer > 0 && (v.id % 3 !== 0 || t.cheer > 3) ? 'jubeln' : (v.id % 4 === 0 ? 'reden' : 'stehen');
+}
+
+function shout(t, lines) {
+  const vs = t.spectators.filter((v) => !v.say);
+  for (let k = 0; k < 2 && vs.length; k++) { const v = vs.splice(Math.floor(Math.random() * vs.length), 1)[0]; v.say = { text: pick(lines), t: -k * 0.6, dur: 2.6 }; }
+}
+
+// Wohin die Bewohner des Ausrichters gehen, um zuzuschauen
+function watchSpot(site) {
+  const t = G.tour;
+  if (!t || t.site !== site || t.stage === 'warten' && hourOf() < 9) return null;
+  return { x: t.lx - 5 + rand(0, 10), y: t.ly + 2 + rand(0, 1.6) };
+}
+
+// Gefolge schaut von der Seite zu, solange du reitest
+function companionWatch(k) {
+  const t = G.tour;
+  if (!t || !t.lock) return null;
+  return { x: t.lx - 6.4 + k * 0.6, y: t.ly + 2.6 };
+}
+
+// ---------------------------------------------------------------- Status und Zeichnen
+function tourneyStatus() {
+  const t = G.tour;
+  if (!t) return null;
+  if (t.stage === 'warten') return `Turnier in ${t.site.name}: Beginn zur zehnten Stunde`;
+  if (t.stage === 'ende') return `Turnier in ${t.site.name}: vorbei`;
+  const m = t.match;
+  if (!m) return `Turnier in ${t.site.name}: Die nächsten Ritter reiten ein`;
+  return `Turnier: ${m.a.player ? 'Du' : m.a.name} <b>${m.ptsA}</b> gegen <b>${m.ptsB}</b> ${m.b.player ? 'Du' : m.b.name} · Durchgang ${Math.min(5, m.pass + 1)}`;
+}
+
+// Schranken, Tribüne und Zelte stehen am Vortag und am Turniertag
+function tourneyLayout() {
+  const tr = G.s.tourney;
+  if (!tr || G.s.day < tr.day - 1 || G.s.day > tr.day) return null;
+  return { lx: tr.lx, ly: tr.ly, knights: tr.knights, building: G.s.day < tr.day, host: G.world.sites.find((s) => s.id === tr.site) };
+}
+
+// ===== justice.js =====
+// Galgen und Hinrichtungen: Wer beim Wildern oder Stehlen erwischt wird, hängt. Vor Burgen,
+// Städten und Marktflecken steht ein Galgen. Die Wachen führen den Verurteilten hinaus, das Urteil
+// wird verlesen, der Priester betet, das Volk schaut zu. Danach wird der Tote begraben.
+// Wer den Mut hat, schneidet ihn vorher los, und die Wachen greifen an.
+
+
+
+
+
+
+
+
+
+
+
+
+const GALLOWS_TYPES = { burg: 1, stadt: 1, markt: 1 };
+const CRIMES = [['Wilderei im Forst des Königs', 'Wilderer'], ['Diebstahl', 'Dieb'], ['Viehdiebstahl', 'Viehdieb'], ['Straßenraub', 'Wegelagerer']];
+const CONDEMNED_NAMES = ['Wat Tyler', 'Hob der Lange', 'Will Scathlock', 'Dickon Miller', 'Jack Straw', 'Ned Fletcher', 'Tom Hogg', 'Alan Swift', 'Gib Turner', 'Hal Wood'];
+const LAST = ['Ich bin unschuldig!', 'Es war doch nur ein Hase …', 'Sagt meiner Frau, dass ich sie liebe.', 'Gott vergebe euch allen.', 'Meine Kinder hatten Hunger!', 'Der Sheriff soll verflucht sein!'];
+
+// ---------------------------------------------------------------- Galgen vor dem Ort
+const gcache = new Map();
+let gworld = null;
+function gallowsFor(s) {
+  if (!s || !GALLOWS_TYPES[s.type]) return null;
+  if (gworld !== G.world) { gcache.clear(); gworld = G.world; }
+  if (gcache.has(s.id)) return gcache.get(s.id);
+  const W = G.world, N = W.N;
+  const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 32 && Math.abs(b.y - s.y) < 32);
+  const bad = (x, y) => {
+    const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
+    return !isWalkable(W, x, y) || t === T.FOREST || t === T.WATER || t === T.BRIDGE || t === T.ROAD || landAt(W, x, y) !== s.land;
+  };
+  let best = null;
+  for (let k = 0; k < 140 && !best; k++) {
+    const a = 0.6 + k * 2.399, r = (s.clear || 7) + 2.5 + (k % 6) * 0.8;
+    const gx = Math.floor(s.x + Math.cos(a) * r) + 0.5, gy = Math.floor(s.y + Math.sin(a) * r) + 0.5;
+    let ok = true;
+    for (let y = gy - 1.5; y <= gy + 2.5 && ok; y += 1) for (let x = gx - 2; x <= gx + 2 && ok; x += 1) if (bad(x, y)) ok = false;
+    if (!ok || near.some((b) => Math.abs(b.x - gx) < 2.4 && Math.abs(b.y - gy) < 2.4)) continue;
+    let road = false;
+    for (let y = gy - 3; y <= gy + 3 && !road; y += 1) for (let x = gx - 3; x <= gx + 3; x += 1) if (W.tiles[Math.floor(y) * N + Math.floor(x)] === T.ROAD) { road = true; break; }
+    if (road || k > 90) best = { x: gx, y: gy, site: s };
+  }
+  gcache.set(s.id, best);
+  return best;
+}
+
+// ---------------------------------------------------------------- Urteile über den Tag verteilt
+function dailyJustice() {
+  const h = G.s.hanging;
+  if (h && h.day < G.s.day) { if (!h.done) unseen(h); G.s.hanging = null; }
+  if (G.exec) endExec();
+  if (G.s.hanging || Math.random() > 0.35) return;
+  const p = G.s.player, land = landAt(G.world, p.x, p.y);
+  const cand = G.world.sites.filter((s) => GALLOWS_TYPES[s.type] && s.land === land && Math.hypot(s.x - p.x, s.y - p.y) < 70 && !isBlighted(s) && gallowsFor(s));
+  if (!cand.length) return;
+  const s = pick(cand), [crime, who] = pick(CRIMES);
+  const hh = { site: s.id, day: G.s.day, hour: randInt(11, 15), crime, who, name: pick(CONDEMNED_NAMES), done: false };
+  G.s.hanging = hh;
+  if (Math.hypot(s.x - p.x, s.y - p.y) < 45) log(`Ausrufer in ${s.name}: Heute zur ${hh.hour}. Stunde wird ein ${who} am Galgen gehängt.`);
+}
+
+// Ohne Zuschauer geschieht es trotzdem, der Tote wird begraben
+function unseen(h) {
+  const s = G.world.sites.find((x) => x.id === h.site);
+  const g = gallowsFor(s);
+  if (g) countDead({ x: g.x, y: g.y });
+  h.done = true;
+}
+
+function hangingToday(s) { const h = G.s.hanging; return h && h.site === s.id && h.day === G.s.day && !h.done ? h : null; }
+
+// ---------------------------------------------------------------- Die Szene
+function startExec(h, s, g) {
+  const dx = g.x - s.x, dy = g.y - s.y, d = Math.hypot(dx, dy) || 1;
+  const start = { x: s.x + (dx / d) * Math.max(2, (s.clear || 6) - 2), y: s.y + (dy / d) * Math.max(2, (s.clear || 6) - 2) };
+  const mk = (role, x, y) => { const v = makeVillager(s, role); v.x = x; v.y = y; v.task = null; v.noSep = true; G.peasants.push(v); return v; };
+  const e = { h, site: s, g, stage: 'zug', t: 0, hanged: false };
+  e.con = mk('bauer', start.x, start.y);
+  e.con.name = `${h.name}, ${h.who}`; e.con.tunic = '#d8d0bc'; e.con.hat = null; e.con.condemned = true; e.con.act = 'gefesselt';
+  e.guards = [mk('wache', start.x - 0.5, start.y + 0.3), mk('wache', start.x + 0.5, start.y - 0.3)];
+  e.priest = mk('priester', start.x + 0.4, start.y + 0.6);
+  e.hangman = mk('bauer', g.x + 0.9, g.y + 0.9);
+  e.hangman.name = 'Henker'; e.hangman.hat = null; e.hangman.lookObj = { tunic: '#2a2628', trim: '#4a3a2a', hood: '#1a181a' };
+  for (const v of [e.con, ...e.guards, e.priest, e.hangman]) v.execution = e;
+  G.exec = e;
+  // Das Volk läuft zusammen
+  for (const v of G.peasants) if (v.home === s && !v.execution && !v.funeral && !v.hidden && v.role !== 'wache' && v.role !== 'bettler') v.task = null;
+  rebuildUnits();
+  log(`Am Galgen von ${s.name} versammelt sich das Volk. Die Wachen führen ${h.name} hinaus.`);
+}
+
+function endExec() {
+  const e = G.exec;
+  if (!e) return;
+  const temp = [e.con, ...e.guards, e.priest, e.hangman];
+  G.peasants = G.peasants.filter((v) => !temp.includes(v) || v.freed);
+  G.exec = null;
+  rebuildUnits();
+}
+
+const speak = (v, text, dur = 3.6) => { if (v && !v.dead) v.say = { text, t: 0, dur }; };
+
+function updateJustice(dt) {
+  const h = G.s.hanging, p = G.s.player;
+  if (!h || h.day !== G.s.day) { if (G.exec) endExec(); return; }
+  const s = G.world.sites.find((x) => x.id === h.site), g = gallowsFor(s);
+  if (!g) return;
+  const dist = Math.hypot(g.x - p.x, g.y - p.y);
+  if (!G.exec) {
+    if (h.done) return;
+    if (dist < 45 && hourOf() >= h.hour - 0.4 && hourOf() < 19) startExec(h, s, g);
+    else if (hourOf() >= h.hour + 1) unseen(h);
+    return;
+  }
+  const e = G.exec;
+  e.t += dt;
+  if (dist > 75) { if (!h.done && e.stage !== 'befreit') unseen(h); endExec(); return; }
+  const front = { x: g.x, y: g.y + 1.3 };
+  if (e.stage === 'zug') {
+    chaseTo(e.priest, front.x + 0.9, front.y + 0.4, dt, 0.15, 0.6); e.priest.act = 'kreuz';
+    chaseTo(e.con, front.x, front.y, dt, 0.1, 0.55); e.con.act = 'gefesselt';
+    e.guards.forEach((v, k) => chaseTo(v, e.con.x + (k ? 0.55 : -0.55), e.con.y + (k ? -0.15 : 0.25), dt, 0.1, 0.62));
+    if (Math.hypot(e.con.x - front.x, e.con.y - front.y) < 0.35 || e.t > 45) { e.stage = 'urteil'; e.t = 0; speak(e.guards[0], `Im Namen des Königs: ${h.name}, für ${h.crime} zum Tod durch den Strang verurteilt!`, 5); }
+    return;
+  }
+  if (e.stage === 'urteil') {
+    e.priest.act = 'beten';
+    if (e.t > 6) { e.stage = 'gebet'; e.t = 0; speak(e.priest, 'Gott sei deiner armen Seele gnädig.'); }
+    return;
+  }
+  if (e.stage === 'gebet') {
+    e.priest.act = 'segnen';
+    if (e.t > 3 && e.t - dt <= 3) speak(e.con, pick(LAST), 3.4);
+    if (e.t > 7.5) { e.stage = 'strang'; e.t = 0; e.priest.act = 'beten'; }
+    return;
+  }
+  if (e.stage === 'strang') {
+    chaseTo(e.con, g.x, g.y + 0.25, dt, 0.08, 0.45);
+    chaseTo(e.hangman, g.x + 0.7, g.y + 0.35, dt, 0.08, 0.5);
+    if (e.t > 4) {
+      e.stage = 'haengen'; e.t = 0; e.hanged = true;
+      e.con.hidden = true;
+      crowdSay(['Oh!', 'Gott steh ihm bei.', 'Armer Kerl.', 'So geht es Dieben.']);
+    }
+    return;
+  }
+  if (e.stage === 'haengen') {
+    if (e.t > 14) {
+      e.stage = 'abnahme'; e.t = 0; e.hanged = false;
+      G.fx.push({ kind: 'corpse', x: front.x + 0.2, y: front.y - 0.3, look: { tunic: '#d8d0bc', trim: '#8a7a5a' }, t: 0, dur: 9 });
+      countDead({ x: g.x, y: g.y });
+      h.done = true;
+      speak(e.priest, 'Wir bringen ihn zum Friedhof.');
+    }
+    return;
+  }
+  if (e.stage === 'abnahme' || e.stage === 'befreit') {
+    for (const v of [e.priest, ...e.guards, e.hangman]) if (!v.dead) chaseTo(v, s.x, s.y, dt, 0.5, 0.6);
+    if (e.con.freed) { const fx = e.con.fleeTo; chaseTo(e.con, fx.x, fx.y, dt, 0.3, 1.6); }
+    if (e.t > 10) endExec();
+  }
+}
+
+function crowdSay(lines) {
+  const e = G.exec;
+  const vs = G.peasants.filter((v) => v.home === e.site && !v.execution && !v.hidden && Math.hypot(v.x - e.g.x, v.y - e.g.y) < 6);
+  for (let k = 0; k < 2 && vs.length; k++) speak(vs.splice(Math.floor(Math.random() * vs.length), 1)[0], pick(lines), 2.8);
+}
+
+// Wohin die Leute gehen, um zuzusehen
+function hangWatch(s) {
+  const e = G.exec;
+  if (!e || e.site !== s || !['zug', 'urteil', 'gebet', 'strang', 'haengen'].includes(e.stage)) return null;
+  const a = Math.PI * (0.15 + Math.random() * 0.7);
+  return { x: e.g.x + Math.cos(a) * rand(2.2, 3.6) - 0.3, y: e.g.y + 1.2 + Math.sin(a) * rand(1.6, 2.8) };
+}
+
+// ---------------------------------------------------------------- Befreien
+function canRescue(u) {
+  const e = G.exec;
+  return !!e && u === e.con && ['zug', 'urteil', 'gebet', 'strang'].includes(e.stage);
+}
+
+function rescueCondemned(u) {
+  const e = G.exec;
+  if (!canRescue(u)) return false;
+  const s = e.site, h = e.h;
+  e.stage = 'befreit'; e.t = 0; e.hanged = false;
+  const c = e.con;
+  c.freed = true; c.condemned = false; c.act = null; c.hidden = false;
+  const dx = c.x - s.x, dy = c.y - s.y, d = Math.hypot(dx, dy) || 1;
+  c.fleeTo = { x: c.x + (dx / d) * 14, y: c.y + (dy / d) * 14 };
+  setTimeout(() => { G.peasants = G.peasants.filter((v) => v !== c); rebuildUnits(); }, 12000);
+  speak(c, 'Gott segne Euch! Ich vergesse das nie!', 3.4);
+  // Die Wachen greifen an: aus den beiden Wachen wird ein echter Trupp
+  const types = DEFENDER_NPC[s.faction] || ['wache'];
+  const members = [];
+  for (const gv of e.guards) { members.push(makeNpc(types[0], gv.x, gv.y, Math.floor(G.s.day / 10))); gv.hidden = true; }
+  for (let k = 0; k < 2; k++) members.push(makeNpc(types[k % 2 ? 1 : 0] || types[0], e.g.x + rand(-1, 1), e.g.y + rand(0.5, 1.5), Math.floor(G.s.day / 10)));
+  const grp = spawnGroup('verteidiger', { pos: { x: e.g.x, y: e.g.y + 1 }, membersUnits: members });
+  if (grp) { grp.faction = s.faction; grp.engaged = true; grp.provoked = true; grp.wait = 99999; grp.path = null; }
+  h.done = true;
+  log(`Du schneidest ${h.name} vom Strick los! Er rennt in die Wälder. Die Wachen gehen auf dich los!`, 'gold');
+  if (s.faction) changeRep(s.faction, -12);
+  changeRep('waldleute', 6);
+  if (s.faction === 'normannen') changeRep('sachsen', 3);
+  addRenown(3);
+  rebuildUnits();
+  return true;
 }
 
 // ===== economy.js =====
@@ -5264,6 +6480,10 @@ function loadCargo(good, n) {
 
 
 
+
+
+
+
 function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
@@ -5302,6 +6522,7 @@ function updateTime(dt) {
 }
 
 function passHours(h) {
+  passWeather(Math.round(h));
   G.s.time += (h / 24) * DAY_LEN;
   while (G.s.time >= DAY_LEN) { G.s.time -= DAY_LEN; newDay(); }
 }
@@ -5316,11 +6537,14 @@ function newDay() {
   replenishAnimals();
   maybeBattle();
   maybeSiege();
+  dailyDynamics();
+  dailyTourney();
+  dailyJustice();
   dailyRepairs();
   dailyBurials();
   const now = seasonIndex();
   if (now !== before) {
-    log(`Der ${SEASONS[now]} ${now === 0 ? `des Jahres ${yearOf()}` : ''} beginnt.`, 'gold');
+    log(`Der ${SEASONS[now]}${now === 0 ? ` des Jahres ${yearOf()}` : ''} beginnt.`, 'gold');
     if (G.onSeason) G.onSeason();
   }
   if (!G.s.flags.victory && G.s.castle.level >= 3 && alliesCount() >= 2) {
@@ -5330,9 +6554,109 @@ function newDay() {
   if (G.onNewDay) G.onNewDay();
 }
 
+// ===== weather.js =====
+// Wetter: Wolken, Regen, Nebel und Schneefall je nach Jahreszeit. Schnee bleibt liegen und taut
+// nach und nach wieder. So gehen die Jahreszeiten fließend ineinander über: Der Winter beginnt
+// grau und kahl, der erste Schnee bleibt in Flecken liegen, im Frühling taut er im Regen weg.
+
+
+
+
+
+
+const WEATHER_NAME = { klar: '', wolken: 'bewölkt', regen: 'Regen', schnee: 'Schneefall', nebel: 'Nebel' };
+
+const absHours = () => G.s.day * 24 + (G.s.time / DAY_LEN) * 24;
+const dayInSeason = () => (G.s.day - 1) % DAYS_PER_SEASON;
+
+function chooseWeather() {
+  const se = seasonIndex(), d = dayInSeason(), h = hourOf();
+  let table;
+  if (se === 0) table = { klar: 4, wolken: 3, regen: d < 2 ? 4 : 2.5, nebel: h < 10 ? 1.4 : 0, schnee: d === 0 ? 0.7 : 0 };
+  else if (se === 1) table = { klar: 7, wolken: 2, regen: 1.5, nebel: 0 };
+  else if (se === 2) table = { klar: 3, wolken: 3, regen: 3.4, nebel: h < 11 ? 2 : 0.4, schnee: d >= 4 ? 1.2 : 0 };
+  else table = { klar: 3, wolken: 2.5, schnee: d === 0 ? 1.4 : 4, regen: d === DAYS_PER_SEASON - 1 ? 1.2 : 0.3, nebel: 0.6 };
+  let sum = 0;
+  for (const v of Object.values(table)) sum += v;
+  let r = Math.random() * sum;
+  for (const [k, v] of Object.entries(table)) { r -= v; if (r <= 0) return k; }
+  return 'klar';
+}
+
+function initWeather() {
+  if (!G.s.weather) G.s.weather = { kind: 'klar', int: 0.5, until: absHours() + rand(3, 8) };
+  if (G.s.snow === undefined) G.s.snow = seasonIndex() === 3 ? 0.5 : 0;
+}
+
+function change(w) {
+  const prev = w.kind;
+  w.kind = chooseWeather();
+  w.int = rand(0.35, 1);
+  w.until = absHours() + rand(3, 10);
+  if (w.kind === prev) return;
+  const p = G.s;
+  if (w.kind === 'schnee' && (p.snow || 0) < 0.05) log(seasonIndex() === 3 ? 'Es schneit. Der erste Schnee bleibt liegen.' : 'Ein paar Schneeflocken fallen.', 'gold');
+  else if (w.kind === 'regen' && Math.random() < 0.3) log(w.int > 0.75 ? 'Ein Wolkenbruch! Es schüttet wie aus Eimern.' : 'Es fängt an zu regnen.');
+  else if (w.kind === 'nebel' && Math.random() < 0.3) log('Nebel zieht auf.');
+}
+
+// Stündlich weiter: Schneedecke wächst bei Schneefall und schmilzt sonst je nach Jahreszeit
+function advance(dh) {
+  const w = G.s.weather;
+  if (absHours() >= w.until) change(w);
+  const se = seasonIndex(), h = hourOf();
+  const before = G.s.snow || 0;
+  if (w.kind === 'schnee') G.s.snow = Math.min(1, before + dh * 0.085 * w.int);
+  else {
+    let melt = [0.05, 0.3, 0.035, 0.004][se];
+    if (w.kind === 'regen') melt *= 2.2;
+    if (w.kind === 'klar' && h > 10 && h < 16) melt *= 1.4;
+    G.s.snow = Math.max(0, before - dh * melt);
+  }
+  if (before >= 0.3 && G.s.snow < 0.3 && se === 0 && G.s.flags.thaw !== yearOf()) { G.s.flags.thaw = yearOf(); log('Tauwetter: Der Schnee schmilzt, die Bäche schwellen an.', 'gold'); }
+}
+
+function updateWeather(dt) {
+  if (!G.s.weather) initWeather();
+  advance((dt / DAY_LEN) * 24);
+}
+
+// Für Zeitsprünge (Rasten, Übernachten): in Stundenschritten
+function passWeather(hours) {
+  if (!G.s.weather) initWeather();
+  for (let k = 0; k < hours; k++) advance(1);
+}
+
+// Schneedecke in Stufen (0, ¼, ½, ¾, 1): Das Gelände wird nur bei einer neuen Stufe neu gemalt
+function snowLevel() { return Math.round((G.s.snow || 0) * 4) / 4; }
+
+// Aussehen der Landschaft: 0 Frühling, 1 Sommer, 2 Herbst, 3 verschneit, 4 kahler Winter ohne Schnee
+function lookSeason() {
+  const lv = snowLevel(), se = seasonIndex();
+  if (lv >= 0.75) return 3;
+  return se === 3 ? 4 : se;
+}
+
+// Bäume tragen schon ab der halben Schneedecke Schnee
+function treeSeason() {
+  const lv = snowLevel(), se = seasonIndex();
+  if (lv >= 0.5) return 3;
+  return se === 3 ? 4 : se;
+}
+
+function precip() {
+  const w = G.s && G.s.weather;
+  return w && (w.kind === 'regen' || w.kind === 'schnee') ? w.int : 0;
+}
+
+function weatherKind() { return (G.s && G.s.weather && G.s.weather.kind) || 'klar'; }
+
 // ===== render.js =====
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
+
+
+
 
 
 
@@ -5394,7 +6718,24 @@ const PAL = [
   { grass: '#7fa140', grass2: '#8bab48', forest: '#4f7832', hills: '#98985a', field: '#d6b850', fieldRow: '#b39436', crop: '#e8cf6a', road: '#b5976a', sand: '#dacb98', water: '#3c7697', water2: '#336684', foam: 'rgba(235,245,245,0.55)', flowers: ['#f4e9a8', '#ffffff', '#d65a4e'] },
   { grass: '#939446', grass2: '#a09d4c', forest: '#736433', hills: '#958a5a', field: '#a3803e', fieldRow: '#7b5e2d', crop: '#b08c48', road: '#a6895f', sand: '#cbb686', water: '#3b6a87', water2: '#335c76', foam: 'rgba(235,245,245,0.45)', flowers: [] },
   { grass: '#e3e9e9', grass2: '#eef2f2', forest: '#d1dad9', hills: '#d8dedb', field: '#e6ebea', fieldRow: '#c6cdcc', crop: '#d0d6d5', road: '#bcb5a9', sand: '#dde0da', water: '#a9c4d1', water2: '#9cb9c7', foam: 'rgba(255,255,255,0.7)', flowers: [] },
+  { grass: '#7f8a50', grass2: '#879052', forest: '#5c5a36', hills: '#8a8660', field: '#8a6e48', fieldRow: '#6a5234', crop: '#8a7a50', road: '#9e8662', sand: '#c4b48a', water: '#3a6680', water2: '#325a72', foam: 'rgba(235,245,245,0.45)', flowers: [] },
 ];
+
+// Landschaft zwischen den Jahreszeiten: Grundfarben der Jahreszeit, je nach Schneedecke ins Weiße
+let palKey = '', palCache = null;
+function lookPal() {
+  const lv = snowLevel(), se = seasonIndex(), key = `${se}|${lv}`;
+  if (key === palKey) return palCache;
+  const base = PAL[se === 3 ? 4 : se], k = lv >= 1 ? 1 : lv * 0.8;
+  const o = {};
+  for (const [name, col] of Object.entries(base)) {
+    if (typeof col === 'string' && col[0] === '#') o[name] = k ? mix(col, PAL[3][name], k) : col;
+    else o[name] = lv >= 0.5 ? PAL[3][name] : col;
+  }
+  palKey = key; palCache = o;
+  return o;
+}
+function lookKey() { return `${seasonIndex()}|${snowLevel()}`; }
 
 // ---------------------------------------------------------------- Grundformen
 function poly(c, pts, fill) {
@@ -5408,7 +6749,7 @@ function poly(c, pts, fill) {
 function P(x, y, z = 0) { return [isoX(x, y), isoY(x, y) - z - baseZ]; }
 function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
 
-function winterize(col) { return seasonIndex() === 3 ? mix(col, '#f0f4f4', 0.68) : col; }
+function winterize(col) { const lv = snowLevel(); return lv > 0 ? mix(col, '#f0f4f4', 0.68 * lv) : col; }
 
 function addLight(x, y, z, r = 26, strength = 1) { lights.push({ x, y, z: z + baseZ, r, s: strength }); }
 
@@ -5641,7 +6982,7 @@ let cacheScale = 1, cacheOn = true, cacheUsed = 0, cacheMax = 400;
 function cachedDraw(c, o, bounds, fn) {
   if (!cacheOn) { fn(c); return; }
   cacheUsed++;
-  const key = `${seasonIndex()}|${darkness() > 0.2 ? 1 : 0}|${cacheScale}`;
+  const key = `${lookKey()}|${darkness() > 0.2 ? 1 : 0}|${cacheScale}`;
   let e = partCache.get(o);
   const ax = isoX(o.x, o.y), ay = isoY(o.x, o.y);
   if (!e || e.key !== key) {
@@ -5667,6 +7008,7 @@ function cachedDraw(c, o, bounds, fn) {
 
 function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
 function drawHouseFast(c, b) {
+  if (b.cons < 1) { drawHouseStage(c, b); return; }
   if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
   cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
 }
@@ -5705,6 +7047,206 @@ function drawTavernFront(c, b) {
   drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.85, 0.7, 0.3, 7, '#8a6440', 0, 'plank');
   const mug = P(b.x + 0.2, b.y + b.wy / 2 + 0.85, 7); c.fillStyle = '#c9b48a'; c.fillRect(mug[0] - 1, mug[1] - 3, 2, 3);
   if (darkness() > 0.15) addLight(b.x, b.y + b.wy / 2, 10, 44, 1.1);
+}
+
+// Bauplatz, Rohbau oder Ruine (siehe dynamics.js)
+function drawHouseStage(c, b) {
+  const k = b.cons;
+  const x0 = b.x - b.wx / 2, x1 = b.x + b.wx / 2, y0 = b.y - b.wy / 2, y1 = b.y + b.wy / 2;
+  if (k === -2) { drawPlot(c, b.x, b.y, b.wx, b.wy); return; }
+  if (k === -1) {
+    // Brandruine: Aschefleck, Mauerreste, verkohlte Balken
+    const g = P(b.x, b.y);
+    c.fillStyle = 'rgba(40,34,30,0.45)'; c.beginPath(); c.ellipse(g[0], g[1], (b.wx + b.wy) * 17, (b.wx + b.wy) * 8.5, 0, 0, Math.PI * 2); c.fill();
+    drawBox(c, b.x, b.y, b.wx + 0.08, b.wy + 0.08, 4, '#6f685e', -3);
+    const wall = mix(WALLS[b.wall] || WALLS.plaster, '#2a2420', 0.55);
+    drawBox(c, x0 + 0.12, b.y, 0.18, b.wy * 0.9, b.h * 0.45, wall, 0, b.wall === 'stone' ? 'stone' : null);
+    drawBox(c, b.x + 0.1, y0 + 0.12, b.wx * 0.7, 0.18, b.h * 0.3, wall, 0, b.wall === 'stone' ? 'stone' : null);
+    c.strokeStyle = '#2a201a'; c.lineWidth = 2.2;
+    const a = P(x0 + 0.2, y1 - 0.1, 0), e = P(b.x + 0.2, y0 + 0.2, b.h * 0.55), f = P(x1 - 0.1, y1 - 0.2, 0), h2 = P(b.x - 0.1, b.y, b.h * 0.4);
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(e[0], e[1]); c.moveTo(f[0], f[1]); c.lineTo(h2[0], h2[1]); c.stroke();
+    drawStones(c, x1 + 0.2, y1 - 0.1, 4);
+    if (Math.random() < 0.02) smokeEmit(g[0], g[1] - 6, 0.3);
+    return;
+  }
+  // Baustelle: Fundament, Fachwerk, Wände, Sparren, zuletzt das Dach
+  const wall = WALLS[b.wall] || WALLS.plaster;
+  drawPlot(c, b.x, b.y, b.wx + 0.3, b.wy + 0.3);
+  drawBox(c, b.x, b.y, b.wx + 0.08, b.wy + 0.08, 5, '#80796d', -4);
+  drawLogs(c, x0 - 0.5, b.y + 0.25, 3);
+  if (k >= 0.86) { drawHouse(c, { ...b, cons: undefined, dmg: 0, fire: 0, lit: false, chimney: false, tavern: false }); drawScaffold(c, b.x, b.y, b.wx + 0.25, b.wy + 0.25, b.h + 6); return; }
+  const postH = b.h * Math.min(1, Math.max(0, (k - 0.15) / 0.3));
+  const wallH = b.h * Math.min(1, Math.max(0, (k - 0.42) / 0.3));
+  if (wallH > 2) drawBox(c, b.x, b.y, b.wx, b.wy, wallH, b.wall === 'timber' ? WALLS.plaster : wall, 0, b.wall === 'stone' ? 'stone' : b.wall === 'wood' ? 'plank' : null);
+  if (postH > 2) {
+    c.strokeStyle = '#6b4a2e'; c.lineWidth = 2;
+    c.beginPath();
+    for (const [px, py] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) { const q0 = P(px, py, 0), q1 = P(px, py, postH); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); }
+    if (postH >= b.h * 0.99) {
+      const q = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map(([px, py]) => P(px, py, b.h));
+      c.moveTo(q[0][0], q[0][1]); for (const p2 of q.slice(1)) c.lineTo(p2[0], p2[1]);
+      // Streben
+      const s1 = P(x0, y1, 0), s2 = P(b.x, y1, b.h * 0.6), s3 = P(x1, y1, 0), s4 = P(x1, b.y, b.h * 0.6);
+      c.moveTo(s1[0], s1[1]); c.lineTo(s2[0], s2[1]); c.moveTo(s3[0], s3[1]); c.lineTo(s4[0], s4[1]);
+    }
+    c.stroke();
+  }
+  if (k >= 0.66) {
+    // Sparren des Dachstuhls
+    const alongX = b.wx >= b.wy, top = b.h + b.rh;
+    c.strokeStyle = '#7a5636'; c.lineWidth = 1.6;
+    c.beginPath();
+    for (const u of [0, 0.34, 0.67, 1]) {
+      const a = alongX ? [P(x0 + u * b.wx, y0, b.h), P(x0 + u * b.wx, b.y, top), P(x0 + u * b.wx, y1, b.h)] : [P(x0, y0 + u * b.wy, b.h), P(b.x, y0 + u * b.wy, top), P(x1, y0 + u * b.wy, b.h)];
+      c.moveTo(a[0][0], a[0][1]); c.lineTo(a[1][0], a[1][1]); c.lineTo(a[2][0], a[2][1]);
+    }
+    const r1 = alongX ? P(x0, b.y, top) : P(b.x, y0, top), r2 = alongX ? P(x1, b.y, top) : P(b.x, y1, top);
+    c.moveTo(r1[0], r1[1]); c.lineTo(r2[0], r2[1]);
+    c.stroke();
+  }
+  if (k >= 0.2) drawScaffold(c, b.x, b.y, b.wx + 0.25, b.wy + 0.25, Math.max(postH, 12) + 6);
+}
+
+// ---------------------------------------------------------------- Turnierplatz
+// Schranke mit Tuchbehang, Tribüne mit Baldachin und Publikum, Zelte der Ritter, Banner
+function tourneyParts() {
+  const L = tourneyLayout();
+  if (!L) return [];
+  const W = G.world, parts = [], { lx, ly } = L;
+  const host = L.host && L.host.faction ? FACTIONS[L.host.faction].color : '#a33b32';
+  const z = groundZ(W, lx, ly);
+  const add = (x, y, f, dd = 0) => parts.push({ x, y, d: x + y + dd, z, f });
+  for (let i = -6; i < 6; i++) {
+    const x0 = lx + i, x1 = x0 + 1;
+    add(x0 + 0.5, ly, (c) => drawTiltPiece(c, x0, x1, ly, i % 2 ? host : '#e8dcc0', i === -6, i === 5));
+  }
+  add(lx, ly - 3, (c) => drawStand(c, lx, ly - 3, host, !L.building));
+  for (const side of [-1, 1]) add(lx + side * 6.4, ly - 0.2, (c) => { const [bx, by] = P(lx + side * 6.4, ly - 0.2, 0); c.strokeStyle = '#4a3322'; c.lineWidth = 2; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx, by - 18); c.stroke(); banner(c, lx + side * 6.4, ly - 0.2, 18, host); });
+  L.knights.forEach((k, i) => {
+    const sd = i % 2 === 0 ? -1 : 1, row = Math.floor(i / 2);
+    const x = lx + sd * (8.4 + (row % 2) * 0.9), y = ly - 1.9 + row * 1.15;
+    add(x, y, (c) => drawPavilion(c, x, y, k.col));
+  });
+  return parts;
+}
+
+function drawTiltPiece(c, x0, x1, y, col, first, last) {
+  const a = P(x0, y, 3), b = P(x1, y, 3), a2 = P(x0, y, 10), b2 = P(x1, y, 10);
+  poly(c, [a, b, b2, a2], col);
+  c.strokeStyle = 'rgba(60,40,20,0.35)'; c.lineWidth = 0.8;
+  c.beginPath(); for (const f of [0.33, 0.66]) { const p1 = lerp2(a, b, f), p2 = lerp2(a2, b2, f); c.moveTo(p1[0], p1[1] + 1); c.lineTo(p2[0], p2[1]); } c.stroke();
+  c.strokeStyle = '#6b4a2e'; c.lineWidth = 2.2;
+  c.beginPath(); c.moveTo(a2[0], a2[1] - 1); c.lineTo(b2[0], b2[1] - 1); c.stroke();
+  c.lineWidth = 1.8;
+  const p0 = P(x0, y, 0), p1 = P(x0, y, 11);
+  c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke();
+  if (last) { const q0 = P(x1, y, 0), q1 = P(x1, y, 11); c.beginPath(); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); c.stroke(); }
+}
+
+function drawStand(c, x, y, col, crowd) {
+  drawShadow(c, x, y, 7.4, 1.6, 30, 0.16);
+  const tiers = [[y + 0.45, 6], [y, 12], [y - 0.45, 18]];
+  const t = G.tour, cheer = t && t.cheer > 0;
+  const cols = ['#9a3b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#e8e0cc', '#6f5a8a', '#8a5a4a', '#4a6a5a'];
+  for (const [ty, h] of tiers.slice().reverse()) {
+    drawBox(c, x, ty, 7.2, 0.5, h, '#8a6440', 0, 'plank');
+    if (!crowd) continue;
+    for (let k = 0; k < 14; k++) {
+      const px = x - 3.3 + k * 0.5 + (ty - y) * 0.3;
+      const [sx, sy] = P(px, ty, h);
+      const bob = cheer ? Math.abs(Math.sin(G.time * 8 + k * 1.3 + ty * 3)) * 2.5 : 0;
+      c.fillStyle = cols[(k * 3 + Math.round(ty * 7)) % cols.length];
+      c.fillRect(sx - 2.4, sy - 8 - bob, 4.8, 6);
+      c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(sx, sy - 10.5 - bob, 2, 0, Math.PI * 2); c.fill();
+      if (cheer && k % 3 === 0) { c.strokeStyle = '#e4ba94'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(sx - 2, sy - 8 - bob); c.lineTo(sx - 4, sy - 14 - bob); c.moveTo(sx + 2, sy - 8 - bob); c.lineTo(sx + 4, sy - 14 - bob); c.stroke(); }
+    }
+  }
+  // Baldachin über der Mitte mit gestreiftem Tuch
+  const top = 36;
+  c.strokeStyle = '#5a3d26'; c.lineWidth = 1.8;
+  for (const [px, py] of [[x - 1.6, y + 0.6], [x + 1.6, y + 0.6], [x + 1.6, y - 0.7]]) { const a = P(px, py, 0), b = P(px, py, top); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+  const r = [P(x - 1.7, y + 0.7, top), P(x + 1.7, y + 0.7, top), P(x + 1.7, y - 0.8, top), P(x - 1.7, y - 0.8, top)];
+  const peak = P(x, y, top + 10);
+  poly(c, [r[0], r[1], peak], col);
+  poly(c, [r[1], r[2], peak], shade(col, 0.8));
+  c.strokeStyle = '#e8dcc0'; c.lineWidth = 2;
+  c.beginPath(); for (const f of [0.25, 0.5, 0.75]) { const q = lerp2(r[0], r[1], f); c.moveTo(q[0], q[1]); c.lineTo(peak[0], peak[1]); } c.stroke();
+  for (let k = 0; k < 6; k++) { const q = lerp2(r[0], r[1], (k + 0.5) / 6); c.fillStyle = k % 2 ? col : '#e8dcc0'; c.beginPath(); c.arc(q[0], q[1], 2.6, 0, Math.PI); c.fill(); }
+  banner(c, x, y, top + 10, col);
+}
+
+function drawPavilion(c, x, y, col) {
+  drawShadow(c, x, y, 1.0, 1.0, 24, 0.16);
+  drawBox(c, x, y, 0.9, 0.9, 13, '#ece2c8');
+  for (const f of [0.15, 0.5, 0.85]) faceQuad(c, x, y, 0.9, 0.9, 'L', f - 0.08, f + 0.08, 0, 13, col);
+  faceQuad(c, x, y, 0.9, 0.9, 'R', 0.3, 0.7, 0, 13, shade(col, 0.85));
+  drawPyramid(c, x, y, 1.05, 1.05, 13, 13, col);
+  const [px, py] = P(x, y, 26);
+  c.strokeStyle = '#4a3322'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(px, py); c.lineTo(px, py - 8); c.stroke();
+  const w = Math.sin(G.time * 3 + x) * 1.2;
+  c.fillStyle = col; c.beginPath(); c.moveTo(px, py - 8); c.lineTo(px + 7, py - 6.5 + w); c.lineTo(px, py - 5); c.fill();
+}
+
+// Galgen: Podest mit Stufe, zwei Pfosten, Querbalken, Strick
+function drawGallows(c, g, hanged) {
+  const wood = '#6b4a2e';
+  drawShadow(c, g.x, g.y, 1.6, 1.1, 50, 0.14);
+  drawBox(c, g.x, g.y + 0.1, 1.6, 1.1, 7, '#7a5a3a', 0, 'plank');
+  drawBox(c, g.x, g.y + 0.85, 0.6, 0.4, 3.5, '#6b4a2e', 0, 'plank');
+  for (const dx of [-0.62, 0.62]) drawBox(c, g.x + dx, g.y, 0.14, 0.14, 44, wood, 7);
+  drawBox(c, g.x, g.y, 1.4, 0.15, 4, '#5a3d26', 51);
+  const [ax, ay] = P(g.x - 0.62, g.y, 38), [bx, by] = P(g.x - 0.25, g.y, 51);
+  c.strokeStyle = wood; c.lineWidth = 2; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+  const [rx, ry] = P(g.x + 0.15, g.y, 51);
+  c.strokeStyle = '#b8a070'; c.lineWidth = 1.1;
+  if (!hanged) {
+    c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx, ry + 12); c.stroke();
+    c.beginPath(); c.ellipse(rx, ry + 15, 2.2, 3, 0, 0, Math.PI * 2); c.stroke();
+    return;
+  }
+  // Eine stille dunkle Gestalt, leicht im Wind
+  c.save(); c.translate(rx, ry); c.rotate(Math.sin(G.time * 1.1) * 0.05);
+  c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 14); c.stroke();
+  c.fillStyle = 'rgba(58,52,48,0.92)';
+  c.beginPath(); c.arc(0, 17, 3, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(-4, 20); c.lineTo(4, 20); c.lineTo(3.4, 32); c.lineTo(-3.4, 32); c.closePath(); c.fill();
+  c.fillRect(-2.6, 32, 2, 8); c.fillRect(0.6, 32, 2, 8);
+  c.restore();
+}
+
+function drawLooseHorse(c, f) {
+  const x = f.x + f.vx * f.t, y = f.y + f.vy * f.t;
+  const [px, py] = P(x, y, 0);
+  const fc = (f.vx - f.vy) >= 0 ? 1 : -1;
+  c.save(); c.translate(px, py); c.globalAlpha = Math.min(1, (f.dur - f.t) * 2); c.scale(fc * 1.14, 1.14);
+  drawHorse(c, f.col, G.time, true, f.look);
+  c.restore();
+}
+
+function drawSplinter(c, f) {
+  const k = f.t;
+  const [px, py] = P(f.x + f.vx * k, f.y + f.vy * k, f.z0 + 30 * k - 50 * k * k);
+  c.globalAlpha = Math.max(0, 1 - k / f.dur);
+  c.strokeStyle = '#d8c8a0'; c.lineWidth = 1.4;
+  c.beginPath(); c.moveTo(px - 2, py - 1); c.lineTo(px + 2, py + 1); c.stroke();
+  c.globalAlpha = 1;
+}
+
+// Zielleiste beim Tjost (Bildschirmkoordinaten)
+function drawAimBar(c, w, h, aim) {
+  const bw = Math.min(440, w - 60), bx = (w - bw) / 2, by = h - (w < 720 ? 190 : 150);
+  c.fillStyle = 'rgba(28,20,14,0.86)'; c.fillRect(bx - 16, by - 34, bw + 32, 62);
+  c.strokeStyle = '#d6ad4c'; c.lineWidth = 1.2; c.strokeRect(bx - 16, by - 34, bw + 32, 62);
+  c.font = '600 14px "Alegreya Sans", sans-serif'; c.textAlign = 'center'; c.fillStyle = '#f3ead2';
+  c.fillText(aim.pressed === null ? (w < 720 ? 'Tippen, wenn die Marke im Gold ist!' : 'Lanze senken: Leertaste oder Klick im goldenen Feld') : 'Die Lanze ist gesenkt …', w / 2, by - 14);
+  c.fillStyle = '#4a3a2a'; c.fillRect(bx, by, bw, 12);
+  const z0 = bx + (aim.c - aim.w / 2) * bw, zw = aim.w * bw;
+  const g = c.createLinearGradient(z0, 0, z0 + zw, 0);
+  g.addColorStop(0, 'rgba(214,173,76,0.35)'); g.addColorStop(0.5, 'rgba(255,224,120,1)'); g.addColorStop(1, 'rgba(214,173,76,0.35)');
+  c.fillStyle = g; c.fillRect(z0, by, zw, 12);
+  const mk = (v, col) => { const x = bx + v * bw; c.fillStyle = col; c.beginPath(); c.moveTo(x, by - 3); c.lineTo(x - 5, by - 10); c.lineTo(x + 5, by - 10); c.closePath(); c.fill(); c.fillRect(x - 1, by - 3, 2, 18); };
+  mk(aim.m, '#ffffff');
+  if (aim.pressed !== null) mk(aim.pressed, '#ff7a5a');
 }
 
 // Brand- und Belagerungsschäden: Ruß, Löcher im Dach, eingestürzte Sparren, danach ein Gerüst
@@ -5938,7 +7480,7 @@ function drawMotte(c, b) {
   const mh = 26, R = 1.45;
   const g = P(b.x, b.y, 0), t = P(b.x, b.y, mh);
   const RX = R * 45, RY = R * 22.6, rx = R * 0.5 * 45, ry = R * 0.5 * 22.6;
-  const grass = seasonIndex() === 3 ? '#dfe5e4' : seasonIndex() === 2 ? '#8f8a48' : '#6f9b45';
+  const grass = lookSeason() === 3 ? '#dfe5e4' : lookSeason() >= 2 ? '#8f8a48' : '#6f9b45';
   c.fillStyle = 'rgba(40,50,30,0.25)'; c.beginPath(); c.ellipse(g[0] + 6, g[1] + 2, RX + 8, RY + 4, 0, 0, Math.PI * 2); c.fill();
   const grad = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
   grad.addColorStop(0, shade(grass, 1.12)); grad.addColorStop(1, shade(grass, 0.72));
@@ -6013,7 +7555,7 @@ function drawTor(c, b) {
   const mh = 70, R = 2.5;
   const g = P(b.x, b.y, 0), t = P(b.x, b.y, mh);
   const RX = R * 45, RY = R * 22.6;
-  const grass = seasonIndex() === 3 ? '#dfe5e4' : seasonIndex() === 2 ? '#8f8a48' : '#6f9b45';
+  const grass = lookSeason() === 3 ? '#dfe5e4' : lookSeason() >= 2 ? '#8f8a48' : '#6f9b45';
   const grad = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
   grad.addColorStop(0, shade(grass, 1.15)); grad.addColorStop(1, shade(grass, 0.68));
   c.fillStyle = grad;
@@ -6078,7 +7620,7 @@ function drawWallRuin(c, o) {
   const [px, py] = P(o.x, o.y, o.h);
   c.fillStyle = shade(col, 0.8);
   c.fillRect(px - 3, py - 2, 3, 2); c.fillRect(px + 4, py - 1, 2, 1);
-  if (seasonIndex() < 3) { c.fillStyle = 'rgba(90,120,50,0.6)'; c.fillRect(px - 6, py + 1, 5, 2); }
+  if (lookSeason() !== 3) { c.fillStyle = 'rgba(90,120,50,0.6)'; c.fillRect(px - 6, py + 1, 5, 2); }
 }
 
 function drawLonghall(c, b) {
@@ -6227,7 +7769,7 @@ function drawStones(c, x, y, n) {
 
 function drawProp(c, b) {
   const [x, y] = P(b.x, b.y, 0);
-  const winter = seasonIndex() === 3;
+  const winter = lookSeason() === 3;
   c.fillStyle = 'rgba(25,35,15,0.2)';
   c.beginPath(); c.ellipse(x + 3, y, 8, 3.5, 0, 0, Math.PI * 2); c.fill();
   switch (b.prop) {
@@ -7123,13 +8665,13 @@ function drawCelebration(c, dt) {
   if (ce && G.time - ce.t0 < 45 && G.world) {
     const s = G.world.sites.find((x) => x.type === 'spieler');
     let px = s.x - 1, py = s.y - 1;
-    if (ce.id === 'wehr') { px = s.x + TOWER_SPOTS[ce.level - 1][0]; py = s.y + TOWER_SPOTS[ce.level - 1][1]; }
+    if (ce.x !== undefined) { px = ce.x; py = ce.y; }
+    else if (ce.id === 'wehr') { px = s.x + TOWER_SPOTS[ce.level - 1][0]; py = s.y + TOWER_SPOTS[ce.level - 1][1]; }
     else if (ce.id !== 'burg') { px = s.x + CASTLE_LAYOUT[ce.id].dx; py = s.y + CASTLE_LAYOUT[ce.id].dy; }
     const sp = toScreen(px, py);
     const z = G.cam.zoom;
     if (sparkles.length < 140) for (let k = 0; k < 3; k++) sparkles.push({ x: sp.x + (Math.random() - 0.5) * 90 * z, y: sp.y - Math.random() * 40 * z, vy: -20 - Math.random() * 30, life: 0, max: 1.2 + Math.random() * 1.2 });
-    const name = ce.id === 'burg' ? BUILDINGS.burg.levels[ce.level].name : `${BUILDINGS[ce.id].name} Stufe ${ce.level}`;
-    const label = `Fertig: ${name}`;
+    const label = ce.label || `Fertig: ${ce.id === 'burg' ? BUILDINGS.burg.levels[ce.level].name : `${BUILDINGS[ce.id].name} Stufe ${ce.level}`}`;
     c.font = `600 ${Math.round(15 + z * 2)}px "IM Fell English SC", Georgia, serif`;
     c.textAlign = 'center';
     const tw = c.measureText(label).width;
@@ -7168,7 +8710,7 @@ function makeDeciduous(season, v) {
   g.fillStyle = '#5a4030';
   g.fillRect(w / 2 - 3, h - 30, 6, 28);
   g.fillStyle = '#6e5038'; g.fillRect(w / 2 - 3, h - 30, 2, 28);
-  if (season === 3) {
+  if (season >= 3) {
     g.strokeStyle = '#4d3a2c'; g.lineCap = 'round';
     const branch = (x, y, a, len, wd) => {
       if (len < 4) return;
@@ -7179,7 +8721,7 @@ function makeDeciduous(season, v) {
     };
     branch(w / 2, h - 28, -Math.PI / 2, 16, 4);
     g.fillStyle = 'rgba(250,252,252,0.9)';
-    for (let k = 0; k < 12; k++) g.fillRect(w / 2 - 16 + r() * 32, 14 + r() * 30, 3, 1.5);
+    if (season === 3) for (let k = 0; k < 12; k++) g.fillRect(w / 2 - 16 + r() * 32, 14 + r() * 30, 3, 1.5);
     return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
   }
   const sets = [
@@ -7240,7 +8782,7 @@ function makeBush(season, v) {
   const w = 34, h = 26;
   const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(4000 + v * 11);
-  const cols = [['#4c8232', '#68a043', '#8cc25c'], ['#3f7a2c', '#55923a', '#77b04e'], ['#8a6a2a', '#b08a34', '#d0aa4a'], ['#5a6650', '#6e7a62', '#eef2f2']][season];
+  const cols = [['#4c8232', '#68a043', '#8cc25c'], ['#3f7a2c', '#55923a', '#77b04e'], ['#8a6a2a', '#b08a34', '#d0aa4a'], ['#5a6650', '#6e7a62', '#eef2f2'], ['#5e5a3c', '#6e6846', '#847c56']][season];
   const blobs = [];
   for (let k = 0; k < 6; k++) blobs.push([w / 2 + (r() - 0.5) * 16, 15 + (r() - 0.5) * 5, 5 + r() * 4]);
   g.fillStyle = 'rgba(28,30,12,0.6)';
@@ -7287,7 +8829,7 @@ function artTree(season, v) {
 
 const SPR = 3;
 function ensureSprites() {
-  const s = seasonIndex();
+  const s = treeSeason();
   if (sprites && spriteSeason === s) return;
   spriteSeason = s;
   sprites = {
@@ -7351,6 +8893,7 @@ function grassPattern(c, ox, oy) {
   return c.__grass;
 }
 
+let tileSnow = 0;
 function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   const M = W.M, vh = W.vh, N = W.N;
   const t = W.tiles[j * N + i];
@@ -7374,15 +8917,26 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath();
   c.fillStyle = cR; c.fill(); c.strokeStyle = cR; c.stroke();
   // Gemalte Wiese: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
-  const grassArt = (t === T.GRASS || t === T.ROAD) && season < 3 ? grassPattern(c, ox, oy) : null;
+  const grassArt = (t === T.GRASS || t === T.ROAD) && (season < 3 || season === 4) ? grassPattern(c, ox, oy) : null;
   if (grassArt) {
     c.save();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
     c.fillStyle = grassArt; c.fill();
-    c.globalAlpha = season === 2 ? 0.5 : 0.26;
+    c.globalAlpha = season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
     c.restore();
+  }
+
+  // Liegengebliebener Schnee in Flecken, je mehr, desto dichter die Decke
+  if (tileSnow > 0 && tileSnow < 1 && !isWater) {
+    const n = Math.floor(hash2(i, j, 41) * 4 * tileSnow + tileSnow * 3.2);
+    c.fillStyle = 'rgba(242,246,246,0.92)';
+    for (let k = 0; k < n; k++) {
+      const p = tp(0.2 + hash2(i + k * 5, j, 42) * 0.6, 0.2 + hash2(i, j + k * 5, 43) * 0.6);
+      const rr = (4 + hash2(i + k, j + k, 44) * 7) * (0.7 + tileSnow);
+      c.beginPath(); c.ellipse(p[0], p[1], rr, rr * 0.5, 0, 0, Math.PI * 2); c.fill();
+    }
   }
 
   if (isWater) {
@@ -7426,7 +8980,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
       }
     }
     if (t === T.FOREST) {
-      c.fillStyle = season === 2 ? '#c9742a' : season === 3 ? '#b9c4c2' : '#3d5e2a';
+      c.fillStyle = season === 2 ? '#c9742a' : season === 3 ? '#b9c4c2' : season === 4 ? '#6a5a3a' : '#3d5e2a';
       for (let k = 0; k < 5; k++) { const p = tp(0.1 + hash2(i + k * 7, j, 31) * 0.8, 0.1 + hash2(i, j + k * 7, 32) * 0.8); c.fillRect(p[0], p[1], 2, 1.4); }
     }
     if ((t === T.HILLS || t === T.SAND) && h2 < 0.4) {
@@ -7488,8 +9042,9 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
 
 function renderChunk(cx, cy, cs = 1) {
   const W = G.world;
-  const season = seasonIndex();
-  const pal = PAL[season];
+  const season = lookSeason();
+  const pal = lookPal();
+  tileSnow = snowLevel();
   const cvs = makeCanvas((CHUNK * TW) * cs, (CHUNK * TH + PAD_TOP + 4) * cs);
   const c = cvs.getContext('2d');
   c.scale(cs, cs);
@@ -7515,7 +9070,7 @@ function getChunk(cx, cy, cs = 1) {
 // Erdscholle an den vorderen Kartenrändern (Diorama)
 function drawSlab(c, minX, maxX, minY, maxY) {
   const W = G.world, N = W.N, M = W.M;
-  const season = seasonIndex();
+  const season = lookSeason();
   const face = (a, b, hA, hB, t, side) => {
     const aB = [a[0], a[1] + hA + SLAB], bB = [b[0], b[1] + hB + SLAB];
     const f = side === 'L' ? 1 : 0.8;
@@ -7524,7 +9079,7 @@ function drawSlab(c, minX, maxX, minY, maxY) {
     poly(c, [mid(a, aB, 0.55), mid(b, bB, 0.55), bB, aB], shade('#5d5750', f));
     poly(c, [mid(a, aB, 0.8), mid(b, bB, 0.8), bB, aB], shade('#4a453f', f));
     const water = t === T.WATER || t === T.BRIDGE;
-    poly(c, [a, b, [b[0], b[1] + 5], [a[0], a[1] + 5]], water ? shade('#3f7a9c', f) : season === 3 ? shade('#e8eded', f) : shade('#5f8f3a', f));
+    poly(c, [a, b, [b[0], b[1] + 5], [a[0], a[1] + 5]], water ? shade('#3f7a9c', f) : season === 3 ? shade('#e8eded', f) : shade(season === 4 ? '#7f8a50' : '#5f8f3a', f));
     const p = lerp2(a, b, 0.4);
     c.fillStyle = 'rgba(30,20,10,0.25)'; c.fillRect(p[0], p[1] + 22, 3, 2);
   };
@@ -7543,7 +9098,7 @@ function drawSlab(c, minX, maxX, minY, maxY) {
 }
 
 function drawWaterShimmer(c, minX, maxX, minY, maxY) {
-  if (seasonIndex() === 3) return;
+  if (lookSeason() === 3) return;
   const W = G.world, N = W.N;
   const i0 = Math.max(0, Math.floor(minX)), i1 = Math.min(N - 1, Math.ceil(maxX));
   const j0 = Math.max(0, Math.floor(minY)), j1 = Math.min(N - 1, Math.ceil(maxY));
@@ -7594,7 +9149,34 @@ function drawHorse(c, col, t, moving, look) {
   c.lineCap = 'butt';
 }
 
+function drawLance(c, u, by) {
+  const col = (u.lookObj && u.lookObj.tunic) || (u.kind === 'player' ? playerColor() : '#9a2f2a');
+  c.save();
+  c.translate(3, by - 12);
+  c.lineCap = 'round';
+  if (u.lanceBroken) {
+    c.strokeStyle = '#e2d4b0'; c.lineWidth = 2.4;
+    c.beginPath(); c.moveTo(-6, 2); c.lineTo(9, -1); c.stroke();
+    c.strokeStyle = '#b89a6a'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(9, -1); c.lineTo(12, -3); c.moveTo(9, -1); c.lineTo(11.5, 1); c.stroke();
+  } else if (u.lanceDown) {
+    c.strokeStyle = '#e8dcc0'; c.lineWidth = 2.6;
+    c.beginPath(); c.moveTo(-9, 2); c.lineTo(36, -4); c.stroke();
+    c.strokeStyle = col; c.lineWidth = 2.6;
+    c.beginPath(); for (const a of [0.15, 0.45, 0.75]) { c.moveTo(-9 + 45 * a, 2 - 6 * a); c.lineTo(-9 + 45 * (a + 0.12), 2 - 6 * (a + 0.12)); } c.stroke();
+    c.fillStyle = '#c8cdd2'; c.beginPath(); c.moveTo(1, -3.5); c.lineTo(5, -0.5); c.lineTo(1, 3); c.closePath(); c.fill();
+  } else {
+    c.strokeStyle = '#e8dcc0'; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(0, 6); c.lineTo(3, -34); c.stroke();
+    const w = Math.sin(G.time * 4 + u.id) * 1.5;
+    c.fillStyle = col; c.beginPath(); c.moveTo(3, -33); c.lineTo(13, -30 + w); c.lineTo(3, -27); c.closePath(); c.fill();
+  }
+  c.lineCap = 'butt';
+  c.restore();
+}
+
 function drawWeapon(c, u, by) {
+  if (u.lance) { drawLance(c, u, by); return; }
   const it = ITEMS[u.eq.waffe];
   if (!it) return;
   const sw = u.swing > 0 ? (u.swing / 0.3) : 0;
@@ -7654,7 +9236,7 @@ function drawFigure(c, u, x, y) {
   const sc = u.small ? 0.8 : 1.14;
   c.scale((u.facing || 1) * sc, sc);
   let by = 0;
-  const low = u.kind === 'peasant' && (u.act === 'jaeten' || u.act === 'sitzen');
+  const low = u.kind === 'peasant' && (u.act === 'jaeten' || u.act === 'sitzen' || u.act === 'sammeln' || u.act === 'pirschen' || u.act === 'betteln');
   if (m) { drawHorse(c, HORSES[u.eq.pferd] || '#7a5232', u.anim, u.moving, u.eq.pferd === 'schlachtross' ? L : null); by = -12; }
   else if (low) {
     by = 5;
@@ -7720,7 +9302,7 @@ function drawFigure(c, u, x, y) {
 }
 
 // Kleidung, Werkzeug und Last der Bewohner, dazu die Arbeitsbewegung
-const ACT_SPEED = { hacke: 3, sichel: 3.4, axt: 3.6, hammer: 5.5, gabel: 2.6, eimer: 1.6, besen: 3.2, verkaufen: 1.4, reden: 1.1, kaufen: 0.8 };
+const ACT_SPEED = { hacke: 3, sichel: 3.4, axt: 3.6, hammer: 5.5, gabel: 2.6, eimer: 1.6, schoepfen: 1.6, besen: 3.2, verkaufen: 1.4, reden: 1.1, kaufen: 0.8, loeschen: 3.2, saeen: 2.2, sammeln: 2.6, pirschen: 0.6 };
 function drawVillagerGear(c, u, yb) {
   const t = G.time * (ACT_SPEED[u.act] || 1) + (u.id % 7);
   const s = Math.sin(t), lift = s > 0 ? s : 0;
@@ -7758,7 +9340,36 @@ function drawVillagerGear(c, u, yb) {
     else if (tool === 'besen') { c.fillStyle = '#b89a5a'; c.beginPath(); c.moveTo(12, -2.5); c.lineTo(16, -3.5); c.lineTo(16, 3.5); c.lineTo(12, 2.5); c.closePath(); c.fill(); }
     c.restore();
   }
-  if (u.act === 'eimer') {
+  if (u.bow && u.act !== 'pirschen') {
+    c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(-2, yb - 12, 8, -Math.PI * 0.45, Math.PI * 0.45); c.stroke();
+  }
+  if (u.act === 'pirschen') {
+    const draw = Math.max(0, Math.sin(t * 0.5)) * 2.5;
+    c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.6;
+    c.beginPath(); c.arc(6, yb - 12, 7, -Math.PI / 2.4, Math.PI / 2.4); c.stroke();
+    c.strokeStyle = 'rgba(240,230,200,0.85)'; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(6 + 7 * Math.cos(-Math.PI / 2.4), yb - 12 + 7 * Math.sin(-Math.PI / 2.4)); c.lineTo(5 - draw, yb - 12); c.lineTo(6 + 7 * Math.cos(Math.PI / 2.4), yb - 12 + 7 * Math.sin(Math.PI / 2.4)); c.stroke();
+    c.strokeStyle = '#7a5a3a'; c.lineWidth = 1; c.beginPath(); c.moveTo(4 - draw, yb - 12); c.lineTo(14, yb - 12); c.stroke();
+  }
+  if (u.act === 'sammeln') {
+    c.strokeStyle = '#7a5636'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(3, yb - 6 - lift * 2); c.lineTo(9, yb - 8 - lift * 2); c.moveTo(4, yb - 4); c.lineTo(8, yb - 6); c.stroke();
+  }
+  if (u.act === 'saeen') {
+    const sw = Math.sin(t * 1.5);
+    c.strokeStyle = shade(u.tunic || '#8a6e4b', 0.85); c.lineWidth = 2;
+    c.beginPath(); c.moveTo(2.5, yb - 14); c.lineTo(6 + sw * 3, yb - 11 - Math.abs(sw) * 3); c.stroke();
+    if (sw > 0.6) { c.fillStyle = '#d8c48a'; for (let q = 0; q < 5; q++) c.fillRect(8 + q * 2.2, yb - 12 + q * 1.6 + ((G.time * 9 + q) % 3), 1.1, 1.1); }
+  }
+  if (u.act === 'loeschen') {
+    const up = Math.max(0, Math.sin(t));
+    c.save(); c.translate(5, yb - 12 - up * 4); c.rotate(-up * 1.2);
+    c.fillStyle = '#7a6a55'; c.fillRect(-1.5, -2, 4, 4.4); c.fillStyle = '#5f86a0'; c.fillRect(-1.1, -2, 3.2, 1);
+    c.restore();
+    if (up > 0.7) { c.strokeStyle = 'rgba(150,200,235,0.85)'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(7, yb - 18); c.quadraticCurveTo(14, yb - 24, 19, yb - 12); c.stroke(); }
+  }
+  if (u.act === 'eimer' || u.act === 'schoepfen') {
     const by = yb - 5 - lift * 7;
     c.strokeStyle = '#c9b48a'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(5.5, yb - 18); c.lineTo(5.5, by); c.stroke();
     c.fillStyle = '#7a6a55'; c.fillRect(3.8, by, 3.4, 3.6); c.fillStyle = '#5f86a0'; c.fillRect(4.2, by, 2.6, 1);
@@ -7768,6 +9379,20 @@ function drawVillagerGear(c, u, yb) {
     c.strokeStyle = shade(u.tunic || '#8a6e4b', 0.85); c.lineWidth = 2;
     c.beginPath(); c.moveTo(2.8, yb - 14); c.lineTo(6.5, yb - 17 - wave); c.stroke();
     c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(6.8, yb - 17.5 - wave, 1.3, 0, Math.PI * 2); c.fill();
+  }
+  if (u.act === 'gefesselt') { c.strokeStyle = '#b8a070'; c.lineWidth = 1; c.beginPath(); c.moveTo(-3, yb - 10); c.lineTo(3, yb - 10); c.stroke(); }
+  if (u.patches) { c.fillStyle = shade(u.tunic || '#7a7062', 0.7); c.fillRect(-2.6, yb - 13, 2.2, 2.4); c.fillStyle = shade(u.tunic || '#7a7062', 1.25); c.fillRect(1, yb - 10, 2.4, 2); }
+  if (u.crutch) { c.strokeStyle = '#7a5a3a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-7, yb + 3); c.lineTo(-4.5, yb - 17); c.moveTo(-6.4, yb - 16.5); c.lineTo(-2.6, yb - 17.5); c.stroke(); }
+  if (u.act === 'betteln') {
+    const up = Math.max(0, Math.sin(G.time * 0.9 + u.id)) > 0.8 ? 2.5 : 0;
+    c.strokeStyle = shade(u.tunic || '#7a7062', 0.85); c.lineWidth = 2; c.beginPath(); c.moveTo(2.5, yb - 13); c.lineTo(6, yb - 9 - up); c.stroke();
+    c.fillStyle = '#8a6a44'; c.beginPath(); c.ellipse(7.5, yb - 8.5 - up, 3, 1.3, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  }
+  if (u.act === 'jubeln') {
+    const w1 = Math.sin(G.time * 9 + u.id) * 2, w2 = Math.sin(G.time * 9 + u.id + 2) * 2;
+    c.strokeStyle = shade(u.tunic || '#8a6e4b', 0.85); c.lineWidth = 2;
+    c.beginPath(); c.moveTo(-2.8, yb - 15); c.lineTo(-5.5, yb - 23 + w1); c.moveTo(2.8, yb - 15); c.lineTo(5.5, yb - 23 + w2); c.stroke();
+    c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(-5.6, yb - 23.5 + w1, 1.3, 0, Math.PI * 2); c.arc(5.6, yb - 23.5 + w2, 1.3, 0, Math.PI * 2); c.fill();
   }
   if (u.act === 'kaufen') { c.fillStyle = '#e8c35a'; c.beginPath(); c.arc(5.5, yb - 11, 1.2, 0, Math.PI * 2); c.fill(); }
   if (u.act === 'kreuz') {
@@ -7810,6 +9435,18 @@ function drawVillagerGear(c, u, yb) {
     case 'holz': c.strokeStyle = '#7a5636'; c.lineWidth = 2.2; for (let k = 0; k < 3; k++) { c.beginPath(); c.moveTo(-5, yb - 18.5 + k * 1.6); c.lineTo(5, yb - 20 + k * 1.6); c.stroke(); } break;
     case 'heu': c.fillStyle = '#d8b452'; c.beginPath(); c.ellipse(0, yb - 24.5, 5.5, 2.8, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'fisch': c.fillStyle = '#b9c4c8'; c.beginPath(); c.ellipse(5.5, yb - 6, 3, 1.2, 0.4, 0, Math.PI * 2); c.fill(); break;
+    case 'balken': c.fillStyle = '#9a7448'; c.save(); c.translate(0, yb - 18); c.rotate(-0.18); c.fillRect(-12, -1.6, 24, 3.2); c.strokeRect(-12, -1.6, 24, 3.2); c.restore(); break;
+    case 'reisig':
+      c.strokeStyle = '#6e5232'; c.lineWidth = 1.1;
+      for (let q = 0; q < 7; q++) { c.beginPath(); c.moveTo(-7 + q * 0.6, yb - 10 - q * 0.9); c.lineTo(-1 + q * 0.5, yb - 21 - q * 0.5); c.stroke(); }
+      c.strokeStyle = '#c9b48a'; c.lineWidth = 1; c.beginPath(); c.moveTo(-6, yb - 14); c.lineTo(-1, yb - 17); c.stroke();
+      break;
+    case 'wild':
+      c.fillStyle = '#8a5a34'; c.beginPath(); c.ellipse(0, yb - 19, 8, 3, -0.1, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.strokeStyle = '#5a3a22'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-6, yb - 18); c.lineTo(-7, yb - 12); c.moveTo(6, yb - 19); c.lineTo(7, yb - 13); c.moveTo(-8, yb - 21); c.lineTo(-11, yb - 25); c.stroke();
+      break;
+    case 'hase': c.fillStyle = '#8a7a66'; c.beginPath(); c.ellipse(5.5, yb - 7, 1.6, 3.6, 0.2, 0, Math.PI * 2); c.fill(); c.fillRect(5, yb - 12, 1, 2.5); break;
+    case 'saatsack': c.fillStyle = '#c9b48a'; c.beginPath(); c.ellipse(-3.6, yb - 9, 2.6, 3.2, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'bahre':
       c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(6, yb - 14); c.lineTo(-22, yb - 14); c.stroke();
       c.fillStyle = '#ece6d8'; c.beginPath(); c.ellipse(-8, yb - 16, 10, 2.8, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(80,70,60,0.6)'; c.lineWidth = 0.8; c.stroke();
@@ -8009,14 +9646,57 @@ function drawSmoke(c, dt) {
   if (smoke.length > 300) smoke.splice(0, smoke.length - 300);
 }
 
-function drawSnow(c, w, h, dt) {
-  if (seasonIndex() !== 3) { snow.length = 0; return; }
-  while (snow.length < 120) snow.push({ x: Math.random() * w, y: Math.random() * h, v: 20 + Math.random() * 30, r: 1 + Math.random() * 1.6 });
-  c.fillStyle = 'rgba(255,255,255,0.85)';
-  for (const f of snow) {
-    f.y += f.v * dt; f.x += Math.sin(G.time + f.v) * 10 * dt;
-    if (f.y > h) { f.y = -4; f.x = Math.random() * w; }
-    c.beginPath(); c.arc(f.x, f.y, f.r, 0, Math.PI * 2); c.fill();
+// Wetter über dem fertigen Bild: Schneeflocken, Regenschnüre, Wolkenschatten, Nebel
+const rain = [];
+let clouds = null;
+function drawWeather(c, w, h, dt) {
+  const kind = weatherKind(), int = precip() || (G.s.weather ? G.s.weather.int : 0);
+  // Schnee
+  const nSnow = kind === 'schnee' ? Math.round(170 * int) : 0;
+  while (snow.length < nSnow) snow.push({ x: Math.random() * w, y: Math.random() * h, v: 20 + Math.random() * 30, r: 1 + Math.random() * 1.6 });
+  if (snow.length > nSnow) snow.length = nSnow;
+  if (nSnow) {
+    c.fillStyle = `rgba(225,230,238,${0.1 * int})`; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    for (const f of snow) {
+      f.y += f.v * dt; f.x += (Math.sin(G.time + f.v) * 10 - 8 * int) * dt;
+      if (f.y > h) { f.y = -4; f.x = Math.random() * w; }
+      c.beginPath(); c.arc(f.x, f.y, f.r, 0, Math.PI * 2); c.fill();
+    }
+  }
+  // Regen: schräge Schnüre, etwas dunkler, kleine Spritzer am Boden
+  const nRain = kind === 'regen' ? Math.round(240 * int) : 0;
+  while (rain.length < nRain) rain.push({ x: Math.random() * (w + 200), y: Math.random() * h, l: 10 + Math.random() * 14, v: 560 + Math.random() * 260 });
+  if (rain.length > nRain) rain.length = nRain;
+  if (nRain) {
+    c.fillStyle = `rgba(40,52,66,${0.18 * int})`; c.fillRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(200,214,228,0.45)'; c.lineWidth = 1;
+    c.beginPath();
+    for (const d of rain) {
+      d.y += d.v * dt; d.x -= d.v * 0.22 * dt;
+      if (d.y > h) { d.y = -d.l; d.x = Math.random() * (w + 200); }
+      c.moveTo(d.x, d.y); c.lineTo(d.x + d.l * 0.22, d.y - d.l);
+    }
+    c.stroke();
+    c.fillStyle = 'rgba(220,232,240,0.45)';
+    for (let k = 0; k < 18 * int; k++) { const x = Math.random() * w, y = Math.random() * h; c.fillRect(x - 1.5, y, 3, 1); }
+  }
+  // Wolkenschatten ziehen über das Land
+  if (kind === 'wolken' || kind === 'regen' || kind === 'schnee') {
+    if (!clouds) clouds = [0, 1, 2, 3].map((k) => ({ x: Math.random() * w, y: Math.random() * h, r: 220 + Math.random() * 200, v: 10 + k * 4 }));
+    for (const cl of clouds) {
+      cl.x += cl.v * dt; cl.y += cl.v * 0.35 * dt;
+      if (cl.x - cl.r > w || cl.y - cl.r > h) { cl.x = -cl.r; cl.y = Math.random() * h - cl.r * 0.5; }
+      const g = c.createRadialGradient(cl.x, cl.y, 0, cl.x, cl.y, cl.r);
+      g.addColorStop(0, `rgba(20,26,34,${kind === 'wolken' ? 0.13 : 0.08})`); g.addColorStop(1, 'rgba(20,26,34,0)');
+      c.fillStyle = g; c.fillRect(cl.x - cl.r, cl.y - cl.r, cl.r * 2, cl.r * 2);
+    }
+  }
+  // Nebel: milchiger Schleier, unten dichter
+  if (kind === 'nebel') {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, `rgba(220,224,226,${0.18 * int})`); g.addColorStop(1, `rgba(228,232,234,${0.42 * int})`);
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
   }
 }
 
@@ -8173,7 +9853,7 @@ function render() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!G.world || !G.s) return;
   ensureSprites();
-  if (cacheSeason !== seasonIndex()) { chunkCache.clear(); cacheSeason = seasonIndex(); }
+  if (cacheSeason !== lookKey()) { chunkCache.clear(); cacheSeason = lookKey(); }
   if (G.castleDirty) { castleParts = buildPlayerCastle(); G.castleDirty = false; }
   if (G.staticDirty) { staticParts = buildStaticParts(); G.staticDirty = false; }
   lights = [];
@@ -8233,10 +9913,19 @@ function render() {
   // Objekte sammeln und nach Tiefe sortieren
   const objs = [];
   const inView = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+  const lists = tourneyLayout();
+  const gallows = [];
+  for (const s of W.sites) {
+    if (s.x < minX - 24 || s.x > maxX + 24 || s.y < minY - 24 || s.y > maxY + 24) continue;
+    const g = gallowsFor(s);
+    if (g && inView(g.x, g.y)) gallows.push(g);
+  }
   for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
     for (const o of W.chunkObjs[cy * CN + cx]) {
       const ix = isoX(o.x, o.y);
       if (ix < isoL || ix > isoR) continue;
+      if (lists && Math.abs(o.x - lists.lx) < 10 && Math.abs(o.y - lists.ly) < 4.6) continue;
+      if (gallows.length && gallows.some((g) => Math.abs(o.x - g.x) < 2 && Math.abs(o.y - g.y) < 2.2)) continue;
       if (o.kind === 'mauer') objs.push({ d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => drawWallRuin(c, o) });
       else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o) });
     }
@@ -8250,8 +9939,14 @@ function render() {
     }
     for (const sh of sg.shots) objs.push({ d: 1e6, z: 0, f: (c) => drawSiegeShot(c, sh) });
   }
+  for (const part of tourneyParts()) if (inView(part.x, part.y)) objs.push(part);
+  for (const g of gallows) objs.push({ d: g.x + g.y, z: zAt(g.x, g.y), f: (c) => drawGallows(c, g, G.exec && G.exec.g === g && G.exec.hanged) });
+  for (const f of G.fx) {
+    if (f.kind === 'pferd' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 0.1, z: zAt(f.x, f.y), f: (c) => drawLooseHorse(c, f) });
+    else if (f.kind === 'splitter') objs.push({ d: 1e6, z: zAt(f.x, f.y), f: (c) => drawSplinter(c, f) });
+  }
   for (const g of funeralProps()) if (inView(g.x, g.y)) objs.push({ d: g.x + g.y - 0.4, z: zAt(g.x, g.y), f: (c) => drawOpenGrave(c, g) });
-  for (const f of G.fx) if (f.kind === 'staub' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 1, z: zAt(f.x, f.y), f: (c) => { const k = f.t / f.dur, [px, py] = P(f.x, f.y, 10); c.globalAlpha = Math.max(0, 0.7 * (1 - k)); c.fillStyle = '#8a7a66'; c.beginPath(); c.arc(px, py - k * 14, 8 + k * 22, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; } });
+  for (const f of G.fx) if (f.kind === 'staub' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 1, z: zAt(f.x, f.y), f: (c) => { const k = f.t / f.dur, [px, py] = P(f.x, f.y, 10); c.globalAlpha = Math.max(0, 0.7 * (1 - k)); c.fillStyle = f.col || '#8a7a66'; c.beginPath(); c.arc(px, py - k * 14, 8 + k * 22, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; } });
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
@@ -8316,9 +10011,10 @@ function render() {
 
   // Tag und Nacht: sanft über das fertige Bild, in allen Grafikstufen gleich gut lesbar
   drawDayNight(ctx, w, h, p, cam, z);
-  drawSnow(ctx, w, h, dt);
+  drawWeather(ctx, w, h, dt);
 
   drawSpeech(ctx, z, inView);
+  if (G.tour && G.tour.aim) drawAimBar(ctx, w, h, G.tour.aim);
   // Sehenswürdigkeiten
   ctx.textAlign = 'center';
   for (const p of W.pois || []) {
@@ -8349,7 +10045,7 @@ function render() {
     const u = G.hover;
     const sp = toScreen(u.x, u.y);
     ctx.font = '600 12px "Alegreya Sans", sans-serif';
-    const label = `${u.name}${u.kind !== 'peasant' ? ` · Stufe ${u.level}` : ''}`;
+    const label = `${u.name}${u.kind !== 'peasant' ? ` · Stufe ${u.level}` : u.role === 'bettler' ? ' · Klick: Almosen geben' : u.condemned ? ' · Klick: befreien' : ''}`;
     const tw = ctx.measureText(label).width;
     const yy = sp.y - (u.mounted ? 56 : 44) * z;
     ctx.fillStyle = 'rgba(28,20,14,0.82)'; ctx.fillRect(sp.x - tw / 2 - 6, yy - 12, tw + 12, 17);
@@ -8410,6 +10106,7 @@ const MINI_COL = [
   ['#3b7090', '#7d9d3f', '#3d6429', '#979159', '#b39a6e', '#d4b64f', '#8a6a42', '#d5c493'],
   ['#3a6683', '#8e9045', '#6a5a2c', '#918259', '#a88d66', '#9e7c3d', '#8a6a42', '#c4b083'],
   ['#8fb0c2', '#dfe6e6', '#a9b8b5', '#c9cfcb', '#a49d90', '#d8dddc', '#8a6a42', '#dadcd6'],
+  ['#3a6680', '#7f8a50', '#5c5a36', '#8a8660', '#9e8662', '#8a6e48', '#8a6a42', '#c4b48a'],
 ];
 
 function buildMinimap() {
@@ -8417,7 +10114,7 @@ function buildMinimap() {
   const cv = makeCanvas(N, N);
   const g = cv.getContext('2d');
   const img = g.createImageData(N, N);
-  const cols = MINI_COL[seasonIndex()].map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  const cols = MINI_COL[lookSeason()].map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const k = j * N + i, t = W.tiles[k];
     let f = 1;
@@ -8428,7 +10125,7 @@ function buildMinimap() {
   }
   g.putImageData(img, 0, 0);
   minimapBase = cv;
-  minimapSeason = seasonIndex();
+  minimapSeason = lookKey();
 }
 
 // Kartenansicht: v = { ox, oy, s, dx, dy } (Welt -> Bild: (x - ox) * s + dx)
@@ -8436,7 +10133,7 @@ function miniPos(x, y, v) { return { x: (x - v.ox) * v.s + v.dx, y: (y - v.oy) *
 function miniToWorld(mx, my, v) { return { x: (mx - v.dx) / v.s + v.ox, y: (my - v.dy) / v.s + v.oy }; }
 
 function drawMap(c, w, h, opts = {}) {
-  if (!minimapBase || minimapSeason !== seasonIndex()) buildMinimap();
+  if (!minimapBase || minimapSeason !== lookKey()) buildMinimap();
   const W = G.world, N = W.N;
   const p = G.s.player;
   const big = !!opts.big;
@@ -9085,6 +10782,9 @@ function tick() {
 
 
 
+
+
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -9103,7 +10803,8 @@ function updateHUD() {
   set('hud-party', `${partyMembers().length}/${partyCap()}`);
   set('hud-cargo', `${cargoUsed()}/${cargoCap()}`);
   set('hud-hp', `${Math.ceil(s.player.hp)}/${s.player.st.maxHp}`);
-  set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${buffActive() ? ' · ausgeruht' : ''}`);
+  const wn = WEATHER_NAME[weatherKind()];
+  set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${wn ? ` · ${wn}` : ''}${buffActive() ? ' · ausgeruht' : ''}`);
   set('hud-clock', clockText());
   const mode = byId('hud-mode');
   const label = G.fast ? 'Zeitraffer' : '';
@@ -9254,7 +10955,7 @@ function townPanel() {
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div>${site.port ? `<div class="actions">${harbourActions(site)}</div>` : ''}`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -9277,16 +10978,64 @@ function townInfo(site) {
         <dt>Dein Ansehen</dt><dd>${repPill(f)}</dd>
         <dt>Billig zu haben</dt><dd>${list(site.produces)}</dd>
         <dt>Gesucht</dt><dd>${list(site.demands)}</dd>
+        ${buildFact(site)}
       </dl>
     </div>
     <div class="actions">
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${tourneyAction(site)}
       ${tavernAction(site)}
       ${harbourActions(site)}
+      ${blightActions(site)}
+      ${raidAction(site)}
     </div>
   </div>`;
+}
+
+// Bautätigkeit im Ort
+function buildFact(site) {
+  const hs = siteHouses(site.id);
+  if (!hs.length) return '';
+  const bau = hs.filter(underConstruction).length, ruin = hs.filter((b) => b.cons === -1).length, dmg = hs.filter((b) => standing(b) && b.dmg > 0).length;
+  const parts = [];
+  if (bau) parts.push(`${bau} ${bau === 1 ? 'Baustelle' : 'Baustellen'}`);
+  if (dmg) parts.push(`${dmg} beschädigt`);
+  if (ruin) parts.push(`${ruin} ${ruin === 1 ? 'Ruine' : 'Ruinen'}`);
+  return `<dt>Häuser</dt><dd>${hs.filter(standing).length} bewohnt${parts.length ? `, ${parts.join(', ')}` : ''}</dd>`;
+}
+
+// Turnier: Ankündigung, Teilnehmer, Anmeldung
+function tourneyAction(site) {
+  const tr = tourneyAt(site);
+  if (!tr) return '';
+  const when = tr.day === G.s.day ? 'heute' : tr.day === G.s.day + 1 ? 'morgen' : `am Tag ${tr.day}`;
+  const names = tr.knights.map((k) => `<span class="swatch" style="--c:${k.col}"></span>${esc(k.player ? `${G.s.player.name} (du)` : k.name)}`).join(', ');
+  const p = G.s.player;
+  let btn;
+  if (tr.joined) btn = '<span class="chip">Angemeldet</span>';
+  else if (!p.eq.pferd) btn = '<span class="chip">Ohne Pferd kein Tjost</span>';
+  else btn = `<button class="btn primary" data-act="tjoin" ${canJoin(tr) ? '' : 'disabled'}>${fmt(tr.fee)} Gold</button>`;
+  return `<h3>Turnier ${when}</h3>
+    <div class="action"><div><b>Tjost vor den Toren</b><p>Acht Ritter, drei Runden, Lanzen und Schilde stellt der Herold. Preis: ${fmt(tr.prize)} Gold und viel Ruhm. Senke die Lanze im richtigen Moment. Ab der zehnten Stunde bei den Schranken sein!</p><p class="muted">${names}</p></div>${btn}</div>`;
+}
+
+// Wiederaufbau stiften oder nach einem Überfall Sühne leisten
+function blightActions(site) {
+  if (isBlighted(site)) {
+    const cost = atoneCost(site), slain = G.s.slain[site.id] || 0;
+    return `<h3>Nach dem Überfall</h3><div class="notice bad"><p>${esc(site.name)} liegt darnieder${slain ? `, ${slain} ${slain === 1 ? 'Bewohner ist' : 'Bewohner sind'} tot` : ''}. Bis Tag ${G.s.blight[site.id]} wird hier nichts gebaut und nichts repariert.</p></div>
+      <div class="action"><div><b>Sühne leisten</b><p>Gold für die Hinterbliebenen und Messen für die Toten. Danach wird wieder gebaut. Ansehen bei den ${esc(FACTIONS[site.faction].short)} +10, Kirche +4.</p></div><button class="btn" data-act="atone" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+  }
+  if (!canDonate(site)) return '';
+  const cost = donateCost(site);
+  return `<div class="action"><div><b>Wiederaufbau stiften</b><p>Bauholz, Stroh und Lohn für die Zimmerleute: Baustellen wachsen schneller, Ruinen werden neu bebaut, Schäden ausgebessert. Ansehen +4.</p></div><button class="btn" data-act="donate" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+}
+
+function raidAction(site) {
+  if (!canRaid(site)) return '';
+  return `<h3>Gewalt</h3><div class="action"><div><b>Ort überfallen</b><p>Die Besatzung stellt sich dir, die Leute fliehen in ihre Häuser. Bei einem Sieg plünderst du Gold und Waren, Häuser gehen in Flammen auf. Danach wird hier lange nichts mehr gebaut.</p></div><button class="btn danger" data-act="raid">Überfallen</button></div>`;
 }
 
 // Gasthaus: Übernachten mit Gefolge
@@ -9308,6 +11057,8 @@ function rumor(site) {
   const army = G.groups.find((g) => g.army && g.members.length);
   if (army) opts.push(`Man sagt, ein großes Heer zieht ${dirText(site, army)}.`);
   if (G.siege) opts.push(`${G.siege.site.type === 'spieler' ? homeName() : G.siege.site.name} wird belagert, heißt es.`);
+  const tr = G.s.tourney;
+  if (tr && !tr.done) { const ts = siteById(tr.site); opts.push(`Am Tag ${tr.day} ist Turnier in ${ts.name}. Da reiten die besten Lanzen des Landes!`); opts.push(`Ich wette zwei Pfennige auf ${tr.knights[Math.floor(Math.random() * tr.knights.length)].name} beim Turnier in ${ts.name}.`); }
   const rich = G.groups.find((g) => g.type === 'steuer' && g.members.length);
   if (rich) opts.push(`Ein Steuereintreiber ist mit voller Kasse ${dirText(site, rich)} unterwegs.`);
   return opts.length ? opts[Math.floor(Math.random() * opts.length)] : 'Es ist ruhig in letzter Zeit. Zu ruhig, wenn Ihr mich fragt.';
@@ -9734,6 +11485,13 @@ const ACTIONS = {
   resume: () => closePanel(),
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   gift: () => giveGift(G.ui.arg),
+  donate: () => donate(G.ui.arg),
+  tjoin: () => joinTourney(),
+  atone: () => atone(G.ui.arg),
+  raid: () => {
+    const site = G.ui.arg, f = site.faction;
+    confirmDialog(`${site.name} wirklich überfallen? Die ${FACTIONS[f].name} werden dich hassen (Ansehen −25${site.type === 'abtei' ? ', bei einer Abtei −35' : ''}), die Kirche ebenso. Wer Bewohner erschlägt, macht es schlimmer. Hier wird danach lange nichts mehr gebaut.`, 'Überfallen', () => { closePanel(); startRaid(site); });
+  },
   sail: (d) => { if (sail(G.ui.arg.id, d.to)) closePanel(); },
   mapzoom: (d) => {
     if (d.d === 'home') { mapState.cx = G.s.player.x; mapState.cy = G.s.player.y; mapState.zoom = Math.max(mapState.zoom, 2); }
@@ -9803,6 +11561,7 @@ const ACTIONS = {
 
 function initUI() {
   G.onLog = renderLog;
+  G.rumor = rumor;
   byId('panel').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
@@ -9860,7 +11619,7 @@ function deserialize(json) {
   s.companions = s.companions.map((c) => makeUnit(c));
   s.castle.recruits = (s.castle.recruits || []).map((c) => makeUnit(c));
   G.s = s;
-  G.groups = []; G.units = []; G.projectiles = []; G.fx = [];
+  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.extras = []; G.tour = null; G.exec = null;
   for (const gd of data.groups) {
     const g = spawnGroup(gd.type, { pos: { x: gd.x, y: gd.y }, questId: gd.questId, members: gd.members });
     if (g) { g.id = gd.id; g.home = gd.home; g.provoked = gd.provoked; }
@@ -9920,6 +11679,11 @@ function saveSummary(data = readSave()) {
 
 
 
+
+
+
+
+
 const keys = new Set();
 let viewCanvas, mini;
 
@@ -9938,7 +11702,7 @@ function newGame(opts) {
   G.s = {
     seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
-    damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null,
+    damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     towns: {}, quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
@@ -9949,7 +11713,8 @@ function newGame(opts) {
   placeNear(squire, player.x, player.y, 1);
   G.s.companions.push(squire);
   initTowns();
-  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = [];
+  initDynamics();
+  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = []; G.extras = []; G.tour = null; G.exec = null;
   spawnPeasants();
   maintainGroups(true);
   rebuildUnits();
@@ -9965,6 +11730,8 @@ function startWorld() {
   home.name = homeName();
   setPlayerWalls(G.world, G.s.castle.level >= 1);
   applyDamage();
+  applyCons();
+  initWeather();
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
@@ -10110,8 +11877,13 @@ function enterSite(s) {
 }
 
 function checkNearSite() {
+  const pa = G.pendingAlms;
+  if (pa && (pa.dead || !G.s.player.path) && Math.hypot(pa.x - G.s.player.x, pa.y - G.s.player.y) >= 2.6) G.pendingAlms = null;
+  else if (pa && Math.hypot(pa.x - G.s.player.x, pa.y - G.s.player.y) < 2.6) { G.pendingAlms = null; G.s.player.path = null; giveAlms(pa); }
   const s = nearestSite();
   G.nearSite = s;
+  const ts = tourneyStatus();
+  if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
@@ -10154,6 +11926,17 @@ function attackNearest() {
 function clickUnit(u) {
   const p = G.s.player;
   const g = u.group;
+  if (raidVictim(u)) { p.attackTarget = u; p.path = null; return true; }
+  if (u.role === 'bettler') {
+    if (Math.hypot(u.x - p.x, u.y - p.y) < 2.6) giveAlms(u);
+    else if (setPlayerPath(u.x, u.y + 0.7)) { G.pendingAlms = u; G.pendingSite = null; }
+    return true;
+  }
+  if (u.condemned && canRescue(u)) {
+    const s = G.exec.site;
+    confirmDialog(`${G.exec.h.name} vom Galgen befreien? Die Wachen von ${s.name} werden angreifen. Die ${FACTIONS[s.faction].name} sehen das gar nicht gern, die Waldleute schon.`, 'Losschneiden', () => rescueCondemned(u));
+    return true;
+  }
   if (!g) return false;
   if (g.engaged || groupHostile(g)) {
     g.engaged = true;
@@ -10193,6 +11976,7 @@ function startHunt(a) {
 
 function clickWorld(px, py) {
   if (!G.started || panelOpen() || dialogOpen()) return;
+  if (joustPress() || (G.tour && G.tour.lock)) return;
   const u = unitAtScreen(px, py);
   if (u && clickUnit(u)) return;
   const an = animalAtScreen(px, py);
@@ -10295,7 +12079,7 @@ function onKey(e) {
   switch (k) {
     case 'e': enterSite(nearestSite()); break;
     case 'r': toggleRide(); break;
-    case ' ': attackNearest(); e.preventDefault(); break;
+    case ' ': if (!joustPress()) attackNearest(); e.preventDefault(); break;
     case 'f': cycleOrder(); break;
     case '1': setOrder('folgen'); break;
     case '2': setOrder('halten'); break;
@@ -10351,6 +12135,7 @@ function bindInput() {
   mini.addEventListener('click', () => tool('map'));
   byId('prompt').addEventListener('click', () => {
     if (!G.started || panelOpen() || dialogOpen()) return;
+    if (joustPress()) return;
     if (inCombat()) attackNearest(); else enterSite(nearestSite());
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
@@ -10374,10 +12159,14 @@ function resize() {
 // ---------------------------------------------------------------- Schleife
 function step(dt) {
   updateTime(dt);
+  updateWeather(dt);
   updateUnits(dt);
   updateGroups(dt);
   updateProjectiles(dt);
   updateAnimals(dt);
+  updateDynamics(dt);
+  updateTourney(dt);
+  updateJustice(dt);
 }
 
 function updateFx(dt) {
@@ -10485,7 +12274,7 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, startBattle, startSiege };
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
 
 })();
 </script>

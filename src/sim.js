@@ -9,6 +9,10 @@ import { maintainGroups, maybeBattle } from './units.js';
 import { maybeSiege, dailyRepairs } from './siege.js';
 import { dailyBurials } from './life.js';
 import { replenishAnimals } from './animals.js';
+import { dailyDynamics } from './dynamics.js';
+import { dailyTourney } from './tournament.js';
+import { dailyJustice } from './justice.js';
+import { passWeather } from './weather.js';
 
 export function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
 
@@ -48,6 +52,7 @@ export function updateTime(dt) {
 }
 
 export function passHours(h) {
+  passWeather(Math.round(h));
   G.s.time += (h / 24) * DAY_LEN;
   while (G.s.time >= DAY_LEN) { G.s.time -= DAY_LEN; newDay(); }
 }
@@ -62,11 +67,14 @@ function newDay() {
   replenishAnimals();
   maybeBattle();
   maybeSiege();
+  dailyDynamics();
+  dailyTourney();
+  dailyJustice();
   dailyRepairs();
   dailyBurials();
   const now = seasonIndex();
   if (now !== before) {
-    log(`Der ${SEASONS[now]} ${now === 0 ? `des Jahres ${yearOf()}` : ''} beginnt.`, 'gold');
+    log(`Der ${SEASONS[now]}${now === 0 ? ` des Jahres ${yearOf()}` : ''} beginnt.`, 'gold');
     if (G.onSeason) G.onSeason();
   }
   if (!G.s.flags.victory && G.s.castle.level >= 3 && alliesCount() >= 2) {

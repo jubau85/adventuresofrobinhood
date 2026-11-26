@@ -41,7 +41,7 @@ export function deserialize(json) {
   s.companions = s.companions.map((c) => makeUnit(c));
   s.castle.recruits = (s.castle.recruits || []).map((c) => makeUnit(c));
   G.s = s;
-  G.groups = []; G.units = []; G.projectiles = []; G.fx = [];
+  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.extras = []; G.tour = null; G.exec = null;
   for (const gd of data.groups) {
     const g = spawnGroup(gd.type, { pos: { x: gd.x, y: gd.y }, questId: gd.questId, members: gd.members });
     if (g) { g.id = gd.id; g.home = gd.home; g.provoked = gd.provoked; }

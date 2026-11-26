@@ -31,6 +31,13 @@ node tools/build.mjs
 - **63 Orte an ihren historischen Stellen**, über ganz England, Wales, die Normandie, Frankreich und Flandern verteilt: von Carlisle, Scarborough und Keswick im Norden über Pembroke, Cardiff und Bodmin im Westen bis Colchester, Battle, Rennes, Ypern und Provins. Dazu die Schauplätze aus *Ivanhoe* in Yorkshire. Straßen und Brücken verbinden die Orte auf jeder Landmasse.
 - **Wahrzeichen:** der Tower von London und St Paul's, die Kathedralen von Canterbury, York, Lincoln, Durham, Ely, Winchester, Hereford, Reims, Laon, Rouen und Chartres (frisch abgebrannt), Notre-Dame und der neue Louvre im Bau, Mont-Saint-Michel auf seinem Felsen, der Gravensteen in Gent, die Tuchhallen von Brügge, Ypern, Troyes und Provins, der Burghügel von York und Glastonbury Tor.
 - **Große Städte:** London füllt bei normalem Zoom mehrere Bildschirme: eine Stadtmauer mit Toren, Strahlen- und Ringgassen, rund 180 Häuser in Zeilen entlang der Gassen, mehrere Pfarrkirchen, Brunnen, Gasthäuser und Schmieden, der Markt in der Mitte und die Themse mit Kai und Brücke. Paris, York, Rouen und Brügge sind ähnlich angelegt, kleinere Orte entsprechend kleiner. Jede Stadt hat ihr eigenes Leben, mit Bewohnern je nach Größe.
+- **Die Welt baut und verfällt:** Auf Bauplätzen am Ortsrand entstehen neue Häuser, mit Fundament, Fachwerk, Gerüst und Bauleuten, die Balken heranschleppen. Anderswo brennt ein Haus ab, ein Sturm deckt ein Dach ab, ein baufälliges Haus wird abgerissen und später neu errichtet. Bricht in deiner Nähe ein Feuer aus, holen die Leute Eimer am Brunnen und löschen.
+- **Dein Einfluss:** Du kannst den Wiederaufbau eines Ortes stiften. Oder ihn überfallen: Die Besatzung stellt sich dir, die Leute fliehen in die Häuser, bei einem Sieg plünderst du Gold und Waren, und Häuser gehen in Flammen auf. Danach liegt der Ort darnieder: Lange wird nichts gebaut oder repariert, die Leute bleiben drinnen und haben Angst. Wer Bewohner erschlägt, verlängert das. Mit Sühne an die Hinterbliebenen kehrt das Leben zurück.
+- **Alltag draußen:** Jäger pirschen am Waldrand und kommen mit Wild oder einem Hasen zurück, Fischer sitzen am Wasser, Bauern säen im Frühling und ernten im Herbst, Mägde und Kinder sammeln Reisig für den Winter.
+- **Turniere:** Herolde kündigen Turniere an, das erste in Ashby. Vor dem Ort stehen Schranken, eine Tribüne mit Baldachin und die Zelte der Ritter, das Volk strömt herbei. Acht Ritter tjosten in drei Runden. Mit Pferd und Startgeld reitest du mit: Senke die Lanze im richtigen Moment, brich Lanzen und hebe Gegner aus dem Sattel. Der Sieger gewinnt Gold und viel Ruhm.
+- **Bettler:** Vor den Stadttoren, an Burgtoren und Kirchentüren sitzen Bettler. Ein Klick gibt Almosen. Die Kirche sieht das gern, und manch Bettler weiß etwas Nützliches.
+- **Galgen:** Vor Burgen, Städten und Marktflecken steht ein Galgen. Wer beim Wildern oder Stehlen erwischt wird, wird hinausgeführt, das Urteil verlesen, der Priester betet, das Volk schaut zu. Danach wird der Tote auf dem Friedhof begraben. Du kannst den Verurteilten auch losschneiden, dann greifen die Wachen an.
+- **Wetter und fließende Jahreszeiten:** Wolken, Regen, Nebel und Schneefall je nach Jahreszeit. Der Winter beginnt kahl und grau, der Schnee bleibt erst in Flecken liegen und deckt dann alles zu. Im Frühling taut er im Regen nach und nach weg.
 - **Feiner Zoom:** Mit dem Mausrad stufenlos von der Übersicht (0,45) bis ganz nah heran (4). Standard ist eine nahe Ansicht, in der eine Kate etwa doppelt so hoch ist wie eine Figur.
 - **Sehenswürdigkeiten:** Stonehenge und der Hadrianswall. Wer sie zum ersten Mal besucht, gewinnt Ruhm.
 - **Einzelhöfe:** Über das Land verstreut liegen Gehöfte mit Äckern, Vieh und Bauern.
@@ -47,7 +54,7 @@ node tools/build.mjs
   - **Pixel:** halbe Auflösung, grobe Pixel
   - **Retro:** Amiga-Stil mit eigener 32-Farben-Palette und feinem Dithering
 - **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf Flüssen und Seen und Vogelschwärme.
-- **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Schnee im Winter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
+- **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Wetter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
 - **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
 - **Die Burg Ashcombe:** Ausbau von der Ruine über Holzburg und Steinburg zur Festung. Neun Gebäude mit je drei Stufen (Rittersaal, Unterkunft, Schmiede, Stallungen, Holzfäller, Steinbruch, Markt, Kapelle, Wachtürme). Jeder Ausbau ist auf der Karte zu sehen:
   - abgesteckte Bauplätze mit Schildern
@@ -73,7 +80,8 @@ node tools/build.mjs
 | W A S D | Direkt laufen |
 | E | Ort betreten, Burg verwalten |
 | R | Auf- und absitzen |
-| Leertaste | Nächsten Feind angreifen |
+| Leertaste | Nächsten Feind angreifen, beim Tjost die Lanze senken |
+| Klick auf Bettler | Almosen geben |
 | F oder 1 2 3 | Gefolge: folgen, halten, angreifen |
 | T | Zeitraffer |
 | I J P M | Gefolge, Aufträge, Politik, Karte |
@@ -90,8 +98,12 @@ node tools/build.mjs
 | `src/geo.js` | Küsten, Flüsse, Bergland und Wälder als Längen- und Breitengrade |
 | `src/world.js` | Weltgenerator (Küsten rastern, Flüsse, Orte, Straßen je Landmasse, Häfen), A*-Wegfindung |
 | `src/units.js` | Einheiten, Werte, Kampf, Gefolge, KI-Gruppen, Fehden, Fähren |
-| `src/life.js` | Alltag der Bewohner: Rollen, Tagesablauf, Arbeitsplätze, Sprüche, Gasthaus, Begräbnisse |
+| `src/life.js` | Alltag der Bewohner: Rollen, Tagesablauf, Arbeitsplätze, Jagd, Reisig, Löschen, Bettler und Almosen, Sprüche, Gasthaus, Begräbnisse |
 | `src/siege.js` | Belagerungen, Gebäudeschäden und Wiederaufbau |
+| `src/dynamics.js` | Bauen und Verfall, Brände, Überfälle, Stiften und Sühne |
+| `src/tournament.js` | Turniere: Ankündigung, Turnierplatz, Tjost, Zielleiste |
+| `src/justice.js` | Galgen und Hinrichtungen, Befreien |
+| `src/weather.js` | Wetter, Schneedecke, fließende Jahreszeiten |
 | `src/economy.js` | Märkte, Preise, Ladung, Ausrüstungshandel |
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |

@@ -143,6 +143,15 @@ export function hitAnimal(a, dmg, shooter) {
   if (a.hp <= 0) killAnimal(a);
 }
 
+// Ein Jäger aus dem Dorf erlegt ein Tier: kein Ertrag für dich, nur ein Tier weniger im Wald
+export function takeAnimal(a) {
+  if (a.dead) return;
+  a.dead = true;
+  G.animals = G.animals.filter((x) => x !== a);
+  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, t: 0, dur: 3 });
+  if (G.s.player.huntTarget === a) G.s.player.huntTarget = null;
+}
+
 function killAnimal(a) {
   const info = ANIMAL_INFO[a.kind];
   a.dead = true;

@@ -15,10 +15,10 @@ const ATTACKER = {
   sachsen: { en: 'heer_john', wa: 'heer_john' },
   franken: { fr: 'heer_normandie', fl: 'heer_normandie', nd: 'heer_normandie' },
 };
-const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'] };
+export const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'] };
 
 // ---------------------------------------------------------------- Schäden und Reparatur
-export function siteBuildings(siteId) { return G.world.buildings.filter((b) => b.site === siteId && b.kind === 'house'); }
+export function siteBuildings(siteId) { return G.world.buildings.filter((b) => b.site === siteId && b.kind === 'house' && !(b.cons < 1)); }
 
 export function damageBuilding(b, amount) {
   if (!b) return;
@@ -51,11 +51,16 @@ export function applyDamage() {
 }
 
 // Jeden Tag bauen die Leute weiter, auch wenn du nicht hinsiehst
+// In verödeten Orten repariert niemand, ausgebrannte Häuser stürzen ein (dynamics.js)
 export function dailyRepairs() {
   for (const k of Object.keys(G.s.damage || {})) {
     const b = buildingByKey(k);
-    if (b) repairBuilding(b, 0.22);
-    else delete G.s.damage[k];
+    if (!b) { delete G.s.damage[k]; continue; }
+    if (typeof b.idx === 'number') {
+      const s = G.world.sites.find((x) => x.id === b.site);
+      if ((s && (G.s.blight[s.id] || 0) > G.s.day) || b.dmg >= 0.9) continue;
+    }
+    repairBuilding(b, 0.22);
   }
 }
 

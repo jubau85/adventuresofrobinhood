@@ -40,6 +40,12 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - Fähren über den Kanal und die Nordsee
 - Große Städte mit Stadtmauer, Strahlen- und Ringgassen, Häuserzeilen, Pfarrkirchen und mehreren Gasthäusern (London mit rund 180 Häusern)
 - Stufenloser Zoom von 0,45 bis 4, Standard nah am Geschehen
+- Kreislauf aus Bauen und Verfall: Bauplätze, Baustellen, Brände mit Löschketten, Abriss und Neubau
+- Überfälle auf Orte mit Plünderung und langer Brache, Stiften für den Wiederaufbau, Sühne
+- Jäger, Fischer, Reisigsammler, Aussaat und Ernte
+- Turniere mit Tribüne, Zelten, NPC-Tjosten und eigenem Tjost (Zielleiste)
+- Bettler mit Almosen, Galgen mit Hinrichtung, Begräbnis und der Möglichkeit zu befreien
+- Wetter (Wolken, Regen, Nebel, Schneefall) und eine Schneedecke, die nach und nach wächst und taut
 - 63 Orte, Wahrzeichen (Kathedralen, Tower, Louvre, Tuchhallen), Stonehenge und Hadrianswall, Einzelhöfe
 - Bewohner mit Rollen und Tagesablauf
 - Hospiz, Schafzucht, Felder, Verpflegung; Fehden zwischen Fraktionen; Kampfbonus in der Burg
@@ -56,7 +62,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 ## Ausbauplan
 
 ### Nächste Schritte
-- **Turnier in Ashby:** Tjost als Minispiel, Preisgeld und viel Ruhm. Ein Kernstück von *Ivanhoe*.
+- **Turniere ausbauen:** Buhurt (Gruppenkampf), Bogenschießen, eigene Turniere auf der Burg ausrichten.
 - **Belagerungen:** Überfälle auf Ashcombe als echte Kämpfe vor den Mauern statt als Würfelwurf. Mauern und Tore blockieren dann den Weg.
 - **Gefährten mit Geschichte:** Benannte Figuren mit eigenen Quests und Loyalität, etwa ein Mönch, eine Bogenschützin oder ein abtrünniger Templer.
 - **Diplomatie-Tafel:** Gesandte schicken, Tribute zahlen, Bündnisse förmlich schließen oder brechen.
@@ -70,7 +76,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - **Klang:** Musik und Umgebungsgeräusche (Wald, Markt, Schmiede).
 
 ### Später
-- Wetter (Regen, Nebel), Hunger im Winter, Seuchen
+- Hunger im Winter, Seuchen, Hochwasser nach der Schneeschmelze
 - Mehrere Spielstände und Schwierigkeitsgrade
 - Gamepad- und Touch-Steuerung ausbauen
 - Eigene Grafiken statt gezeichneter Formen

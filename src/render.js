@@ -13,6 +13,9 @@ import { graveSlot, graveCount, funeralProps } from './life.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
 import { unitLook, heraldLook } from './units.js';
 import { questTarget } from './politics.js';
+import { tourneyLayout } from './tournament.js';
+import { gallowsFor } from './justice.js';
+import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weather.js';
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -61,7 +64,24 @@ const PAL = [
   { grass: '#7fa140', grass2: '#8bab48', forest: '#4f7832', hills: '#98985a', field: '#d6b850', fieldRow: '#b39436', crop: '#e8cf6a', road: '#b5976a', sand: '#dacb98', water: '#3c7697', water2: '#336684', foam: 'rgba(235,245,245,0.55)', flowers: ['#f4e9a8', '#ffffff', '#d65a4e'] },
   { grass: '#939446', grass2: '#a09d4c', forest: '#736433', hills: '#958a5a', field: '#a3803e', fieldRow: '#7b5e2d', crop: '#b08c48', road: '#a6895f', sand: '#cbb686', water: '#3b6a87', water2: '#335c76', foam: 'rgba(235,245,245,0.45)', flowers: [] },
   { grass: '#e3e9e9', grass2: '#eef2f2', forest: '#d1dad9', hills: '#d8dedb', field: '#e6ebea', fieldRow: '#c6cdcc', crop: '#d0d6d5', road: '#bcb5a9', sand: '#dde0da', water: '#a9c4d1', water2: '#9cb9c7', foam: 'rgba(255,255,255,0.7)', flowers: [] },
+  { grass: '#7f8a50', grass2: '#879052', forest: '#5c5a36', hills: '#8a8660', field: '#8a6e48', fieldRow: '#6a5234', crop: '#8a7a50', road: '#9e8662', sand: '#c4b48a', water: '#3a6680', water2: '#325a72', foam: 'rgba(235,245,245,0.45)', flowers: [] },
 ];
+
+// Landschaft zwischen den Jahreszeiten: Grundfarben der Jahreszeit, je nach Schneedecke ins Weiße
+let palKey = '', palCache = null;
+function lookPal() {
+  const lv = snowLevel(), se = seasonIndex(), key = `${se}|${lv}`;
+  if (key === palKey) return palCache;
+  const base = PAL[se === 3 ? 4 : se], k = lv >= 1 ? 1 : lv * 0.8;
+  const o = {};
+  for (const [name, col] of Object.entries(base)) {
+    if (typeof col === 'string' && col[0] === '#') o[name] = k ? mix(col, PAL[3][name], k) : col;
+    else o[name] = lv >= 0.5 ? PAL[3][name] : col;
+  }
+  palKey = key; palCache = o;
+  return o;
+}
+function lookKey() { return `${seasonIndex()}|${snowLevel()}`; }
 
 // ---------------------------------------------------------------- Grundformen
 function poly(c, pts, fill) {
@@ -75,7 +95,7 @@ function poly(c, pts, fill) {
 function P(x, y, z = 0) { return [isoX(x, y), isoY(x, y) - z - baseZ]; }
 function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
 
-function winterize(col) { return seasonIndex() === 3 ? mix(col, '#f0f4f4', 0.68) : col; }
+function winterize(col) { const lv = snowLevel(); return lv > 0 ? mix(col, '#f0f4f4', 0.68 * lv) : col; }
 
 function addLight(x, y, z, r = 26, strength = 1) { lights.push({ x, y, z: z + baseZ, r, s: strength }); }
 
@@ -308,7 +328,7 @@ let cacheScale = 1, cacheOn = true, cacheUsed = 0, cacheMax = 400;
 function cachedDraw(c, o, bounds, fn) {
   if (!cacheOn) { fn(c); return; }
   cacheUsed++;
-  const key = `${seasonIndex()}|${darkness() > 0.2 ? 1 : 0}|${cacheScale}`;
+  const key = `${lookKey()}|${darkness() > 0.2 ? 1 : 0}|${cacheScale}`;
   let e = partCache.get(o);
   const ax = isoX(o.x, o.y), ay = isoY(o.x, o.y);
   if (!e || e.key !== key) {
@@ -334,6 +354,7 @@ function cachedDraw(c, o, bounds, fn) {
 
 function houseBounds(b) { const half = (b.wx + b.wy) * 16; return [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10]; }
 function drawHouseFast(c, b) {
+  if (b.cons < 1) { drawHouseStage(c, b); return; }
   if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
   cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
 }
@@ -372,6 +393,206 @@ function drawTavernFront(c, b) {
   drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.85, 0.7, 0.3, 7, '#8a6440', 0, 'plank');
   const mug = P(b.x + 0.2, b.y + b.wy / 2 + 0.85, 7); c.fillStyle = '#c9b48a'; c.fillRect(mug[0] - 1, mug[1] - 3, 2, 3);
   if (darkness() > 0.15) addLight(b.x, b.y + b.wy / 2, 10, 44, 1.1);
+}
+
+// Bauplatz, Rohbau oder Ruine (siehe dynamics.js)
+function drawHouseStage(c, b) {
+  const k = b.cons;
+  const x0 = b.x - b.wx / 2, x1 = b.x + b.wx / 2, y0 = b.y - b.wy / 2, y1 = b.y + b.wy / 2;
+  if (k === -2) { drawPlot(c, b.x, b.y, b.wx, b.wy); return; }
+  if (k === -1) {
+    // Brandruine: Aschefleck, Mauerreste, verkohlte Balken
+    const g = P(b.x, b.y);
+    c.fillStyle = 'rgba(40,34,30,0.45)'; c.beginPath(); c.ellipse(g[0], g[1], (b.wx + b.wy) * 17, (b.wx + b.wy) * 8.5, 0, 0, Math.PI * 2); c.fill();
+    drawBox(c, b.x, b.y, b.wx + 0.08, b.wy + 0.08, 4, '#6f685e', -3);
+    const wall = mix(WALLS[b.wall] || WALLS.plaster, '#2a2420', 0.55);
+    drawBox(c, x0 + 0.12, b.y, 0.18, b.wy * 0.9, b.h * 0.45, wall, 0, b.wall === 'stone' ? 'stone' : null);
+    drawBox(c, b.x + 0.1, y0 + 0.12, b.wx * 0.7, 0.18, b.h * 0.3, wall, 0, b.wall === 'stone' ? 'stone' : null);
+    c.strokeStyle = '#2a201a'; c.lineWidth = 2.2;
+    const a = P(x0 + 0.2, y1 - 0.1, 0), e = P(b.x + 0.2, y0 + 0.2, b.h * 0.55), f = P(x1 - 0.1, y1 - 0.2, 0), h2 = P(b.x - 0.1, b.y, b.h * 0.4);
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(e[0], e[1]); c.moveTo(f[0], f[1]); c.lineTo(h2[0], h2[1]); c.stroke();
+    drawStones(c, x1 + 0.2, y1 - 0.1, 4);
+    if (Math.random() < 0.02) smokeEmit(g[0], g[1] - 6, 0.3);
+    return;
+  }
+  // Baustelle: Fundament, Fachwerk, Wände, Sparren, zuletzt das Dach
+  const wall = WALLS[b.wall] || WALLS.plaster;
+  drawPlot(c, b.x, b.y, b.wx + 0.3, b.wy + 0.3);
+  drawBox(c, b.x, b.y, b.wx + 0.08, b.wy + 0.08, 5, '#80796d', -4);
+  drawLogs(c, x0 - 0.5, b.y + 0.25, 3);
+  if (k >= 0.86) { drawHouse(c, { ...b, cons: undefined, dmg: 0, fire: 0, lit: false, chimney: false, tavern: false }); drawScaffold(c, b.x, b.y, b.wx + 0.25, b.wy + 0.25, b.h + 6); return; }
+  const postH = b.h * Math.min(1, Math.max(0, (k - 0.15) / 0.3));
+  const wallH = b.h * Math.min(1, Math.max(0, (k - 0.42) / 0.3));
+  if (wallH > 2) drawBox(c, b.x, b.y, b.wx, b.wy, wallH, b.wall === 'timber' ? WALLS.plaster : wall, 0, b.wall === 'stone' ? 'stone' : b.wall === 'wood' ? 'plank' : null);
+  if (postH > 2) {
+    c.strokeStyle = '#6b4a2e'; c.lineWidth = 2;
+    c.beginPath();
+    for (const [px, py] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) { const q0 = P(px, py, 0), q1 = P(px, py, postH); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); }
+    if (postH >= b.h * 0.99) {
+      const q = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map(([px, py]) => P(px, py, b.h));
+      c.moveTo(q[0][0], q[0][1]); for (const p2 of q.slice(1)) c.lineTo(p2[0], p2[1]);
+      // Streben
+      const s1 = P(x0, y1, 0), s2 = P(b.x, y1, b.h * 0.6), s3 = P(x1, y1, 0), s4 = P(x1, b.y, b.h * 0.6);
+      c.moveTo(s1[0], s1[1]); c.lineTo(s2[0], s2[1]); c.moveTo(s3[0], s3[1]); c.lineTo(s4[0], s4[1]);
+    }
+    c.stroke();
+  }
+  if (k >= 0.66) {
+    // Sparren des Dachstuhls
+    const alongX = b.wx >= b.wy, top = b.h + b.rh;
+    c.strokeStyle = '#7a5636'; c.lineWidth = 1.6;
+    c.beginPath();
+    for (const u of [0, 0.34, 0.67, 1]) {
+      const a = alongX ? [P(x0 + u * b.wx, y0, b.h), P(x0 + u * b.wx, b.y, top), P(x0 + u * b.wx, y1, b.h)] : [P(x0, y0 + u * b.wy, b.h), P(b.x, y0 + u * b.wy, top), P(x1, y0 + u * b.wy, b.h)];
+      c.moveTo(a[0][0], a[0][1]); c.lineTo(a[1][0], a[1][1]); c.lineTo(a[2][0], a[2][1]);
+    }
+    const r1 = alongX ? P(x0, b.y, top) : P(b.x, y0, top), r2 = alongX ? P(x1, b.y, top) : P(b.x, y1, top);
+    c.moveTo(r1[0], r1[1]); c.lineTo(r2[0], r2[1]);
+    c.stroke();
+  }
+  if (k >= 0.2) drawScaffold(c, b.x, b.y, b.wx + 0.25, b.wy + 0.25, Math.max(postH, 12) + 6);
+}
+
+// ---------------------------------------------------------------- Turnierplatz
+// Schranke mit Tuchbehang, Tribüne mit Baldachin und Publikum, Zelte der Ritter, Banner
+function tourneyParts() {
+  const L = tourneyLayout();
+  if (!L) return [];
+  const W = G.world, parts = [], { lx, ly } = L;
+  const host = L.host && L.host.faction ? FACTIONS[L.host.faction].color : '#a33b32';
+  const z = groundZ(W, lx, ly);
+  const add = (x, y, f, dd = 0) => parts.push({ x, y, d: x + y + dd, z, f });
+  for (let i = -6; i < 6; i++) {
+    const x0 = lx + i, x1 = x0 + 1;
+    add(x0 + 0.5, ly, (c) => drawTiltPiece(c, x0, x1, ly, i % 2 ? host : '#e8dcc0', i === -6, i === 5));
+  }
+  add(lx, ly - 3, (c) => drawStand(c, lx, ly - 3, host, !L.building));
+  for (const side of [-1, 1]) add(lx + side * 6.4, ly - 0.2, (c) => { const [bx, by] = P(lx + side * 6.4, ly - 0.2, 0); c.strokeStyle = '#4a3322'; c.lineWidth = 2; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx, by - 18); c.stroke(); banner(c, lx + side * 6.4, ly - 0.2, 18, host); });
+  L.knights.forEach((k, i) => {
+    const sd = i % 2 === 0 ? -1 : 1, row = Math.floor(i / 2);
+    const x = lx + sd * (8.4 + (row % 2) * 0.9), y = ly - 1.9 + row * 1.15;
+    add(x, y, (c) => drawPavilion(c, x, y, k.col));
+  });
+  return parts;
+}
+
+function drawTiltPiece(c, x0, x1, y, col, first, last) {
+  const a = P(x0, y, 3), b = P(x1, y, 3), a2 = P(x0, y, 10), b2 = P(x1, y, 10);
+  poly(c, [a, b, b2, a2], col);
+  c.strokeStyle = 'rgba(60,40,20,0.35)'; c.lineWidth = 0.8;
+  c.beginPath(); for (const f of [0.33, 0.66]) { const p1 = lerp2(a, b, f), p2 = lerp2(a2, b2, f); c.moveTo(p1[0], p1[1] + 1); c.lineTo(p2[0], p2[1]); } c.stroke();
+  c.strokeStyle = '#6b4a2e'; c.lineWidth = 2.2;
+  c.beginPath(); c.moveTo(a2[0], a2[1] - 1); c.lineTo(b2[0], b2[1] - 1); c.stroke();
+  c.lineWidth = 1.8;
+  const p0 = P(x0, y, 0), p1 = P(x0, y, 11);
+  c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.stroke();
+  if (last) { const q0 = P(x1, y, 0), q1 = P(x1, y, 11); c.beginPath(); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); c.stroke(); }
+}
+
+function drawStand(c, x, y, col, crowd) {
+  drawShadow(c, x, y, 7.4, 1.6, 30, 0.16);
+  const tiers = [[y + 0.45, 6], [y, 12], [y - 0.45, 18]];
+  const t = G.tour, cheer = t && t.cheer > 0;
+  const cols = ['#9a3b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#e8e0cc', '#6f5a8a', '#8a5a4a', '#4a6a5a'];
+  for (const [ty, h] of tiers.slice().reverse()) {
+    drawBox(c, x, ty, 7.2, 0.5, h, '#8a6440', 0, 'plank');
+    if (!crowd) continue;
+    for (let k = 0; k < 14; k++) {
+      const px = x - 3.3 + k * 0.5 + (ty - y) * 0.3;
+      const [sx, sy] = P(px, ty, h);
+      const bob = cheer ? Math.abs(Math.sin(G.time * 8 + k * 1.3 + ty * 3)) * 2.5 : 0;
+      c.fillStyle = cols[(k * 3 + Math.round(ty * 7)) % cols.length];
+      c.fillRect(sx - 2.4, sy - 8 - bob, 4.8, 6);
+      c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(sx, sy - 10.5 - bob, 2, 0, Math.PI * 2); c.fill();
+      if (cheer && k % 3 === 0) { c.strokeStyle = '#e4ba94'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(sx - 2, sy - 8 - bob); c.lineTo(sx - 4, sy - 14 - bob); c.moveTo(sx + 2, sy - 8 - bob); c.lineTo(sx + 4, sy - 14 - bob); c.stroke(); }
+    }
+  }
+  // Baldachin über der Mitte mit gestreiftem Tuch
+  const top = 36;
+  c.strokeStyle = '#5a3d26'; c.lineWidth = 1.8;
+  for (const [px, py] of [[x - 1.6, y + 0.6], [x + 1.6, y + 0.6], [x + 1.6, y - 0.7]]) { const a = P(px, py, 0), b = P(px, py, top); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+  const r = [P(x - 1.7, y + 0.7, top), P(x + 1.7, y + 0.7, top), P(x + 1.7, y - 0.8, top), P(x - 1.7, y - 0.8, top)];
+  const peak = P(x, y, top + 10);
+  poly(c, [r[0], r[1], peak], col);
+  poly(c, [r[1], r[2], peak], shade(col, 0.8));
+  c.strokeStyle = '#e8dcc0'; c.lineWidth = 2;
+  c.beginPath(); for (const f of [0.25, 0.5, 0.75]) { const q = lerp2(r[0], r[1], f); c.moveTo(q[0], q[1]); c.lineTo(peak[0], peak[1]); } c.stroke();
+  for (let k = 0; k < 6; k++) { const q = lerp2(r[0], r[1], (k + 0.5) / 6); c.fillStyle = k % 2 ? col : '#e8dcc0'; c.beginPath(); c.arc(q[0], q[1], 2.6, 0, Math.PI); c.fill(); }
+  banner(c, x, y, top + 10, col);
+}
+
+function drawPavilion(c, x, y, col) {
+  drawShadow(c, x, y, 1.0, 1.0, 24, 0.16);
+  drawBox(c, x, y, 0.9, 0.9, 13, '#ece2c8');
+  for (const f of [0.15, 0.5, 0.85]) faceQuad(c, x, y, 0.9, 0.9, 'L', f - 0.08, f + 0.08, 0, 13, col);
+  faceQuad(c, x, y, 0.9, 0.9, 'R', 0.3, 0.7, 0, 13, shade(col, 0.85));
+  drawPyramid(c, x, y, 1.05, 1.05, 13, 13, col);
+  const [px, py] = P(x, y, 26);
+  c.strokeStyle = '#4a3322'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(px, py); c.lineTo(px, py - 8); c.stroke();
+  const w = Math.sin(G.time * 3 + x) * 1.2;
+  c.fillStyle = col; c.beginPath(); c.moveTo(px, py - 8); c.lineTo(px + 7, py - 6.5 + w); c.lineTo(px, py - 5); c.fill();
+}
+
+// Galgen: Podest mit Stufe, zwei Pfosten, Querbalken, Strick
+function drawGallows(c, g, hanged) {
+  const wood = '#6b4a2e';
+  drawShadow(c, g.x, g.y, 1.6, 1.1, 50, 0.14);
+  drawBox(c, g.x, g.y + 0.1, 1.6, 1.1, 7, '#7a5a3a', 0, 'plank');
+  drawBox(c, g.x, g.y + 0.85, 0.6, 0.4, 3.5, '#6b4a2e', 0, 'plank');
+  for (const dx of [-0.62, 0.62]) drawBox(c, g.x + dx, g.y, 0.14, 0.14, 44, wood, 7);
+  drawBox(c, g.x, g.y, 1.4, 0.15, 4, '#5a3d26', 51);
+  const [ax, ay] = P(g.x - 0.62, g.y, 38), [bx, by] = P(g.x - 0.25, g.y, 51);
+  c.strokeStyle = wood; c.lineWidth = 2; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+  const [rx, ry] = P(g.x + 0.15, g.y, 51);
+  c.strokeStyle = '#b8a070'; c.lineWidth = 1.1;
+  if (!hanged) {
+    c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx, ry + 12); c.stroke();
+    c.beginPath(); c.ellipse(rx, ry + 15, 2.2, 3, 0, 0, Math.PI * 2); c.stroke();
+    return;
+  }
+  // Eine stille dunkle Gestalt, leicht im Wind
+  c.save(); c.translate(rx, ry); c.rotate(Math.sin(G.time * 1.1) * 0.05);
+  c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 14); c.stroke();
+  c.fillStyle = 'rgba(58,52,48,0.92)';
+  c.beginPath(); c.arc(0, 17, 3, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(-4, 20); c.lineTo(4, 20); c.lineTo(3.4, 32); c.lineTo(-3.4, 32); c.closePath(); c.fill();
+  c.fillRect(-2.6, 32, 2, 8); c.fillRect(0.6, 32, 2, 8);
+  c.restore();
+}
+
+function drawLooseHorse(c, f) {
+  const x = f.x + f.vx * f.t, y = f.y + f.vy * f.t;
+  const [px, py] = P(x, y, 0);
+  const fc = (f.vx - f.vy) >= 0 ? 1 : -1;
+  c.save(); c.translate(px, py); c.globalAlpha = Math.min(1, (f.dur - f.t) * 2); c.scale(fc * 1.14, 1.14);
+  drawHorse(c, f.col, G.time, true, f.look);
+  c.restore();
+}
+
+function drawSplinter(c, f) {
+  const k = f.t;
+  const [px, py] = P(f.x + f.vx * k, f.y + f.vy * k, f.z0 + 30 * k - 50 * k * k);
+  c.globalAlpha = Math.max(0, 1 - k / f.dur);
+  c.strokeStyle = '#d8c8a0'; c.lineWidth = 1.4;
+  c.beginPath(); c.moveTo(px - 2, py - 1); c.lineTo(px + 2, py + 1); c.stroke();
+  c.globalAlpha = 1;
+}
+
+// Zielleiste beim Tjost (Bildschirmkoordinaten)
+function drawAimBar(c, w, h, aim) {
+  const bw = Math.min(440, w - 60), bx = (w - bw) / 2, by = h - (w < 720 ? 190 : 150);
+  c.fillStyle = 'rgba(28,20,14,0.86)'; c.fillRect(bx - 16, by - 34, bw + 32, 62);
+  c.strokeStyle = '#d6ad4c'; c.lineWidth = 1.2; c.strokeRect(bx - 16, by - 34, bw + 32, 62);
+  c.font = '600 14px "Alegreya Sans", sans-serif'; c.textAlign = 'center'; c.fillStyle = '#f3ead2';
+  c.fillText(aim.pressed === null ? (w < 720 ? 'Tippen, wenn die Marke im Gold ist!' : 'Lanze senken: Leertaste oder Klick im goldenen Feld') : 'Die Lanze ist gesenkt …', w / 2, by - 14);
+  c.fillStyle = '#4a3a2a'; c.fillRect(bx, by, bw, 12);
+  const z0 = bx + (aim.c - aim.w / 2) * bw, zw = aim.w * bw;
+  const g = c.createLinearGradient(z0, 0, z0 + zw, 0);
+  g.addColorStop(0, 'rgba(214,173,76,0.35)'); g.addColorStop(0.5, 'rgba(255,224,120,1)'); g.addColorStop(1, 'rgba(214,173,76,0.35)');
+  c.fillStyle = g; c.fillRect(z0, by, zw, 12);
+  const mk = (v, col) => { const x = bx + v * bw; c.fillStyle = col; c.beginPath(); c.moveTo(x, by - 3); c.lineTo(x - 5, by - 10); c.lineTo(x + 5, by - 10); c.closePath(); c.fill(); c.fillRect(x - 1, by - 3, 2, 18); };
+  mk(aim.m, '#ffffff');
+  if (aim.pressed !== null) mk(aim.pressed, '#ff7a5a');
 }
 
 // Brand- und Belagerungsschäden: Ruß, Löcher im Dach, eingestürzte Sparren, danach ein Gerüst
@@ -605,7 +826,7 @@ function drawMotte(c, b) {
   const mh = 26, R = 1.45;
   const g = P(b.x, b.y, 0), t = P(b.x, b.y, mh);
   const RX = R * 45, RY = R * 22.6, rx = R * 0.5 * 45, ry = R * 0.5 * 22.6;
-  const grass = seasonIndex() === 3 ? '#dfe5e4' : seasonIndex() === 2 ? '#8f8a48' : '#6f9b45';
+  const grass = lookSeason() === 3 ? '#dfe5e4' : lookSeason() >= 2 ? '#8f8a48' : '#6f9b45';
   c.fillStyle = 'rgba(40,50,30,0.25)'; c.beginPath(); c.ellipse(g[0] + 6, g[1] + 2, RX + 8, RY + 4, 0, 0, Math.PI * 2); c.fill();
   const grad = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
   grad.addColorStop(0, shade(grass, 1.12)); grad.addColorStop(1, shade(grass, 0.72));
@@ -680,7 +901,7 @@ function drawTor(c, b) {
   const mh = 70, R = 2.5;
   const g = P(b.x, b.y, 0), t = P(b.x, b.y, mh);
   const RX = R * 45, RY = R * 22.6;
-  const grass = seasonIndex() === 3 ? '#dfe5e4' : seasonIndex() === 2 ? '#8f8a48' : '#6f9b45';
+  const grass = lookSeason() === 3 ? '#dfe5e4' : lookSeason() >= 2 ? '#8f8a48' : '#6f9b45';
   const grad = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
   grad.addColorStop(0, shade(grass, 1.15)); grad.addColorStop(1, shade(grass, 0.68));
   c.fillStyle = grad;
@@ -745,7 +966,7 @@ function drawWallRuin(c, o) {
   const [px, py] = P(o.x, o.y, o.h);
   c.fillStyle = shade(col, 0.8);
   c.fillRect(px - 3, py - 2, 3, 2); c.fillRect(px + 4, py - 1, 2, 1);
-  if (seasonIndex() < 3) { c.fillStyle = 'rgba(90,120,50,0.6)'; c.fillRect(px - 6, py + 1, 5, 2); }
+  if (lookSeason() !== 3) { c.fillStyle = 'rgba(90,120,50,0.6)'; c.fillRect(px - 6, py + 1, 5, 2); }
 }
 
 function drawLonghall(c, b) {
@@ -894,7 +1115,7 @@ function drawStones(c, x, y, n) {
 
 function drawProp(c, b) {
   const [x, y] = P(b.x, b.y, 0);
-  const winter = seasonIndex() === 3;
+  const winter = lookSeason() === 3;
   c.fillStyle = 'rgba(25,35,15,0.2)';
   c.beginPath(); c.ellipse(x + 3, y, 8, 3.5, 0, 0, Math.PI * 2); c.fill();
   switch (b.prop) {
@@ -1790,13 +2011,13 @@ function drawCelebration(c, dt) {
   if (ce && G.time - ce.t0 < 45 && G.world) {
     const s = G.world.sites.find((x) => x.type === 'spieler');
     let px = s.x - 1, py = s.y - 1;
-    if (ce.id === 'wehr') { px = s.x + TOWER_SPOTS[ce.level - 1][0]; py = s.y + TOWER_SPOTS[ce.level - 1][1]; }
+    if (ce.x !== undefined) { px = ce.x; py = ce.y; }
+    else if (ce.id === 'wehr') { px = s.x + TOWER_SPOTS[ce.level - 1][0]; py = s.y + TOWER_SPOTS[ce.level - 1][1]; }
     else if (ce.id !== 'burg') { px = s.x + CASTLE_LAYOUT[ce.id].dx; py = s.y + CASTLE_LAYOUT[ce.id].dy; }
     const sp = toScreen(px, py);
     const z = G.cam.zoom;
     if (sparkles.length < 140) for (let k = 0; k < 3; k++) sparkles.push({ x: sp.x + (Math.random() - 0.5) * 90 * z, y: sp.y - Math.random() * 40 * z, vy: -20 - Math.random() * 30, life: 0, max: 1.2 + Math.random() * 1.2 });
-    const name = ce.id === 'burg' ? BUILDINGS.burg.levels[ce.level].name : `${BUILDINGS[ce.id].name} Stufe ${ce.level}`;
-    const label = `Fertig: ${name}`;
+    const label = ce.label || `Fertig: ${ce.id === 'burg' ? BUILDINGS.burg.levels[ce.level].name : `${BUILDINGS[ce.id].name} Stufe ${ce.level}`}`;
     c.font = `600 ${Math.round(15 + z * 2)}px "IM Fell English SC", Georgia, serif`;
     c.textAlign = 'center';
     const tw = c.measureText(label).width;
@@ -1835,7 +2056,7 @@ function makeDeciduous(season, v) {
   g.fillStyle = '#5a4030';
   g.fillRect(w / 2 - 3, h - 30, 6, 28);
   g.fillStyle = '#6e5038'; g.fillRect(w / 2 - 3, h - 30, 2, 28);
-  if (season === 3) {
+  if (season >= 3) {
     g.strokeStyle = '#4d3a2c'; g.lineCap = 'round';
     const branch = (x, y, a, len, wd) => {
       if (len < 4) return;
@@ -1846,7 +2067,7 @@ function makeDeciduous(season, v) {
     };
     branch(w / 2, h - 28, -Math.PI / 2, 16, 4);
     g.fillStyle = 'rgba(250,252,252,0.9)';
-    for (let k = 0; k < 12; k++) g.fillRect(w / 2 - 16 + r() * 32, 14 + r() * 30, 3, 1.5);
+    if (season === 3) for (let k = 0; k < 12; k++) g.fillRect(w / 2 - 16 + r() * 32, 14 + r() * 30, 3, 1.5);
     return { cvs: cv, ax: w / 2, ay: h - 3, k: 1 / SPR };
   }
   const sets = [
@@ -1907,7 +2128,7 @@ function makeBush(season, v) {
   const w = 34, h = 26;
   const cv = makeCanvas(w * SPR, h * SPR), g = cv.getContext('2d'); g.scale(SPR, SPR);
   const r = mulberry32(4000 + v * 11);
-  const cols = [['#4c8232', '#68a043', '#8cc25c'], ['#3f7a2c', '#55923a', '#77b04e'], ['#8a6a2a', '#b08a34', '#d0aa4a'], ['#5a6650', '#6e7a62', '#eef2f2']][season];
+  const cols = [['#4c8232', '#68a043', '#8cc25c'], ['#3f7a2c', '#55923a', '#77b04e'], ['#8a6a2a', '#b08a34', '#d0aa4a'], ['#5a6650', '#6e7a62', '#eef2f2'], ['#5e5a3c', '#6e6846', '#847c56']][season];
   const blobs = [];
   for (let k = 0; k < 6; k++) blobs.push([w / 2 + (r() - 0.5) * 16, 15 + (r() - 0.5) * 5, 5 + r() * 4]);
   g.fillStyle = 'rgba(28,30,12,0.6)';
@@ -1954,7 +2175,7 @@ function artTree(season, v) {
 
 const SPR = 3;
 function ensureSprites() {
-  const s = seasonIndex();
+  const s = treeSeason();
   if (sprites && spriteSeason === s) return;
   spriteSeason = s;
   sprites = {
@@ -2018,6 +2239,7 @@ function grassPattern(c, ox, oy) {
   return c.__grass;
 }
 
+let tileSnow = 0;
 function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   const M = W.M, vh = W.vh, N = W.N;
   const t = W.tiles[j * N + i];
@@ -2041,15 +2263,26 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath();
   c.fillStyle = cR; c.fill(); c.strokeStyle = cR; c.stroke();
   // Gemalte Wiese: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
-  const grassArt = (t === T.GRASS || t === T.ROAD) && season < 3 ? grassPattern(c, ox, oy) : null;
+  const grassArt = (t === T.GRASS || t === T.ROAD) && (season < 3 || season === 4) ? grassPattern(c, ox, oy) : null;
   if (grassArt) {
     c.save();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
     c.fillStyle = grassArt; c.fill();
-    c.globalAlpha = season === 2 ? 0.5 : 0.26;
+    c.globalAlpha = season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
     c.restore();
+  }
+
+  // Liegengebliebener Schnee in Flecken, je mehr, desto dichter die Decke
+  if (tileSnow > 0 && tileSnow < 1 && !isWater) {
+    const n = Math.floor(hash2(i, j, 41) * 4 * tileSnow + tileSnow * 3.2);
+    c.fillStyle = 'rgba(242,246,246,0.92)';
+    for (let k = 0; k < n; k++) {
+      const p = tp(0.2 + hash2(i + k * 5, j, 42) * 0.6, 0.2 + hash2(i, j + k * 5, 43) * 0.6);
+      const rr = (4 + hash2(i + k, j + k, 44) * 7) * (0.7 + tileSnow);
+      c.beginPath(); c.ellipse(p[0], p[1], rr, rr * 0.5, 0, 0, Math.PI * 2); c.fill();
+    }
   }
 
   if (isWater) {
@@ -2093,7 +2326,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
       }
     }
     if (t === T.FOREST) {
-      c.fillStyle = season === 2 ? '#c9742a' : season === 3 ? '#b9c4c2' : '#3d5e2a';
+      c.fillStyle = season === 2 ? '#c9742a' : season === 3 ? '#b9c4c2' : season === 4 ? '#6a5a3a' : '#3d5e2a';
       for (let k = 0; k < 5; k++) { const p = tp(0.1 + hash2(i + k * 7, j, 31) * 0.8, 0.1 + hash2(i, j + k * 7, 32) * 0.8); c.fillRect(p[0], p[1], 2, 1.4); }
     }
     if ((t === T.HILLS || t === T.SAND) && h2 < 0.4) {
@@ -2155,8 +2388,9 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
 
 function renderChunk(cx, cy, cs = 1) {
   const W = G.world;
-  const season = seasonIndex();
-  const pal = PAL[season];
+  const season = lookSeason();
+  const pal = lookPal();
+  tileSnow = snowLevel();
   const cvs = makeCanvas((CHUNK * TW) * cs, (CHUNK * TH + PAD_TOP + 4) * cs);
   const c = cvs.getContext('2d');
   c.scale(cs, cs);
@@ -2182,7 +2416,7 @@ function getChunk(cx, cy, cs = 1) {
 // Erdscholle an den vorderen Kartenrändern (Diorama)
 function drawSlab(c, minX, maxX, minY, maxY) {
   const W = G.world, N = W.N, M = W.M;
-  const season = seasonIndex();
+  const season = lookSeason();
   const face = (a, b, hA, hB, t, side) => {
     const aB = [a[0], a[1] + hA + SLAB], bB = [b[0], b[1] + hB + SLAB];
     const f = side === 'L' ? 1 : 0.8;
@@ -2191,7 +2425,7 @@ function drawSlab(c, minX, maxX, minY, maxY) {
     poly(c, [mid(a, aB, 0.55), mid(b, bB, 0.55), bB, aB], shade('#5d5750', f));
     poly(c, [mid(a, aB, 0.8), mid(b, bB, 0.8), bB, aB], shade('#4a453f', f));
     const water = t === T.WATER || t === T.BRIDGE;
-    poly(c, [a, b, [b[0], b[1] + 5], [a[0], a[1] + 5]], water ? shade('#3f7a9c', f) : season === 3 ? shade('#e8eded', f) : shade('#5f8f3a', f));
+    poly(c, [a, b, [b[0], b[1] + 5], [a[0], a[1] + 5]], water ? shade('#3f7a9c', f) : season === 3 ? shade('#e8eded', f) : shade(season === 4 ? '#7f8a50' : '#5f8f3a', f));
     const p = lerp2(a, b, 0.4);
     c.fillStyle = 'rgba(30,20,10,0.25)'; c.fillRect(p[0], p[1] + 22, 3, 2);
   };
@@ -2210,7 +2444,7 @@ function drawSlab(c, minX, maxX, minY, maxY) {
 }
 
 function drawWaterShimmer(c, minX, maxX, minY, maxY) {
-  if (seasonIndex() === 3) return;
+  if (lookSeason() === 3) return;
   const W = G.world, N = W.N;
   const i0 = Math.max(0, Math.floor(minX)), i1 = Math.min(N - 1, Math.ceil(maxX));
   const j0 = Math.max(0, Math.floor(minY)), j1 = Math.min(N - 1, Math.ceil(maxY));
@@ -2261,7 +2495,34 @@ function drawHorse(c, col, t, moving, look) {
   c.lineCap = 'butt';
 }
 
+function drawLance(c, u, by) {
+  const col = (u.lookObj && u.lookObj.tunic) || (u.kind === 'player' ? playerColor() : '#9a2f2a');
+  c.save();
+  c.translate(3, by - 12);
+  c.lineCap = 'round';
+  if (u.lanceBroken) {
+    c.strokeStyle = '#e2d4b0'; c.lineWidth = 2.4;
+    c.beginPath(); c.moveTo(-6, 2); c.lineTo(9, -1); c.stroke();
+    c.strokeStyle = '#b89a6a'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(9, -1); c.lineTo(12, -3); c.moveTo(9, -1); c.lineTo(11.5, 1); c.stroke();
+  } else if (u.lanceDown) {
+    c.strokeStyle = '#e8dcc0'; c.lineWidth = 2.6;
+    c.beginPath(); c.moveTo(-9, 2); c.lineTo(36, -4); c.stroke();
+    c.strokeStyle = col; c.lineWidth = 2.6;
+    c.beginPath(); for (const a of [0.15, 0.45, 0.75]) { c.moveTo(-9 + 45 * a, 2 - 6 * a); c.lineTo(-9 + 45 * (a + 0.12), 2 - 6 * (a + 0.12)); } c.stroke();
+    c.fillStyle = '#c8cdd2'; c.beginPath(); c.moveTo(1, -3.5); c.lineTo(5, -0.5); c.lineTo(1, 3); c.closePath(); c.fill();
+  } else {
+    c.strokeStyle = '#e8dcc0'; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(0, 6); c.lineTo(3, -34); c.stroke();
+    const w = Math.sin(G.time * 4 + u.id) * 1.5;
+    c.fillStyle = col; c.beginPath(); c.moveTo(3, -33); c.lineTo(13, -30 + w); c.lineTo(3, -27); c.closePath(); c.fill();
+  }
+  c.lineCap = 'butt';
+  c.restore();
+}
+
 function drawWeapon(c, u, by) {
+  if (u.lance) { drawLance(c, u, by); return; }
   const it = ITEMS[u.eq.waffe];
   if (!it) return;
   const sw = u.swing > 0 ? (u.swing / 0.3) : 0;
@@ -2321,7 +2582,7 @@ function drawFigure(c, u, x, y) {
   const sc = u.small ? 0.8 : 1.14;
   c.scale((u.facing || 1) * sc, sc);
   let by = 0;
-  const low = u.kind === 'peasant' && (u.act === 'jaeten' || u.act === 'sitzen');
+  const low = u.kind === 'peasant' && (u.act === 'jaeten' || u.act === 'sitzen' || u.act === 'sammeln' || u.act === 'pirschen' || u.act === 'betteln');
   if (m) { drawHorse(c, HORSES[u.eq.pferd] || '#7a5232', u.anim, u.moving, u.eq.pferd === 'schlachtross' ? L : null); by = -12; }
   else if (low) {
     by = 5;
@@ -2387,7 +2648,7 @@ function drawFigure(c, u, x, y) {
 }
 
 // Kleidung, Werkzeug und Last der Bewohner, dazu die Arbeitsbewegung
-const ACT_SPEED = { hacke: 3, sichel: 3.4, axt: 3.6, hammer: 5.5, gabel: 2.6, eimer: 1.6, besen: 3.2, verkaufen: 1.4, reden: 1.1, kaufen: 0.8 };
+const ACT_SPEED = { hacke: 3, sichel: 3.4, axt: 3.6, hammer: 5.5, gabel: 2.6, eimer: 1.6, schoepfen: 1.6, besen: 3.2, verkaufen: 1.4, reden: 1.1, kaufen: 0.8, loeschen: 3.2, saeen: 2.2, sammeln: 2.6, pirschen: 0.6 };
 function drawVillagerGear(c, u, yb) {
   const t = G.time * (ACT_SPEED[u.act] || 1) + (u.id % 7);
   const s = Math.sin(t), lift = s > 0 ? s : 0;
@@ -2425,7 +2686,36 @@ function drawVillagerGear(c, u, yb) {
     else if (tool === 'besen') { c.fillStyle = '#b89a5a'; c.beginPath(); c.moveTo(12, -2.5); c.lineTo(16, -3.5); c.lineTo(16, 3.5); c.lineTo(12, 2.5); c.closePath(); c.fill(); }
     c.restore();
   }
-  if (u.act === 'eimer') {
+  if (u.bow && u.act !== 'pirschen') {
+    c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(-2, yb - 12, 8, -Math.PI * 0.45, Math.PI * 0.45); c.stroke();
+  }
+  if (u.act === 'pirschen') {
+    const draw = Math.max(0, Math.sin(t * 0.5)) * 2.5;
+    c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.6;
+    c.beginPath(); c.arc(6, yb - 12, 7, -Math.PI / 2.4, Math.PI / 2.4); c.stroke();
+    c.strokeStyle = 'rgba(240,230,200,0.85)'; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(6 + 7 * Math.cos(-Math.PI / 2.4), yb - 12 + 7 * Math.sin(-Math.PI / 2.4)); c.lineTo(5 - draw, yb - 12); c.lineTo(6 + 7 * Math.cos(Math.PI / 2.4), yb - 12 + 7 * Math.sin(Math.PI / 2.4)); c.stroke();
+    c.strokeStyle = '#7a5a3a'; c.lineWidth = 1; c.beginPath(); c.moveTo(4 - draw, yb - 12); c.lineTo(14, yb - 12); c.stroke();
+  }
+  if (u.act === 'sammeln') {
+    c.strokeStyle = '#7a5636'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(3, yb - 6 - lift * 2); c.lineTo(9, yb - 8 - lift * 2); c.moveTo(4, yb - 4); c.lineTo(8, yb - 6); c.stroke();
+  }
+  if (u.act === 'saeen') {
+    const sw = Math.sin(t * 1.5);
+    c.strokeStyle = shade(u.tunic || '#8a6e4b', 0.85); c.lineWidth = 2;
+    c.beginPath(); c.moveTo(2.5, yb - 14); c.lineTo(6 + sw * 3, yb - 11 - Math.abs(sw) * 3); c.stroke();
+    if (sw > 0.6) { c.fillStyle = '#d8c48a'; for (let q = 0; q < 5; q++) c.fillRect(8 + q * 2.2, yb - 12 + q * 1.6 + ((G.time * 9 + q) % 3), 1.1, 1.1); }
+  }
+  if (u.act === 'loeschen') {
+    const up = Math.max(0, Math.sin(t));
+    c.save(); c.translate(5, yb - 12 - up * 4); c.rotate(-up * 1.2);
+    c.fillStyle = '#7a6a55'; c.fillRect(-1.5, -2, 4, 4.4); c.fillStyle = '#5f86a0'; c.fillRect(-1.1, -2, 3.2, 1);
+    c.restore();
+    if (up > 0.7) { c.strokeStyle = 'rgba(150,200,235,0.85)'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(7, yb - 18); c.quadraticCurveTo(14, yb - 24, 19, yb - 12); c.stroke(); }
+  }
+  if (u.act === 'eimer' || u.act === 'schoepfen') {
     const by = yb - 5 - lift * 7;
     c.strokeStyle = '#c9b48a'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(5.5, yb - 18); c.lineTo(5.5, by); c.stroke();
     c.fillStyle = '#7a6a55'; c.fillRect(3.8, by, 3.4, 3.6); c.fillStyle = '#5f86a0'; c.fillRect(4.2, by, 2.6, 1);
@@ -2435,6 +2725,20 @@ function drawVillagerGear(c, u, yb) {
     c.strokeStyle = shade(u.tunic || '#8a6e4b', 0.85); c.lineWidth = 2;
     c.beginPath(); c.moveTo(2.8, yb - 14); c.lineTo(6.5, yb - 17 - wave); c.stroke();
     c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(6.8, yb - 17.5 - wave, 1.3, 0, Math.PI * 2); c.fill();
+  }
+  if (u.act === 'gefesselt') { c.strokeStyle = '#b8a070'; c.lineWidth = 1; c.beginPath(); c.moveTo(-3, yb - 10); c.lineTo(3, yb - 10); c.stroke(); }
+  if (u.patches) { c.fillStyle = shade(u.tunic || '#7a7062', 0.7); c.fillRect(-2.6, yb - 13, 2.2, 2.4); c.fillStyle = shade(u.tunic || '#7a7062', 1.25); c.fillRect(1, yb - 10, 2.4, 2); }
+  if (u.crutch) { c.strokeStyle = '#7a5a3a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-7, yb + 3); c.lineTo(-4.5, yb - 17); c.moveTo(-6.4, yb - 16.5); c.lineTo(-2.6, yb - 17.5); c.stroke(); }
+  if (u.act === 'betteln') {
+    const up = Math.max(0, Math.sin(G.time * 0.9 + u.id)) > 0.8 ? 2.5 : 0;
+    c.strokeStyle = shade(u.tunic || '#7a7062', 0.85); c.lineWidth = 2; c.beginPath(); c.moveTo(2.5, yb - 13); c.lineTo(6, yb - 9 - up); c.stroke();
+    c.fillStyle = '#8a6a44'; c.beginPath(); c.ellipse(7.5, yb - 8.5 - up, 3, 1.3, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  }
+  if (u.act === 'jubeln') {
+    const w1 = Math.sin(G.time * 9 + u.id) * 2, w2 = Math.sin(G.time * 9 + u.id + 2) * 2;
+    c.strokeStyle = shade(u.tunic || '#8a6e4b', 0.85); c.lineWidth = 2;
+    c.beginPath(); c.moveTo(-2.8, yb - 15); c.lineTo(-5.5, yb - 23 + w1); c.moveTo(2.8, yb - 15); c.lineTo(5.5, yb - 23 + w2); c.stroke();
+    c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(-5.6, yb - 23.5 + w1, 1.3, 0, Math.PI * 2); c.arc(5.6, yb - 23.5 + w2, 1.3, 0, Math.PI * 2); c.fill();
   }
   if (u.act === 'kaufen') { c.fillStyle = '#e8c35a'; c.beginPath(); c.arc(5.5, yb - 11, 1.2, 0, Math.PI * 2); c.fill(); }
   if (u.act === 'kreuz') {
@@ -2477,6 +2781,18 @@ function drawVillagerGear(c, u, yb) {
     case 'holz': c.strokeStyle = '#7a5636'; c.lineWidth = 2.2; for (let k = 0; k < 3; k++) { c.beginPath(); c.moveTo(-5, yb - 18.5 + k * 1.6); c.lineTo(5, yb - 20 + k * 1.6); c.stroke(); } break;
     case 'heu': c.fillStyle = '#d8b452'; c.beginPath(); c.ellipse(0, yb - 24.5, 5.5, 2.8, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'fisch': c.fillStyle = '#b9c4c8'; c.beginPath(); c.ellipse(5.5, yb - 6, 3, 1.2, 0.4, 0, Math.PI * 2); c.fill(); break;
+    case 'balken': c.fillStyle = '#9a7448'; c.save(); c.translate(0, yb - 18); c.rotate(-0.18); c.fillRect(-12, -1.6, 24, 3.2); c.strokeRect(-12, -1.6, 24, 3.2); c.restore(); break;
+    case 'reisig':
+      c.strokeStyle = '#6e5232'; c.lineWidth = 1.1;
+      for (let q = 0; q < 7; q++) { c.beginPath(); c.moveTo(-7 + q * 0.6, yb - 10 - q * 0.9); c.lineTo(-1 + q * 0.5, yb - 21 - q * 0.5); c.stroke(); }
+      c.strokeStyle = '#c9b48a'; c.lineWidth = 1; c.beginPath(); c.moveTo(-6, yb - 14); c.lineTo(-1, yb - 17); c.stroke();
+      break;
+    case 'wild':
+      c.fillStyle = '#8a5a34'; c.beginPath(); c.ellipse(0, yb - 19, 8, 3, -0.1, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.strokeStyle = '#5a3a22'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-6, yb - 18); c.lineTo(-7, yb - 12); c.moveTo(6, yb - 19); c.lineTo(7, yb - 13); c.moveTo(-8, yb - 21); c.lineTo(-11, yb - 25); c.stroke();
+      break;
+    case 'hase': c.fillStyle = '#8a7a66'; c.beginPath(); c.ellipse(5.5, yb - 7, 1.6, 3.6, 0.2, 0, Math.PI * 2); c.fill(); c.fillRect(5, yb - 12, 1, 2.5); break;
+    case 'saatsack': c.fillStyle = '#c9b48a'; c.beginPath(); c.ellipse(-3.6, yb - 9, 2.6, 3.2, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'bahre':
       c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(6, yb - 14); c.lineTo(-22, yb - 14); c.stroke();
       c.fillStyle = '#ece6d8'; c.beginPath(); c.ellipse(-8, yb - 16, 10, 2.8, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(80,70,60,0.6)'; c.lineWidth = 0.8; c.stroke();
@@ -2676,14 +2992,57 @@ function drawSmoke(c, dt) {
   if (smoke.length > 300) smoke.splice(0, smoke.length - 300);
 }
 
-function drawSnow(c, w, h, dt) {
-  if (seasonIndex() !== 3) { snow.length = 0; return; }
-  while (snow.length < 120) snow.push({ x: Math.random() * w, y: Math.random() * h, v: 20 + Math.random() * 30, r: 1 + Math.random() * 1.6 });
-  c.fillStyle = 'rgba(255,255,255,0.85)';
-  for (const f of snow) {
-    f.y += f.v * dt; f.x += Math.sin(G.time + f.v) * 10 * dt;
-    if (f.y > h) { f.y = -4; f.x = Math.random() * w; }
-    c.beginPath(); c.arc(f.x, f.y, f.r, 0, Math.PI * 2); c.fill();
+// Wetter über dem fertigen Bild: Schneeflocken, Regenschnüre, Wolkenschatten, Nebel
+const rain = [];
+let clouds = null;
+function drawWeather(c, w, h, dt) {
+  const kind = weatherKind(), int = precip() || (G.s.weather ? G.s.weather.int : 0);
+  // Schnee
+  const nSnow = kind === 'schnee' ? Math.round(170 * int) : 0;
+  while (snow.length < nSnow) snow.push({ x: Math.random() * w, y: Math.random() * h, v: 20 + Math.random() * 30, r: 1 + Math.random() * 1.6 });
+  if (snow.length > nSnow) snow.length = nSnow;
+  if (nSnow) {
+    c.fillStyle = `rgba(225,230,238,${0.1 * int})`; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    for (const f of snow) {
+      f.y += f.v * dt; f.x += (Math.sin(G.time + f.v) * 10 - 8 * int) * dt;
+      if (f.y > h) { f.y = -4; f.x = Math.random() * w; }
+      c.beginPath(); c.arc(f.x, f.y, f.r, 0, Math.PI * 2); c.fill();
+    }
+  }
+  // Regen: schräge Schnüre, etwas dunkler, kleine Spritzer am Boden
+  const nRain = kind === 'regen' ? Math.round(240 * int) : 0;
+  while (rain.length < nRain) rain.push({ x: Math.random() * (w + 200), y: Math.random() * h, l: 10 + Math.random() * 14, v: 560 + Math.random() * 260 });
+  if (rain.length > nRain) rain.length = nRain;
+  if (nRain) {
+    c.fillStyle = `rgba(40,52,66,${0.18 * int})`; c.fillRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(200,214,228,0.45)'; c.lineWidth = 1;
+    c.beginPath();
+    for (const d of rain) {
+      d.y += d.v * dt; d.x -= d.v * 0.22 * dt;
+      if (d.y > h) { d.y = -d.l; d.x = Math.random() * (w + 200); }
+      c.moveTo(d.x, d.y); c.lineTo(d.x + d.l * 0.22, d.y - d.l);
+    }
+    c.stroke();
+    c.fillStyle = 'rgba(220,232,240,0.45)';
+    for (let k = 0; k < 18 * int; k++) { const x = Math.random() * w, y = Math.random() * h; c.fillRect(x - 1.5, y, 3, 1); }
+  }
+  // Wolkenschatten ziehen über das Land
+  if (kind === 'wolken' || kind === 'regen' || kind === 'schnee') {
+    if (!clouds) clouds = [0, 1, 2, 3].map((k) => ({ x: Math.random() * w, y: Math.random() * h, r: 220 + Math.random() * 200, v: 10 + k * 4 }));
+    for (const cl of clouds) {
+      cl.x += cl.v * dt; cl.y += cl.v * 0.35 * dt;
+      if (cl.x - cl.r > w || cl.y - cl.r > h) { cl.x = -cl.r; cl.y = Math.random() * h - cl.r * 0.5; }
+      const g = c.createRadialGradient(cl.x, cl.y, 0, cl.x, cl.y, cl.r);
+      g.addColorStop(0, `rgba(20,26,34,${kind === 'wolken' ? 0.13 : 0.08})`); g.addColorStop(1, 'rgba(20,26,34,0)');
+      c.fillStyle = g; c.fillRect(cl.x - cl.r, cl.y - cl.r, cl.r * 2, cl.r * 2);
+    }
+  }
+  // Nebel: milchiger Schleier, unten dichter
+  if (kind === 'nebel') {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, `rgba(220,224,226,${0.18 * int})`); g.addColorStop(1, `rgba(228,232,234,${0.42 * int})`);
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
   }
 }
 
@@ -2840,7 +3199,7 @@ export function render() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!G.world || !G.s) return;
   ensureSprites();
-  if (cacheSeason !== seasonIndex()) { chunkCache.clear(); cacheSeason = seasonIndex(); }
+  if (cacheSeason !== lookKey()) { chunkCache.clear(); cacheSeason = lookKey(); }
   if (G.castleDirty) { castleParts = buildPlayerCastle(); G.castleDirty = false; }
   if (G.staticDirty) { staticParts = buildStaticParts(); G.staticDirty = false; }
   lights = [];
@@ -2900,10 +3259,19 @@ export function render() {
   // Objekte sammeln und nach Tiefe sortieren
   const objs = [];
   const inView = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+  const lists = tourneyLayout();
+  const gallows = [];
+  for (const s of W.sites) {
+    if (s.x < minX - 24 || s.x > maxX + 24 || s.y < minY - 24 || s.y > maxY + 24) continue;
+    const g = gallowsFor(s);
+    if (g && inView(g.x, g.y)) gallows.push(g);
+  }
   for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
     for (const o of W.chunkObjs[cy * CN + cx]) {
       const ix = isoX(o.x, o.y);
       if (ix < isoL || ix > isoR) continue;
+      if (lists && Math.abs(o.x - lists.lx) < 10 && Math.abs(o.y - lists.ly) < 4.6) continue;
+      if (gallows.length && gallows.some((g) => Math.abs(o.x - g.x) < 2 && Math.abs(o.y - g.y) < 2.2)) continue;
       if (o.kind === 'mauer') objs.push({ d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => drawWallRuin(c, o) });
       else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o) });
     }
@@ -2917,8 +3285,14 @@ export function render() {
     }
     for (const sh of sg.shots) objs.push({ d: 1e6, z: 0, f: (c) => drawSiegeShot(c, sh) });
   }
+  for (const part of tourneyParts()) if (inView(part.x, part.y)) objs.push(part);
+  for (const g of gallows) objs.push({ d: g.x + g.y, z: zAt(g.x, g.y), f: (c) => drawGallows(c, g, G.exec && G.exec.g === g && G.exec.hanged) });
+  for (const f of G.fx) {
+    if (f.kind === 'pferd' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 0.1, z: zAt(f.x, f.y), f: (c) => drawLooseHorse(c, f) });
+    else if (f.kind === 'splitter') objs.push({ d: 1e6, z: zAt(f.x, f.y), f: (c) => drawSplinter(c, f) });
+  }
   for (const g of funeralProps()) if (inView(g.x, g.y)) objs.push({ d: g.x + g.y - 0.4, z: zAt(g.x, g.y), f: (c) => drawOpenGrave(c, g) });
-  for (const f of G.fx) if (f.kind === 'staub' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 1, z: zAt(f.x, f.y), f: (c) => { const k = f.t / f.dur, [px, py] = P(f.x, f.y, 10); c.globalAlpha = Math.max(0, 0.7 * (1 - k)); c.fillStyle = '#8a7a66'; c.beginPath(); c.arc(px, py - k * 14, 8 + k * 22, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; } });
+  for (const f of G.fx) if (f.kind === 'staub' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 1, z: zAt(f.x, f.y), f: (c) => { const k = f.t / f.dur, [px, py] = P(f.x, f.y, 10); c.globalAlpha = Math.max(0, 0.7 * (1 - k)); c.fillStyle = f.col || '#8a7a66'; c.beginPath(); c.arc(px, py - k * 14, 8 + k * 22, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; } });
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
@@ -2983,9 +3357,10 @@ export function render() {
 
   // Tag und Nacht: sanft über das fertige Bild, in allen Grafikstufen gleich gut lesbar
   drawDayNight(ctx, w, h, p, cam, z);
-  drawSnow(ctx, w, h, dt);
+  drawWeather(ctx, w, h, dt);
 
   drawSpeech(ctx, z, inView);
+  if (G.tour && G.tour.aim) drawAimBar(ctx, w, h, G.tour.aim);
   // Sehenswürdigkeiten
   ctx.textAlign = 'center';
   for (const p of W.pois || []) {
@@ -3016,7 +3391,7 @@ export function render() {
     const u = G.hover;
     const sp = toScreen(u.x, u.y);
     ctx.font = '600 12px "Alegreya Sans", sans-serif';
-    const label = `${u.name}${u.kind !== 'peasant' ? ` · Stufe ${u.level}` : ''}`;
+    const label = `${u.name}${u.kind !== 'peasant' ? ` · Stufe ${u.level}` : u.role === 'bettler' ? ' · Klick: Almosen geben' : u.condemned ? ' · Klick: befreien' : ''}`;
     const tw = ctx.measureText(label).width;
     const yy = sp.y - (u.mounted ? 56 : 44) * z;
     ctx.fillStyle = 'rgba(28,20,14,0.82)'; ctx.fillRect(sp.x - tw / 2 - 6, yy - 12, tw + 12, 17);
@@ -3077,6 +3452,7 @@ const MINI_COL = [
   ['#3b7090', '#7d9d3f', '#3d6429', '#979159', '#b39a6e', '#d4b64f', '#8a6a42', '#d5c493'],
   ['#3a6683', '#8e9045', '#6a5a2c', '#918259', '#a88d66', '#9e7c3d', '#8a6a42', '#c4b083'],
   ['#8fb0c2', '#dfe6e6', '#a9b8b5', '#c9cfcb', '#a49d90', '#d8dddc', '#8a6a42', '#dadcd6'],
+  ['#3a6680', '#7f8a50', '#5c5a36', '#8a8660', '#9e8662', '#8a6e48', '#8a6a42', '#c4b48a'],
 ];
 
 function buildMinimap() {
@@ -3084,7 +3460,7 @@ function buildMinimap() {
   const cv = makeCanvas(N, N);
   const g = cv.getContext('2d');
   const img = g.createImageData(N, N);
-  const cols = MINI_COL[seasonIndex()].map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  const cols = MINI_COL[lookSeason()].map((hx) => { const n = parseInt(hx.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const k = j * N + i, t = W.tiles[k];
     let f = 1;
@@ -3095,7 +3471,7 @@ function buildMinimap() {
   }
   g.putImageData(img, 0, 0);
   minimapBase = cv;
-  minimapSeason = seasonIndex();
+  minimapSeason = lookKey();
 }
 
 // Kartenansicht: v = { ox, oy, s, dx, dy } (Welt -> Bild: (x - ox) * s + dx)
@@ -3103,7 +3479,7 @@ export function miniPos(x, y, v) { return { x: (x - v.ox) * v.s + v.dx, y: (y - 
 export function miniToWorld(mx, my, v) { return { x: (mx - v.dx) / v.s + v.ox, y: (my - v.dy) / v.s + v.oy }; }
 
 export function drawMap(c, w, h, opts = {}) {
-  if (!minimapBase || minimapSeason !== seasonIndex()) buildMinimap();
+  if (!minimapBase || minimapSeason !== lookKey()) buildMinimap();
   const W = G.world, N = W.N;
   const p = G.s.player;
   const big = !!opts.big;

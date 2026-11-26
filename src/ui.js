@@ -21,6 +21,11 @@ import { seasonIndex, yearOf, clockText, passHours, hourOf } from './sim.js';
 import { buffActive } from './life.js';
 import { drawMap, miniToWorld } from './render.js';
 import { landAt } from './world.js';
+import {
+  canRaid, startRaid, isBlighted, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
+} from './dynamics.js';
+import { tourneyAt, canJoin, joinTourney } from './tournament.js';
+import { WEATHER_NAME, weatherKind } from './weather.js';
 
 export function byId(id) { return document.getElementById(id); }
 
@@ -40,7 +45,8 @@ export function updateHUD() {
   set('hud-party', `${partyMembers().length}/${partyCap()}`);
   set('hud-cargo', `${cargoUsed()}/${cargoCap()}`);
   set('hud-hp', `${Math.ceil(s.player.hp)}/${s.player.st.maxHp}`);
-  set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${buffActive() ? ' · ausgeruht' : ''}`);
+  const wn = WEATHER_NAME[weatherKind()];
+  set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${wn ? ` · ${wn}` : ''}${buffActive() ? ' · ausgeruht' : ''}`);
   set('hud-clock', clockText());
   const mode = byId('hud-mode');
   const label = G.fast ? 'Zeitraffer' : '';
@@ -191,7 +197,7 @@ function townPanel() {
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div>${site.port ? `<div class="actions">${harbourActions(site)}</div>` : ''}`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -214,16 +220,64 @@ function townInfo(site) {
         <dt>Dein Ansehen</dt><dd>${repPill(f)}</dd>
         <dt>Billig zu haben</dt><dd>${list(site.produces)}</dd>
         <dt>Gesucht</dt><dd>${list(site.demands)}</dd>
+        ${buildFact(site)}
       </dl>
     </div>
     <div class="actions">
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${tourneyAction(site)}
       ${tavernAction(site)}
       ${harbourActions(site)}
+      ${blightActions(site)}
+      ${raidAction(site)}
     </div>
   </div>`;
+}
+
+// Bautätigkeit im Ort
+function buildFact(site) {
+  const hs = siteHouses(site.id);
+  if (!hs.length) return '';
+  const bau = hs.filter(underConstruction).length, ruin = hs.filter((b) => b.cons === -1).length, dmg = hs.filter((b) => standing(b) && b.dmg > 0).length;
+  const parts = [];
+  if (bau) parts.push(`${bau} ${bau === 1 ? 'Baustelle' : 'Baustellen'}`);
+  if (dmg) parts.push(`${dmg} beschädigt`);
+  if (ruin) parts.push(`${ruin} ${ruin === 1 ? 'Ruine' : 'Ruinen'}`);
+  return `<dt>Häuser</dt><dd>${hs.filter(standing).length} bewohnt${parts.length ? `, ${parts.join(', ')}` : ''}</dd>`;
+}
+
+// Turnier: Ankündigung, Teilnehmer, Anmeldung
+function tourneyAction(site) {
+  const tr = tourneyAt(site);
+  if (!tr) return '';
+  const when = tr.day === G.s.day ? 'heute' : tr.day === G.s.day + 1 ? 'morgen' : `am Tag ${tr.day}`;
+  const names = tr.knights.map((k) => `<span class="swatch" style="--c:${k.col}"></span>${esc(k.player ? `${G.s.player.name} (du)` : k.name)}`).join(', ');
+  const p = G.s.player;
+  let btn;
+  if (tr.joined) btn = '<span class="chip">Angemeldet</span>';
+  else if (!p.eq.pferd) btn = '<span class="chip">Ohne Pferd kein Tjost</span>';
+  else btn = `<button class="btn primary" data-act="tjoin" ${canJoin(tr) ? '' : 'disabled'}>${fmt(tr.fee)} Gold</button>`;
+  return `<h3>Turnier ${when}</h3>
+    <div class="action"><div><b>Tjost vor den Toren</b><p>Acht Ritter, drei Runden, Lanzen und Schilde stellt der Herold. Preis: ${fmt(tr.prize)} Gold und viel Ruhm. Senke die Lanze im richtigen Moment. Ab der zehnten Stunde bei den Schranken sein!</p><p class="muted">${names}</p></div>${btn}</div>`;
+}
+
+// Wiederaufbau stiften oder nach einem Überfall Sühne leisten
+function blightActions(site) {
+  if (isBlighted(site)) {
+    const cost = atoneCost(site), slain = G.s.slain[site.id] || 0;
+    return `<h3>Nach dem Überfall</h3><div class="notice bad"><p>${esc(site.name)} liegt darnieder${slain ? `, ${slain} ${slain === 1 ? 'Bewohner ist' : 'Bewohner sind'} tot` : ''}. Bis Tag ${G.s.blight[site.id]} wird hier nichts gebaut und nichts repariert.</p></div>
+      <div class="action"><div><b>Sühne leisten</b><p>Gold für die Hinterbliebenen und Messen für die Toten. Danach wird wieder gebaut. Ansehen bei den ${esc(FACTIONS[site.faction].short)} +10, Kirche +4.</p></div><button class="btn" data-act="atone" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+  }
+  if (!canDonate(site)) return '';
+  const cost = donateCost(site);
+  return `<div class="action"><div><b>Wiederaufbau stiften</b><p>Bauholz, Stroh und Lohn für die Zimmerleute: Baustellen wachsen schneller, Ruinen werden neu bebaut, Schäden ausgebessert. Ansehen +4.</p></div><button class="btn" data-act="donate" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+}
+
+function raidAction(site) {
+  if (!canRaid(site)) return '';
+  return `<h3>Gewalt</h3><div class="action"><div><b>Ort überfallen</b><p>Die Besatzung stellt sich dir, die Leute fliehen in ihre Häuser. Bei einem Sieg plünderst du Gold und Waren, Häuser gehen in Flammen auf. Danach wird hier lange nichts mehr gebaut.</p></div><button class="btn danger" data-act="raid">Überfallen</button></div>`;
 }
 
 // Gasthaus: Übernachten mit Gefolge
@@ -245,6 +299,8 @@ function rumor(site) {
   const army = G.groups.find((g) => g.army && g.members.length);
   if (army) opts.push(`Man sagt, ein großes Heer zieht ${dirText(site, army)}.`);
   if (G.siege) opts.push(`${G.siege.site.type === 'spieler' ? homeName() : G.siege.site.name} wird belagert, heißt es.`);
+  const tr = G.s.tourney;
+  if (tr && !tr.done) { const ts = siteById(tr.site); opts.push(`Am Tag ${tr.day} ist Turnier in ${ts.name}. Da reiten die besten Lanzen des Landes!`); opts.push(`Ich wette zwei Pfennige auf ${tr.knights[Math.floor(Math.random() * tr.knights.length)].name} beim Turnier in ${ts.name}.`); }
   const rich = G.groups.find((g) => g.type === 'steuer' && g.members.length);
   if (rich) opts.push(`Ein Steuereintreiber ist mit voller Kasse ${dirText(site, rich)} unterwegs.`);
   return opts.length ? opts[Math.floor(Math.random() * opts.length)] : 'Es ist ruhig in letzter Zeit. Zu ruhig, wenn Ihr mich fragt.';
@@ -625,7 +681,8 @@ function helpPanel() {
         <dt>W A S D</dt><dd>Direkt laufen</dd>
         <dt>E</dt><dd>Siedlung oder Burg betreten</dd>
         <dt>R</dt><dd>Auf- und absitzen</dd>
-        <dt>Leertaste</dt><dd>Nächsten Feind angreifen</dd>
+        <dt>Leertaste</dt><dd>Nächsten Feind angreifen, beim Tjost die Lanze senken</dd>
+        <dt>Klick auf Bettler</dt><dd>Almosen geben (3 Gold)</dd>
         <dt>Klick auf Tier</dt><dd>Mit dem Bogen jagen: Fleisch und Felle</dd>
         <dt>F oder 1 2 3</dt><dd>Gefolge: folgen, Stellung halten, angreifen</dd>
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
@@ -648,6 +705,12 @@ function helpPanel() {
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
         <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> beschießt ein Heer eine Burg oder Stadt und stürmt das Tor. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben.</li>
+        <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
+        <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
+        <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
+        <li>Diebe und Wilderer werden am <b>Galgen</b> vor der Stadt gehängt. Wer den Verurteilten befreit, hat die Wachen am Hals, aber die Waldleute auf seiner Seite.</li>
+        <li><b>Bettler</b> sitzen vor den Stadttoren und Kirchen. Almosen freuen die Kirche, und manchmal weiß ein Bettler etwas Nützliches.</li>
+        <li>Das <b>Wetter</b> wechselt: Regen, Nebel und im Winter Schnee, der nach und nach liegen bleibt und im Frühling taut. Bei Regen bleiben viele Leute drinnen.</li>
         <li>Im <b>Gasthaus</b> übernachtest du mit deinem Gefolge: voll geheilt, bis zum Abend ausgeruht (+10 % Angriff und Abwehr, +15 % Erfahrung), und der Wirt erzählt Gerüchte.</li>
       </ol></div>
     </div>`,
@@ -671,6 +734,13 @@ const ACTIONS = {
   resume: () => closePanel(),
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   gift: () => giveGift(G.ui.arg),
+  donate: () => donate(G.ui.arg),
+  tjoin: () => joinTourney(),
+  atone: () => atone(G.ui.arg),
+  raid: () => {
+    const site = G.ui.arg, f = site.faction;
+    confirmDialog(`${site.name} wirklich überfallen? Die ${FACTIONS[f].name} werden dich hassen (Ansehen −25${site.type === 'abtei' ? ', bei einer Abtei −35' : ''}), die Kirche ebenso. Wer Bewohner erschlägt, macht es schlimmer. Hier wird danach lange nichts mehr gebaut.`, 'Überfallen', () => { closePanel(); startRaid(site); });
+  },
   sail: (d) => { if (sail(G.ui.arg.id, d.to)) closePanel(); },
   mapzoom: (d) => {
     if (d.d === 'home') { mapState.cx = G.s.player.x; mapState.cy = G.s.player.y; mapState.zoom = Math.max(mapState.zoom, 2); }
@@ -740,6 +810,7 @@ const ACTIONS = {
 
 export function initUI() {
   G.onLog = renderLog;
+  G.rumor = rumor;
   byId('panel').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;

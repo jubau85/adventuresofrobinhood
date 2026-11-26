@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'life', 'siege', 'economy', 'politics', 'castle', 'sim', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
+const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'economy', 'politics', 'castle', 'sim', 'weather', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
 function topLevelNames(src) {

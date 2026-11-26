@@ -280,12 +280,29 @@ export function generateWorld(seed) {
   for (const s of W.sites) placeCemetery(W, s);
   // Feste Nummer je Gebäude: Schäden werden darüber gespeichert
   W.buildings.forEach((b, i) => { b.idx = i; });
+  assignPlots(W);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
   addWallRuinObjs(W);
   buildStaticWalls(W);
   return W;
+}
+
+// Bauplätze: Einige Häuser am Ortsrand stehen am Anfang noch nicht. Dort wird im Lauf des
+// Spiels gebaut (siehe dynamics.js). Eigener Zufall je Ort, damit der Rest der Welt gleich bleibt.
+const PLOT_TYPES = { stadt: 1, markt: 1, dorf: 1, burg: 1, halle: 1 };
+function assignPlots(W) {
+  for (const s of W.sites) {
+    if (!PLOT_TYPES[s.type]) continue;
+    const hs = W.buildings.filter((b) => b.site === s.id && b.kind === 'house' && !b.tavern && !b.smithy);
+    if (hs.length < 4) continue;
+    hs.sort((a, b) => Math.hypot(b.x - s.x, b.y - s.y) - Math.hypot(a.x - s.x, a.y - s.y));
+    const outer = hs.slice(0, Math.max(3, Math.ceil(hs.length * 0.4)));
+    const rng = mulberry32((W.seed ^ (s.x * 7919 + s.y * 104729)) >>> 0);
+    const n = Math.max(1, Math.min(14, Math.round(hs.length * 0.09)));
+    for (let k = 0; k < n && outer.length; k++) outer.splice(Math.floor(rng() * outer.length), 1)[0].plot = true;
+  }
 }
 
 // Landmasse an einer Stelle (0 = Meer). Gruppen und Wege bleiben auf ihrer Landmasse.

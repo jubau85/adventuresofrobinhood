@@ -12,9 +12,11 @@ import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed }
 import { cargoFree, addCargo, siteById } from './economy.js';
 import { castleSite, bLevel, castleBonusAt } from './castle.js';
 import { hourOf, passHours } from './sim.js';
-import { hitAnimal } from './animals.js';
+import { hitAnimal, takeAnimal } from './animals.js';
 import { spawnVillagers, updateVillager, updateSayings, buffActive } from './life.js';
 import { countDead, updateSiege } from './siege.js';
+import { raidVictim, villagerKilled } from './dynamics.js';
+import { companionWatch } from './tournament.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -145,7 +147,9 @@ export function rebuildUnits() {
   const list = [G.s.player];
   for (const c of partyMembers()) { c.dead = false; list.push(c); }
   for (const g of G.groups) for (const m of g.members) list.push(m);
+  if (G.peasants.some((v) => v.dead)) G.peasants = G.peasants.filter((v) => !v.dead);
   for (const p of G.peasants) list.push(p);
+  for (const e of G.extras || []) list.push(e);
   G.units = list;
 }
 
@@ -236,7 +240,7 @@ export function groupHostile(g) {
 
 function isEnemy(a, b) {
   if (b.dead || a.dead) return false;
-  if (a.team === 'player') return !!(b.group && b.group.engaged);
+  if (a.team === 'player') return !!(b.group && b.group.engaged) || raidVictim(b);
   const ga = a.group;
   if (!ga) return false;
   if (ga.engaged && b.team === 'player') return true;
@@ -321,7 +325,8 @@ export function updateProjectiles(dt) {
     if (p.t >= p.dur) {
       const tg = p.target;
       if (p.animal) {
-        if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) hitAnimal(tg, p.dmg, p.att);
+        if (p.npcHunt) { if (!tg.dead) takeAnimal(tg); }
+        else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) hitAnimal(tg, p.dmg, p.att);
       } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg);
       G.projectiles.splice(i, 1);
     }
@@ -357,6 +362,7 @@ function unitDown(t, killer) {
   G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25 });
   const g = t.group;
   countDead(t);
+  if (t.kind === 'peasant') { villagerKilled(t); return; }
   // Erfahrung nur für Kämpfe, an denen du beteiligt bist
   if ((killer && killer.team === 'player') || (g && g.engaged)) {
     const xp = 6 + t.level * 6;
@@ -497,8 +503,10 @@ export function updateUnits(dt) {
 
 function updatePlayer(p, dt) {
   if (p.dead) return;
+  if (G.tour && G.tour.lock) return;
   const inp = G.input;
-  if (p.attackTarget && (p.attackTarget.dead || !p.attackTarget.group || !p.attackTarget.group.engaged)) p.attackTarget = null;
+  const at = p.attackTarget;
+  if (at && (at.dead || ((!at.group || !at.group.engaged) && !raidVictim(at)))) p.attackTarget = null;
   if (p.huntTarget && (p.huntTarget.dead || !p.st.ranged)) p.huntTarget = null;
   if (inp.dx || inp.dy) {
     p.path = null; p.attackTarget = null; p.huntTarget = null; G.pendingSite = null;
@@ -544,6 +552,8 @@ function engage(u, enemy, dt) {
 function updateCompanion(u, k, dt) {
   const p = G.s.player;
   const order = G.s.order;
+  const watch = companionWatch(k);
+  if (watch) { u.mounted = false; chaseTo(u, watch.x, watch.y, dt, 0.3); return; }
   u.mounted = p.mounted && !!u.st.horse;
   let enemy = null;
   if (order === 'halten') enemy = nearestEnemy(u, u.st.range + 1.5);
@@ -586,7 +596,7 @@ function updateGroupMember(m, g, k, dt) {
 
 function separate() {
   const p = G.s.player;
-  const list = G.units.filter((o) => !o.dead && !o.hidden && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) <= 31);
+  const list = G.units.filter((o) => !o.dead && !o.hidden && !o.noSep && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) <= 31);
   for (let i = 0; i < list.length; i++) {
     const a = list[i];
     for (let j = i + 1; j < list.length; j++) {
@@ -974,7 +984,7 @@ function feudLost(g) {
   removeGroup(g);
 }
 
-function removeGroup(g) {
+export function removeGroup(g) {
   for (const m of g.members) m.dead = true;
   g.members = [];
   for (const o of G.groups) if (o.feud === g) { o.feud = null; o.peace = G.time + 45; }

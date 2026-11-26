@@ -15,12 +15,17 @@ import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
 import { castleSite, castleBonusAt, dailyBalance } from './castle.js';
 import { applyDamage, startSiege, siegeStatus } from './siege.js';
+import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
+import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
+import { initWeather, updateWeather } from './weather.js';
 import { updateTime, passHours } from './sim.js';
 import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
+import { giveAlms } from './life.js';
+import { rescueCondemned, updateJustice, canRescue } from './justice.js';
 import { darkness } from './sim.js';
 import { isoX, isoY } from './iso.js';
 
@@ -42,7 +47,7 @@ function newGame(opts) {
   G.s = {
     seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
-    damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null,
+    damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     towns: {}, quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
@@ -53,7 +58,8 @@ function newGame(opts) {
   placeNear(squire, player.x, player.y, 1);
   G.s.companions.push(squire);
   initTowns();
-  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = [];
+  initDynamics();
+  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = []; G.extras = []; G.tour = null; G.exec = null;
   spawnPeasants();
   maintainGroups(true);
   rebuildUnits();
@@ -69,6 +75,8 @@ function startWorld() {
   home.name = homeName();
   setPlayerWalls(G.world, G.s.castle.level >= 1);
   applyDamage();
+  applyCons();
+  initWeather();
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
@@ -214,8 +222,13 @@ function enterSite(s) {
 }
 
 function checkNearSite() {
+  const pa = G.pendingAlms;
+  if (pa && (pa.dead || !G.s.player.path) && Math.hypot(pa.x - G.s.player.x, pa.y - G.s.player.y) >= 2.6) G.pendingAlms = null;
+  else if (pa && Math.hypot(pa.x - G.s.player.x, pa.y - G.s.player.y) < 2.6) { G.pendingAlms = null; G.s.player.path = null; giveAlms(pa); }
   const s = nearestSite();
   G.nearSite = s;
+  const ts = tourneyStatus();
+  if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
@@ -258,6 +271,17 @@ function attackNearest() {
 function clickUnit(u) {
   const p = G.s.player;
   const g = u.group;
+  if (raidVictim(u)) { p.attackTarget = u; p.path = null; return true; }
+  if (u.role === 'bettler') {
+    if (Math.hypot(u.x - p.x, u.y - p.y) < 2.6) giveAlms(u);
+    else if (setPlayerPath(u.x, u.y + 0.7)) { G.pendingAlms = u; G.pendingSite = null; }
+    return true;
+  }
+  if (u.condemned && canRescue(u)) {
+    const s = G.exec.site;
+    confirmDialog(`${G.exec.h.name} vom Galgen befreien? Die Wachen von ${s.name} werden angreifen. Die ${FACTIONS[s.faction].name} sehen das gar nicht gern, die Waldleute schon.`, 'Losschneiden', () => rescueCondemned(u));
+    return true;
+  }
   if (!g) return false;
   if (g.engaged || groupHostile(g)) {
     g.engaged = true;
@@ -297,6 +321,7 @@ function startHunt(a) {
 
 function clickWorld(px, py) {
   if (!G.started || panelOpen() || dialogOpen()) return;
+  if (joustPress() || (G.tour && G.tour.lock)) return;
   const u = unitAtScreen(px, py);
   if (u && clickUnit(u)) return;
   const an = animalAtScreen(px, py);
@@ -399,7 +424,7 @@ function onKey(e) {
   switch (k) {
     case 'e': enterSite(nearestSite()); break;
     case 'r': toggleRide(); break;
-    case ' ': attackNearest(); e.preventDefault(); break;
+    case ' ': if (!joustPress()) attackNearest(); e.preventDefault(); break;
     case 'f': cycleOrder(); break;
     case '1': setOrder('folgen'); break;
     case '2': setOrder('halten'); break;
@@ -455,6 +480,7 @@ function bindInput() {
   mini.addEventListener('click', () => tool('map'));
   byId('prompt').addEventListener('click', () => {
     if (!G.started || panelOpen() || dialogOpen()) return;
+    if (joustPress()) return;
     if (inCombat()) attackNearest(); else enterSite(nearestSite());
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
@@ -478,10 +504,14 @@ function resize() {
 // ---------------------------------------------------------------- Schleife
 function step(dt) {
   updateTime(dt);
+  updateWeather(dt);
   updateUnits(dt);
   updateGroups(dt);
   updateProjectiles(dt);
   updateAnimals(dt);
+  updateDynamics(dt);
+  updateTourney(dt);
+  updateJustice(dt);
 }
 
 function updateFx(dt) {
@@ -589,4 +619,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, startBattle, startSiege };
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
