@@ -7,6 +7,12 @@ const ART_FILES = {
   wiese_sommer: 'assets/boden/wiese_sommer.jpg',
   laub_1_sommer: 'assets/natur/laub_1_sommer.png',
   fig_ritter: 'assets/figuren/ritter.png',
+  fig3d_bauer_gehen: 'assets/figuren3d/bauer_gehen.webp',
+  fig3d_bauer_gehen_maske: 'assets/figuren3d/bauer_gehen_maske.webp',
+  fig3d_bauer_stehen: 'assets/figuren3d/bauer_stehen.webp',
+  fig3d_bauer_stehen_maske: 'assets/figuren3d/bauer_stehen_maske.webp',
+  fig3d_bauer_aufheben: 'assets/figuren3d/bauer_aufheben.webp',
+  fig3d_bauer_aufheben_maske: 'assets/figuren3d/bauer_aufheben_maske.webp',
 };
 
 export const ART = {};

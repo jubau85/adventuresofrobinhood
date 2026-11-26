@@ -2939,7 +2939,8 @@ function drawFigure(c, u, x, y) {
   c.scale((u.facing || 1) * sc, sc);
   // Handgemalte Figur, wo es eine gibt (bisher dein Ritter zu Fuß), sonst gezeichnet
   const spr = !m && u.kind === 'player' && !u.female ? figSprite('fig_ritter', playerColor()) : null;
-  const yb = spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m);
+  const f3 = spr ? null : fig3dFor(u, m);
+  const yb = f3 ? drawFig3d(c, u, f3, L) : spr ? drawSpriteFigure(c, u, spr) : drawFigureBody(c, u, L, m);
   if (u.flash > 0) {
     c.globalAlpha = Math.min(1, u.flash * 5);
     c.fillStyle = '#ffffff';
@@ -3008,6 +3009,69 @@ function drawFigureBody(c, u, L, m) {
   }
   if (u.kind === 'peasant') drawVillagerGear(c, u, yb);
   return yb;
+}
+
+// ---------------------------------------------------------------- 3D-Figuren (Meshy + Blender: tools/sprites.py, tools/sprite_pack.py)
+// Bögen: Zeilen = 8 Richtungen, Spalten = Bilder. Richtung 0 schaut nach links unten (+y in Feldern), jede weitere
+// dreht sich um 45° gegen den Uhrzeigersinn (von oben gesehen): Richtung d schaut nach (sin d·45°, cos d·45°).
+// Die Hauptkleidung liegt in Grau im Körperbild; die Maske sagt, wo sie ist, und das Spiel färbt sie je Figur ein.
+const FIG3D = {
+  bauer: {
+    zelle: 112, fusspunkt: [56, 83], figur_px: 60,
+    bewegungen: { gehen: { bilder: 8, dauer: 1.033 }, stehen: { bilder: 4, dauer: 4 }, aufheben: { bilder: 6, dauer: 7.167 } },
+  },
+};
+// Wer schon als 3D-Figur unterwegs ist (Männer; Frauen und Kinder folgen mit eigenen Modellen)
+const FIG3D_ROLES = { buerger: 'bauer', reisender: 'bauer' };
+const FIG3D_ACT = { sammeln: 'aufheben', saeen: 'aufheben', jaeten: 'aufheben' };
+const fig3dCache = new Map();
+let fig3dTmp = null;
+
+function fig3dFor(u, m) {
+  if (m || u.kind !== 'peasant' || u.female || u.small || u.hidden) return null;
+  const mod = FIG3D_ROLES[u.role];
+  return mod && ART[`fig3d_${mod}_stehen`] && ART[`fig3d_${mod}_gehen`] && ART[`fig3d_${mod}_stehen_maske`] ? mod : null;
+}
+
+function fig3dCell(model, anim, dir, frame, color) {
+  const key = `${model}|${anim}|${dir}|${frame}|${color}`;
+  let cv = fig3dCache.get(key);
+  if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
+  const base = ART[`fig3d_${model}_${anim}`], mask = ART[`fig3d_${model}_${anim}_maske`];
+  if (!base || !mask) return null;
+  const C = FIG3D[model].zelle, sx = frame * C, sy = dir * C;
+  if (!fig3dTmp) fig3dTmp = makeCanvas(C, C);
+  const tg = fig3dTmp.getContext('2d');
+  tg.globalCompositeOperation = 'source-over'; tg.clearRect(0, 0, C, C);
+  tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+  tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, C, C);
+  tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+  tg.globalCompositeOperation = 'source-over';
+  cv = makeCanvas(C, C);
+  const g = cv.getContext('2d');
+  g.drawImage(base, sx, sy, C, C, 0, 0, C, C);
+  g.drawImage(fig3dTmp, 0, 0);
+  fig3dCache.set(key, cv);
+  while (fig3dCache.size > 400) fig3dCache.delete(fig3dCache.keys().next().value);
+  return cv;
+}
+
+function drawFig3d(c, u, model, L) {
+  const M = FIG3D[model];
+  let anim = u.moving ? 'gehen' : FIG3D_ACT[u.act] || 'stehen';
+  if (!ART[`fig3d_${model}_${anim}`]) anim = 'stehen';
+  const A = M.bewegungen[anim];
+  const dir = ((Math.round(Math.atan2(u.dirX ?? 0, u.dirY ?? 1) / (Math.PI / 4)) % 8) + 8) % 8;
+  const dur = A.dauer * (anim === 'gehen' ? 1.3 : 1);
+  const frame = Math.floor((((G.time + (u.id % 13) * 0.37) / dur) * A.bilder)) % A.bilder;
+  const cell = fig3dCell(model, anim, dir, frame, u.tunic || L.tunic || '#8a6e4b');
+  if (!cell) return drawFigureBody(c, u, L, false);
+  const k = 23.5 / M.figur_px;
+  c.save();
+  c.scale(u.facing || 1, 1);   // die Richtung steckt im Bild, nicht spiegeln
+  c.drawImage(cell, -M.fusspunkt[0] * k, -M.fusspunkt[1] * k, M.zelle * k, M.zelle * k);
+  c.restore();
+  return 0;
 }
 
 // ---------------------------------------------------------------- Handgemalte Figuren (assets/figuren)

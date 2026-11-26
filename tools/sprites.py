@@ -159,7 +159,10 @@ ANCHOR = (round(fx * CELL, 1), round((1 - fy) * CELL, 1))
 # Bewegungen (ohne Skelett: nur „statisch“)
 acts = list(bpy.data.actions) if arm else [None]
 hips = next((b.name for b in arm.pose.bones if 'hip' in b.name.lower() or 'pelvis' in b.name.lower()), None) if arm else None
-meta = {'zelle': CELL, 'fusspunkt': ANCHOR, 'figur_px': FIG_PX, 'richtungen': DIRS, 'hand': hand, 'bewegungen': {}}
+# Mehrere Durchläufe (eine Datei je Bewegung) schreiben in dieselbe sprites.json
+mpath = os.path.join(out, 'sprites.json')
+old = json.load(open(mpath)) if os.path.exists(mpath) else {}
+meta = {'zelle': CELL, 'fusspunkt': ANCHOR, 'figur_px': FIG_PX, 'richtungen': DIRS, 'hand': hand, 'bewegungen': old.get('bewegungen', {})}
 tmp = os.path.join(out, '_tmp.png')
 for act in acts:
     parts = act.name.split('|') if act else ['statisch']
@@ -203,5 +206,5 @@ for act in acts:
     meta['bewegungen'][name] = {'bilder': n, 'schleife': walk or 'idle' in name.lower(), 'dauer': round((f1 - f0) / sc.render.fps, 3)}
     print('fertig', name, n, 'Bilder,', len(dirs), 'Richtungen', flush=True)
 if os.path.exists(tmp): os.remove(tmp)
-json.dump(meta, open(os.path.join(out, 'sprites.json'), 'w'), indent=1, ensure_ascii=False)
+json.dump(meta, open(mpath, 'w'), indent=1, ensure_ascii=False)
 print('Fußpunkt', ANCHOR, 'Hand', hand, 'Höhe', round(HEIGHT, 2))
