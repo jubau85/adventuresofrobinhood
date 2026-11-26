@@ -2048,10 +2048,15 @@ function siteRadius(def) {
   return def.clear + ({ markt: 2, dorf: 2, burg: 2, abtei: 1, halle: 1 }[def.type] || 0);
 }
 
-// Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse)
+// Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse).
+// Gruben und Einsiedeleien kommen zuletzt: Sie suchen sich einen entlegenen Platz in Wald und Hügeln,
+// ein gutes Stück entfernt von Städten, Burgen und Dörfern.
+const REMOTE = { mine: 1, einsiedelei: 1 };
+const REMOTE_GAP = 17;
 function placeSettlements(W, rng) {
   const N = W.N;
-  for (const def0 of SETTLEMENTS) {
+  const order = SETTLEMENTS.filter((d) => !REMOTE[d.type]).concat(SETTLEMENTS.filter((d) => REMOTE[d.type]));
+  for (const def0 of order) {
     const def = { ...def0, clear: siteRadius(def0) };
     const g = geoToTile(def.lon, def.lat);
     const gx = Math.floor(g.x), gy = Math.floor(g.y);
@@ -2081,10 +2086,13 @@ function placeSettlements(W, rng) {
             const f = countAround(W, x, y, 5, T.FOREST);
             if (strict && f < 24) continue;
             score += (70 - f) * 0.15;
-          } else if (def.type === 'mine') {
-            score -= countAround(W, x, y, 4, T.HILLS) * 0.35;
-          } else if (def.type === 'einsiedelei') {
-            score -= (countAround(W, x, y, 4, T.FOREST) + countAround(W, x, y, 4, T.HILLS)) * 0.12;
+          } else if (REMOTE[def.type]) {
+            if (def.type === 'mine') score -= countAround(W, x, y, 4, T.HILLS) * 0.35;
+            else score -= (countAround(W, x, y, 4, T.FOREST) + countAround(W, x, y, 4, T.HILLS)) * 0.12;
+            // Abstand zum Rand des nächsten Ortes: je näher, desto schlechter
+            let near = Infinity;
+            for (const o of W.sites) if (!REMOTE[o.type] && o.type !== 'lager') near = Math.min(near, Math.hypot(o.tx - x, o.ty - y) - o.clear);
+            if (near < REMOTE_GAP) { if (strict && near < 9) continue; score += (REMOTE_GAP - near) * 2.2; }
           } else {
             if (W.tiles[i] === T.HILLS) score += 3;
             score += countAround(W, x, y, 3, T.HILLS) * 0.3;
@@ -2097,6 +2105,9 @@ function placeSettlements(W, rng) {
     const best = tryFind(true, 34) || tryFind(false, 56) || near;
     W.sites.push({ ...def, tx: best.x, ty: best.y, x: best.x + 0.5, y: best.y + 0.5, land: home });
   }
+  // Reihenfolge wie in der Liste, damit der Rest der Welt gleich erzeugt wird
+  const rank = new Map(SETTLEMENTS.map((d, i) => [d.id, i]));
+  W.sites.sort((a, b) => rank.get(a.id) - rank.get(b.id));
 }
 
 function nearestWalkableTile(W, tx, ty) {
@@ -2149,10 +2160,11 @@ function roadPoint(s) {
 }
 
 // Straßenkosten: Meer ist unpassierbar, über Flüsse führen Brücken
-function makeRoadCost(W, yard) {
+function makeRoadCost(W, yard, avoid) {
   return (i) => {
     if (W.sea[i]) return 1e9;
     if (yard && yard[i]) return 60;
+    if (avoid && avoid[i]) return 40;
     switch (W.tiles[i]) {
       case T.ROAD: case T.BRIDGE: return 0.35;
       case T.GRASS: return 1;
@@ -2175,7 +2187,7 @@ function buildRoads(W) {
   // Je Landmasse ein minimaler Spannbaum (Prim) plus ein paar Querverbindungen
   const byLand = new Map();
   for (const s of W.sites) {
-    if (s.type === 'lager') continue;
+    if (s.type === 'lager' || REMOTE[s.type]) continue;
     if (!byLand.has(s.land)) byLand.set(s.land, []);
     byLand.get(s.land).push(s);
   }
@@ -2214,7 +2226,16 @@ function buildRoads(W) {
       if (x >= 0 && y >= 0 && x < N && y < N) yard[y * N + x] = 1;
     }
   }
-  const roadCost = makeRoadCost(W, yard);
+  // Um Gruben und Einsiedeleien machen die Straßen einen Bogen
+  const avoid = new Uint8Array(N * N);
+  for (const s of W.sites) {
+    if (!REMOTE[s.type]) continue;
+    for (let oy = -8; oy <= 8; oy++) for (let ox = -8; ox <= 8; ox++) {
+      const x = s.tx + ox, y = s.ty + oy;
+      if (x >= 0 && y >= 0 && x < N && y < N && ox * ox + oy * oy <= 64) avoid[y * N + x] = 1;
+    }
+  }
+  const roadCost = makeRoadCost(W, yard, avoid);
   edges.sort((p, q) => p.d - q.d);
   for (const e of edges) {
     const pa = roadPoint(e.a), pb = roadPoint(e.b);
@@ -2233,8 +2254,8 @@ function buildRoads(W) {
     }
   }
 
-  // Lager der Waldleute: sicherstellen, dass sie erreichbar sind (Trampelpfad, wenn nötig)
-  for (const camp of W.sites.filter((s) => s.type === 'lager')) {
+  // Lager der Waldleute, Gruben und Einsiedeleien: sicherstellen, dass sie erreichbar sind (Brücke, wenn nötig)
+  for (const camp of W.sites.filter((s) => s.type === 'lager' || REMOTE[s.type])) {
     let nearest = null;
     for (const s of byLand.get(camp.land) || []) {
       const d = Math.hypot(s.tx - camp.tx, s.ty - camp.ty);
