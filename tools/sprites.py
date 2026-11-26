@@ -12,6 +12,8 @@
 #   --probe              nur ein Bild je Bewegung und Richtung 0, zum schnellen Prüfen
 #   --schleife <name,...> diese Bewegungen laufen im Kreis (letztes Bild = erstes, wird nicht doppelt gerendert)
 #   --punkt <knochen>    Lage dieses Knochens (Kopf) je Richtung und Bild mitschreiben, z. B. der Sattel für den Reiter
+#   --helm <glb>         Helm (Ursprung unten, Gesicht nach -Y) passend über den Kopf setzen, fest am Kopfknochen
+#   --punkt <a,b,...>    auch mehrere Knochen, je Name eine Liste
 #   --meter <m>          Körpergröße, an der sich der Maßstab misst (Standard: Höhe des Modells); mit --figur
 #                        zusammen bleibt der Maßstab über Modelle hinweg gleich (Mensch 1,75 m = 120 px)
 #
@@ -112,6 +114,41 @@ if opt.get('waffe'):
         wroot.location = (0, -arm.data.bones[hand].length + palm, 0)
     meshes += wm
 
+# Helm über den Kopf: Kopf in der Ruhehaltung ausmessen (Punkte, die am Kopfknochen hängen), Helm darum,
+# dann wie ein starres Teil mit voller Gewichtung am Kopfknochen
+if opt.get('helm') and arm:
+    head = next(b.name for b in arm.data.bones if b.name.lower() == 'head')
+    body = max(meshes, key=lambda o: len(o.data.vertices))
+    gi = {g.index for g in body.vertex_groups if g.name.lower() in ('head', 'head_end', 'headfront')}
+    pts = [body.matrix_world @ v.co for v in body.data.vertices if sum(g.weight for g in v.groups if g.group in gi) > 0.5]
+    hlo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+    hhi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    before = set(sc.objects)
+    bpy.ops.import_scene.gltf(filepath=opt['helm'])
+    hobjs = [o for o in sc.objects if o not in before and o.type == 'MESH']
+    for o in hobjs:
+        o.parent = None
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in hobjs: o.select_set(True)
+    bpy.context.view_layer.objects.active = hobjs[0]
+    bpy.ops.object.join()
+    hm = bpy.context.view_layer.objects.active
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    size = max(hhi.x - hlo.x, hhi.y - hlo.y)
+    k = size * float(opt.get('helmweite', 1.18)) / 0.25
+    top = hhi.z + 0.02
+    bottom = min(hlo.z + (hhi.z - hlo.z) * 0.08, top - 0.32 * k)
+    kz = (top - bottom) / 0.32
+    for v in hm.data.vertices:
+        v.co = Vector(((hlo.x + hhi.x) / 2 + v.co.x * k, (hlo.y + hhi.y) / 2 + v.co.y * k, bottom + v.co.z * kz))
+    hm.parent = root
+    hm.matrix_parent_inverse = root.matrix_world.inverted()
+    vg = hm.vertex_groups.new(name=head); vg.add(range(len(hm.data.vertices)), 1.0, 'REPLACE')
+    hm.parent = arm; hm.matrix_parent_inverse = arm.matrix_world.inverted()
+    mod = hm.modifiers.new('skelett', 'ARMATURE'); mod.object = arm
+    meshes.append(hm)
+    print('Helm', [round(x, 3) for x in hlo], [round(x, 3) for x in hhi], 'Maß', round(k, 2), round(kz, 2))
+
 # Kamera: orthografisch, 30° von oben, um 45° gedreht – genau die 2:1-Schrägansicht des Spiels
 cam = bpy.data.objects.new('kamera', bpy.data.cameras.new('kamera')); sc.collection.objects.link(cam); sc.camera = cam
 cam.data.type = 'ORTHO'
@@ -174,7 +211,8 @@ for act in acts:
     parts = act.name.split('|') if act else ['statisch']
     name = parts[1] if len(parts) >= 3 else parts[-1]
     if act and ONLY and name not in ONLY and act.name not in ONLY: continue
-    if opt.get('punkt'): meta.setdefault('punkte', {})[name] = []
+    if opt.get('punkt'):
+        for pn in opt['punkt'].split(','): meta.setdefault('punkte', {})[name if ',' not in opt['punkt'] else f'{name}|{pn}'] = []
     if act:
         arm.animation_data_create(); arm.animation_data.action = act
         if hasattr(arm.animation_data, 'action_slot') and act.slots: arm.animation_data.action_slot = act.slots[0]
@@ -199,9 +237,11 @@ for act in acts:
                 root.location.x -= hw.x; root.location.y -= hw.y
             if opt.get('punkt'):
                 bpy.context.view_layer.update()
-                pw = arm.matrix_world @ arm.pose.bones[opt['punkt']].head
-                px_, py_, _ = world_to_camera_view(sc, cam, pw)
-                meta.setdefault('punkte', {}).setdefault(name, []).append([round(px_ * CELL, 1), round((1 - py_) * CELL, 1)])
+                for pn in opt['punkt'].split(','):
+                    pw = arm.matrix_world @ arm.pose.bones[pn].head
+                    px_, py_, _ = world_to_camera_view(sc, cam, pw)
+                    key = name if ',' not in opt['punkt'] else f'{name}|{pn}'
+                    meta.setdefault('punkte', {}).setdefault(key, []).append([round(px_ * CELL, 1), round((1 - py_) * CELL, 1)])
             r.filepath = tmp
             bpy.ops.render.render(write_still=True)
             im = bpy.data.images.load(tmp, check_existing=False)

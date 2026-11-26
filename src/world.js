@@ -1662,5 +1662,20 @@ function placeTrees(W, rng) {
       const ci = Math.floor(oy / CHUNK) * CN + Math.floor(ox / CHUNK);
       W.chunkObjs[ci].push({ kind: kk, x: ox, y: oy, v: Math.floor(rng() * 3), s: 0.8 + rng() * 0.45 });
     }
+    // Schilf an Fluss- und Seeufern, im Wald hier und da ein umgestürzter Stamm oder ein Baumstumpf
+    // (eigener Zufall je Feld, damit der übrige Aufbau der Welt gleich bleibt)
+    const hx = hash2(x, y, 517);
+    let extra = null;
+    if ((t === T.GRASS || t === T.SAND) && hx < 0.4) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const j = (y + dy) * N + x + dx;
+        if (W.tiles[j] === T.WATER && !W.sea[j]) { extra = { kind: 'schilf', x: x + 0.5 + dx * 0.25, y: y + 0.5 + dy * 0.25 }; break; }
+      }
+    } else if (t === T.FOREST && hx < 0.022) extra = { kind: 'stamm', x: x + 0.5, y: y + 0.5 };
+    else if (t === T.FOREST && hx < 0.045) extra = { kind: 'stumpf', x: x + 0.3 + hash2(x, y, 518) * 0.4, y: y + 0.3 + hash2(x, y, 519) * 0.4 };
+    if (extra && !nearSite(extra.x, extra.y) && !nearBuilding(extra.x, extra.y)) {
+      const ci = Math.floor(extra.y / CHUNK) * CN + Math.floor(extra.x / CHUNK);
+      W.chunkObjs[ci].push({ ...extra, v: Math.floor(hash2(x, y, 520) * 2), s: 0.85 + hash2(x, y, 521) * 0.3 });
+    }
   }
 }

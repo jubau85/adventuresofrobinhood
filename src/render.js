@@ -1412,9 +1412,12 @@ function drawProp(c, b) {
       c.beginPath(); c.moveTo(x - 6, y - 4); c.lineTo(x - 2, y - 10); c.moveTo(x, y - 2); c.lineTo(x + 3, y - 10); c.moveTo(x + 5, y - 2); c.lineTo(x + 6, y - 7); c.stroke();
       break;
     }
-    case 'holzstapel':
-      drawLogs(c, b.x, b.y - 0.2, 3 + Math.floor(b.v * 3));
+    case 'holzstapel': {
+      const im = ART.holzstapel;
+      if (im) { const k = TREE_K * (0.8 + b.v * 0.3); c.drawImage(im, x - im.width * k / 2, y - im.height * k * 0.86, im.width * k, im.height * k); }
+      else drawLogs(c, b.x, b.y - 0.2, 3 + Math.floor(b.v * 3));
       break;
+    }
     case 'karren': {
       drawBox(c, b.x, b.y, 0.6, 0.34, 5, '#8a6440', 4, 'plank');
       const w1 = P(b.x - 0.05, b.y + 0.2, 4), w2 = P(b.x + 0.32, b.y - 0.05, 4);
@@ -2543,6 +2546,11 @@ function artNadel(look) {
   return set.every(Boolean) ? set : null;
 }
 
+// Büsche: Sommerbild auch im Frühling, Winterbild (kahl, etwas Schnee) im ganzen Winter. Felsen tragen im Schnee eine Haube.
+function artSet(ids) { const set = ids.map((id) => artSprite(id)); return set.every(Boolean) ? set : null; }
+function artBusch(look) { const suf = look === 2 ? 'herbst' : look >= 3 ? 'winter' : 'sommer'; return artSet([1, 2, 3].map((n) => `busch_${n}_${suf}`)); }
+function artFels(look) { return artSet([1, 2, 3].map((n) => (look === 3 ? `fels_${n}_winter` : `fels_${n}`))); }
+
 const SPR = 3;
 function ensureSprites() {
   const s = treeSeason();
@@ -2551,8 +2559,12 @@ function ensureSprites() {
   sprites = {
     laub: artLaub(s) || [0, 1, 2].map((v) => makeDeciduous(s, v)),
     nadel: artNadel(s) || [0, 1, 2].map((v) => makeConifer(s, v)),
-    fels: [0, 1, 2].map((v) => makeRock(s, v)),
-    busch: [0, 1, 2].map((v) => makeBush(s, v)),
+    fels: artFels(s) || [0, 1, 2].map((v) => makeRock(s, v)),
+    busch: artBusch(s) || [0, 1, 2].map((v) => makeBush(s, v)),
+    // nur gemalt: ohne Bild bleiben sie weg
+    schilf: artSet(['schilf']),
+    stumpf: artSet(['baumstumpf']),
+    stamm: artSet(['baum_umgestuerzt_1', 'baum_umgestuerzt_2']),
   };
 }
 
@@ -2566,14 +2578,15 @@ function treeIndex(o, n) {
 }
 
 function drawTreeObj(c, o) {
-  const set = sprites[o.kind] || sprites.laub;
+  const set = o.kind in sprites ? sprites[o.kind] : sprites.laub;
+  if (!set) return;
   const sp = set[treeIndex(o, set.length)];
   const z = groundZ(G.world, o.x, o.y);
   const x = isoX(o.x, o.y), y = isoY(o.x, o.y) - z;
   const w = sp.cvs.width * o.s * (sp.k || 1), h = sp.cvs.height * o.s * (sp.k || 1);
-  const big = o.kind === 'laub' || o.kind === 'nadel';
+  const big = o.kind === 'laub' || o.kind === 'nadel', long = o.kind === 'stamm';
   c.fillStyle = 'rgba(20,35,12,0.2)';
-  c.beginPath(); c.ellipse(x + (big ? 10 : 4) * o.s, y - 1, (big ? 16 : 10) * o.s, (big ? 5.5 : 3.5) * o.s, 0, 0, Math.PI * 2); c.fill();
+  if (o.kind !== 'schilf') { c.beginPath(); c.ellipse(x + (big ? 10 : long ? 0 : 4) * o.s, y - 1, (big ? 16 : long ? 22 : 10) * o.s, (big ? 5.5 : long ? 6 : 3.5) * o.s, 0, 0, Math.PI * 2); c.fill(); }
   c.drawImage(sp.cvs, x - sp.ax * o.s, y - sp.ay * o.s, w, h);
 }
 
@@ -3822,7 +3835,7 @@ export function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.ca
 
 // Neue gemalte Grafik geladen: Bäume und Boden neu aufbauen
 onArt((id) => {
-  if (id.startsWith('laub') || id.startsWith('nadel')) sprites = null;
+  if (/^(laub|nadel|busch|fels|schilf|baum)/.test(id)) sprites = null;
   if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee)/.test(id)) { chunkCache.clear(); minimapBase = null; }
 });
 

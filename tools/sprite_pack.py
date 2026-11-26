@@ -46,7 +46,9 @@ for old, info in meta['bewegungen'].items():
     Image.fromarray((mask * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(dst, f'{name}_{new}_maske.webp'), quality=85, method=6)
     out['bewegungen'][new] = {'bilder': info['bilder'], 'schleife': info['schleife'], 'dauer': info['dauer']}
     # Punkte (z. B. Sattel) je Richtung und Bild, in Zellen-Pixeln der kleinen Fassung
-    if meta.get('punkte', {}).get(old):
-        out.setdefault('punkte', {})[new] = [[round(x * k, 1), round(y * k, 1)] for x, y in meta['punkte'][old]]
+    for key, arr in meta.get('punkte', {}).items():
+        base, _, pn = key.partition('|')
+        if base == old and arr:
+            out.setdefault('punkte', {})[new + ('|' + pn if pn else '')] = [[round(x * k, 1), round(y * k, 1)] for x, y in arr]
     print('gepackt', new, im.size, os.path.getsize(os.path.join(dst, f'{name}_{new}.webp')) // 1024, 'KB')
 print(json.dumps(out, ensure_ascii=False))
