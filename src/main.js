@@ -81,7 +81,7 @@ function startWorld() {
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
-  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.1 : 1.6) : (G.view.w < 720 ? 1.1 : 1.4);
+  G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.3 : 1.9) : (G.view.w < 720 ? 1.3 : 1.6);
   G.started = true;
   G.fast = false;
   G.ui.sel = null;

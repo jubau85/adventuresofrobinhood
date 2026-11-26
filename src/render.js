@@ -95,6 +95,9 @@ function poly(c, pts, fill) {
 function P(x, y, z = 0) { return [isoX(x, y), isoY(x, y) - z - baseZ]; }
 function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
 
+// Größe der Figuren und Tiere im Verhältnis zu den Häusern: eine Kate ist gut zwei- bis dreimal so hoch wie ein Mensch
+const FIG = 0.75;
+
 function winterize(col) { const lv = snowLevel(); return lv > 0 ? mix(col, '#f0f4f4', 0.68 * lv) : col; }
 
 function addLight(x, y, z, r = 26, strength = 1) { lights.push({ x, y, z: z + baseZ, r, s: strength }); }
@@ -297,7 +300,7 @@ function drawHouse(c, b) {
     c.stroke();
   }
   // Tür mit Rahmen
-  const dh = Math.min(11, b.h * 0.68);
+  const dh = Math.min(20, b.h * 0.7);
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.36, 0.64, 0, dh + 1.5, '#6a4c34');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.4, 0.6, 0, dh, '#3d2b1f');
   windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, b.lit);
@@ -358,20 +361,20 @@ function drawHouseFast(c, b) {
   if (b.dmg > 0 || b.fire > G.time || b.tavern) { drawHouse(c, b); return; }
   cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
 }
-function drawChurchFast(c, b) { const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 130 : 115), half / 2 + 16], (g) => drawChurch(g, b)); }
+function drawChurchFast(c, b) { const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16], (g) => drawChurch(g, b)); }
 
 // Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
 function drawCityWallPiece(c, o) {
   const col = '#b9b1a1';
   if (o.tower) {
-    drawShadow(c, o.x, o.y, 1.3, 1.3, 50, 0.18);
-    drawBox(c, o.x, o.y, 1.25, 1.25, o.gate ? 46 : 40, col, 0, 'stone');
-    drawMerlons(c, o.x, o.y, 1.25, 1.25, o.gate ? 46 : 40, col);
-    if (o.gate) banner(c, o.x, o.y, 46, o.color);
+    drawShadow(c, o.x, o.y, 1.3, 1.3, 64, 0.18);
+    drawBox(c, o.x, o.y, 1.25, 1.25, o.gate ? 62 : 54, col, 0, 'stone');
+    drawMerlons(c, o.x, o.y, 1.25, 1.25, o.gate ? 62 : 54, col);
+    if (o.gate) banner(c, o.x, o.y, 62, o.color);
     return;
   }
-  drawBox(c, o.x, o.y, 1.0, 1.0, 28, col, 0, 'stone');
-  drawMerlons(c, o.x, o.y, 1.0, 1.0, 28, col, 0.16);
+  drawBox(c, o.x, o.y, 1.0, 1.0, 38, col, 0, 'stone');
+  drawMerlons(c, o.x, o.y, 1.0, 1.0, 38, col, 0.16);
 }
 
 // Wirtshaus: Ausleger mit Schild, Bänke und Tisch vor der Tür
@@ -564,7 +567,7 @@ function drawLooseHorse(c, f) {
   const x = f.x + f.vx * f.t, y = f.y + f.vy * f.t;
   const [px, py] = P(x, y, 0);
   const fc = (f.vx - f.vy) >= 0 ? 1 : -1;
-  c.save(); c.translate(px, py); c.globalAlpha = Math.min(1, (f.dur - f.t) * 2); c.scale(fc * 1.14, 1.14);
+  c.save(); c.translate(px, py); c.globalAlpha = Math.min(1, (f.dur - f.t) * 2); c.scale(fc * 1.14 * FIG, 1.14 * FIG);
   drawHorse(c, f.col, G.time, true, f.look);
   c.restore();
 }
@@ -687,7 +690,7 @@ function drawOpenGrave(c, g) {
 function drawChurch(c, b) {
   const stone = '#b5ae9f';
   const tx = b.x + b.wx / 2 - 0.45, ty = b.y;
-  const th = b.abbey ? 70 : 58;
+  const th = b.abbey ? 88 : 74;
   drawShadow(c, b.x, b.y, b.wx, b.wy, th * 0.8);
   drawBox(c, b.x - 0.25, b.y, b.wx - 0.5, b.wy, b.h, stone, 0, 'stone');
   const nb = { x: b.x - 0.25, y: b.y, wx: b.wx - 0.5, wy: b.wy };
@@ -695,7 +698,7 @@ function drawChurch(c, b) {
     faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u - 0.02, u + 0.1, b.h * 0.32, b.h * 0.84, '#6f685c');
     faceQuad(c, nb.x, nb.y, nb.wx, nb.wy, 'L', u, u + 0.08, b.h * 0.35, b.h * 0.8, darkness() > 0.2 ? '#ffd27a' : '#41506a');
   }
-  drawGableRoof(c, b.x - 0.25, b.y, b.wx - 0.5, b.wy, b.h, 16, ROOFS.tile, stone, true);
+  drawGableRoof(c, b.x - 0.25, b.y, b.wx - 0.5, b.wy, b.h, 20, ROOFS.tile, stone, true);
   drawBox(c, tx, ty, 1.0, 1.0, th, stone, 0, 'stone');
   faceQuad(c, tx, ty, 1, 1, 'L', 0.32, 0.68, 0, 14, '#5a4030');
   faceQuad(c, tx, ty, 1, 1, 'L', 0.38, 0.62, 0, 12, '#2f241b');
@@ -1331,7 +1334,7 @@ function buildStaticParts() {
         const prev = ring[(k - 1 + ring.length) % ring.length], next = ring[(k + 1) % ring.length];
         const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
         const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
-        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -96 : -66, 26], (g) => drawCityWallPiece(g, o)) });
+        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o)) });
       });
     }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
@@ -1404,7 +1407,7 @@ function drawWorker(c, x, y, tool, phase, o = {}) {
   c.save();
   c.translate(px, py);
   c.fillStyle = 'rgba(20,30,10,0.28)'; c.beginPath(); c.ellipse(2, 0, 6, 2.6, 0, 0, Math.PI * 2); c.fill();
-  c.scale((o.flip ? -1 : 1) * 1.1, 1.1);
+  c.scale((o.flip ? -1 : 1) * 1.1 * FIG, 1.1 * FIG);
   c.strokeStyle = '#3b2e24'; c.lineWidth = 2.1;
   c.beginPath(); c.moveTo(-1.5, -7); c.lineTo(-2, 0); c.moveTo(1.5, -7); c.lineTo(2, 0); c.stroke();
   const tunic = o.col || '#8a6e4b';
@@ -1978,7 +1981,7 @@ function villageSpots(s) {
     if (Math.hypot(x - s.x, y - s.y) < 6) continue;
     if (avoid.some((o) => Math.hypot(o.x - x, o.y - y) < o.r)) continue;
     if (spots.some((o) => Math.hypot(o.x - x, o.y - y) < 1.9)) continue;
-    const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: 13 + r() * 6, rh: 11 + r() * 5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
+    const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: (13 + r() * 6) * 1.6, rh: (11 + r() * 5) * 1.5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
     if (r() < 0.6) b.prop = { prop: ['heu', 'holzstapel', 'fass', 'beet'][Math.floor(r() * 4)], x: x + 0.75, y: y + (r() - 0.5) * 0.6, v: r() };
     spots.push(b);
   }
@@ -2040,7 +2043,7 @@ function drawCelebration(c, dt) {
 
 function drawHorseStanding(c, x, y, col) {
   const [px, py] = P(x, y, 0);
-  c.save(); c.translate(px, py); c.scale(1.1, 1.1);
+  c.save(); c.translate(px, py); c.scale(1.1 * FIG, 1.1 * FIG);
   c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(3, 0, 13, 4.5, 0, 0, Math.PI * 2); c.fill();
   drawHorse(c, col, 0, false, null);
   c.restore();
@@ -2572,6 +2575,7 @@ function drawFigure(c, u, x, y) {
   const m = u.mounted && u.st.horse;
   c.save();
   c.translate(x, y);
+  c.scale(FIG, FIG);
   c.fillStyle = 'rgba(20,30,10,0.3)';
   c.beginPath(); c.ellipse(3, 0, m ? 14 : 8, m ? 5 : 3.4, 0, 0, Math.PI * 2); c.fill();
   if (u.kind === 'player' || u.kind === 'companion') {
@@ -2640,7 +2644,7 @@ function drawFigure(c, u, x, y) {
   }
   c.restore();
   if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999) && u.kind !== 'peasant') {
-    const w = 18, top = y + (m ? -44 : -32);
+    const w = 18, top = y + (m ? -44 : -32) * FIG;
     c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
     c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
     c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
@@ -2810,7 +2814,7 @@ function drawSpeech(c, z, inView) {
     const sp = toScreen(v.x, v.y);
     const a = Math.min(1, (v.say.dur - v.say.t) * 2, v.say.t * 4);
     const tw = c.measureText(v.say.text).width;
-    const bx = sp.x, by = sp.y - (v.small ? 34 : 42) * z;
+    const bx = sp.x, by = sp.y - (v.small ? 34 : 42) * FIG * z;
     c.globalAlpha = a;
     c.fillStyle = 'rgba(250,244,228,0.95)'; c.strokeStyle = 'rgba(60,44,28,0.85)'; c.lineWidth = 1.2;
     c.beginPath();
@@ -2823,17 +2827,20 @@ function drawSpeech(c, z, inView) {
 }
 
 function drawCorpse(c, f, x, y) {
+  c.save(); c.translate(x, y); c.scale(FIG, FIG); x = 0; y = 0;
   c.globalAlpha = Math.min(1, (f.dur - f.t) / 3);
   c.fillStyle = 'rgba(0,0,0,0.22)'; c.beginPath(); c.ellipse(x, y, 9, 3.5, 0, 0, Math.PI * 2); c.fill();
   c.fillStyle = f.look.tunic; c.beginPath(); c.ellipse(x, y - 2, 6.5, 2.6, -0.2, 0, Math.PI * 2); c.fill();
   c.fillStyle = '#d9b08c'; c.beginPath(); c.arc(x + 7, y - 3.5, 2.6, 0, Math.PI * 2); c.fill();
   c.globalAlpha = 1;
+  c.restore();
 }
 
 function drawAnimal(c, a, x, y) {
   const winter = seasonIndex() === 3;
   c.save();
   c.translate(x, y);
+  c.scale(FIG, FIG);
   if (a.kind !== 'ente') { c.fillStyle = 'rgba(20,30,10,0.22)'; c.beginPath(); c.ellipse(2, 0, a.kind === 'huhn' ? 3.5 : 8, a.kind === 'huhn' ? 1.5 : 2.8, 0, 0, Math.PI * 2); c.fill(); }
   c.scale(a.facing, 1);
   const step = a.moving ? Math.sin(a.anim * 10) * 1.6 : 0;
@@ -2925,7 +2932,7 @@ function drawAnimal(c, a, x, y) {
 // Erlegtes Tier, liegt eine Weile im Gras
 function drawCarcass(c, f, x, y) {
   const col = { hirsch: '#8a5a34', schaf: '#efe9dc', kuh: '#9a6a42', huhn: '#f2eee6', ente: '#8a6a45' }[f.animal] || '#8a5a34';
-  const big = f.animal === 'hirsch' || f.animal === 'kuh' ? 1 : f.animal === 'schaf' ? 0.8 : 0.45;
+  const big = (f.animal === 'hirsch' || f.animal === 'kuh' ? 1 : f.animal === 'schaf' ? 0.8 : 0.45) * FIG;
   c.globalAlpha = Math.min(1, (f.dur - f.t) / 4);
   c.fillStyle = 'rgba(0,0,0,0.2)'; c.beginPath(); c.ellipse(x, y, 10 * big, 3.5 * big, 0, 0, Math.PI * 2); c.fill();
   c.fillStyle = col; c.strokeStyle = OUTLINE; c.lineWidth = 0.8;
@@ -2970,7 +2977,7 @@ export function animalAtScreen(px, py) {
     if (a.dead) continue;
     if (a.kind === 'huhn' && darkness() > 0.4) continue;
     const sp = toScreen(a.x, a.y);
-    const d = Math.hypot(sp.x - px, sp.y - 6 * G.cam.zoom - py);
+    const d = Math.hypot(sp.x - px, sp.y - 6 * FIG * G.cam.zoom - py);
     if (d < bd) { bd = d; best = a; }
   }
   return best;
@@ -3393,7 +3400,7 @@ export function render() {
     ctx.font = '600 12px "Alegreya Sans", sans-serif';
     const label = `${u.name}${u.kind !== 'peasant' ? ` · Stufe ${u.level}` : u.role === 'bettler' ? ' · Klick: Almosen geben' : u.condemned ? ' · Klick: befreien' : ''}`;
     const tw = ctx.measureText(label).width;
-    const yy = sp.y - (u.mounted ? 56 : 44) * z;
+    const yy = sp.y - (u.mounted ? 56 : 44) * FIG * z;
     ctx.fillStyle = 'rgba(28,20,14,0.82)'; ctx.fillRect(sp.x - tw / 2 - 6, yy - 12, tw + 12, 17);
     ctx.fillStyle = u.group && (u.group.engaged || u.group.provoked) ? '#ff9a80' : '#f3ead2';
     ctx.fillText(label, sp.x, yy);
@@ -3621,7 +3628,7 @@ export function unitAtScreen(px, py) {
   for (const u of G.units) {
     if (u.dead || u.hidden || u.kind === 'player') continue;
     const sp = toScreen(u.x, u.y);
-    const d = Math.hypot(sp.x - px, sp.y - (u.mounted ? 22 : 14) * G.cam.zoom - py);
+    const d = Math.hypot(sp.x - px, sp.y - (u.mounted ? 22 : 14) * FIG * G.cam.zoom - py);
     if (d < bd) { bd = d; best = u; }
   }
   return best;

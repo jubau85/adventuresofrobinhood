@@ -281,6 +281,7 @@ export function generateWorld(seed) {
   // Feste Nummer je Gebäude: Schäden werden darüber gespeichert
   W.buildings.forEach((b, i) => { b.idx = i; });
   assignPlots(W);
+  scaleBuildings(W);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
@@ -302,6 +303,14 @@ function assignPlots(W) {
     const rng = mulberry32((W.seed ^ (s.x * 7919 + s.y * 104729)) >>> 0);
     const n = Math.max(1, Math.min(14, Math.round(hs.length * 0.09)));
     for (let k = 0; k < n && outer.length; k++) outer.splice(Math.floor(rng() * outer.length), 1)[0].plot = true;
+  }
+}
+
+// Häuser im richtigen Verhältnis zu den Figuren: Traufe gut eine Menschenhöhe, darüber ein steiles Dach
+function scaleBuildings(W) {
+  for (const b of W.buildings) {
+    if (b.kind === 'house') { b.h = Math.round(b.h * 1.35); b.rh = Math.round(b.rh * 1.3); }
+    else if (b.kind === 'church' || b.kind === 'longhall') b.h = Math.round(b.h * 1.3);
   }
 }
 
