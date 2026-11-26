@@ -62,7 +62,7 @@ node tools/build.mjs
   - **Retro:** Amiga-Stil mit eigener 32-Farben-Palette und feinem Dithering
 - **Tiere:** Schafe, Kühe und Hühner bei den Höfen, Hirsche im Wald, die vor dir fliehen, Enten auf Flüssen und Seen und Vogelschwärme.
 - **Lebendige Welt:** Tag und Nacht, vier Jahreszeiten mit Wetter, Dorfbewohner, Händlerzüge, Steuereintreiber, Patrouillen, Wegelagerer und Raubritter.
-- **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat.
+- **Reiten:** Pferde machen schneller und im Kampf stärker. Das Gefolge sitzt mit auf, wenn es Pferde hat. Die Pferde sind 3D-Modelle (in Blender gebaut, `tools/pferd.py`) in acht Richtungen: Sie stehen und schlagen mit dem Schweif, gehen im Viertakt-Schritt und galoppieren im Dreitakt, je nach Tempo; die Hufe stehen dabei fest am Boden. Das Fell hat die Farbe des Pferds (Klepper braun, Zelter Schimmel), das Schlachtross trägt eine Schabracke in der Wappenfarbe seines Reiters. Der Reiter sitzt im Sattel und wippt mit. In der Koppel der Burg gehen die Pferde ihre Runde und grasen.
 - **Die Burg Ashcombe:** Ausbau von der Ruine über Holzburg und Steinburg zur Festung. Neun Gebäude mit je drei Stufen (Rittersaal, Unterkunft, Schmiede, Stallungen, Holzfäller, Steinbruch, Markt, Kapelle, Wachtürme). Jeder Ausbau ist auf der Karte zu sehen:
   - abgesteckte Bauplätze mit Schildern
   - Baustellen mit wachsendem Rohbau, Gerüst und Bauleuten
@@ -131,6 +131,7 @@ node tools/build.mjs
 | `src/main.js` | Start, Hauptschleife, Eingabe |
 | `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
 | `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |
+| `tools/pferd.py` | Baut ein Pferd in Blender (Körper aus Skelett und Hautmodifikator, Knochen, Gewichte) und berechnet Stehen, Schritt, Galopp und Grasen; `--art ross` für das Schlachtross mit Schabracke. Danach `tools/sprites.py … --schleife … --punkt sattel --meter 1.75` und `tools/sprite_pack.py` |
 | `tools/wege.mjs` | Prüft für drei Welten, ob jede Haustür, jede Ortsmitte und jeder Platz, den die Bewohner ansteuern (Brunnen, Stände, Amboss, Kirche, Gasthaus), frei steht und erreichbar ist, und misst den Abstand zwischen den Häusern (`node tools/wege.mjs`, zum Vergleich `--ohne-haeuser`) |
 | `tools/ton.py` | Macht aus gelieferten Tönen spielfertige MP3s: nahtlose Schleifen für Hintergründe, Stille weg bei Musikstücken (`python3 tools/ton.py schleife|stueck <quelle> <ziel.mp3>`) |
 | `tools/sprites.py` | Rendert eine animierte 3D-Figur (GLB) mit Blender in Sprite-Bögen: 2:1-Schrägansicht, 8 Richtungen, Umrisse, Fußpunkt (`/opt/blender-venv/bin/python tools/sprites.py <figur.glb> <ordner>`) |

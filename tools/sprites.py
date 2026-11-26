@@ -10,6 +10,10 @@
 #   --bilder name=n,...  Bilder je Bewegung, z. B. Idle=4,Casual_Walk=8 (Standard 6, Gehen 8)
 #   --nur <name,...>     nur diese Bewegungen
 #   --probe              nur ein Bild je Bewegung und Richtung 0, zum schnellen Prüfen
+#   --schleife <name,...> diese Bewegungen laufen im Kreis (letztes Bild = erstes, wird nicht doppelt gerendert)
+#   --punkt <knochen>    Lage dieses Knochens (Kopf) je Richtung und Bild mitschreiben, z. B. der Sattel für den Reiter
+#   --meter <m>          Körpergröße, an der sich der Maßstab misst (Standard: Höhe des Modells); mit --figur
+#                        zusammen bleibt der Maßstab über Modelle hinweg gleich (Mensch 1,75 m = 120 px)
 #
 # Ausgabe je Bewegung: <name>.png (Zeilen = Richtungen, Spalten = Bilder) und sprites.json mit Zellgröße,
 # Fußpunkt, Bildzahl und Richtungen. Richtung 0 schaut nach links unten (zum Betrachter), jede weitere
@@ -35,6 +39,7 @@ FRAMES = {}
 for part in (opt.get('bilder') or '').split(','):
     if '=' in part: n, v = part.split('='); FRAMES[n.strip()] = int(v)
 ONLY = set(x.strip() for x in opt['nur'].split(',')) if opt.get('nur') else None
+LOOPS = set(x.strip() for x in opt['schleife'].split(',')) if opt.get('schleife') else set()
 os.makedirs(out, exist_ok=True)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -116,7 +121,8 @@ dist = 20
 cam.location = target + Vector((math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el))) * dist
 cam.rotation_euler = (math.radians(90) - el, 0, az)
 # Bildhöhe der Figur: HEIGHT * cos(30°) Meter sollen FIG_PX Pixel sein
-cam.data.ortho_scale = HEIGHT * math.cos(el) * CELL / FIG_PX
+SCALE_H = float(opt['meter']) if opt.get('meter') else HEIGHT
+cam.data.ortho_scale = SCALE_H * math.cos(el) * CELL / FIG_PX
 cam.data.clip_start, cam.data.clip_end = 0.1, 100
 
 # Licht von links oben, dazu weiches Umgebungslicht, damit die gemalten Farben stehen bleiben
@@ -162,19 +168,20 @@ hips = next((b.name for b in arm.pose.bones if 'hip' in b.name.lower() or 'pelvi
 # Mehrere Durchläufe (eine Datei je Bewegung) schreiben in dieselbe sprites.json
 mpath = os.path.join(out, 'sprites.json')
 old = json.load(open(mpath)) if os.path.exists(mpath) else {}
-meta = {'zelle': CELL, 'fusspunkt': ANCHOR, 'figur_px': FIG_PX, 'richtungen': DIRS, 'hand': hand, 'bewegungen': old.get('bewegungen', {})}
+meta = {'zelle': CELL, 'fusspunkt': ANCHOR, 'figur_px': FIG_PX, 'richtungen': DIRS, 'hand': hand, 'bewegungen': old.get('bewegungen', {}), 'punkte': old.get('punkte', {})}
 tmp = os.path.join(out, '_tmp.png')
 for act in acts:
     parts = act.name.split('|') if act else ['statisch']
     name = parts[1] if len(parts) >= 3 else parts[-1]
     if act and ONLY and name not in ONLY and act.name not in ONLY: continue
+    if opt.get('punkt'): meta.setdefault('punkte', {})[name] = []
     if act:
         arm.animation_data_create(); arm.animation_data.action = act
         if hasattr(arm.animation_data, 'action_slot') and act.slots: arm.animation_data.action_slot = act.slots[0]
         f0, f1 = act.frame_range
     else:
         f0, f1 = 0, 0
-    walk = 'walk' in name.lower() or 'run' in name.lower()
+    walk = 'walk' in name.lower() or 'run' in name.lower() or name in LOOPS
     n = 1 if opt.get('probe') or not act else FRAMES.get(name, 8 if walk else 6)
     frames = [f0 + (f1 - f0) * i / (n if walk else max(1, n - 1)) for i in range(n)]
     dirs = [0] if opt.get('probe') else list(range(DIRS))
@@ -186,10 +193,15 @@ for act in acts:
             sc.frame_set(int(f), subframe=f - int(f))
             # Gehen auf der Stelle: Hüfte waagerecht auf den Ursprung zurückziehen
             root.location.x = root.location.y = 0
-            if walk and hips:
+            if walk and hips and name not in LOOPS:
                 bpy.context.view_layer.update()
                 hw = arm.matrix_world @ arm.pose.bones[hips].head
                 root.location.x -= hw.x; root.location.y -= hw.y
+            if opt.get('punkt'):
+                bpy.context.view_layer.update()
+                pw = arm.matrix_world @ arm.pose.bones[opt['punkt']].head
+                px_, py_, _ = world_to_camera_view(sc, cam, pw)
+                meta.setdefault('punkte', {}).setdefault(name, []).append([round(px_ * CELL, 1), round((1 - py_) * CELL, 1)])
             r.filepath = tmp
             bpy.ops.render.render(write_still=True)
             im = bpy.data.images.load(tmp, check_existing=False)

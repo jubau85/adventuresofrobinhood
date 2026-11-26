@@ -318,6 +318,7 @@ function rideTo(u, x, y, dt, v) {
   const step = Math.min(d, v * dt);
   u.x += (dx / d) * step; u.y += (dy / d) * step;
   u.moving = true; u.anim += dt;
+  if (d > 1e-6) { u.dirX = dx / d; u.dirY = dy / d; }
   const sx = dx - dy;
   if (Math.abs(sx) > 0.02) u.facing = sx > 0 ? 1 : -1;
 }

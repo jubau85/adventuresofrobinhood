@@ -13,6 +13,21 @@ const ART_FILES = {
   fig3d_bauer_stehen_maske: 'assets/figuren3d/bauer_stehen_maske.webp',
   fig3d_bauer_aufheben: 'assets/figuren3d/bauer_aufheben.webp',
   fig3d_bauer_aufheben_maske: 'assets/figuren3d/bauer_aufheben_maske.webp',
+  // Pferde (tools/pferd.py): Reitpferd mit einfärbbarem Fell, Schlachtross mit einfärbbarer Schabracke
+  pferd3d_pferd_stehen: 'assets/pferde/pferd_stehen.webp',
+  pferd3d_pferd_stehen_maske: 'assets/pferde/pferd_stehen_maske.webp',
+  pferd3d_pferd_schritt: 'assets/pferde/pferd_schritt.webp',
+  pferd3d_pferd_schritt_maske: 'assets/pferde/pferd_schritt_maske.webp',
+  pferd3d_pferd_galopp: 'assets/pferde/pferd_galopp.webp',
+  pferd3d_pferd_galopp_maske: 'assets/pferde/pferd_galopp_maske.webp',
+  pferd3d_pferd_grasen: 'assets/pferde/pferd_grasen.webp',
+  pferd3d_pferd_grasen_maske: 'assets/pferde/pferd_grasen_maske.webp',
+  pferd3d_ross_stehen: 'assets/pferde/ross_stehen.webp',
+  pferd3d_ross_stehen_maske: 'assets/pferde/ross_stehen_maske.webp',
+  pferd3d_ross_schritt: 'assets/pferde/ross_schritt.webp',
+  pferd3d_ross_schritt_maske: 'assets/pferde/ross_schritt_maske.webp',
+  pferd3d_ross_galopp: 'assets/pferde/ross_galopp.webp',
+  pferd3d_ross_galopp_maske: 'assets/pferde/ross_galopp_maske.webp',
 };
 
 export const ART = {};

@@ -9,6 +9,7 @@ import { groundZ, tileAt } from './world.js';
 import { conProgress, villageSpots } from './castle.js';
 import { castlePasture } from './animals.js';
 import { ART, onArt } from './assets.js';
+import { HORSE3D } from './pferde.js';
 import { graveSlot, graveCount, funeralProps } from './life.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
 import { unitLook, heraldLook } from './units.js';
@@ -795,8 +796,13 @@ function drawLooseHorse(c, f) {
   const x = f.x + f.vx * f.t, y = f.y + f.vy * f.t;
   const [px, py] = P(x, y, 0);
   const fc = (f.vx - f.vy) >= 0 ? 1 : -1;
-  c.save(); c.translate(px, py); c.globalAlpha = Math.min(1, (f.dur - f.t) * 2); c.scale(fc * 1.14 * FIG, 1.14 * FIG);
-  drawHorse(c, f.col, G.time, true, f.look);
+  const kind = f.look ? 'ross' : 'pferd';
+  c.save(); c.translate(px, py); c.globalAlpha = Math.min(1, (f.dur - f.t) * 2);
+  if (horseReady(kind)) {
+    // Ohne Reiter davongaloppierend
+    c.scale(1.14 * FIG, 1.14 * FIG);
+    drawHorseSprite(c, kind, 'galopp', dirIndex(f.vx, f.vy), f.t * 1.7, f.look ? f.look.tunic : f.col);
+  } else { c.scale(fc * 1.14 * FIG, 1.14 * FIG); drawHorse(c, f.col, G.time, true, f.look); }
   c.restore();
 }
 
@@ -1938,13 +1944,24 @@ function addCastleBuilding(add, id, L, p, s) {
       const cols = ['#7a5232', '#b8b0a2', '#2e2925', '#9a6a3a'];
       for (let k = 0; k < n; k++) {
         add(pad.x, pad.y + (k - n / 2) * 0.3, (c) => {
-          const t = G.time * 0.22 + k * 2.1;
-          const hx = pad.x + Math.sin(t) * (pw / 2 - 0.45), hy = pad.y + Math.cos(t * 0.8 + k) * (ph / 2 - 0.45);
-          const vx = Math.cos(t) * (pw / 2 - 0.45) - (-Math.sin(t * 0.8 + k) * 0.8 * (ph / 2 - 0.45));
+          // Koppelpferde: eine Weile im Schritt die Runde, dann grasen sie (jedes zu seiner Zeit)
+          const cyc = 26, walk = 9, tt = G.time + k * 7.3, cyc0 = Math.floor(tt / cyc), inC = tt - cyc0 * cyc;
+          const moving = inC < walk;
+          const t = (cyc0 * walk + Math.min(inC, walk)) * 0.22 + k * 2.1;
+          const ax = pw / 2 - 0.45, ay = ph / 2 - 0.45;
+          const hx = pad.x + Math.sin(t) * ax, hy = pad.y + Math.cos(t * 0.8 + k) * ay;
+          const dx = Math.cos(t) * ax, dy = -Math.sin(t * 0.8 + k) * 0.8 * ay;
           const [px, py] = P(hx, hy);
-          c.save(); c.translate(px, py); c.scale(vx >= 0 ? 1 : -1, 1);
-          c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(3, 0, 13, 4.5, 0, 0, Math.PI * 2); c.fill();
-          drawHorse(c, cols[k % cols.length], G.time * 0.6, true, null);
+          c.save(); c.translate(px, py);
+          if (horseReady('pferd')) {
+            c.scale(1.14 * FIG, 1.14 * FIG);
+            c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(0, 0, 16, 6, 0, 0, Math.PI * 2); c.fill();
+            drawHorseSprite(c, 'pferd', moving ? 'schritt' : 'grasen', dirIndex(dx, dy), moving ? tt * 0.9 : tt / 3, cols[k % cols.length]);
+          } else {
+            c.scale(dx - dy >= 0 ? 1 : -1, 1);
+            c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(3, 0, 13, 4.5, 0, 0, Math.PI * 2); c.fill();
+            drawHorse(c, cols[k % cols.length], G.time * 0.6, true, null);
+          }
           c.restore();
         });
       }
@@ -2904,7 +2921,7 @@ function drawFigure(c, u, x, y) {
   c.translate(x, y);
   c.scale(FIG, FIG);
   c.fillStyle = 'rgba(20,30,10,0.3)';
-  c.beginPath(); c.ellipse(3, 0, m ? 14 : 8, m ? 5 : 3.4, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(m ? 0 : 3, 0, m ? 16 : 8, m ? 6 : 3.4, 0, 0, Math.PI * 2); c.fill();
   if (u.kind === 'player' || u.kind === 'companion') {
     c.strokeStyle = u.kind === 'player' ? 'rgba(255,214,90,0.9)' : 'rgba(150,190,255,0.7)';
     c.lineWidth = 1.4;
@@ -2934,7 +2951,20 @@ function drawFigure(c, u, x, y) {
 function drawFigureBody(c, u, L, m) {
   let by = 0;
   const low = u.kind === 'peasant' && (u.act === 'jaeten' || u.act === 'sitzen' || u.act === 'sammeln' || u.act === 'pirschen' || u.act === 'betteln');
-  if (m) { drawHorse(c, HORSES[u.eq.pferd] || '#7a5232', u.anim, u.moving, u.eq.pferd === 'schlachtross' ? L : null); by = -12; }
+  let late = null;
+  if (m) {
+    const hs = horse3dFor(u, L);
+    if (hs) {
+      if (hs.front) late = hs; else hs.paint(c);
+      // Reiter im Sattel: Hüfte auf dem Sattelpunkt, ein Bein hängt an der Flanke herab
+      c.translate(hs.x, 0);
+      by = hs.y + 6.2;
+      c.strokeStyle = '#3b2e24'; c.lineWidth = 2.3; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(0.4, by - 7); c.lineTo(2.6, by - 3.4); c.lineTo(2, by + 2.2); c.stroke();
+      c.lineCap = 'butt';
+      c.fillStyle = '#2a2018'; c.fillRect(1.2, by + 1.6, 2.6, 1.5);
+    } else { drawHorse(c, HORSES[u.eq.pferd] || '#7a5232', u.anim, u.moving, u.eq.pferd === 'schlachtross' ? L : null); by = -12; }
+  }
   else if (low) {
     by = 5;
     c.strokeStyle = '#3b2e24'; c.lineWidth = 2.3;
@@ -2983,6 +3013,7 @@ function drawFigureBody(c, u, L, m) {
     if (u.female) c.fillRect(-3.4, yb - 19.5, 1.6, 5);
   }
   if (u.kind === 'peasant') drawVillagerGear(c, u, yb);
+  if (late) { c.translate(-late.x, 0); late.paint(c); c.translate(late.x, 0); }
   return yb;
 }
 
@@ -3048,6 +3079,77 @@ function drawFig3d(c, u, model, L) {
   c.drawImage(cell, -M.fusspunkt[0] * k, -M.fusspunkt[1] * k, M.zelle * k, M.zelle * k);
   c.restore();
   return 0;
+}
+
+// ---------------------------------------------------------------- 3D-Pferde (tools/pferd.py)
+// Gleiche Bögen wie bei den 3D-Figuren. Beim Reitpferd ist das Fell einfärbbar (Klepper braun, Zelter Schimmel),
+// beim Schlachtross die Schabracke (Wappenfarbe des Reiters). Der Sattelpunkt je Bild trägt den Reiter.
+const HORSE_K = 23.5 / 60;   // gleicher Maßstab wie die 3D-Figuren
+function horseReady(kind) { return !!(ART[`pferd3d_${kind}_stehen`] && ART[`pferd3d_${kind}_schritt`] && ART[`pferd3d_${kind}_galopp_maske`]); }
+function horseCell(kind, anim, dir, frame, color) {
+  const key = `${kind}|${anim}|${dir}|${frame}|${color}`;
+  let cv = fig3dCache.get(key);
+  if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
+  const base = ART[`pferd3d_${kind}_${anim}`], mask = ART[`pferd3d_${kind}_${anim}_maske`];
+  if (!base || !mask) return null;
+  const C = HORSE3D[kind].zelle, sx = frame * C, sy = dir * C;
+  const tmp = makeCanvas(C, C), tg = tmp.getContext('2d');
+  tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+  tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, C, C);
+  tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+  cv = makeCanvas(C, C);
+  const g = cv.getContext('2d');
+  g.drawImage(base, sx, sy, C, C, 0, 0, C, C);
+  g.drawImage(tmp, 0, 0);
+  fig3dCache.set(key, cv);
+  while (fig3dCache.size > 600) fig3dCache.delete(fig3dCache.keys().next().value);
+  return cv;
+}
+const dirIndex = (dx, dy) => ((Math.round(Math.atan2(dx, dy) / (Math.PI / 4)) % 8) + 8) % 8;
+// Bild und Sattelpunkt eines Pferdes (Ursprung am Boden unter dem Rumpf)
+function horseFrame(kind, anim, dir, phase, color) {
+  const M = HORSE3D[kind];
+  if (!M.bewegungen[anim] || !ART[`pferd3d_${kind}_${anim}`]) anim = 'stehen';
+  const A = M.bewegungen[anim];
+  const frame = ((Math.floor(phase * A.bilder) % A.bilder) + A.bilder) % A.bilder;
+  const cell = horseCell(kind, anim, dir, frame, color);
+  if (!cell) return null;
+  const k = HORSE_K, pts = M.sattel[anim], i = (dir * A.bilder + frame) * 2;
+  return { cell, x0: -M.fusspunkt[0] * k, y0: -M.fusspunkt[1] * k, size: M.zelle * k, sx: pts[i] * k, sy: pts[i + 1] * k };
+}
+function drawHorseSprite(c, kind, anim, dir, phase, color) {
+  const h = horseFrame(kind, anim, dir, phase, color);
+  if (!h) return null;
+  c.drawImage(h.cell, h.x0, h.y0, h.size, h.size);
+  return { x: h.sx, y: h.sy };
+}
+// Gangart nach dem Tempo: Stehen, Schritt, Galopp. Die Beine laufen im Takt der Bewegung.
+function horseGait(u) {
+  const dt = Math.max(0, Math.min(0.25, G.time - (u._ht ?? G.time)));
+  const d = u._hx === undefined ? 0 : Math.hypot(u.x - u._hx, u.y - u._hy);
+  if (dt > 0) u._hv = (u._hv || 0) * 0.85 + (Math.min(d / dt, 8)) * 0.15;
+  u._hx = u.x; u._hy = u.y; u._ht = G.time;
+  const v = u.moving ? Math.max(u._hv || 0, 0.4) : 0;
+  const anim = v < 0.15 ? 'stehen' : v < 1.35 ? 'schritt' : 'galopp';
+  const rate = anim === 'stehen' ? 1 / 4 : anim === 'schritt' ? Math.max(0.7, v / 0.9) : Math.max(1.3, Math.min(2.6, v * 0.85));
+  u._hp = (u._hp || (u.id % 7) * 0.13) + dt * rate;
+  return { anim, phase: u._hp };
+}
+// Pferd eines Reiters: Sattelpunkt (im gespiegelten Raum der Figur) und eine Malfunktion.
+// front: Blick genau von vorn, dann steht der Kopf des Pferdes vor dem Reiter und wird nach ihm gemalt.
+function horse3dFor(u, L) {
+  const kind = u.eq.pferd === 'schlachtross' ? 'ross' : 'pferd';
+  if (!horseReady(kind)) return null;
+  const { anim, phase } = horseGait(u);
+  const color = kind === 'ross' ? (u.tunic || L.tunic || '#7a2a22') : HORSES[u.eq.pferd] || '#7a5232';
+  const dir = dirIndex(u.dirX ?? 0, u.dirY ?? 1);
+  const h = horseFrame(kind, anim, dir, phase, color);
+  if (!h) return null;
+  const f = u.facing || 1;
+  return {
+    x: h.sx * f, y: h.sy, front: dir === 1,
+    paint: (c) => { c.save(); c.scale(f, 1); c.drawImage(h.cell, h.x0, h.y0, h.size, h.size); c.restore(); },
+  };
 }
 
 // ---------------------------------------------------------------- Handgemalte Figuren (assets/figuren)
