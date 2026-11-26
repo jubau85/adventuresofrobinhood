@@ -4,7 +4,7 @@ import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
-import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, loadMusicPref, audioDebug } from './audio.js';
+import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
 import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
@@ -20,14 +20,14 @@ import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } f
 import { initWeather, updateWeather, precip } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
-import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
+import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { giveAlms } from './life.js';
 import { rescueCondemned, updateJustice, canRescue } from './justice.js';
-import { darkness, seasonIndex } from './sim.js';
+import { darkness, seasonIndex, hourOf } from './sim.js';
 import { isoX, isoY } from './iso.js';
 
 const keys = new Set();
@@ -654,6 +654,36 @@ function frameBody(now) {
     return;
   }
   render();
+  playWork(workEmitters());
+  soundscape(dt);
+}
+
+// Geräusche der Welt: Feuer knistert, Glocken läuten zur sechsten, zwölften und achtzehnten Stunde, Münzen klingen
+let sndT = 0, lastGold = null, lastHour = null, bellQueue = [];
+function soundscape(dt) {
+  if (!G.s || !G.world) return;
+  const p = G.s.player, W = G.world;
+  if (lastGold !== null && G.s.gold !== lastGold && !G.fast) sfx('muenzen', Math.min(1, 0.45 + Math.abs(G.s.gold - lastGold) / 300));
+  lastGold = G.s.gold;
+  sndT -= dt;
+  if (sndT <= 0) {
+    sndT = 0.22;
+    let n = 0;
+    for (const b of W.buildings) {
+      if (!(b.fire > G.time) || Math.abs(b.x - p.x) > 16 || Math.abs(b.y - p.y) > 16) continue;
+      sfxAt('knistern', b.x, b.y, 0.9, 16);
+      if (++n >= 3) break;
+    }
+  }
+  const h = Math.floor(hourOf());
+  if (lastHour !== null && h !== lastHour && (h === 6 || h === 12 || h === 18) && !G.fast) {
+    if (!W.churchSpots) W.churchSpots = W.buildings.filter((b) => b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale'));
+    let best = null, bd = 30;
+    for (const c of W.churchSpots) { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; best = c; } }
+    if (best) for (let k = 0; k < 3; k++) bellQueue.push({ at: G.time + k * 1.7, x: best.x, y: best.y });
+  }
+  lastHour = h;
+  while (bellQueue.length && bellQueue[0].at <= G.time) { const b = bellQueue.shift(); sfxAt('glocke', b.x, b.y, 0.8, 30); }
 }
 
 // Titelbild und Vorschau zeichnen (nur solange das Startmenü offen ist)

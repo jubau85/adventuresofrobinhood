@@ -12,6 +12,7 @@ import { hourOf, passHours } from './sim.js';
 import { changeRep, addRenown } from './politics.js';
 import { makeVillager } from './life.js';
 import { isBlighted } from './dynamics.js';
+import { sfxAt } from './audio.js';
 
 const KNIGHT_NAMES = [
   'Sir Baldwin de Montclair', 'Sir Aymer de Rochefort', 'Sir Gilbert of Wycombe', 'Sir Raoul le Hardi', 'Sir Thurstan of Holderness',
@@ -392,6 +393,7 @@ function resolvePass(t, m) {
 }
 
 function splinter(x, y) {
+  sfxAt('lanze', x, y, 1, 30);
   for (let k = 0; k < 7; k++) G.fx.push({ kind: 'splitter', x, y, vx: rand(-2.2, 2.2), vy: rand(-1.4, 1.4), z0: 18, t: 0, dur: 0.8 });
 }
 

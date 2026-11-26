@@ -390,7 +390,7 @@ function chooseTask(v) {
       if (sp.stalls.length && Math.random() < 0.5) { goTo(v, pick(sp.stalls).front, 'kaufen', rand(6, 12), 'korb'); return; }
       goTo(v, house(), 'besen', rand(8, 16)); return;
     case 'handwerker':
-      if (sp.anvils.length && Math.random() < 0.65) { goTo(v, pick(sp.anvils), 'hammer', rand(16, 32)); return; }
+      if (sp.anvils.length && Math.random() < 0.65) { goTo(v, pick(sp.anvils), 'hammer', rand(16, 32)); v.task.anvil = true; return; }
       if (sp.wood.length) { goTo(v, pick(sp.wood), 'axt', rand(10, 20), 'holz'); return; }
       goTo(v, house(), 'hammer', rand(10, 18)); return;
     case 'haendler':

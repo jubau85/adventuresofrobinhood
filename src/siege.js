@@ -10,6 +10,7 @@ import { cargoFree, addCargo } from './economy.js';
 import { spawnGroup, rebuildUnits, inCombat, makeNpc, partyMembers } from './units.js';
 import { isWalkable, landAt, findPath, wallRing, palisadeBand, nearestWalkable } from './world.js';
 import { villageHouses, castleDefense } from './castle.js';
+import { sfxAt } from './audio.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
@@ -228,6 +229,7 @@ function closeGates(sg) {
   sg.gatesClosed = true;
   for (const [x, y] of w.gates) W.block[y * W.N + x] = 1;
   stepAside(sg.site);
+  if (w.gates.length) sfxAt('tor', w.gates[0][0] + 0.5, w.gates[0][1] + 0.5, 1, 40);
 }
 
 // Wer in einem gerade geschlossenen Tor steht, tritt beiseite
@@ -265,6 +267,8 @@ export function setHomeGate(closed) {
   G.s.gateClosed = !!closed;
   for (const [x, y] of homeGateTiles()) W.block[y * N + x] = closed ? 1 : 0;
   if (closed) stepAside(homeSite());
+  const gt = homeGateTiles()[0];
+  if (gt) sfxAt('tor', gt[0] + 0.5, gt[1] + 0.5, 1, 40);
   if (sieged) sg.gatesClosed = !!closed;
   log(closed ? `Das Tor von ${homeName()} schlägt zu, die Riegel fallen. Durch die Pforte (E) kommst du weiter hinein und hinaus.`
     : sieged ? `Das Tor von ${homeName()} steht offen, mitten in der Belagerung! Jetzt können die Angreifer durchs Tor.` : `Das Tor von ${homeName()} steht wieder offen.`, closed ? 'good' : sieged ? 'bad' : '');
@@ -297,6 +301,7 @@ function openBreach(sg) {
   const st = sg.walls.st, W = G.world, p = G.s.player;
   if (st.open) return;
   st.open = true; st.dmg = 1; st.since = G.s.day;
+  sfxAt('einsturz', st.bx, st.by, 1, 45);
   for (const [x, y] of st.tiles) W.block[y * W.N + x] = 0;
   // Führt kein Weg durch die Lücke (Mauer mit Treppenstufen), wird sie verbreitert
   const w = sg.walls;
@@ -439,6 +444,7 @@ export function updateSiege(dt) {
   for (const sh of sg.shots) {
     if (sh.t < sh.dur || sh.hit) continue;
     sh.hit = true;
+    sfxAt('einschlag', sh.x1, sh.y1, sh.wall ? 1 : 0.8, 40);
     if (sh.wall) { if (sg.walls) hitWall(sg); continue; }
     damageBuilding(sh.b, rand(0.25, 0.4));
     G.fx.push({ kind: 'staub', x: sh.x1, y: sh.y1, t: 0, dur: 1.2 });
@@ -467,12 +473,12 @@ export function updateSiege(dt) {
       const pool = houses.length ? houses : vh;
       // Meist zielt das Trebuchet auf die Mauer, bis die Bresche offen ist, sonst auf die Dächer
       if (sg.walls && !sg.walls.st.open && (Math.random() < 0.75 || !pool.length)) {
-        sg.tre.fired = G.time;
+        sg.tre.fired = G.time; sfxAt('trebuchet', sg.tre.x, sg.tre.y, 0.9, 40);
         sg.shots.push({ x0: sg.tre.x, y0: sg.tre.y, x1: sg.walls.st.bx, y1: sg.walls.st.by, t: -0.35, dur: 1.6, wall: true });
       } else if (pool.length) {
         const b = pick(pool);
         if (!b.idx && b.idx !== 0) b.idx = `v${(s.villageSpots || []).indexOf(b)}`;
-        sg.tre.fired = G.time;
+        sg.tre.fired = G.time; sfxAt('trebuchet', sg.tre.x, sg.tre.y, 0.9, 40);
         sg.shots.push({ x0: sg.tre.x, y0: sg.tre.y, x1: b.x, y1: b.y, t: -0.35, dur: 1.6, b });
       }
     }

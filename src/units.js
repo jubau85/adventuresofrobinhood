@@ -18,6 +18,7 @@ import { countDead, updateSiege } from './siege.js';
 import { raidVictim, villagerKilled } from './dynamics.js';
 import { companionWatch } from './tournament.js';
 import { cheatOn } from './cheats.js';
+import { sfxAt } from './audio.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -284,8 +285,10 @@ function attack(u, t) {
   if (Math.abs(sx) > 0.05) u.facing = sx >= 0 ? 1 : -1;
   u.combatT = 5; t.combatT = 5;
   if (u.st.ranged) {
+    sfxAt(ITEMS[u.eq.waffe].kind === 'armbrust' ? 'armbrust' : 'bogen', u.x, u.y, 0.8);
     G.projectiles.push({ x: u.x, y: u.y, tx: t.x, ty: t.y, target: t, att: u, t: 0, dur: Math.max(0.18, d / 15), bolt: ITEMS[u.eq.waffe].kind === 'armbrust' });
   } else {
+    sfxAt('hieb', u.x, u.y, 0.6);
     applyHit(u, t);
   }
 }
@@ -294,6 +297,7 @@ function applyHit(a, t) {
   if (t.dead) return;
   if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
   const { dmg, crit } = calcDamage(a, t);
+  sfxAt(t.eq && t.eq.schild && Math.random() < 0.4 ? 'schild' : (t.st.armorDef || 0) >= 6 ? 'klirren' : 'treffer', t.x, t.y, crit ? 1 : 0.8);
   t.hp -= dmg;
   t.flash = 0.18;
   t.combatT = 5;

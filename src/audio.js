@@ -4,6 +4,9 @@
 // spielt sie statt der erzeugten Musik. Hintergrundgeräusche laufen darunter in einer Schleife.
 // Startet erst nach einer Eingabe des Spielers, so wie Browser es verlangen.
 
+import { G } from './state.js';
+import { isoX } from './iso.js';
+
 let ac = null, master = null, dry = null, wet = null;
 let enabled = true, started = false;
 let mood = 'titel', playingMood = null;
@@ -60,6 +63,7 @@ export function startAudio() {
   wet = ac.createGain(); wet.gain.value = 0.35; wet.connect(conv); conv.connect(master);
   master.gain.setTargetAtTime(0.55, ac.currentTime, 1.2);
   fileBus = ac.createGain(); fileBus.gain.value = 1; fileBus.connect(master);
+  sfxBus = ac.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(master);
   loadFiles();
   nextTime = ac.currentTime + 0.3;
   timer = setInterval(tick, 150);
@@ -287,9 +291,181 @@ function updateFiles() {
   if (!ambTrack && a) ambTrack = startTrack(a, true, 0.7);
 }
 
+// ---------------------------------------------------------------- Geräusche
+// Live erzeugt aus Rauschen, Tönen und Hüllkurven, jedes Mal ein wenig anders. Leiser mit der Entfernung zum
+// Helden, links oder rechts nach der Lage im Bild, ferne Geräusche mit etwas mehr Hall.
+let sfxBus = null, noiseBuffer = null;
+const lastKind = {};
+let voicesT = 0, voices = 0;
+const vary = (v, k = 0.06) => v * (1 + (Math.random() * 2 - 1) * k);
+
+function noiseBuf() {
+  if (noiseBuffer) return noiseBuffer;
+  const len = ac.sampleRate;
+  noiseBuffer = ac.createBuffer(1, len, ac.sampleRate);
+  const d = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return noiseBuffer;
+}
+function envGain(t, attack, peak, decay) {
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+  return g;
+}
+// Rauschen durch einen Filter, auf Wunsch mit wandernder Mittenfrequenz
+function nz(out, t, { type = 'bandpass', f = 1000, f2 = null, q = 1, vol = 0.5, a = 0.002, d = 0.1 }) {
+  const n = ac.createBufferSource(); n.buffer = noiseBuf();
+  n.playbackRate.value = vary(1, 0.2);
+  const flt = ac.createBiquadFilter(); flt.type = type; flt.frequency.setValueAtTime(f, t); flt.Q.value = q;
+  if (f2) flt.frequency.exponentialRampToValueAtTime(f2, t + a + d);
+  const g = envGain(t, a, vol, d);
+  n.connect(flt); flt.connect(g); g.connect(out);
+  n.start(t, Math.random() * 0.5); n.stop(t + a + d + 0.05);
+}
+// Ein Teilton, auf Wunsch mit fallender Tonhöhe
+function tone(out, t, { f = 440, f2 = null, type = 'sine', vol = 0.3, a = 0.002, d = 0.3 }) {
+  const o = ac.createOscillator(); o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + d);
+  const g = envGain(t, a, vol, d);
+  o.connect(g); g.connect(out);
+  o.start(t); o.stop(t + a + d + 0.05);
+}
+
+const SFX = {
+  // Schmied: Hammer auf Amboss, heller Klang mit unharmonischen Obertönen
+  amboss(o, t) {
+    const f = vary(980, 0.05);
+    [[1, 0.42, 1.1], [2.76, 0.26, 0.8], [5.4, 0.15, 0.5], [8.93, 0.08, 0.3]].forEach(([r, v, d]) => tone(o, t, { f: f * r, vol: v, d }));
+    nz(o, t, { f: 3500, q: 1, vol: 0.35, d: 0.03 });
+  },
+  // Baustelle: Hammer auf Holz
+  hammer(o, t) {
+    nz(o, t, { f: vary(450, 0.15), q: 1.2, vol: 0.7, d: 0.09 });
+    tone(o, t, { f: vary(140), f2: 90, vol: 0.55, d: 0.08 });
+    nz(o, t, { type: 'highpass', f: 2200, vol: 0.22, d: 0.015 });
+  },
+  axt(o, t) {
+    nz(o, t, { f: vary(900, 0.15), q: 1.5, vol: 0.6, d: 0.12 });
+    tone(o, t, { f: vary(220), f2: 160, vol: 0.32, d: 0.1 });
+    nz(o, t + 0.03, { type: 'highpass', f: 3000, vol: 0.18, d: 0.05 });
+  },
+  hacke(o, t) {
+    nz(o, t, { type: 'lowpass', f: vary(500, 0.2), vol: 0.55, d: 0.12 });
+    nz(o, t + 0.01, { f: 1600, q: 0.8, vol: 0.14, d: 0.05 });
+  },
+  hieb(o, t) { nz(o, t, { f: 700, f2: 2600, q: 1.4, vol: 0.32, a: 0.07, d: 0.13 }); },
+  klirren(o, t) {
+    const f = vary(1500, 0.1);
+    [[1, 0.3, 0.35], [2.1, 0.18, 0.25], [3.7, 0.1, 0.15]].forEach(([r, v, d]) => tone(o, t, { f: f * r, vol: v, d }));
+    nz(o, t, { type: 'highpass', f: 4000, vol: 0.25, d: 0.03 });
+  },
+  treffer(o, t) {
+    nz(o, t, { type: 'lowpass', f: 600, vol: 0.6, d: 0.1 });
+    tone(o, t, { f: vary(95), f2: 60, vol: 0.45, d: 0.08 });
+  },
+  schild(o, t) {
+    nz(o, t, { f: vary(320, 0.1), q: 1.6, vol: 0.75, d: 0.14 });
+    tone(o, t, { f: vary(110), f2: 75, vol: 0.5, d: 0.12 });
+  },
+  bogen(o, t) {
+    tone(o, t, { f: vary(170), f2: 110, type: 'triangle', vol: 0.32, d: 0.14 });
+    nz(o, t + 0.01, { f: 1800, f2: 900, q: 1, vol: 0.12, a: 0.02, d: 0.14 });
+  },
+  armbrust(o, t) {
+    nz(o, t, { type: 'highpass', f: 1500, vol: 0.45, d: 0.03 });
+    tone(o, t, { f: vary(240), f2: 170, type: 'triangle', vol: 0.3, d: 0.1 });
+  },
+  trebuchet(o, t) {
+    tone(o, t, { f: 70, f2: 52, type: 'sawtooth', vol: 0.12, a: 0.05, d: 0.5 });
+    nz(o, t + 0.15, { f: 300, f2: 900, q: 0.8, vol: 0.25, a: 0.25, d: 0.35 });
+  },
+  einschlag(o, t) {
+    nz(o, t, { type: 'lowpass', f: 320, vol: 0.9, d: 0.45 });
+    tone(o, t, { f: 62, f2: 40, vol: 0.6, d: 0.3 });
+    for (let k = 0; k < 8; k++) nz(o, t + 0.05 + Math.random() * 0.5, { f: vary(1500, 0.4), q: 1.2, vol: 0.12, d: 0.04 });
+  },
+  einsturz(o, t) {
+    nz(o, t, { type: 'lowpass', f: 260, vol: 1, a: 0.05, d: 1.6 });
+    tone(o, t, { f: 55, f2: 35, vol: 0.6, d: 0.8 });
+    for (let k = 0; k < 22; k++) nz(o, t + Math.random() * 1.4, { f: vary(1300, 0.5), q: 1, vol: 0.14, d: 0.05 });
+  },
+  tor(o, t) {
+    nz(o, t, { type: 'lowpass', f: 220, vol: 0.9, d: 0.28 });
+    tone(o, t, { f: 72, f2: 50, vol: 0.5, d: 0.22 });
+    nz(o, t + 0.16, { f: 2500, q: 2, vol: 0.3, d: 0.03 });
+  },
+  lanze(o, t) {
+    nz(o, t, { f: 1200, q: 0.8, vol: 0.8, d: 0.25 });
+    nz(o, t, { type: 'highpass', f: 3000, vol: 0.4, d: 0.05 });
+    tone(o, t, { f: 130, f2: 80, vol: 0.4, d: 0.12 });
+  },
+  muenzen(o, t) {
+    for (let k = 0; k < 4; k++) {
+      const tt = t + k * vary(0.07, 0.4), f = 2600 + Math.random() * 1800;
+      tone(o, tt, { f, vol: 0.09, d: vary(0.12, 0.3) });
+      tone(o, tt, { f: f * 2.4, vol: 0.04, d: 0.06 });
+    }
+  },
+  glocke(o, t) {
+    const f = 300;
+    [[0.5, 0.22, 5], [1, 0.3, 4], [1.2, 0.17, 3], [1.5, 0.12, 3], [2, 0.15, 2.5], [2.5, 0.07, 1.5], [3, 0.05, 1]]
+      .forEach(([r, v, d]) => tone(o, t, { f: f * r, vol: v, d }));
+  },
+  knistern(o, t) {
+    for (let k = 0; k < 3; k++) nz(o, t + Math.random() * 0.2, { type: 'highpass', f: vary(1400, 0.3), vol: 0.1 + Math.random() * 0.25, d: 0.012 + Math.random() * 0.015 });
+  },
+};
+
+// Geräusch ohne Ort (Bedienung, Münzen)
+export function sfx(kind, vol = 1) { playSfx(kind, vol, 0, 0); }
+
+// Geräusch an einem Ort der Welt
+export function sfxAt(kind, x, y, vol = 1, range = 22) {
+  if (!ac || !enabled || !G.s) return;
+  const p = G.s.player;
+  const d = Math.hypot(x - p.x, y - p.y);
+  if (d > range) return;
+  const k = 1 - d / range;
+  const pan = Math.max(-1, Math.min(1, ((isoX(x, y) - G.cam.x) * G.cam.zoom) / (G.view.w / 2))) * 0.75;
+  playSfx(kind, vol * k * k, pan, d / range);
+}
+
+function playSfx(kind, vol, pan, far) {
+  if (!ac || !enabled || !SFX[kind] || vol < 0.02) return;
+  const now = ac.currentTime;
+  // Gleiche Geräusche nicht übereinander stapeln, insgesamt höchstens zwölf je Zehntelsekunde
+  if (now - (lastKind[kind] || 0) < 0.045) return;
+  if (now - voicesT > 0.1) { voicesT = now; voices = 0; }
+  if (++voices > 12) return;
+  lastKind[kind] = now;
+  const g = ac.createGain(); g.gain.value = Math.min(1, vol);
+  const pn = ac.createStereoPanner ? ac.createStereoPanner() : null;
+  if (pn) { pn.pan.value = pan; g.connect(pn); pn.connect(sfxBus); } else g.connect(sfxBus);
+  if (far > 0.2) { const s = ac.createGain(); s.gain.value = 0.25 * far; g.connect(s); s.connect(wet); }
+  SFX[kind](g, now + 0.005);
+  setTimeout(() => g.disconnect(), 6500);
+}
+
+// Werkzeuge im Bild: Jeder Schlag erklingt in dem Augenblick, in dem das Werkzeug trifft (siehe render.js)
+let lastWorkT = null;
+export function playWork(list) {
+  if (!ac || !enabled || !G.s) return;
+  const now = G.time;
+  if (lastWorkT === null || G.fast || now < lastWorkT || now - lastWorkT > 0.5) { lastWorkT = now; return; }
+  const prev = lastWorkT; lastWorkT = now;
+  let n = 0;
+  for (const e of list) {
+    const a = prev * e.speed + e.phase - Math.PI, b = now * e.speed + e.phase - Math.PI;
+    if (Math.floor(b / (Math.PI * 2)) > Math.floor(a / (Math.PI * 2))) { sfxAt(e.kind, e.x, e.y, e.kind === 'amboss' ? 0.55 : 0.75, 18); if (++n >= 6) break; }
+  }
+}
+
 // Für Tests: was geladen ist und was gerade läuft
 export function audioDebug() {
-  return { started, state: ac && ac.state, loaded: Object.keys(buffers), music: track && track.id, amb: ambTrack && ambTrack.id, resting: !!ac && !track && ac.currentTime < restUntil, want };
+  return { started, state: ac && ac.state, loaded: Object.keys(buffers), music: track && track.id, amb: ambTrack && ambTrack.id, resting: !!ac && !track && ac.currentTime < restUntil, want, lastSfx: { ...lastKind } };
 }
 
 function fileMusicActive() { return !!(want.music && buffers[want.music]) && (!!track || ac.currentTime < restUntil); }

@@ -884,6 +884,11 @@ function drawCemetery(c, s, front) {
   c.fillStyle = '#a8a296'; c.fillRect(qx - 1.5, qy - 18, 3, 18); c.fillRect(qx - 5, qy - 14, 10, 3);
 }
 
+// Werkzeuge im Bild melden ihren Takt; das Tonmodul spielt jeden Schlag im Moment des Treffers
+let workSounds = [];
+export function workEmitters() { return workSounds; }
+function emitWork(x, y, kind, speed, phase) { if (workSounds.length < 40) workSounds.push({ x, y, kind, speed, phase }); }
+
 // Trebuchet der Belagerer: Gestell, Schwenkarm, Gegengewicht
 function drawTrebuchet(c, tr) {
   const [bx, by] = P(tr.x, tr.y);
@@ -1736,6 +1741,7 @@ function drawPlot(c, x, y, wx, wy) {
 
 // Kleine Arbeiterfigur mit Werkzeug (hämmert, hackt, schlägt)
 function drawWorker(c, x, y, tool, phase, o = {}) {
+  if (tool === 'hammer' || tool === 'axt' || tool === 'hacke') emitWork(x, y, tool === 'hammer' && o.apron ? 'amboss' : tool, o.speed || 5, phase);
   const [px, py] = P(x, y, o.z || 0);
   const t = G.time * (o.speed || 5) + phase;
   const s = Math.sin(t);
@@ -3097,6 +3103,7 @@ function drawVillagerGear(c, u, yb) {
   }
   // Werkzeug in der Hand
   const tool = { hacke: 'hacke', sichel: 'sichel', axt: 'axt', hammer: 'hammer', gabel: 'gabel', besen: 'besen' }[u.act];
+  if (tool === 'hammer' || tool === 'axt' || tool === 'hacke') emitWork(u.x, u.y, tool === 'hammer' && u.task && u.task.anvil ? 'amboss' : tool, ACT_SPEED[u.act] || 1, u.id % 7);
   if (tool) {
     c.save(); c.translate(2.5, yb - 13); c.rotate(-2.3 + lift * 2.0);
     c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.8;
@@ -3640,6 +3647,7 @@ export function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#1a2018';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  workSounds = [];
   if (!G.world || !G.s) return;
   ensureSprites();
   if (cacheSeason !== lookKey()) { chunkCache.clear(); cacheSeason = lookKey(); }
