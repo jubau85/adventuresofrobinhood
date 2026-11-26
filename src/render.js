@@ -2498,16 +2498,49 @@ function makeRock(season, v) {
   return { cvs: cv, ax: 20, ay: 25, k: 1 / SPR };
 }
 
-// Gemalte Laubbäume (Frühling und Sommer), drei Spielarten durch leichte Farbverschiebung
-const SEASON_FILE = ['sommer', 'sommer', 'herbst', 'winter'];
-function artTree(season, v) {
-  const im = ART[`laub_1_${season === 0 && ART.laub_1_fruehling ? 'fruehling' : SEASON_FILE[season]}`];
+// Gemalte Bäume. Laubbäume: 1 Eiche, 2 Buche, 3 Birke, 4 Apfelbaum, je Herbst und Winter (der Winter auch für den
+// kahlen Winter ohne Schnee); im Frühling und Sommer gibt es bisher nur die Eiche, in drei Farbspielarten.
+// Nadelbäume: 1 Kiefer, 2 Fichte, 3 junge Tanne, im Schnee die verschneite Fassung.
+// Alle Bilder im selben Maßstab gemalt (vierfach), im Spiel 0,275 Einheiten je Bildpunkt.
+const TREE_K = 0.275;
+const treeAnchorCache = new Map();
+function treeAnchor(id, im) {
+  // Stammfuß: unterste deckende Zeile in der Bildmitte
+  if (treeAnchorCache.has(id)) return treeAnchorCache.get(id);
+  const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
+  g.drawImage(im, 0, 0);
+  const d = g.getImageData(Math.floor(im.width * 0.35), 0, Math.ceil(im.width * 0.3), im.height).data, w = Math.ceil(im.width * 0.3);
+  let foot = im.height * 0.9;
+  for (let y = im.height - 1; y > im.height * 0.5; y--) {
+    let n = 0;
+    for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 140) n++;
+    if (n >= 3) { foot = y - 2; break; }
+  }
+  treeAnchorCache.set(id, foot);
+  return foot;
+}
+function artSprite(id, filter = '') {
+  const im = ART[id];
   if (!im) return null;
   const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
-  g.filter = ['saturate(1.35) hue-rotate(16deg) brightness(1.06)', 'saturate(1.3) hue-rotate(26deg) brightness(0.96)', 'saturate(1.3) hue-rotate(9deg) brightness(1.1)'][v];
+  if (filter) g.filter = filter;
   g.drawImage(im, 0, 0);
-  const k = 0.55;
-  return { cvs: cv, ax: (im.width / 2) * k, ay: im.height * 0.893 * k, k };
+  return { cvs: cv, ax: (im.width / 2) * TREE_K, ay: treeAnchor(id, im) * TREE_K, k: TREE_K };
+}
+const OAK_TINT = ['saturate(1.35) hue-rotate(16deg) brightness(1.06)', 'saturate(1.3) hue-rotate(26deg) brightness(0.96)', 'saturate(1.3) hue-rotate(9deg) brightness(1.1)'];
+function artLaub(look) {
+  if (look === 2 || look === 3 || look === 4) {
+    const suf = look === 2 ? 'herbst' : 'winter';
+    const set = [1, 2, 3, 4].map((n) => artSprite(`laub_${n}_${suf}`));
+    return set.every(Boolean) ? set : null;
+  }
+  const id = look === 0 && ART.laub_1_fruehling ? 'laub_1_fruehling' : 'laub_1_sommer';
+  const set = [0, 1, 2].map((v) => artSprite(id, OAK_TINT[v]));
+  return set.every(Boolean) ? set : null;
+}
+function artNadel(look) {
+  const set = [1, 2, 3].map((n) => artSprite(look === 3 && ART[`nadel_${n}_winter`] ? `nadel_${n}_winter` : `nadel_${n}`));
+  return set.every(Boolean) ? set : null;
 }
 
 const SPR = 3;
@@ -2516,16 +2549,25 @@ function ensureSprites() {
   if (sprites && spriteSeason === s) return;
   spriteSeason = s;
   sprites = {
-    laub: [0, 1, 2].map((v) => artTree(s, v) || makeDeciduous(s, v)),
-    nadel: [0, 1, 2].map((v) => makeConifer(s, v)),
+    laub: artLaub(s) || [0, 1, 2].map((v) => makeDeciduous(s, v)),
+    nadel: artNadel(s) || [0, 1, 2].map((v) => makeConifer(s, v)),
     fels: [0, 1, 2].map((v) => makeRock(s, v)),
     busch: [0, 1, 2].map((v) => makeBush(s, v)),
   };
 }
 
+// Welche Art an diesem Platz wächst: fest je Baum, damit eine Birke auch im Winter eine Birke ist.
+// Eichen und Buchen am häufigsten, Birken seltener, Apfelbäume nur vereinzelt.
+const LAUB_MIX = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3];
+function treeIndex(o, n) {
+  const h = hash2(Math.floor(o.x * 7), Math.floor(o.y * 7), 313);
+  if (o.kind === 'laub' && n === 4) return LAUB_MIX[Math.floor(h * LAUB_MIX.length)];
+  return n === 3 && o.kind !== 'laub' ? Math.floor(h * 3) : o.v % n;
+}
+
 function drawTreeObj(c, o) {
   const set = sprites[o.kind] || sprites.laub;
-  const sp = set[o.v % set.length];
+  const sp = set[treeIndex(o, set.length)];
   const z = groundZ(G.world, o.x, o.y);
   const x = isoX(o.x, o.y), y = isoY(o.x, o.y) - z;
   const w = sp.cvs.width * o.s * (sp.k || 1), h = sp.cvs.height * o.s * (sp.k || 1);
@@ -2565,15 +2607,29 @@ function tileColor(t, pal, hv) {
 // Helligkeit eines Hangs: Licht kommt von links oben
 function slopeLight(dhdx, dhdy) { return 1 + Math.max(-0.32, Math.min(0.2, (dhdx - dhdy) / 34)); }
 
-// Wiesentextur als Muster: ein Bild deckt 4 × 4 Kacheln, schräg wie der Boden
+// Gemalte Böden als Muster: ein Bild deckt 4 × 4 Kacheln, schräg wie der Boden
 const GRASS_TILES = 4;
-function grassPattern(c, ox, oy) {
-  const im = ART.wiese_sommer;
+function texPattern(c, id, ox, oy) {
+  const im = ART[id];
   if (!im) return null;
-  if (!c.__grass) c.__grass = c.createPattern(im, 'repeat');
+  const cache = c.__tex || (c.__tex = {});
+  if (!cache[id]) cache[id] = c.createPattern(im, 'repeat');
   const k = im.width / GRASS_TILES;
-  c.__grass.setTransform(new DOMMatrix([HW / k, HH / k, -HW / k, HH / k, ox, oy]));
-  return c.__grass;
+  cache[id].setTransform(new DOMMatrix([HW / k, HH / k, -HW / k, HH / k, ox, oy]));
+  return cache[id];
+}
+// Welcher gemalte Boden zu Gelände und Jahreszeit passt (look: 0 Frühling, 1 Sommer, 2 Herbst, 3 Schnee,
+// 4 kahler Winter). Unter tiefem Schnee (ganze Decke) liegt überall Schnee, nur Wege und Äcker zeichnen sich ab.
+const TEX_HERBST = { [T.GRASS]: 'wiese_herbst', [T.ROAD]: 'wiese_herbst', [T.HILLS]: 'heide_herbst', [T.FOREST]: 'waldboden_herbst' };
+const TEX_WINTER = { [T.GRASS]: 'wiese_winter', [T.ROAD]: 'wiese_winter', [T.HILLS]: 'heide_winter', [T.FOREST]: 'waldboden_winter', [T.FIELD]: 'acker_winter' };
+function groundTex(t, look, sea) {
+  if (t === T.WATER || t === T.BRIDGE) return (look === 3 || look === 4) && !sea ? 'wasser_winter' : null;
+  if (look === 3) {
+    if (tileSnow >= 1 && t !== T.FIELD && t !== T.SAND) return ART.schnee ? 'schnee' : TEX_WINTER[t];
+    return TEX_WINTER[t] || null;
+  }
+  if (look === 2 || look === 4) return TEX_HERBST[t] || null;
+  return t === T.GRASS || t === T.ROAD ? 'wiese_sommer' : null;
 }
 
 let tileSnow = 0;
@@ -2599,13 +2655,18 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   c.fillStyle = cL; c.fill(); c.strokeStyle = cL; c.stroke();
   c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath();
   c.fillStyle = cR; c.fill(); c.strokeStyle = cR; c.stroke();
-  // Gemalte Wiese: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
-  const grassArt = (t === T.GRASS || t === T.ROAD) && (season < 3 || season === 4) ? grassPattern(c, ox, oy) : null;
+  // Gemalter Boden: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
+  const texId = groundTex(t, season, isWater && W.sea[j * N + i]);
+  const grassArt = texId ? texPattern(c, texId, ox, oy) : null;
   if (grassArt) {
     c.save();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
+    if (isWater) c.globalAlpha = 0.85;
     c.fillStyle = grassArt; c.fill();
-    c.globalAlpha = season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
+    // Farbe der Jahreszeit darüber: Sommerwiese im Herbst und Winter stärker, eigene Herbst- und Winterbilder nur leicht;
+    // kahler Winter nimmt die Herbstbilder, matter und kälter
+    const own = texId !== 'wiese_sommer';
+    c.globalAlpha = isWater ? 0 : own ? (season === 4 ? 0.42 : season === 3 ? 0.08 : 0.14) : season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
     // Hänge auch auf der gemalten Wiese sichtbar machen: Lichtseite heller, Schattenseite dunkler
@@ -2619,8 +2680,8 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     c.restore();
   }
 
-  // Liegengebliebener Schnee in Flecken, je mehr, desto dichter die Decke
-  if (tileSnow > 0 && tileSnow < 1 && !isWater) {
+  // Liegengebliebener Schnee in Flecken, je mehr, desto dichter die Decke (die gemalten Winterböden haben ihn schon)
+  if (tileSnow > 0 && tileSnow < 1 && !isWater && !(grassArt && season === 3)) {
     const n = Math.floor(hash2(i, j, 41) * 4 * tileSnow + tileSnow * 3.2);
     c.fillStyle = 'rgba(242,246,246,0.92)';
     for (let k = 0; k < n; k++) {
@@ -2633,7 +2694,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   if (isWater) {
     const land = (a, b) => a >= 0 && b >= 0 && a < N && b < N && W.tiles[b * N + a] !== T.WATER && W.tiles[b * N + a] !== T.BRIDGE;
     const nU = land(i, j - 1), nR = land(i + 1, j), nD = land(i, j + 1), nL = land(i - 1, j);
-    if (!nU && !nR && !nD && !nL && season !== 3) {
+    if (!nU && !nR && !nD && !nL && season !== 3 && !grassArt) {
       const deep = shade(pal.water2, 0.97 + pn * 0.06);
       c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
       c.fillStyle = deep; c.fill(); c.strokeStyle = deep; c.lineWidth = 0.9; c.stroke();
@@ -2645,14 +2706,14 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     if (nD) { c.moveTo(Bp[0] - 1, Bp[1] - 1.5); c.lineTo(Lp[0] + 2, Lp[1] + 0.5); }
     if (nL) { c.moveTo(Lp[0] + 2, Lp[1] + 0.5); c.lineTo(Tp[0] - 1, Tp[1] + 1.5); }
     c.stroke();
-    if (season === 3 && h1 < 0.3) {
+    if (season === 3 && h1 < 0.3 && !grassArt) {
       c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1;
       const a = tp(0.2, 0.5), b = tp(0.6, 0.4);
       c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
     }
   }
 
-  if ((t === T.GRASS && !grassArt) || t === T.FOREST || t === T.HILLS || t === T.SAND) {
+  if (!grassArt && (t === T.GRASS || t === T.FOREST || t === T.HILLS || t === T.SAND)) {
     c.strokeStyle = shade(base, 0.74); c.lineWidth = 1;
     c.beginPath();
     const n = t === T.FOREST ? 4 : t === T.SAND ? 1 : 3;
@@ -2680,7 +2741,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
       c.beginPath(); c.ellipse(p[0], p[1], 2.4, 1.4, 0, 0, Math.PI * 2); c.fill();
     }
   }
-  if (t === T.FIELD) {
+  if (t === T.FIELD && !grassArt) {
     for (let k = 1; k <= 4; k++) {
       const f = k / 5;
       const a = tp(0.04, f), b = tp(0.96, f);
@@ -2708,10 +2769,12 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     const rc = bridge ? '#8f6e44' : pal.road;
     c.strokeStyle = bridge ? '#5a4128' : shade(rc, 0.82); c.lineWidth = 17;
     for (const a of arms) { c.beginPath(); c.moveTo(ctr[0], ctr[1]); c.lineTo(a[0], a[1]); c.stroke(); }
-    c.strokeStyle = rc; c.lineWidth = bridge ? 13 : 12.5;
+    // Im Schnee: Matsch und Fahrspuren aus dem gemalten Winterweg
+    const roadArt = !bridge && season === 3 ? texPattern(c, 'weg_winter', ox, oy) : null;
+    c.strokeStyle = roadArt || rc; c.lineWidth = bridge ? 13 : 12.5;
     for (const a of arms) { c.beginPath(); c.moveTo(ctr[0], ctr[1]); c.lineTo(a[0], a[1]); c.stroke(); }
-    if (!arms.length) { c.fillStyle = rc; c.beginPath(); c.ellipse(ctr[0], ctr[1], 8, 4, 0, 0, Math.PI * 2); c.fill(); }
-    if (!bridge) {
+    if (!arms.length) { c.fillStyle = roadArt || rc; c.beginPath(); c.ellipse(ctr[0], ctr[1], 8, 4, 0, 0, Math.PI * 2); c.fill(); }
+    if (!bridge && !roadArt) {
       c.strokeStyle = shade(rc, 0.88); c.lineWidth = 1.2;
       for (const a of arms) {
         c.beginPath(); c.moveTo(ctr[0] - 2.5, ctr[1]); c.lineTo(a[0] - 2.5, a[1]); c.moveTo(ctr[0] + 2.5, ctr[1]); c.lineTo(a[0] + 2.5, a[1]); c.stroke();
@@ -3759,8 +3822,8 @@ export function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.ca
 
 // Neue gemalte Grafik geladen: Bäume und Boden neu aufbauen
 onArt((id) => {
-  if (id.startsWith('laub')) sprites = null;
-  if (id.startsWith('wiese')) chunkCache.clear();
+  if (id.startsWith('laub') || id.startsWith('nadel')) sprites = null;
+  if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee)/.test(id)) { chunkCache.clear(); minimapBase = null; }
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }
