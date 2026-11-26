@@ -50,6 +50,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - Bewohner mit Rollen und Tagesablauf
 - Hospiz, Schafzucht, Felder, Verpflegung; Fehden zwischen Fraktionen; Kampfbonus in der Burg
 - Schlachten zweier Heere (bis 50 gegen 50), Belagerungen mit Trebuchet, Gebäudeschäden und Wiederaufbau, Friedhöfe mit Begräbnissen, Gasthäuser mit Übernachtung
+- Seitenwahl bei Belagerungen: Verteidigern beistehen (Ausfall der Besatzung, Dank der Stadt) oder den Belagerern dienen (Sturm auf dein Zeichen, Beuteanteil); Belagerungen, Schlachten und Turniere sind auf beiden Karten markiert und werden am Bildrand angezeigt
 - Tag und Nacht mit Lichtern, vier Jahreszeiten (Schnee, Herbstlaub)
 - Spieler und Gefolge mit Reiten, Ausrüstung, Stufen, Befehlen
 - Sechs Gruppentypen mit eigener Route und eigenem Verhalten

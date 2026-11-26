@@ -3,8 +3,10 @@
 // werden beschädigt. Danach bauen die Bewohner wieder auf, und die Toten werden begraben.
 
 import { G, log, homeName } from './state.js';
-import { GROUP_TYPES } from './data.js';
-import { rand, pick } from './rng.js';
+import { GROUP_TYPES, FACTIONS, GOODS, dirText } from './data.js';
+import { rand, pick, randInt } from './rng.js';
+import { changeRep, addRenown, isHostileFaction } from './politics.js';
+import { cargoFree, addCargo } from './economy.js';
 import { spawnGroup, rebuildUnits, inCombat, makeNpc } from './units.js';
 import { isWalkable, landAt, findPath } from './world.js';
 import { villageHouses } from './castle.js';
@@ -129,7 +131,8 @@ export function startSiege(target = null, armyType = null, scale = null) {
   };
   rebuildUnits();
   const own = target.type === 'spieler';
-  log(own ? `${GROUP_TYPES[armyType].nom} zieht gegen ${homeName()}! Eine Belagerung steht bevor.` : `${GROUP_TYPES[armyType].nom} zieht vor ${target.name} und will die ${target.type === 'burg' ? 'Burg' : 'Stadt'} belagern!`, 'bad');
+  const where = dirText(p, target);
+  log(own ? `${GROUP_TYPES[armyType].nom} zieht gegen ${homeName()}! Eine Belagerung steht bevor.` : `Ein Bote meldet: ${GROUP_TYPES[armyType].nom} zieht vor ${target.name} (${where}) und will die ${target.type === 'burg' ? 'Burg' : 'Stadt'} belagern! Auf der Karte ist der Ort markiert. Im Feldlager oder in ${target.name} kannst du dich einer Seite anschließen.`, 'bad');
   return true;
 }
 
@@ -149,6 +152,7 @@ function raiseDefenders(sg) {
   const g = spawnGroup('verteidiger', { pos, membersUnits: members });
   if (!g) return null;
   g.faction = own ? null : s.faction; g.defender = s.id; g.wait = 99999; g.path = null; g.homeGuard = own;
+  if (sg.side === 'att') g.engaged = true;
   rebuildUnits();
   return g;
 }
@@ -176,6 +180,7 @@ export function updateSiege(dt) {
     } else if (sg.t > 260) return endSiege(sg, 'abgezogen');
     return;
   }
+  keepSides(sg);
   if (sg.stage === 'belagerung') {
     sg.shotT -= dt;
     if (sg.shotT <= 0) {
@@ -190,7 +195,9 @@ export function updateSiege(dt) {
         sg.shots.push({ x0: sg.tre.x, y0: sg.tre.y, x1: b.x, y1: b.y, t: -0.35, dur: 1.6, b });
       }
     }
-    if (sg.t > 70) {
+    // Der Sturm wartet, bis du nah genug bist (höchstens bis 160 s), damit du noch rechtzeitig kommst
+    const dS = Math.hypot(s.x - p.x, s.y - p.y);
+    if (sg.storm || (sg.t > 70 && (dS < 35 || sg.t > 160))) {
       sg.stage = 'sturm';
       if (alive(sg.def)) { army.feud = sg.def; sg.def.feud = army; army.path = null; }
       if (s.type === 'spieler' && Math.hypot(s.x - p.x, s.y - p.y) < 60) army.engaged = true;
@@ -232,6 +239,7 @@ function endSiege(sg, how, quiet = false) {
   } else if (how === 'abgewehrt') {
     if (near) log(s.type === 'spieler' ? `Die Belagerung von ${name} ist abgeschlagen!` : `Die Belagerung von ${name} ist abgeschlagen. Die Verteidiger jubeln.`, 'good');
   } else if (near) log(`Die Belagerer ziehen von ${name} ab.`);
+  sideOutcome(sg, how, quiet);
   // Heer zieht heim, Besatzung kehrt in die Häuser zurück
   const army = sg.army;
   if (army && G.groups.includes(army)) { army.siegeDone = true; army.feud = null; army.engaged = false; army.path = null; army.wait = rand(2, 5); army.peace = G.time + 120; }
@@ -245,5 +253,132 @@ function endSiege(sg, how, quiet = false) {
 export function siegeStatus() {
   const sg = G.siege;
   if (!sg) return null;
-  return { name: sg.site.type === 'spieler' ? homeName() : sg.site.name, stage: sg.stage, att: sg.army.members.length, def: sg.def ? sg.def.members.length : 0, x: sg.site.x, y: sg.site.y, army: GROUP_TYPES[sg.army.type].name };
+  return {
+    name: sg.site.type === 'spieler' ? homeName() : sg.site.name, stage: sg.stage, att: sg.army.members.length, def: sg.def ? sg.def.members.length : 0,
+    x: sg.site.x, y: sg.site.y, army: GROUP_TYPES[sg.army.type].name, side: sg.side || null, camp: sg.camp, own: sg.site.type === 'spieler',
+  };
+}
+
+// ---------------------------------------------------------------- Seitenwahl
+// Im Feldlager oder in der belagerten Stadt kannst du dich einer Seite anschließen.
+// Verteidiger: Die Besatzung wagt einen Ausfall, wenn du am Lager angreifst. Hält die Stadt, dankt sie dir.
+// Belagerer: Du bläst mit zum Sturm, die Besatzung greift dich an. Fällt die Stadt, bekommst du einen Beuteanteil.
+export function siegeAt(site) { return G.siege && G.siege.site === site ? G.siege : null; }
+export function nearSiegeCamp(r = 5) {
+  const sg = G.siege, p = G.s.player;
+  return !!sg && sg.stage !== 'anmarsch' && sg.site.type !== 'spieler' && Math.hypot(sg.camp.x - p.x, sg.camp.y - p.y) < r;
+}
+export function isSiegeGroup(g) { const sg = G.siege; return !!sg && !!g && (g === sg.army || g === sg.def); }
+
+export function sideBlock(side) {
+  const sg = G.siege;
+  if (!sg) return 'Hier wird nicht mehr belagert.';
+  const s = sg.site;
+  if (s.type === 'spieler') return 'Deine eigene Burg verteidigst du ohnehin.';
+  const fa = sg.army.faction, fs = s.faction;
+  if (sg.side === side) return 'Auf dieser Seite stehst du schon.';
+  if (sg.side) return `Du hast dich schon ${sg.side === 'def' ? 'den Verteidigern' : 'den Belagerern'} angeschlossen.`;
+  if (side === 'att') {
+    if (sg.army.provoked || sg.army.engaged) return 'Du hast das Heer schon angegriffen. Im Lager will dich niemand sehen.';
+    if (isHostileFaction(fa)) return `Der Hauptmann lässt dich nicht ins Lager. Die ${FACTIONS[fa].name} sind dir feindlich gesinnt.`;
+  } else {
+    if (sg.def && (sg.def.provoked || sg.def.engaged)) return 'Du hast die Besatzung schon angegriffen.';
+    if (isHostileFaction(fs)) return `Die Besatzung traut dir nicht. Die ${FACTIONS[fs].name} sind dir feindlich gesinnt.`;
+  }
+  return null;
+}
+
+// Was dir die Seiten in Aussicht stellen (für die Tafel)
+export function sideOffer() {
+  const sg = G.siege;
+  if (!sg) return null;
+  const s = sg.site;
+  const thanks = s.type === 'stadt' ? 240 : s.type === 'burg' ? 200 : 130;
+  const share = Math.round(125 * (s.type === 'stadt' ? 1.4 : 1) / 10) * 10;
+  return { thanks, share, fa: sg.army.faction, fs: s.faction };
+}
+
+export function joinSiege(side) {
+  const why = sideBlock(side);
+  if (why) { log(why, 'bad'); return false; }
+  const sg = G.siege, s = sg.site, army = sg.army;
+  sg.side = side;
+  if (side === 'def') {
+    army.provoked = true;
+    changeRep(army.faction, -5);
+    log(`Du stellst dich auf die Seite von ${s.name}. Greif das Feldlager an, dann wagt die Besatzung einen Ausfall und kämpft mit dir.`, 'good');
+  } else {
+    changeRep(s.faction, -8);
+    changeRep(army.faction, 3);
+    if (sg.def) sg.def.provoked = true;
+    log(`Du reihst dich bei den Belagerern vor ${s.name} ein. Der Hauptmann nickt dir zu: „Wenn du bereit bist, blasen wir zum Sturm.“`, 'good');
+  }
+  return true;
+}
+
+export function canCallStorm() { const sg = G.siege; return !!sg && sg.side === 'att' && sg.stage === 'belagerung' && !sg.storm; }
+export function callStorm() {
+  if (!canCallStorm()) return false;
+  G.siege.storm = true;
+  log(`Die Hörner blasen zum Sturm auf ${G.siege.site.name}!`, 'bad');
+  return true;
+}
+
+// Wer sich einer Seite angeschlossen hat, wird von der anderen angegriffen, sobald er in der Nähe ist
+function keepSides(sg) {
+  if (!sg.side) return;
+  const p = G.s.player, army = sg.army, def = sg.def;
+  const alive = (g) => g && g.members.length && G.groups.includes(g);
+  const near = (g, r) => g.members.some((m) => Math.hypot(m.x - p.x, m.y - p.y) < r);
+  if (p.dead) return;
+  if (sg.side === 'def') {
+    if (!army.engaged && near(army, 30)) army.engaged = true;
+    if (!sg.sortie && alive(def) && sg.stage === 'belagerung' && (army.engaged || Math.hypot(sg.camp.x - p.x, sg.camp.y - p.y) < 14)) {
+      sg.sortie = true;
+      army.feud = def; def.feud = army;
+      log(`Das Tor von ${sg.site.name} öffnet sich: Die Besatzung wagt einen Ausfall und kämpft an deiner Seite!`, 'good');
+    }
+  } else if (alive(def) && !def.engaged && near(def, 26)) def.engaged = true;
+}
+
+// Dank, Beute und Folgen für deine Seite
+function sideOutcome(sg, how, quiet) {
+  const side = sg.side, s = sg.site;
+  if (!side || s.type === 'spieler') return;
+  const fs = FACTIONS[s.faction].short, fa = FACTIONS[sg.army.faction].short;
+  if (quiet) {
+    log(`Nachricht aus ${s.name}: ${how === 'gefallen' ? 'Die Stadt ist gefallen.' : 'Die Belagerung ist vorbei.'} Du warst nicht mehr dabei.`);
+    return;
+  }
+  const offer = sideOffer();
+  if (side === 'def') {
+    if (how !== 'abgewehrt') { log(`Trotz deiner Hilfe ${how === 'gefallen' ? `ist ${s.name} gefallen` : `ist die Belagerung von ${s.name} zu Ende gegangen`}.`, how === 'gefallen' ? 'bad' : ''); return; }
+    const gold = Math.round((offer.thanks * rand(0.85, 1.15)) / 10) * 10;
+    G.s.gold += gold;
+    changeRep(s.faction, 10);
+    addRenown(15);
+    (G.s.rescued || (G.s.rescued = {}))[s.id] = G.s.day;
+    log(`${s.name} ist gerettet! Man feiert dich auf dem Markt. Dank der Stadt: ${gold} Gold, Ansehen bei den ${fs} +10, Ruhm +15.`, 'gold');
+    return;
+  }
+  if (how !== 'gefallen') { log(`Der Sturm auf ${s.name} ist gescheitert. Die ${fs} werden dir das nicht so bald vergessen.`, 'bad'); return; }
+  const gold = Math.round((offer.share * rand(0.75, 1.3)) / 10) * 10;
+  G.s.gold += gold;
+  const loot = [`${gold} Gold`];
+  const town = G.s.towns[s.id];
+  if (town) {
+    const goods = Object.entries(town.stock).filter(([, n]) => n > 2).sort(() => Math.random() - 0.5).slice(0, 2);
+    for (const [g, n] of goods) {
+      const k = Math.min(Math.ceil(n / 3), randInt(4, 8), cargoFree());
+      if (k <= 0) continue;
+      addCargo(g, k); town.stock[g] -= k;
+      loot.push(`${k} ${GOODS[g].name}`);
+    }
+  }
+  changeRep(sg.army.faction, 8);
+  changeRep(s.faction, -6);
+  addRenown(8);
+  const bl = G.s.blight || (G.s.blight = {});
+  bl[s.id] = Math.max(bl[s.id] || 0, G.s.day + 6);
+  log(`${s.name} ist gefallen, und du warst unter den Ersten auf der Mauer. Dein Beuteanteil: ${loot.join(', ')}. Ansehen bei den ${fa} +8, bei den ${fs} −6.`, 'gold');
 }

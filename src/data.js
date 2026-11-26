@@ -16,6 +16,17 @@ export const SAVE_VERSION = 4;
 const LAT_N = 55.3, LAT_S = 47.9;
 export const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
 export const KM_PER_TILE = GEO.dLat * 111.2;
+
+// Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
+export function dirText(from, to) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 4) return 'ganz in der Nähe';
+  const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
+  const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
+  return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
+}
 // Maßstab gegenüber der ersten Fassung (320 Kacheln): Reichweiten in geo.js sind darauf bezogen
 export const GEO_SCALE = MAP / 320;
 export function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }

@@ -2,7 +2,7 @@
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
 
 import { G, homeName, playerColor } from './state.js';
-import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, POIS } from './data.js';
+import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, POIS, KM_PER_TILE } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt } from './world.js';
@@ -3669,6 +3669,7 @@ export function render() {
     ctx.fillStyle = '#f3ead2';
     ctx.fillText(a.label, sp.x, yy);
   }
+  drawEventPointers(ctx, w, h);
   drawCelebration(ctx, dt);
   drawCompass(ctx, w, h);
 }
@@ -3752,13 +3753,6 @@ export function drawMap(c, w, h, opts = {}) {
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
   if (big) drawMapDecor(c, v);
-  for (const mk of [G.battle, G.siege && G.siege.site].filter(Boolean)) {
-    const q = miniPos(mk.x, mk.y, v), sz = big ? 9 : 7;
-    c.strokeStyle = '#1d140c'; c.lineWidth = 4;
-    c.beginPath(); c.moveTo(q.x - sz, q.y - sz); c.lineTo(q.x + sz, q.y + sz); c.moveTo(q.x + sz, q.y - sz); c.lineTo(q.x - sz, q.y + sz); c.stroke();
-    c.strokeStyle = '#ff6a4a'; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(q.x - sz, q.y - sz); c.lineTo(q.x + sz, q.y + sz); c.moveTo(q.x + sz, q.y - sz); c.lineTo(q.x - sz, q.y + sz); c.stroke();
-  }
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);
@@ -3780,6 +3774,19 @@ export function drawMap(c, w, h, opts = {}) {
   c.textAlign = 'center';
   const RANK = { spieler: 0, stadt: 1, burg: 2, abtei: 3, markt: 4, halle: 5, dorf: 6, lager: 7, mine: 8, einsiedelei: 9 };
   const placed = [];
+  // Ereignisse (Belagerung, Schlacht, Turnier): Platz für Symbol und Beschriftung freihalten
+  const marks = eventMarks().map((mk) => {
+    const q = miniPos(mk.x, mk.y, v), r = big ? 10 : 6.5;
+    placed.push({ x0: q.x - r - 2, y0: q.y - r - 2, x1: q.x + r + 2, y1: q.y + r + 2 });
+    let cap = null;
+    if (big) {
+      c.font = '700 12px "Alegreya Sans", sans-serif';
+      const tw = c.measureText(mk.label).width;
+      cap = { x: q.x, y: q.y + r + 15, tw };
+      placed.push({ x0: q.x - tw / 2 - 4, y0: cap.y - 12, x1: q.x + tw / 2 + 4, y1: cap.y + 4 });
+    }
+    return { mk, q, r, cap };
+  });
   const order = W.sites.slice().sort((a, b) => RANK[a.type] - RANK[b.type]);
   for (const s of order) {
     const q = miniPos(s.x, s.y, v);
@@ -3820,6 +3827,18 @@ export function drawMap(c, w, h, opts = {}) {
     }
   }
   c.textAlign = 'center';
+  for (const { mk, q, r, cap } of marks) {
+    const k = big ? 0.35 : ((G.time || 0) * 0.8) % 1;
+    c.strokeStyle = mk.col; c.globalAlpha = 0.85 * (1 - k); c.lineWidth = 2;
+    c.beginPath(); c.arc(q.x, q.y, r + 2 + k * r * 1.3, 0, Math.PI * 2); c.stroke();
+    c.globalAlpha = 1;
+    drawEventIcon(c, mk, q.x, q.y, r);
+    if (cap) {
+      c.font = '700 12px "Alegreya Sans", sans-serif';
+      c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,6,0.9)'; c.strokeText(mk.label, cap.x, cap.y);
+      c.fillStyle = mk.col; c.fillText(mk.label, cap.x, cap.y);
+    }
+  }
   const q = miniPos(p.x, p.y, v);
   c.fillStyle = '#ffffff'; c.strokeStyle = '#1d140c'; c.lineWidth = 2;
   c.beginPath(); c.arc(q.x, q.y, big ? 5 : 3.4, 0, Math.PI * 2); c.stroke(); c.fill();
@@ -3833,6 +3852,114 @@ export function drawMap(c, w, h, opts = {}) {
     c.fillText('N', w - 9, 13);
   }
   return v;
+}
+
+// ---------------------------------------------------------------- Ereignisse markieren
+// Belagerung, Feldschlacht und angekündigtes Turnier: auf beiden Karten und als Pfeil am Bildrand
+export function eventMarks() {
+  const out = [];
+  const sg = G.siege;
+  if (sg) {
+    const name = sg.site.type === 'spieler' ? homeName() : sg.site.name;
+    out.push({ kind: 'siege', x: sg.site.x, y: sg.site.y, label: `Belagerung von ${name}`, short: 'Belagerung', col: '#ff6a4a', reach: 170 });
+  }
+  if (G.battle) out.push({ kind: 'battle', x: G.battle.x, y: G.battle.y, label: 'Feldschlacht', short: 'Schlacht', col: '#ff6a4a', reach: 120 });
+  const tr = G.s && G.s.tourney;
+  if (tr && !tr.done) {
+    const host = G.world.sites.find((s) => s.id === tr.site);
+    const when = tr.day === G.s.day ? 'heute' : tr.day === G.s.day + 1 ? 'morgen' : `Tag ${tr.day}`;
+    out.push({ kind: 'tourney', x: tr.lx, y: tr.ly, label: `Turnier in ${host ? host.name : ''} · ${when}`, short: `Turnier ${when}`, col: '#ffd65a', reach: tr.day - G.s.day <= 1 ? 170 : 0 });
+  }
+  return out;
+}
+
+function drawEventIcon(c, mk, x, y, r) {
+  c.fillStyle = '#1d140c'; c.beginPath(); c.arc(x, y, r + 1.5, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = mk.col; c.lineWidth = Math.max(1.5, r * 0.16); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+  const u = r / 10;
+  if (mk.kind === 'siege') {
+    // Turm mit Zinnen und Flamme
+    c.fillStyle = '#d9d1bd';
+    c.fillRect(x - 3.6 * u, y - 3 * u, 7.2 * u, 8.2 * u);
+    for (let k = 0; k < 3; k++) c.fillRect(x - 3.6 * u + k * 2.8 * u, y - 5 * u, 1.6 * u, 2.2 * u);
+    c.fillStyle = '#1d140c'; c.fillRect(x - 1 * u, y + 1.6 * u, 2 * u, 3.6 * u);
+    c.fillStyle = '#ff8a3a'; c.beginPath(); c.moveTo(x + 2.2 * u, y - 9 * u); c.quadraticCurveTo(x + 6.5 * u, y - 4.5 * u, x + 3.6 * u, y - 2.6 * u); c.quadraticCurveTo(x + 1 * u, y - 4 * u, x + 2.2 * u, y - 9 * u); c.fill();
+  } else if (mk.kind === 'battle') {
+    // Gekreuzte Schwerter
+    c.strokeStyle = '#e9dfc6'; c.lineWidth = Math.max(1.4, 1.6 * u); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - 5.5 * u, y - 5.5 * u); c.lineTo(x + 5 * u, y + 5 * u); c.moveTo(x + 5.5 * u, y - 5.5 * u); c.lineTo(x - 5 * u, y + 5 * u); c.stroke();
+    c.strokeStyle = '#ff6a4a';
+    c.beginPath(); c.moveTo(x + 1.6 * u, y + 4.4 * u); c.lineTo(x + 4.4 * u, y + 1.6 * u); c.moveTo(x - 1.6 * u, y + 4.4 * u); c.lineTo(x - 4.4 * u, y + 1.6 * u); c.stroke();
+    c.lineCap = 'butt';
+  } else {
+    // Lanze mit Wimpel
+    c.strokeStyle = '#e9dfc6'; c.lineWidth = Math.max(1.4, 1.5 * u); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - 5 * u, y + 6 * u); c.lineTo(x + 4 * u, y - 6.5 * u); c.stroke();
+    c.lineCap = 'butt';
+    c.fillStyle = '#c9483a'; c.beginPath(); c.moveTo(x + 3 * u, y - 5 * u); c.lineTo(x + 7.5 * u, y - 2.6 * u); c.lineTo(x + 1.6 * u, y - 1.8 * u); c.closePath(); c.fill();
+    c.fillStyle = '#ffd65a'; c.beginPath(); c.moveTo(x + 2.4 * u, y - 3.8 * u); c.lineTo(x + 5 * u, y - 2.6 * u); c.lineTo(x + 1.9 * u, y - 2.2 * u); c.closePath(); c.fill();
+  }
+}
+
+// Im Bild: ein Schild über dem Ort. Außerhalb: ein Pfeil am Bildrand mit Entfernung.
+function drawEventPointers(c, w, h) {
+  const p = G.s.player;
+  const t = G.time || 0;
+  for (const mk of eventMarks()) {
+    const d = Math.hypot(mk.x - p.x, mk.y - p.y);
+    if (d > mk.reach) continue;
+    // Mitten in der Belagerung braucht es keinen Pfeil
+    if (mk.kind === 'siege' && (d < 24 || Math.hypot(G.siege.camp.x - p.x, G.siege.camp.y - p.y) < 16)) continue;
+    const sp = toScreen(mk.x, mk.y);
+    const z = G.cam.zoom;
+    const mL = 34, mR = w - 34, mT = 70, mB = h - 96;
+    const inside = sp.x > mL && sp.x < mR && sp.y > mT && sp.y < mB;
+    c.font = '700 12px "Alegreya Sans", sans-serif';
+    c.textAlign = 'center';
+    if (inside) {
+      if (mk.kind === 'battle') continue;
+      const site = mk.kind === 'siege' ? G.siege.site : null;
+      const up = site ? (site.type === 'spieler' || site.type === 'burg' ? 150 : 98) : 64;
+      const y = sp.y - up * z - 6 + Math.sin(t * 2.2) * 2.5;
+      const tw = c.measureText(mk.label).width;
+      c.fillStyle = 'rgba(28,20,14,0.82)'; c.fillRect(sp.x - tw / 2 - 26, y - 12, tw + 36, 22);
+      c.strokeStyle = mk.col; c.lineWidth = 1; c.strokeRect(sp.x - tw / 2 - 26, y - 12, tw + 36, 22);
+      drawEventIcon(c, mk, sp.x - tw / 2 - 12, y - 1, 8);
+      c.fillStyle = mk.col; c.fillText(mk.label, sp.x + 6, y + 3);
+      continue;
+    }
+    // Schnittpunkt der Linie Bildmitte → Ziel mit dem Rand (oben rechts liegt die Karte)
+    const cx = w / 2, cy = h / 2, dx = sp.x - cx, dy = sp.y - cy;
+    let k = Infinity;
+    if (dx > 0) k = Math.min(k, (mR - cx) / dx); if (dx < 0) k = Math.min(k, (mL - cx) / dx);
+    if (dy > 0) k = Math.min(k, (mB - cy) / dy); if (dy < 0) k = Math.min(k, (mT - cy) / dy);
+    let x = cx + dx * k, y = cy + dy * k;
+    // Karte oben rechts und Meldungen unten links freihalten
+    const mini = document.getElementById('minimap');
+    const mw = mini ? mini.offsetWidth + 24 : 200, mh = mini ? mini.offsetTop + mini.offsetHeight + 18 : 250;
+    if (x > w - mw && y < mh) { if (dx > 0 && Math.abs(dx) > Math.abs(dy)) y = mh; else x = w - mw; }
+    const logEl = document.getElementById('log');
+    const lr = logEl && logEl.offsetHeight ? logEl.getBoundingClientRect() : null;
+    if (lr && x < lr.right + 24 && y > lr.top - 40) { if (x <= mL + 1) y = Math.max(mT, lr.top - 40); else x = lr.right + 30; }
+    const a = Math.atan2(dy, dx);
+    const pulse = 1 + Math.sin(t * 4) * 0.06;
+    c.save();
+    c.translate(x, y);
+    c.rotate(a);
+    c.fillStyle = mk.col;
+    c.beginPath(); c.moveTo(25 * pulse, 0); c.lineTo(15, -7); c.lineTo(15, 7); c.closePath(); c.fill();
+    c.strokeStyle = '#1d140c'; c.lineWidth = 1.2; c.stroke();
+    c.restore();
+    drawEventIcon(c, mk, x, y, 13);
+    const mi = Math.max(1, Math.round((d * KM_PER_TILE) / 1.609));
+    const txt = `${mk.short} · ${mi} ${mi === 1 ? 'Meile' : 'Meilen'}`;
+    const tw = c.measureText(txt).width;
+    let tx = x, ty = y + 30;
+    if (ty > h - 70) ty = y - 22;
+    tx = Math.max(tw / 2 + 8, Math.min(w - tw / 2 - 8, tx));
+    c.fillStyle = 'rgba(28,20,14,0.8)'; c.fillRect(tx - tw / 2 - 6, ty - 12, tw + 12, 17);
+    c.fillStyle = mk.col; c.fillText(txt, tx, ty);
+  }
 }
 
 // Große Karte: Fährlinien, Landschaftsnamen, Windrose

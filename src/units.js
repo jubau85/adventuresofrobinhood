@@ -793,9 +793,9 @@ export function updateGroups(dt) {
     if (g.engaged) {
       let minD = Infinity;
       for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
-      if (minD > (g.army ? 40 : 17) || p.dead) {
+      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || p.dead) {
         g.engaged = false;
-        g.path = null; g.wait = 2;
+        g.path = null; g.wait = g.defender ? 99999 : 2;
         g.x = lead.x; g.y = lead.y;
         log(`${gt.nom} ${gt.pl ? 'lassen' : 'lässt'} von dir ab.`);
       }
@@ -960,8 +960,8 @@ function checkFeuds() {
 
 function endFeud(g) {
   const f = g.feud;
-  g.feud = null; g.path = null; g.wait = rand(2, 5); g.peace = G.time + 90;
-  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = rand(2, 5); f.peace = G.time + 90; }
+  g.feud = null; g.path = null; g.wait = g.defender ? 99999 : rand(2, 5); g.peace = G.time + 90;
+  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = f.defender ? 99999 : rand(2, 5); f.peace = G.time + 90; }
 }
 
 // Fern vom Spieler wird eine Fehde einfach ausgewürfelt

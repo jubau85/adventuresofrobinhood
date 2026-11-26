@@ -255,6 +255,10 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 8px !important; font-family: var(--font-ui); font-size: 13px; }
 .legend .dash { display: inline-block; width: 18px; height: 0; margin-right: 5px; border-top: 2px dashed var(--parchment-3); vertical-align: 3px; }
 .legend .ring { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 50%; border: 2px solid #c9a21a; vertical-align: -1px; }
+.legend .ev { display: inline-block; width: 12px; height: 12px; margin-right: 5px; border-radius: 50%; background: #1d140c; border: 2px solid #ff6a4a; vertical-align: -1px; }
+.legend .ev.gold { border-color: #ffd65a; }
+.events { max-width: 760px; margin: 10px auto 0; display: grid; gap: 6px; }
+.events .action p { margin: 0; }
 .menu { display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
 .menu .btn { padding: 9px 14px; font-size: 15px; }
 .menu .gfx { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; }
@@ -491,6 +495,17 @@ const SAVE_VERSION = 4;
 const LAT_N = 55.3, LAT_S = 47.9;
 const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
 const KM_PER_TILE = GEO.dLat * 111.2;
+
+// Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
+function dirText(from, to) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 4) return 'ganz in der Nähe';
+  const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
+  const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
+  return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
+}
 // Maßstab gegenüber der ersten Fassung (320 Kacheln): Reichweiten in geo.js sind darauf bezogen
 const GEO_SCALE = MAP / 320;
 function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }
@@ -3602,9 +3617,9 @@ function updateGroups(dt) {
     if (g.engaged) {
       let minD = Infinity;
       for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
-      if (minD > (g.army ? 40 : 17) || p.dead) {
+      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || p.dead) {
         g.engaged = false;
-        g.path = null; g.wait = 2;
+        g.path = null; g.wait = g.defender ? 99999 : 2;
         g.x = lead.x; g.y = lead.y;
         log(`${gt.nom} ${gt.pl ? 'lassen' : 'lässt'} von dir ab.`);
       }
@@ -3769,8 +3784,8 @@ function checkFeuds() {
 
 function endFeud(g) {
   const f = g.feud;
-  g.feud = null; g.path = null; g.wait = rand(2, 5); g.peace = G.time + 90;
-  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = rand(2, 5); f.peace = G.time + 90; }
+  g.feud = null; g.path = null; g.wait = g.defender ? 99999 : rand(2, 5); g.peace = G.time + 90;
+  if (f && f.feud === g) { f.feud = null; f.path = null; f.wait = f.defender ? 99999 : rand(2, 5); f.peace = G.time + 90; }
 }
 
 // Fern vom Spieler wird eine Fehde einfach ausgewürfelt
@@ -4871,6 +4886,8 @@ function updateFunerals(dt) {
 
 
 
+
+
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
   normannen: { en: 'heer_richard', wa: 'heer_richard', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp' },
@@ -4991,7 +5008,8 @@ function startSiege(target = null, armyType = null, scale = null) {
   };
   rebuildUnits();
   const own = target.type === 'spieler';
-  log(own ? `${GROUP_TYPES[armyType].nom} zieht gegen ${homeName()}! Eine Belagerung steht bevor.` : `${GROUP_TYPES[armyType].nom} zieht vor ${target.name} und will die ${target.type === 'burg' ? 'Burg' : 'Stadt'} belagern!`, 'bad');
+  const where = dirText(p, target);
+  log(own ? `${GROUP_TYPES[armyType].nom} zieht gegen ${homeName()}! Eine Belagerung steht bevor.` : `Ein Bote meldet: ${GROUP_TYPES[armyType].nom} zieht vor ${target.name} (${where}) und will die ${target.type === 'burg' ? 'Burg' : 'Stadt'} belagern! Auf der Karte ist der Ort markiert. Im Feldlager oder in ${target.name} kannst du dich einer Seite anschließen.`, 'bad');
   return true;
 }
 
@@ -5011,6 +5029,7 @@ function raiseDefenders(sg) {
   const g = spawnGroup('verteidiger', { pos, membersUnits: members });
   if (!g) return null;
   g.faction = own ? null : s.faction; g.defender = s.id; g.wait = 99999; g.path = null; g.homeGuard = own;
+  if (sg.side === 'att') g.engaged = true;
   rebuildUnits();
   return g;
 }
@@ -5038,6 +5057,7 @@ function updateSiege(dt) {
     } else if (sg.t > 260) return endSiege(sg, 'abgezogen');
     return;
   }
+  keepSides(sg);
   if (sg.stage === 'belagerung') {
     sg.shotT -= dt;
     if (sg.shotT <= 0) {
@@ -5052,7 +5072,9 @@ function updateSiege(dt) {
         sg.shots.push({ x0: sg.tre.x, y0: sg.tre.y, x1: b.x, y1: b.y, t: -0.35, dur: 1.6, b });
       }
     }
-    if (sg.t > 70) {
+    // Wer in der Nähe ist oder sich einer Seite angeschlossen hat, kommt noch rechtzeitig zum Sturm
+    const dS = Math.hypot(s.x - p.x, s.y - p.y);
+    if (sg.storm || (sg.t > 70 && (dS < 35 || sg.t > 160))) {
       sg.stage = 'sturm';
       if (alive(sg.def)) { army.feud = sg.def; sg.def.feud = army; army.path = null; }
       if (s.type === 'spieler' && Math.hypot(s.x - p.x, s.y - p.y) < 60) army.engaged = true;
@@ -5094,6 +5116,7 @@ function endSiege(sg, how, quiet = false) {
   } else if (how === 'abgewehrt') {
     if (near) log(s.type === 'spieler' ? `Die Belagerung von ${name} ist abgeschlagen!` : `Die Belagerung von ${name} ist abgeschlagen. Die Verteidiger jubeln.`, 'good');
   } else if (near) log(`Die Belagerer ziehen von ${name} ab.`);
+  sideOutcome(sg, how, quiet);
   // Heer zieht heim, Besatzung kehrt in die Häuser zurück
   const army = sg.army;
   if (army && G.groups.includes(army)) { army.siegeDone = true; army.feud = null; army.engaged = false; army.path = null; army.wait = rand(2, 5); army.peace = G.time + 120; }
@@ -5107,7 +5130,134 @@ function endSiege(sg, how, quiet = false) {
 function siegeStatus() {
   const sg = G.siege;
   if (!sg) return null;
-  return { name: sg.site.type === 'spieler' ? homeName() : sg.site.name, stage: sg.stage, att: sg.army.members.length, def: sg.def ? sg.def.members.length : 0, x: sg.site.x, y: sg.site.y, army: GROUP_TYPES[sg.army.type].name };
+  return {
+    name: sg.site.type === 'spieler' ? homeName() : sg.site.name, stage: sg.stage, att: sg.army.members.length, def: sg.def ? sg.def.members.length : 0,
+    x: sg.site.x, y: sg.site.y, army: GROUP_TYPES[sg.army.type].name, side: sg.side || null, camp: sg.camp, own: sg.site.type === 'spieler',
+  };
+}
+
+// ---------------------------------------------------------------- Seitenwahl
+// Im Feldlager oder in der belagerten Stadt kannst du dich einer Seite anschließen.
+// Verteidiger: Die Besatzung wagt einen Ausfall, wenn du am Lager angreifst. Hält die Stadt, dankt sie dir.
+// Belagerer: Du bläst mit zum Sturm, die Besatzung greift dich an. Fällt die Stadt, bekommst du einen Beuteanteil.
+function siegeAt(site) { return G.siege && G.siege.site === site ? G.siege : null; }
+function nearSiegeCamp(r = 5) {
+  const sg = G.siege, p = G.s.player;
+  return !!sg && sg.stage !== 'anmarsch' && sg.site.type !== 'spieler' && Math.hypot(sg.camp.x - p.x, sg.camp.y - p.y) < r;
+}
+function isSiegeGroup(g) { const sg = G.siege; return !!sg && !!g && (g === sg.army || g === sg.def); }
+
+function sideBlock(side) {
+  const sg = G.siege;
+  if (!sg) return 'Hier wird nicht mehr belagert.';
+  const s = sg.site;
+  if (s.type === 'spieler') return 'Deine eigene Burg verteidigst du ohnehin.';
+  const fa = sg.army.faction, fs = s.faction;
+  if (sg.side === side) return 'Auf dieser Seite stehst du schon.';
+  if (sg.side) return `Du hast dich schon ${sg.side === 'def' ? 'den Verteidigern' : 'den Belagerern'} angeschlossen.`;
+  if (side === 'att') {
+    if (sg.army.provoked || sg.army.engaged) return 'Du hast das Heer schon angegriffen. Im Lager will dich niemand sehen.';
+    if (isHostileFaction(fa)) return `Der Hauptmann lässt dich nicht ins Lager. Die ${FACTIONS[fa].name} sind dir feindlich gesinnt.`;
+  } else {
+    if (sg.def && (sg.def.provoked || sg.def.engaged)) return 'Du hast die Besatzung schon angegriffen.';
+    if (isHostileFaction(fs)) return `Die Besatzung traut dir nicht. Die ${FACTIONS[fs].name} sind dir feindlich gesinnt.`;
+  }
+  return null;
+}
+
+// Was dir die Seiten in Aussicht stellen (für die Tafel)
+function sideOffer() {
+  const sg = G.siege;
+  if (!sg) return null;
+  const s = sg.site;
+  const thanks = s.type === 'stadt' ? 240 : s.type === 'burg' ? 200 : 130;
+  const share = Math.round(125 * (s.type === 'stadt' ? 1.4 : 1) / 10) * 10;
+  return { thanks, share, fa: sg.army.faction, fs: s.faction };
+}
+
+function joinSiege(side) {
+  const why = sideBlock(side);
+  if (why) { log(why, 'bad'); return false; }
+  const sg = G.siege, s = sg.site, army = sg.army;
+  sg.side = side;
+  if (side === 'def') {
+    army.provoked = true;
+    changeRep(army.faction, -5);
+    log(`Du stellst dich auf die Seite von ${s.name}. Greif das Feldlager an, dann wagt die Besatzung einen Ausfall und kämpft mit dir.`, 'good');
+  } else {
+    changeRep(s.faction, -8);
+    changeRep(army.faction, 3);
+    if (sg.def) sg.def.provoked = true;
+    log(`Du reihst dich bei den Belagerern vor ${s.name} ein. Der Hauptmann nickt dir zu: „Wenn du bereit bist, blasen wir zum Sturm.“`, 'good');
+  }
+  return true;
+}
+
+function canCallStorm() { const sg = G.siege; return !!sg && sg.side === 'att' && sg.stage === 'belagerung' && !sg.storm; }
+function callStorm() {
+  if (!canCallStorm()) return false;
+  G.siege.storm = true;
+  log(`Die Hörner blasen zum Sturm auf ${G.siege.site.name}!`, 'bad');
+  return true;
+}
+
+// Wer sich einer Seite angeschlossen hat, wird von der anderen angegriffen, sobald er in der Nähe ist
+function keepSides(sg) {
+  if (!sg.side) return;
+  const p = G.s.player, army = sg.army, def = sg.def;
+  const alive = (g) => g && g.members.length && G.groups.includes(g);
+  const near = (g, r) => g.members.some((m) => Math.hypot(m.x - p.x, m.y - p.y) < r);
+  if (p.dead) return;
+  if (sg.side === 'def') {
+    if (!army.engaged && near(army, 30)) army.engaged = true;
+    if (!sg.sortie && alive(def) && sg.stage === 'belagerung' && (army.engaged || Math.hypot(sg.camp.x - p.x, sg.camp.y - p.y) < 14)) {
+      sg.sortie = true;
+      army.feud = def; def.feud = army;
+      log(`Das Tor von ${sg.site.name} öffnet sich: Die Besatzung wagt einen Ausfall und kämpft an deiner Seite!`, 'good');
+    }
+  } else if (alive(def) && !def.engaged && near(def, 26)) def.engaged = true;
+}
+
+// Dank, Beute und Folgen für deine Seite
+function sideOutcome(sg, how, quiet) {
+  const side = sg.side, s = sg.site;
+  if (!side || s.type === 'spieler') return;
+  const fs = FACTIONS[s.faction].short, fa = FACTIONS[sg.army.faction].short;
+  if (quiet) {
+    log(`Nachricht aus ${s.name}: ${how === 'gefallen' ? 'Die Stadt ist gefallen.' : 'Die Belagerung ist vorbei.'} Du warst nicht mehr dabei.`);
+    return;
+  }
+  const offer = sideOffer();
+  if (side === 'def') {
+    if (how !== 'abgewehrt') { log(`Trotz deiner Hilfe ${how === 'gefallen' ? `ist ${s.name} gefallen` : `ist die Belagerung von ${s.name} zu Ende gegangen`}.`, how === 'gefallen' ? 'bad' : ''); return; }
+    const gold = Math.round((offer.thanks * rand(0.85, 1.15)) / 10) * 10;
+    G.s.gold += gold;
+    changeRep(s.faction, 10);
+    addRenown(15);
+    (G.s.rescued || (G.s.rescued = {}))[s.id] = G.s.day;
+    log(`${s.name} ist gerettet! Man feiert dich auf dem Markt. Dank der Stadt: ${gold} Gold, Ansehen bei den ${fs} +10, Ruhm +15.`, 'gold');
+    return;
+  }
+  if (how !== 'gefallen') { log(`Der Sturm auf ${s.name} ist gescheitert. Die ${fs} werden dir das nicht so bald vergessen.`, 'bad'); return; }
+  const gold = Math.round((offer.share * rand(0.75, 1.3)) / 10) * 10;
+  G.s.gold += gold;
+  const loot = [`${gold} Gold`];
+  const town = G.s.towns[s.id];
+  if (town) {
+    const goods = Object.entries(town.stock).filter(([, n]) => n > 2).sort(() => Math.random() - 0.5).slice(0, 2);
+    for (const [g, n] of goods) {
+      const k = Math.min(Math.ceil(n / 3), randInt(4, 8), cargoFree());
+      if (k <= 0) continue;
+      addCargo(g, k); town.stock[g] -= k;
+      loot.push(`${k} ${GOODS[g].name}`);
+    }
+  }
+  changeRep(sg.army.faction, 8);
+  changeRep(s.faction, -6);
+  addRenown(8);
+  const bl = G.s.blight || (G.s.blight = {});
+  bl[s.id] = Math.max(bl[s.id] || 0, G.s.day + 6);
+  log(`${s.name} ist gefallen, und du warst unter den Ersten auf der Mauer. Dein Beuteanteil: ${loot.join(', ')}. Ansehen bei den ${fa} +8, bei den ${fs} −6.`, 'gold');
 }
 
 // ===== dynamics.js =====
@@ -5520,7 +5670,7 @@ function announce() {
       joined: false, done: false,
     };
     G.s.flags.tourneys = (G.s.flags.tourneys || 0) + 1;
-    log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold.`, 'gold');
+    log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold. Die Schranken sind auf der Karte markiert.`, 'gold');
     return;
   }
 }
@@ -10956,6 +11106,7 @@ function render() {
     ctx.fillStyle = '#f3ead2';
     ctx.fillText(a.label, sp.x, yy);
   }
+  drawEventPointers(ctx, w, h);
   drawCelebration(ctx, dt);
   drawCompass(ctx, w, h);
 }
@@ -11039,13 +11190,6 @@ function drawMap(c, w, h, opts = {}) {
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
   if (big) drawMapDecor(c, v);
-  for (const mk of [G.battle, G.siege && G.siege.site].filter(Boolean)) {
-    const q = miniPos(mk.x, mk.y, v), sz = big ? 9 : 7;
-    c.strokeStyle = '#1d140c'; c.lineWidth = 4;
-    c.beginPath(); c.moveTo(q.x - sz, q.y - sz); c.lineTo(q.x + sz, q.y + sz); c.moveTo(q.x + sz, q.y - sz); c.lineTo(q.x - sz, q.y + sz); c.stroke();
-    c.strokeStyle = '#ff6a4a'; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(q.x - sz, q.y - sz); c.lineTo(q.x + sz, q.y + sz); c.moveTo(q.x + sz, q.y - sz); c.lineTo(q.x - sz, q.y + sz); c.stroke();
-  }
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);
@@ -11067,6 +11211,19 @@ function drawMap(c, w, h, opts = {}) {
   c.textAlign = 'center';
   const RANK = { spieler: 0, stadt: 1, burg: 2, abtei: 3, markt: 4, halle: 5, dorf: 6, lager: 7, mine: 8, einsiedelei: 9 };
   const placed = [];
+  // Ereignisse (Belagerung, Schlacht, Turnier): Platz für Symbol und Beschriftung freihalten
+  const marks = eventMarks().map((mk) => {
+    const q = miniPos(mk.x, mk.y, v), r = big ? 10 : 6.5;
+    placed.push({ x0: q.x - r - 2, y0: q.y - r - 2, x1: q.x + r + 2, y1: q.y + r + 2 });
+    let cap = null;
+    if (big) {
+      c.font = '700 12px "Alegreya Sans", sans-serif';
+      const tw = c.measureText(mk.label).width;
+      cap = { x: q.x, y: q.y + r + 15, tw };
+      placed.push({ x0: q.x - tw / 2 - 4, y0: cap.y - 12, x1: q.x + tw / 2 + 4, y1: cap.y + 4 });
+    }
+    return { mk, q, r, cap };
+  });
   const order = W.sites.slice().sort((a, b) => RANK[a.type] - RANK[b.type]);
   for (const s of order) {
     const q = miniPos(s.x, s.y, v);
@@ -11107,6 +11264,18 @@ function drawMap(c, w, h, opts = {}) {
     }
   }
   c.textAlign = 'center';
+  for (const { mk, q, r, cap } of marks) {
+    const k = big ? 0.35 : ((G.time || 0) * 0.8) % 1;
+    c.strokeStyle = mk.col; c.globalAlpha = 0.85 * (1 - k); c.lineWidth = 2;
+    c.beginPath(); c.arc(q.x, q.y, r + 2 + k * r * 1.3, 0, Math.PI * 2); c.stroke();
+    c.globalAlpha = 1;
+    drawEventIcon(c, mk, q.x, q.y, r);
+    if (cap) {
+      c.font = '700 12px "Alegreya Sans", sans-serif';
+      c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,6,0.9)'; c.strokeText(mk.label, cap.x, cap.y);
+      c.fillStyle = mk.col; c.fillText(mk.label, cap.x, cap.y);
+    }
+  }
   const q = miniPos(p.x, p.y, v);
   c.fillStyle = '#ffffff'; c.strokeStyle = '#1d140c'; c.lineWidth = 2;
   c.beginPath(); c.arc(q.x, q.y, big ? 5 : 3.4, 0, Math.PI * 2); c.stroke(); c.fill();
@@ -11120,6 +11289,114 @@ function drawMap(c, w, h, opts = {}) {
     c.fillText('N', w - 9, 13);
   }
   return v;
+}
+
+// ---------------------------------------------------------------- Ereignisse markieren
+// Belagerung, Feldschlacht und angekündigtes Turnier: auf beiden Karten und als Pfeil am Bildrand
+function eventMarks() {
+  const out = [];
+  const sg = G.siege;
+  if (sg) {
+    const name = sg.site.type === 'spieler' ? homeName() : sg.site.name;
+    out.push({ kind: 'siege', x: sg.site.x, y: sg.site.y, label: `Belagerung von ${name}`, short: 'Belagerung', col: '#ff6a4a', reach: 170 });
+  }
+  if (G.battle) out.push({ kind: 'battle', x: G.battle.x, y: G.battle.y, label: 'Feldschlacht', short: 'Schlacht', col: '#ff6a4a', reach: 120 });
+  const tr = G.s && G.s.tourney;
+  if (tr && !tr.done) {
+    const host = G.world.sites.find((s) => s.id === tr.site);
+    const when = tr.day === G.s.day ? 'heute' : tr.day === G.s.day + 1 ? 'morgen' : `Tag ${tr.day}`;
+    out.push({ kind: 'tourney', x: tr.lx, y: tr.ly, label: `Turnier in ${host ? host.name : ''} · ${when}`, short: `Turnier ${when}`, col: '#ffd65a', reach: tr.day - G.s.day <= 1 ? 170 : 0 });
+  }
+  return out;
+}
+
+function drawEventIcon(c, mk, x, y, r) {
+  c.fillStyle = '#1d140c'; c.beginPath(); c.arc(x, y, r + 1.5, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = mk.col; c.lineWidth = Math.max(1.5, r * 0.16); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+  const u = r / 10;
+  if (mk.kind === 'siege') {
+    // Turm mit Zinnen und Flamme
+    c.fillStyle = '#d9d1bd';
+    c.fillRect(x - 3.6 * u, y - 3 * u, 7.2 * u, 8.2 * u);
+    for (let k = 0; k < 3; k++) c.fillRect(x - 3.6 * u + k * 2.8 * u, y - 5 * u, 1.6 * u, 2.2 * u);
+    c.fillStyle = '#1d140c'; c.fillRect(x - 1 * u, y + 1.6 * u, 2 * u, 3.6 * u);
+    c.fillStyle = '#ff8a3a'; c.beginPath(); c.moveTo(x + 2.2 * u, y - 9 * u); c.quadraticCurveTo(x + 6.5 * u, y - 4.5 * u, x + 3.6 * u, y - 2.6 * u); c.quadraticCurveTo(x + 1 * u, y - 4 * u, x + 2.2 * u, y - 9 * u); c.fill();
+  } else if (mk.kind === 'battle') {
+    // Gekreuzte Schwerter
+    c.strokeStyle = '#e9dfc6'; c.lineWidth = Math.max(1.4, 1.6 * u); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - 5.5 * u, y - 5.5 * u); c.lineTo(x + 5 * u, y + 5 * u); c.moveTo(x + 5.5 * u, y - 5.5 * u); c.lineTo(x - 5 * u, y + 5 * u); c.stroke();
+    c.strokeStyle = '#ff6a4a';
+    c.beginPath(); c.moveTo(x + 1.6 * u, y + 4.4 * u); c.lineTo(x + 4.4 * u, y + 1.6 * u); c.moveTo(x - 1.6 * u, y + 4.4 * u); c.lineTo(x - 4.4 * u, y + 1.6 * u); c.stroke();
+    c.lineCap = 'butt';
+  } else {
+    // Lanze mit Wimpel
+    c.strokeStyle = '#e9dfc6'; c.lineWidth = Math.max(1.4, 1.5 * u); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - 5 * u, y + 6 * u); c.lineTo(x + 4 * u, y - 6.5 * u); c.stroke();
+    c.lineCap = 'butt';
+    c.fillStyle = '#c9483a'; c.beginPath(); c.moveTo(x + 3 * u, y - 5 * u); c.lineTo(x + 7.5 * u, y - 2.6 * u); c.lineTo(x + 1.6 * u, y - 1.8 * u); c.closePath(); c.fill();
+    c.fillStyle = '#ffd65a'; c.beginPath(); c.moveTo(x + 2.4 * u, y - 3.8 * u); c.lineTo(x + 5 * u, y - 2.6 * u); c.lineTo(x + 1.9 * u, y - 2.2 * u); c.closePath(); c.fill();
+  }
+}
+
+// Im Bild: ein Schild über dem Ort. Außerhalb: ein Pfeil am Bildrand mit Entfernung.
+function drawEventPointers(c, w, h) {
+  const p = G.s.player;
+  const t = G.time || 0;
+  for (const mk of eventMarks()) {
+    const d = Math.hypot(mk.x - p.x, mk.y - p.y);
+    if (d > mk.reach) continue;
+    // Mitten in der Belagerung braucht es keinen Pfeil
+    if (mk.kind === 'siege' && (d < 24 || Math.hypot(G.siege.camp.x - p.x, G.siege.camp.y - p.y) < 16)) continue;
+    const sp = toScreen(mk.x, mk.y);
+    const z = G.cam.zoom;
+    const mL = 34, mR = w - 34, mT = 70, mB = h - 96;
+    const inside = sp.x > mL && sp.x < mR && sp.y > mT && sp.y < mB;
+    c.font = '700 12px "Alegreya Sans", sans-serif';
+    c.textAlign = 'center';
+    if (inside) {
+      if (mk.kind === 'battle') continue;
+      const site = mk.kind === 'siege' ? G.siege.site : null;
+      const up = site ? (site.type === 'spieler' || site.type === 'burg' ? 150 : 98) : 64;
+      const y = sp.y - up * z - 6 + Math.sin(t * 2.2) * 2.5;
+      const tw = c.measureText(mk.label).width;
+      c.fillStyle = 'rgba(28,20,14,0.82)'; c.fillRect(sp.x - tw / 2 - 26, y - 12, tw + 36, 22);
+      c.strokeStyle = mk.col; c.lineWidth = 1; c.strokeRect(sp.x - tw / 2 - 26, y - 12, tw + 36, 22);
+      drawEventIcon(c, mk, sp.x - tw / 2 - 12, y - 1, 8);
+      c.fillStyle = mk.col; c.fillText(mk.label, sp.x + 6, y + 3);
+      continue;
+    }
+    // Schnittpunkt der Linie Bildmitte → Ziel mit dem Rand (oben rechts liegt die Karte)
+    const cx = w / 2, cy = h / 2, dx = sp.x - cx, dy = sp.y - cy;
+    let k = Infinity;
+    if (dx > 0) k = Math.min(k, (mR - cx) / dx); if (dx < 0) k = Math.min(k, (mL - cx) / dx);
+    if (dy > 0) k = Math.min(k, (mB - cy) / dy); if (dy < 0) k = Math.min(k, (mT - cy) / dy);
+    let x = cx + dx * k, y = cy + dy * k;
+    // Karte oben rechts und Meldungen unten links freihalten
+    const mini = document.getElementById('minimap');
+    const mw = mini ? mini.offsetWidth + 24 : 200, mh = mini ? mini.offsetTop + mini.offsetHeight + 18 : 250;
+    if (x > w - mw && y < mh) { if (dx > 0 && Math.abs(dx) > Math.abs(dy)) y = mh; else x = w - mw; }
+    const logEl = document.getElementById('log');
+    const lr = logEl && logEl.offsetHeight ? logEl.getBoundingClientRect() : null;
+    if (lr && x < lr.right + 24 && y > lr.top - 40) { if (x <= mL + 1) y = Math.max(mT, lr.top - 40); else x = lr.right + 30; }
+    const a = Math.atan2(dy, dx);
+    const pulse = 1 + Math.sin(t * 4) * 0.06;
+    c.save();
+    c.translate(x, y);
+    c.rotate(a);
+    c.fillStyle = mk.col;
+    c.beginPath(); c.moveTo(25 * pulse, 0); c.lineTo(15, -7); c.lineTo(15, 7); c.closePath(); c.fill();
+    c.strokeStyle = '#1d140c'; c.lineWidth = 1.2; c.stroke();
+    c.restore();
+    drawEventIcon(c, mk, x, y, 13);
+    const mi = Math.max(1, Math.round((d * KM_PER_TILE) / 1.609));
+    const txt = `${mk.short} · ${mi} ${mi === 1 ? 'Meile' : 'Meilen'}`;
+    const tw = c.measureText(txt).width;
+    let tx = x, ty = y + 30;
+    if (ty > h - 70) ty = y - 22;
+    tx = Math.max(tw / 2 + 8, Math.min(w - tw / 2 - 8, tx));
+    c.fillStyle = 'rgba(28,20,14,0.8)'; c.fillRect(tx - tw / 2 - 6, ty - 12, tw + 12, 17);
+    c.fillStyle = mk.col; c.fillText(txt, tx, ty);
+  }
 }
 
 // Große Karte: Fährlinien, Landschaftsnamen, Windrose
@@ -11684,6 +11961,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -11751,7 +12029,7 @@ function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c', siege: 's' };
 
 function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -11784,7 +12062,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -11823,16 +12101,6 @@ function itemStats(id) {
   return p.join(' · ');
 }
 
-// Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
-function dirText(from, to) {
-  const dx = to.x - from.x, dy = to.y - from.y;
-  const d = Math.hypot(dx, dy);
-  if (d < 4) return 'ganz in der Nähe';
-  const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
-  const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
-  const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
-  return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
-}
 
 function questCard(q, buttons) {
   const s = siteById(q.from);
@@ -11850,13 +12118,14 @@ function townPanel() {
   const site = G.ui.arg;
   if (site.type === 'einsiedelei') return hermitPanel(site);
   if (isAbandoned(site)) return abandonedPanel(site);
+  if (siegeAt(site) && G.siege.stage !== 'anmarsch') return siegePanel();
   const f = site.faction;
   const town = G.s.towns[site.id];
   const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${siegeAt(site) ? siegeActions() : ''}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -11883,6 +12152,7 @@ function townInfo(site) {
       </dl>
     </div>
     <div class="actions">
+      ${siegeAt(site) ? siegeActions() : ''}
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
@@ -11945,6 +12215,48 @@ function hermitPanel(site) {
       </div>
     </div>`,
   };
+}
+
+// Belagerung: Lage und Seitenwahl (im Feldlager oder in der belagerten Stadt)
+const SIEGE_STAGE = { anmarsch: 'Das Heer ist auf dem Anmarsch.', belagerung: 'Das Trebuchet beschießt die Häuser.', sturm: 'Sturm aufs Tor!' };
+function siegePanel() {
+  const sg = G.siege, st = siegeStatus();
+  if (!sg) return { title: 'Belagerung', tabs: [], body: '<div class="notice"><p>Die Belagerung ist vorbei.</p></div>' };
+  const s = sg.site, off = sideOffer();
+  const inside = G.ui.panel === 'town';
+  return {
+    title: `Belagerung von ${st.name}`,
+    sub: `${swatch(off.fa)}${esc(st.army)} gegen ${swatch(off.fs)}${esc(s.name)}`,
+    tabs: [],
+    body: `<div class="cols">
+      <div>
+        <p class="lede">${inside ? `Die Tore von ${esc(s.name)} sind verrammelt, auf den Mauern stehen Bogenschützen. ` : 'Zelte, Feuer und das Knarren des Trebuchets. '}${SIEGE_STAGE[sg.stage]}</p>
+        <dl class="facts">
+          <dt>Belagerer</dt><dd>${swatch(off.fa)}${esc(st.army)}: <b>${st.att}</b> Mann · ${repPill(off.fa)}</dd>
+          <dt>Verteidiger</dt><dd>${swatch(off.fs)}${sg.def ? `Besatzung: <b>${st.def}</b> Mann` : 'Die Besatzung hinter den Mauern'} · ${repPill(off.fs)}</dd>
+        </dl>
+      </div>
+      <div class="actions">${siegeActions()}</div>
+    </div>`,
+  };
+}
+
+function siegeActions() {
+  const sg = G.siege;
+  if (!sg || sg.site.type === 'spieler') return '';
+  const s = sg.site, off = sideOffer(), fa = FACTIONS[off.fa].short, fs = FACTIONS[off.fs].short;
+  if (sg.side) {
+    const storm = canCallStorm() ? `<div class="action"><div><b>Zum Sturm blasen</b><p>Der Hauptmann wartet auf dein Zeichen. Dann rennen alle gegen das Tor an.</p></div><button class="btn danger" data-act="ssturm">Sturm!</button></div>` : '';
+    const what = sg.side === 'def'
+      ? `Du kämpfst für ${esc(s.name)}. ${sg.sortie ? 'Die Besatzung ist mit dir draußen vor den Mauern.' : 'Greif das Feldlager an, dann wagt die Besatzung einen Ausfall.'} Hält die Stadt, dankt sie dir.`
+      : `Du dienst im Heer vor ${esc(s.name)}. Die Besatzung greift dich an, wo sie dich sieht. Fällt die Stadt, bekommst du deinen Beuteanteil.`;
+    return `<h3>Belagerung</h3><div class="notice ${sg.side === 'def' ? 'good' : ''}"><p>${what}</p></div>${storm}`;
+  }
+  const bD = sideBlock('def'), bA = sideBlock('att');
+  return `<h3>Belagerung · wähle deine Seite</h3>
+    <div class="action"><div><b>Den Verteidigern beistehen</b><p>Greif das Feldlager an, dann wagt die Besatzung einen Ausfall. Hält ${esc(s.name)}, dankt dir die Stadt mit etwa ${fmt(off.thanks)} Gold, Ansehen bei den ${esc(fs)} +10 und Ruhm +15. Die ${esc(fa)} sehen das ungern (−5, mehr, wenn du ihr Heer zerschlägst).</p>${bD ? `<p class="muted">${esc(bD)}</p>` : ''}</div><button class="btn primary" data-act="sdef" ${bD ? 'disabled' : ''}>Beistehen</button></div>
+    <div class="action"><div><b>Den Belagerern dienen</b><p>Du kämpfst für ${esc(GROUP_TYPES[sg.army.type].acc)} und stürmst mit, die Besatzung greift dich an. Fällt ${esc(s.name)}, bekommst du einen Beuteanteil (etwa ${fmt(off.share)} Gold und Waren aus der Stadt) und Ansehen bei den ${esc(fa)} +8. Die ${esc(fs)} vergessen das nicht (−8 sofort, −6 beim Fall).</p>${bA ? `<p class="muted">${esc(bA)}</p>` : ''}</div><button class="btn danger" data-act="satt" ${bA ? 'disabled' : ''}>Dienen</button></div>
+    <p class="muted">Oder du schaust nur zu. Entfernst du dich zu weit, entscheidet sich die Belagerung ohne dich.</p>`;
 }
 
 // Turnier: Ankündigung, Teilnehmer, Anmeldung
@@ -12267,6 +12579,30 @@ function politicsPanel() {
 }
 
 // ---------------------------------------------------------------- Karte
+// Laufende Ereignisse mit Richtung und „Hinreisen“
+function eventTargets() {
+  const out = [], p = G.s.player;
+  const sg = G.siege;
+  if (sg) {
+    const st = siegeStatus();
+    const own = sg.site.type === 'spieler';
+    const t = own || sg.stage === 'anmarsch' ? { x: sg.site.x, y: sg.site.y + 1 } : { x: sg.camp.x, y: sg.camp.y + 1.5 };
+    out.push({ k: 'siege', t, camp: !own && sg.stage !== 'anmarsch', text: `<b>Belagerung von ${esc(st.name)}</b> (${{ anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage]}), ${dirText(p, sg.site)}` });
+  }
+  const tr = G.s.tourney;
+  if (tr && !tr.done) {
+    const host = G.world.sites.find((x) => x.id === tr.site);
+    const when = tr.day === G.s.day ? 'heute' : tr.day === G.s.day + 1 ? 'morgen' : `am Tag ${tr.day}`;
+    out.push({ k: 'tourney', t: { x: host.x, y: host.y + 0.6 }, site: host, text: `<b>Turnier in ${esc(host.name)}</b> ${when}, ${dirText(p, host)}` });
+  }
+  return out;
+}
+function eventList() {
+  const ev = eventTargets();
+  if (!ev.length) return '';
+  return `<div class="events">${ev.map((e) => `<div class="action"><div><p>${e.text}</p></div><button class="btn sm" data-act="goevent" data-k="${e.k}">Hinreisen</button></div>`).join('')}</div>`;
+}
+
 let mapView = null;
 const mapState = { zoom: 2, cx: null, cy: null };
 function mapPanel() {
@@ -12274,7 +12610,7 @@ function mapPanel() {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff.', tabs: [],
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="dash"></span>Fähre</span></p>`,
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span><span><span class="dash"></span>Fähre</span></p>${eventList()}`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.closest('.mapwrap');
@@ -12423,6 +12759,7 @@ function helpPanel() {
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
         <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> beschießt ein Heer eine Burg oder Stadt und stürmt das Tor. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben.</li>
+        <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (die Besatzung wagt einen Ausfall, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
@@ -12454,6 +12791,13 @@ const ACTIONS = {
   gift: () => giveGift(G.ui.arg),
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
+  sdef: () => joinSiege('def'),
+  satt: () => {
+    const sg = G.siege;
+    if (!sg) return;
+    confirmDialog(`Wirklich gegen ${sg.site.name} ziehen? Die ${FACTIONS[sg.site.faction].name} werden dir das übel nehmen (Ansehen −8 sofort, −6, wenn die Stadt fällt), und die Besatzung greift dich an.`, 'Dienen', () => { joinSiege('att'); refreshPanel(); });
+  },
+  ssturm: () => callStorm(),
   lease: () => leaseMine(G.ui.arg),
   hrat: () => hermitAdvice(G.ui.arg),
   hsegen: () => hermitBless(G.ui.arg),
@@ -12498,6 +12842,15 @@ const ACTIONS = {
   claim: (d) => { const q = questById(d.q); if (q) claimQuest(q); },
   letter: (d) => { const q = questById(d.q); if (q) deliverLetter(q); },
   abandon: (d) => { const q = questById(d.q); if (q) confirmDialog(`Den Auftrag „${q.title}“ aufgeben? Das kostet etwas Ansehen.`, 'Aufgeben', () => { abandonQuest(q); refreshPanel(); }); },
+  goevent: (d) => {
+    const e = eventTargets().find((x) => x.k === d.k);
+    if (!e) return;
+    if (setPlayerPath(e.t.x, e.t.y)) {
+      G.pendingSite = e.site || null;
+      G.pendingCamp = !!e.camp;
+      closePanel();
+    } else log('Dorthin führt kein Weg.', 'bad');
+  },
   goto: (d) => {
     const q = questById(d.q);
     if (!q) return;
@@ -12854,6 +13207,13 @@ function nearestSite() {
   return best;
 }
 
+// E oder Klick auf die Statuszeile: Ort betreten, sonst ins Feldlager einer Belagerung
+function interactHere() {
+  const s = nearestSite();
+  if (s) enterSite(s);
+  else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
+}
+
 function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
@@ -12871,7 +13231,11 @@ function checkNearSite() {
   const ts = tourneyStatus();
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
-  if (s && !inCombat()) {
+  if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
+  if (!s && nearSiegeCamp() && !inCombat()) {
+    const sg = siegeStatus();
+    showPrompt(`<kbd>E</kbd> Feldlager vor ${esc(sg.name)}${sg.side ? '' : ': Seite wählen'}${battleText(' · ')}`);
+  } else if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
     showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
   } else if (inCombat()) {
@@ -12886,7 +13250,8 @@ function battleText(prefix) {
   const sg = siegeStatus();
   if (sg && Math.hypot(sg.x - G.s.player.x, sg.y - G.s.player.y) < 50) {
     const st = { anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage];
-    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>`;
+    const side = sg.side === 'def' ? ' · du hilfst den Verteidigern' : sg.side === 'att' ? ' · du dienst den Belagerern' : '';
+    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>${side}`;
   }
   const b = battleStatus();
   if (!b || Math.hypot(b.x - G.s.player.x, b.y - G.s.player.y) > 45) return '';
@@ -12924,6 +13289,11 @@ function clickUnit(u) {
     return true;
   }
   if (!g) return false;
+  if (isSiegeGroup(g) && G.siege.site.type !== 'spieler' && !G.siege.side && !g.engaged && !groupHostile(g)) {
+    if (Math.hypot(u.x - p.x, u.y - p.y) < 7 || nearSiegeCamp(7)) openPanel('siege');
+    else if (setPlayerPath(G.siege.camp.x, G.siege.camp.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; }
+    return true;
+  }
   if (g.engaged || groupHostile(g)) {
     g.engaged = true;
     p.attackTarget = u;
@@ -12973,6 +13343,13 @@ function clickWorld(px, py) {
   p.huntTarget = null;
   let site = null;
   for (const s of G.world.sites) if (Math.hypot(s.x - wp.x, s.y - wp.y) < (s.type === 'spieler' ? 4.5 : 2.5)) site = s;
+  G.pendingCamp = false;
+  const sgc = G.siege && G.siege.stage !== 'anmarsch' && G.siege.site.type !== 'spieler' ? G.siege.camp : null;
+  if (!site && sgc && Math.hypot(sgc.x - wp.x, sgc.y - wp.y) < 3.2) {
+    if (nearSiegeCamp()) { openPanel('siege'); return; }
+    if (setPlayerPath(sgc.x, sgc.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; G.clickMarker = { x: sgc.x, y: sgc.y + 1.5, t: 0 }; }
+    return;
+  }
   let tx = wp.x, ty = wp.y;
   if (site) {
     if (Math.hypot(site.x - p.x, site.y - p.y) < interactRadius(site)) { enterSite(site); return; }
@@ -13064,7 +13441,7 @@ function onKey(e) {
   if (panelOpen()) return;
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); return; }
   switch (k) {
-    case 'e': enterSite(nearestSite()); break;
+    case 'e': interactHere(); break;
     case 'r': toggleRide(); break;
     case ' ': if (!joustPress()) attackNearest(); e.preventDefault(); break;
     case 'f': cycleOrder(); break;
@@ -13123,7 +13500,7 @@ function bindInput() {
   byId('prompt').addEventListener('click', () => {
     if (!G.started || panelOpen() || dialogOpen()) return;
     if (joustPress()) return;
-    if (inCombat()) attackNearest(); else enterSite(nearestSite());
+    if (inCombat()) attackNearest(); else interactHere();
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
   byId('btn-continue').addEventListener('click', () => { startAudio(); loadGame(); });

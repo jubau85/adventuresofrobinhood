@@ -14,7 +14,7 @@ import {
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
 import { castleSite, castleBonusAt, dailyBalance } from './castle.js';
-import { applyDamage, startSiege, siegeStatus } from './siege.js';
+import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
 import { initWeather, updateWeather } from './weather.js';
@@ -214,6 +214,13 @@ function nearestSite() {
   return best;
 }
 
+// E oder Klick auf die Statuszeile: Ort betreten, sonst ins Feldlager einer Belagerung
+function interactHere() {
+  const s = nearestSite();
+  if (s) enterSite(s);
+  else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
+}
+
 function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
@@ -231,7 +238,11 @@ function checkNearSite() {
   const ts = tourneyStatus();
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
-  if (s && !inCombat()) {
+  if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
+  if (!s && nearSiegeCamp() && !inCombat()) {
+    const sg = siegeStatus();
+    showPrompt(`<kbd>E</kbd> Feldlager vor ${esc(sg.name)}${sg.side ? '' : ': Seite wählen'}${battleText(' · ')}`);
+  } else if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
     showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
   } else if (inCombat()) {
@@ -246,7 +257,8 @@ function battleText(prefix) {
   const sg = siegeStatus();
   if (sg && Math.hypot(sg.x - G.s.player.x, sg.y - G.s.player.y) < 50) {
     const st = { anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage];
-    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>`;
+    const side = sg.side === 'def' ? ' · du hilfst den Verteidigern' : sg.side === 'att' ? ' · du dienst den Belagerern' : '';
+    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>${side}`;
   }
   const b = battleStatus();
   if (!b || Math.hypot(b.x - G.s.player.x, b.y - G.s.player.y) > 45) return '';
@@ -284,6 +296,11 @@ function clickUnit(u) {
     return true;
   }
   if (!g) return false;
+  if (isSiegeGroup(g) && G.siege.site.type !== 'spieler' && !G.siege.side && !g.engaged && !groupHostile(g)) {
+    if (Math.hypot(u.x - p.x, u.y - p.y) < 7 || nearSiegeCamp(7)) openPanel('siege');
+    else if (setPlayerPath(G.siege.camp.x, G.siege.camp.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; }
+    return true;
+  }
   if (g.engaged || groupHostile(g)) {
     g.engaged = true;
     p.attackTarget = u;
@@ -333,6 +350,13 @@ function clickWorld(px, py) {
   p.huntTarget = null;
   let site = null;
   for (const s of G.world.sites) if (Math.hypot(s.x - wp.x, s.y - wp.y) < (s.type === 'spieler' ? 4.5 : 2.5)) site = s;
+  G.pendingCamp = false;
+  const sgc = G.siege && G.siege.stage !== 'anmarsch' && G.siege.site.type !== 'spieler' ? G.siege.camp : null;
+  if (!site && sgc && Math.hypot(sgc.x - wp.x, sgc.y - wp.y) < 3.2) {
+    if (nearSiegeCamp()) { openPanel('siege'); return; }
+    if (setPlayerPath(sgc.x, sgc.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; G.clickMarker = { x: sgc.x, y: sgc.y + 1.5, t: 0 }; }
+    return;
+  }
   let tx = wp.x, ty = wp.y;
   if (site) {
     if (Math.hypot(site.x - p.x, site.y - p.y) < interactRadius(site)) { enterSite(site); return; }
@@ -424,7 +448,7 @@ function onKey(e) {
   if (panelOpen()) return;
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); return; }
   switch (k) {
-    case 'e': enterSite(nearestSite()); break;
+    case 'e': interactHere(); break;
     case 'r': toggleRide(); break;
     case ' ': if (!joustPress()) attackNearest(); e.preventDefault(); break;
     case 'f': cycleOrder(); break;
@@ -483,7 +507,7 @@ function bindInput() {
   byId('prompt').addEventListener('click', () => {
     if (!G.started || panelOpen() || dialogOpen()) return;
     if (joustPress()) return;
-    if (inCombat()) attackNearest(); else enterSite(nearestSite());
+    if (inCombat()) attackNearest(); else interactHere();
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
   byId('btn-continue').addEventListener('click', () => { startAudio(); loadGame(); });

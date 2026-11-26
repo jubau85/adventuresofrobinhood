@@ -69,7 +69,7 @@ function announce() {
       joined: false, done: false,
     };
     G.s.flags.tourneys = (G.s.flags.tourneys || 0) + 1;
-    log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold.`, 'gold');
+    log(`Herolde rufen aus: In ${day - G.s.day} Tagen (Tag ${day}) wird vor ${s.name} ein Turnier gehalten! Preis ${G.s.tourney.prize} Gold, Startgeld ${G.s.tourney.fee} Gold. Die Schranken sind auf der Karte markiert.`, 'gold');
     return;
   }
 }

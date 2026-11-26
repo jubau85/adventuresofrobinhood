@@ -3,7 +3,7 @@
 import { G, log, homeName } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS, REGIONS, KM_PER_TILE, CASTLE_BONUS, FOOD_PRICE,
+  TYPE_NAME, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, GROUP_TYPES,
 } from './data.js';
 import {
   buy, sell, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
@@ -25,6 +25,7 @@ import {
   canRaid, raidBlock, raidable, startRaid, isBlighted, isAbandoned, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
 } from './dynamics.js';
 import { tourneyAt, canJoin, joinTourney } from './tournament.js';
+import { siegeAt, siegeStatus, sideBlock, sideOffer, joinSiege, canCallStorm, callStorm } from './siege.js';
 import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
@@ -96,7 +97,7 @@ export function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c', siege: 's' };
 
 export function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -129,7 +130,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -168,16 +169,6 @@ function itemStats(id) {
   return p.join(' · ');
 }
 
-// Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
-function dirText(from, to) {
-  const dx = to.x - from.x, dy = to.y - from.y;
-  const d = Math.hypot(dx, dy);
-  if (d < 4) return 'ganz in der Nähe';
-  const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
-  const names = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
-  const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
-  return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
-}
 
 function questCard(q, buttons) {
   const s = siteById(q.from);
@@ -195,13 +186,14 @@ function townPanel() {
   const site = G.ui.arg;
   if (site.type === 'einsiedelei') return hermitPanel(site);
   if (isAbandoned(site)) return abandonedPanel(site);
+  if (siegeAt(site) && G.siege.stage !== 'anmarsch') return siegePanel();
   const f = site.faction;
   const town = G.s.towns[site.id];
   const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${siegeAt(site) ? siegeActions() : ''}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -228,6 +220,7 @@ function townInfo(site) {
       </dl>
     </div>
     <div class="actions">
+      ${siegeAt(site) ? siegeActions() : ''}
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
@@ -290,6 +283,48 @@ function hermitPanel(site) {
       </div>
     </div>`,
   };
+}
+
+// Belagerung: Lage und Seitenwahl (im Feldlager oder in der belagerten Stadt)
+const SIEGE_STAGE = { anmarsch: 'Das Heer ist auf dem Anmarsch.', belagerung: 'Das Trebuchet beschießt die Häuser.', sturm: 'Sturm aufs Tor!' };
+function siegePanel() {
+  const sg = G.siege, st = siegeStatus();
+  if (!sg) return { title: 'Belagerung', tabs: [], body: '<div class="notice"><p>Die Belagerung ist vorbei.</p></div>' };
+  const s = sg.site, off = sideOffer();
+  const inside = G.ui.panel === 'town';
+  return {
+    title: `Belagerung von ${st.name}`,
+    sub: `${swatch(off.fa)}${esc(st.army)} gegen ${swatch(off.fs)}${esc(s.name)}`,
+    tabs: [],
+    body: `<div class="cols">
+      <div>
+        <p class="lede">${inside ? `Die Tore von ${esc(s.name)} sind verrammelt, auf den Mauern stehen Bogenschützen. ` : 'Zelte, Feuer und das Knarren des Trebuchets. '}${SIEGE_STAGE[sg.stage]}</p>
+        <dl class="facts">
+          <dt>Belagerer</dt><dd>${swatch(off.fa)}${esc(st.army)}: <b>${st.att}</b> Mann · ${repPill(off.fa)}</dd>
+          <dt>Verteidiger</dt><dd>${swatch(off.fs)}${sg.def ? `Besatzung: <b>${st.def}</b> Mann` : 'Die Besatzung hinter den Mauern'} · ${repPill(off.fs)}</dd>
+        </dl>
+      </div>
+      <div class="actions">${siegeActions()}</div>
+    </div>`,
+  };
+}
+
+function siegeActions() {
+  const sg = G.siege;
+  if (!sg || sg.site.type === 'spieler') return '';
+  const s = sg.site, off = sideOffer(), fa = FACTIONS[off.fa].short, fs = FACTIONS[off.fs].short;
+  if (sg.side) {
+    const storm = canCallStorm() ? `<div class="action"><div><b>Zum Sturm blasen</b><p>Der Hauptmann wartet auf dein Zeichen. Dann rennen alle gegen das Tor an.</p></div><button class="btn danger" data-act="ssturm">Sturm!</button></div>` : '';
+    const what = sg.side === 'def'
+      ? `Du kämpfst für ${esc(s.name)}. ${sg.sortie ? 'Die Besatzung ist mit dir draußen vor den Mauern.' : 'Greif das Feldlager an, dann wagt die Besatzung einen Ausfall.'} Hält die Stadt, dankt sie dir.`
+      : `Du dienst im Heer vor ${esc(s.name)}. Die Besatzung greift dich an, wo sie dich sieht. Fällt die Stadt, bekommst du deinen Beuteanteil.`;
+    return `<h3>Belagerung</h3><div class="notice ${sg.side === 'def' ? 'good' : ''}"><p>${what}</p></div>${storm}`;
+  }
+  const bD = sideBlock('def'), bA = sideBlock('att');
+  return `<h3>Belagerung · wähle deine Seite</h3>
+    <div class="action"><div><b>Den Verteidigern beistehen</b><p>Greif das Feldlager an, dann wagt die Besatzung einen Ausfall. Hält ${esc(s.name)}, dankt dir die Stadt mit etwa ${fmt(off.thanks)} Gold, Ansehen bei den ${esc(fs)} +10 und Ruhm +15. Die ${esc(fa)} sehen das ungern (−5, mehr, wenn du ihr Heer zerschlägst).</p>${bD ? `<p class="muted">${esc(bD)}</p>` : ''}</div><button class="btn primary" data-act="sdef" ${bD ? 'disabled' : ''}>Beistehen</button></div>
+    <div class="action"><div><b>Den Belagerern dienen</b><p>Du kämpfst für ${esc(GROUP_TYPES[sg.army.type].acc)} und stürmst mit, die Besatzung greift dich an. Fällt ${esc(s.name)}, bekommst du einen Beuteanteil (etwa ${fmt(off.share)} Gold und Waren aus der Stadt) und Ansehen bei den ${esc(fa)} +8. Die ${esc(fs)} vergessen das nicht (−8 sofort, −6 beim Fall).</p>${bA ? `<p class="muted">${esc(bA)}</p>` : ''}</div><button class="btn danger" data-act="satt" ${bA ? 'disabled' : ''}>Dienen</button></div>
+    <p class="muted">Oder du schaust nur zu. Entfernst du dich zu weit, entscheidet sich die Belagerung ohne dich.</p>`;
 }
 
 // Turnier: Ankündigung, Teilnehmer, Anmeldung
@@ -612,6 +647,30 @@ function politicsPanel() {
 }
 
 // ---------------------------------------------------------------- Karte
+// Laufende Ereignisse mit Richtung und „Hinreisen“
+function eventTargets() {
+  const out = [], p = G.s.player;
+  const sg = G.siege;
+  if (sg) {
+    const st = siegeStatus();
+    const own = sg.site.type === 'spieler';
+    const t = own || sg.stage === 'anmarsch' ? { x: sg.site.x, y: sg.site.y + 1 } : { x: sg.camp.x, y: sg.camp.y + 1.5 };
+    out.push({ k: 'siege', t, camp: !own && sg.stage !== 'anmarsch', text: `<b>Belagerung von ${esc(st.name)}</b> (${{ anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage]}), ${dirText(p, sg.site)}` });
+  }
+  const tr = G.s.tourney;
+  if (tr && !tr.done) {
+    const host = G.world.sites.find((x) => x.id === tr.site);
+    const when = tr.day === G.s.day ? 'heute' : tr.day === G.s.day + 1 ? 'morgen' : `am Tag ${tr.day}`;
+    out.push({ k: 'tourney', t: { x: host.x, y: host.y + 0.6 }, site: host, text: `<b>Turnier in ${esc(host.name)}</b> ${when}, ${dirText(p, host)}` });
+  }
+  return out;
+}
+function eventList() {
+  const ev = eventTargets();
+  if (!ev.length) return '';
+  return `<div class="events">${ev.map((e) => `<div class="action"><div><p>${e.text}</p></div><button class="btn sm" data-act="goevent" data-k="${e.k}">Hinreisen</button></div>`).join('')}</div>`;
+}
+
 let mapView = null;
 const mapState = { zoom: 2, cx: null, cy: null };
 function mapPanel() {
@@ -619,7 +678,7 @@ function mapPanel() {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff.', tabs: [],
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="dash"></span>Fähre</span></p>`,
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span><span><span class="dash"></span>Fähre</span></p>${eventList()}`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.closest('.mapwrap');
@@ -768,6 +827,7 @@ function helpPanel() {
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
         <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> beschießt ein Heer eine Burg oder Stadt und stürmt das Tor. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben.</li>
+        <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (die Besatzung wagt einen Ausfall, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
@@ -799,6 +859,13 @@ const ACTIONS = {
   gift: () => giveGift(G.ui.arg),
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
+  sdef: () => joinSiege('def'),
+  satt: () => {
+    const sg = G.siege;
+    if (!sg) return;
+    confirmDialog(`Wirklich gegen ${sg.site.name} ziehen? Die ${FACTIONS[sg.site.faction].name} werden dir das übel nehmen (Ansehen −8 sofort, −6, wenn die Stadt fällt), und die Besatzung greift dich an.`, 'Dienen', () => { joinSiege('att'); refreshPanel(); });
+  },
+  ssturm: () => callStorm(),
   lease: () => leaseMine(G.ui.arg),
   hrat: () => hermitAdvice(G.ui.arg),
   hsegen: () => hermitBless(G.ui.arg),
@@ -843,6 +910,15 @@ const ACTIONS = {
   claim: (d) => { const q = questById(d.q); if (q) claimQuest(q); },
   letter: (d) => { const q = questById(d.q); if (q) deliverLetter(q); },
   abandon: (d) => { const q = questById(d.q); if (q) confirmDialog(`Den Auftrag „${q.title}“ aufgeben? Das kostet etwas Ansehen.`, 'Aufgeben', () => { abandonQuest(q); refreshPanel(); }); },
+  goevent: (d) => {
+    const e = eventTargets().find((x) => x.k === d.k);
+    if (!e) return;
+    if (setPlayerPath(e.t.x, e.t.y)) {
+      G.pendingSite = e.site || null;
+      G.pendingCamp = !!e.camp;
+      closePanel();
+    } else log('Dorthin führt kein Weg.', 'bad');
+  },
   goto: (d) => {
     const q = questById(d.q);
     if (!q) return;
