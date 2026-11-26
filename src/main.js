@@ -4,7 +4,7 @@ import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
-import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
+import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, sfxEnabled, setSfxEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
 import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
@@ -136,9 +136,16 @@ function updateMusicButtons() {
 function toggleMusic() {
   setMusicEnabled(!musicEnabled());
   updateMusicButtons();
+  log(musicEnabled() ? 'Musik an.' : 'Musik aus.');
+}
+function toggleSfx() {
+  setSfxEnabled(!sfxEnabled());
+  log(sfxEnabled() ? 'Geräusche an.' : 'Geräusche aus.');
 }
 G.toggleMusic = () => { toggleMusic(); };
 G.musicOn = () => musicEnabled();
+G.toggleSfx = () => { toggleSfx(); };
+G.sfxOn = () => sfxEnabled();
 
 function showTitle() {
   G.started = false;
@@ -489,6 +496,7 @@ function onKey(e) {
     case '3': setOrder('angriff'); break;
     case 't': toggleFast(); break;
     case 'l': toggleMusic(); break;
+    case 'k': toggleSfx(); break;
     case 'g': G.cycleGfx(); break;
     case 'b': toggleHomeGate(); break;
     case '+': case '=': zoom(1.15); break;

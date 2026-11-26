@@ -3024,12 +3024,13 @@ const FIG3D = {
 // Wer schon als 3D-Figur unterwegs ist (Männer; Frauen und Kinder folgen mit eigenen Modellen)
 const FIG3D_ROLES = { buerger: 'bauer', reisender: 'bauer' };
 const FIG3D_ACT = { sammeln: 'aufheben', saeen: 'aufheben', jaeten: 'aufheben' };
+const FIG3D_SKIP = { moench: 1, priester: 1, einsiedler: 1, wache: 1, kind: 1 };
 const fig3dCache = new Map();
 let fig3dTmp = null;
 
 function fig3dFor(u, m) {
   if (m || u.kind !== 'peasant' || u.female || u.small || u.hidden) return null;
-  const mod = FIG3D_ROLES[u.role];
+  const mod = FIG3D_ROLES[u.role] || (G.fig3dAll && !FIG3D_SKIP[u.role] ? 'bauer' : null);   // fig3dAll: nur zum Ausprobieren
   return mod && ART[`fig3d_${mod}_stehen`] && ART[`fig3d_${mod}_gehen`] && ART[`fig3d_${mod}_stehen_maske`] ? mod : null;
 }
 

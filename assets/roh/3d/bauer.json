@@ -1,0 +1,13 @@
+{
+  "zweck": "Probestück für den Figuren-Baukasten: Mann in Grundkleidung (Kittel Cyan zum Umfärben)",
+  "meshy": {
+    "vorschau_text_to_3d": "01a21791-ef3d-7625-9029-d877162fe5ca",
+    "bemalung_refine": "01a21797-281e-7684-b3dd-edcd4449c8f6",
+    "skelett_rigging": "01a217a5-a18d-7763-8af9-0732d6c35c34",
+    "bewegungen": "01a217a6-8e4c-701c-9771-8fd3433605f4",
+    "bewegungen_ids": {"0": "Idle", "219": "Right Hand Sword Slash", "178": "Hit Reaction", "189": "Dying Backwards", "276": "Male Bend Over Pick Up"},
+    "punkte": 70
+  },
+  "schwert": "tools/waffen.py (selbst gebaut, Meshy-Schwert war unbrauchbar)",
+  "rendern": "tools/sprites.py, Zelle 224, Figur 120 px, 8 Richtungen; packen: tools/sprite_pack.py --zelle 112"
+}

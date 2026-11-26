@@ -8,7 +8,7 @@ import { G } from './state.js';
 import { isoX, screenToWorld } from './iso.js';
 
 let ac = null, master = null, dry = null, wet = null;
-let enabled = true, started = false;
+let enabled = true, sfxOn = true, started = false;   // enabled = Musik, sfxOn = Geräusche und Hintergrund
 let mood = 'titel', playingMood = null;
 let nextTime = 0, phraseIdx = 0, timer = null;
 let droneNodes = null;
@@ -19,19 +19,37 @@ const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 // ---------------------------------------------------------------- Einstellungen
 export function musicEnabled() { return enabled; }
 
+export function sfxEnabled() { return sfxOn; }
+
 export function loadMusicPref() {
-  try { const v = localStorage.getItem('ritter-musik'); enabled = v === null ? true : v === '1'; } catch (e) { enabled = true; }
+  try {
+    const v = localStorage.getItem('ritter-musik'); enabled = v === null ? true : v === '1';
+    const s = localStorage.getItem('ritter-geraeusche'); sfxOn = s === null ? true : s === '1';
+  } catch (e) { enabled = true; sfxOn = true; }
   return enabled;
 }
 
 export function setMusicEnabled(on) {
   enabled = on;
   try { localStorage.setItem('ritter-musik', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
-  if (!ac) { if (on) startAudio(); return; }
-  const now = ac.currentTime;
+  applyMaster();
+}
+
+export function setSfxEnabled(on) {
+  sfxOn = on;
+  try { localStorage.setItem('ritter-geraeusche', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
+  applyMaster();
+}
+
+// Gesamtlautstärke an, solange Musik oder Geräusche an sind; ausgeschaltete Musik hört sofort auf
+function applyMaster() {
+  if (!ac) { if (enabled || sfxOn) startAudio(); return; }
+  const now = ac.currentTime, on = enabled || sfxOn;
   master.gain.cancelScheduledValues(now);
   master.gain.setTargetAtTime(on ? 0.55 : 0, now, 0.4);
   if (on && ac.state === 'suspended') ac.resume();
+  if (!enabled) { if (track) { stopTrack(track); track = null; } restUntil = 0; if (droneNodes) setDrone(false); playingMood = null; }
+  if (!sfxOn && ambTrack) { stopTrack(ambTrack); ambTrack = null; }
 }
 
 export function setMood(m) { mood = m; }
@@ -48,7 +66,7 @@ function makeImpulse(seconds, decay) {
 }
 
 export function startAudio() {
-  if (started || !enabled) return;
+  if (started || !(enabled || sfxOn)) return;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   try { ac = new AC(); } catch (e) { return; }
@@ -69,7 +87,7 @@ export function startAudio() {
   timer = setInterval(tick, 150);
   document.addEventListener('visibilitychange', () => {
     if (!ac) return;
-    if (document.hidden) ac.suspend(); else if (enabled) ac.resume();
+    if (document.hidden) ac.suspend(); else if (enabled || sfxOn) ac.resume();
   });
 }
 
@@ -294,11 +312,11 @@ function stopTrack(t, tc = 1.2) {
 
 // Musikstück einmal ganz, dann eine Pause nur mit Hintergrund, dann wieder von vorn
 function updateFiles() {
-  const m = want.music && buffers[want.music] ? want.music : null;
+  const m = enabled && want.music && buffers[want.music] ? want.music : null;
   if (track && track.id !== m) { stopTrack(track); track = null; restUntil = 0; }
   if (track && ac.currentTime >= track.endsAt - 0.05) { track = null; restUntil = ac.currentTime + 18 + Math.random() * 22; }
   if (!track && m && ac.currentTime >= restUntil) track = startTrack(m, false, 0.9);
-  const a = want.amb && buffers[want.amb] ? want.amb : null;
+  const a = sfxOn && want.amb && buffers[want.amb] ? want.amb : null;
   if (ambTrack && ambTrack.id !== a) { stopTrack(ambTrack, 1.5); ambTrack = null; }
   if (!ambTrack && a) ambTrack = startTrack(a, true, 0.7);
 }
@@ -436,7 +454,7 @@ export function sfx(kind, vol = 1) { playSfx(kind, vol, 0, 0); }
 
 // Geräusch an einem Ort der Welt. Man hört von der Bildmitte aus: Was man sieht, hört man auch.
 export function sfxAt(kind, x, y, vol = 1, range = 22) {
-  if (!ac || !enabled || !G.s) return;
+  if (!ac || !sfxOn || !G.s) return;
   const c = screenToWorld(G.view.w / 2, G.view.h / 2, G.cam, G.view.w, G.view.h);
   const d = Math.hypot(x - c.x, y - c.y);
   if (d > range) return;
@@ -446,7 +464,7 @@ export function sfxAt(kind, x, y, vol = 1, range = 22) {
 }
 
 function playSfx(kind, vol, pan, far) {
-  if (!ac || !enabled || !SFX[kind] || vol < 0.02) return;
+  if (!ac || !sfxOn || !SFX[kind] || vol < 0.02) return;
   const now = ac.currentTime;
   // Gleiche Geräusche nicht übereinander stapeln, insgesamt höchstens zwölf je Zehntelsekunde
   if (now - (lastKind[kind] || 0) < 0.045) return;
@@ -464,7 +482,7 @@ function playSfx(kind, vol, pan, far) {
 // Werkzeuge im Bild: Jeder Schlag erklingt in dem Augenblick, in dem das Werkzeug trifft (siehe render.js)
 let lastWorkT = null;
 export function playWork(list) {
-  if (!ac || !enabled || !G.s) return;
+  if (!ac || !sfxOn || !G.s) return;
   const now = G.time;
   if (lastWorkT === null || G.fast || now < lastWorkT || now - lastWorkT > 0.5) { lastWorkT = now; return; }
   const prev = lastWorkT; lastWorkT = now;
@@ -477,14 +495,15 @@ export function playWork(list) {
 
 // Für Tests: was geladen ist und was gerade läuft
 export function audioDebug() {
-  return { started, state: ac && ac.state, loaded: Object.keys(buffers), music: track && track.id, amb: ambTrack && ambTrack.id, resting: !!ac && !track && ac.currentTime < restUntil, want, lastSfx: { ...lastKind } };
+  return { started, musik: enabled, geraeusche: sfxOn, state: ac && ac.state, loaded: Object.keys(buffers), music: track && track.id, amb: ambTrack && ambTrack.id, resting: !!ac && !track && ac.currentTime < restUntil, want, lastSfx: { ...lastKind } };
 }
 
 function fileMusicActive() { return !!(want.music && buffers[want.music]) && (!!track || ac.currentTime < restUntil); }
 
 function tick() {
-  if (!ac || !enabled) return;
+  if (!ac || !(enabled || sfxOn)) return;
   updateFiles();
+  if (!enabled) { if (droneNodes) setDrone(false); playingMood = null; nextTime = ac.currentTime + 0.3; return; }
   // Läuft eine Aufnahme (oder die Pause danach), schweigt die erzeugte Musik
   if (fileMusicActive()) {
     if (droneNodes) setDrone(false);

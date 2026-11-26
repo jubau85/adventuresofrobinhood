@@ -785,7 +785,11 @@ function menuPanel() {
         <span class="label">Grafik</span>
         ${[['klar', 'Klar'], ['pixel', 'Pixel'], ['retro', 'Retro']].map(([m, n]) => `<button class="btn sm${G.gfx === m ? ' primary' : ''}" data-act="gfx" data-mode="${m}" aria-pressed="${G.gfx === m}">${n}</button>`).join('')}
       </div>
-      <button class="btn" data-act="music">Musik ${G.musicOn && G.musicOn() ? 'ausschalten' : 'einschalten'}</button>
+      <div class="gfx" role="group" aria-label="Ton">
+        <span class="label">Ton</span>
+        <button class="btn sm${G.musicOn && G.musicOn() ? ' primary' : ''}" data-act="music" aria-pressed="${!!(G.musicOn && G.musicOn())}">Musik ${G.musicOn && G.musicOn() ? 'an' : 'aus'}</button>
+        <button class="btn sm${G.sfxOn && G.sfxOn() ? ' primary' : ''}" data-act="sfx" aria-pressed="${!!(G.sfxOn && G.sfxOn())}">Geräusche ${G.sfxOn && G.sfxOn() ? 'an' : 'aus'}</button>
+      </div>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
@@ -826,7 +830,8 @@ function helpPanel() {
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
-        <dt>L</dt><dd>Musik und Geräusche an und aus</dd>
+        <dt>L</dt><dd>Musik an und aus</dd>
+        <dt>K</dt><dd>Geräusche an und aus</dd>
         <dt>G</dt><dd>Grafik wechseln: klar, Pixel, Retro (Amiga-Stil)</dd>
         <dt>Esc</dt><dd>Tafel schließen, Menü</dd>
         <dt>F9</dt><dd>Testmodus mit Cheats</dd>
@@ -976,6 +981,7 @@ const ACTIONS = {
   cheat: (d) => { toggleCheat(d.c); updateHUD(); },
   cheatdo: (d) => { cheatDo(d.do); updateHUD(); },
   music: () => { if (G.toggleMusic) G.toggleMusic(); },
+  sfx: () => { if (G.toggleSfx) G.toggleSfx(); },
   gfx: (d) => { if (G.setGfx) G.setGfx(d.mode); },
   newgame: () => confirmDialog('Ein neues Spiel beginnen? Der aktuelle Fortschritt geht verloren, wenn du nicht gespeichert hast.', 'Neues Spiel', () => { closePanel(); if (G.showTitle) G.showTitle(); }),
 };
