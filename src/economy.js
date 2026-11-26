@@ -89,6 +89,24 @@ export function sell(site, good, n) {
   return { sold, earned };
 }
 
+// Aus dem Burglager verkaufen, ohne die Ware selbst herzuschaffen: Händler holen sie ab und behalten ein Zehntel als
+// Fuhrlohn. keep: so viel bleibt im Lager liegen.
+export const HAUL = 0.9;
+export function storedSellPrice(site, good) { return Math.max(1, Math.floor(sellPrice(site, good) * HAUL)); }
+export function sellStored(site, good, n, keep = 0) {
+  const town = G.s.towns[site.id], st = G.s.castle.storage;
+  let sold = 0, earned = 0;
+  for (let k = 0; k < n; k++) {
+    if ((st[good] || 0) <= keep) break;
+    const p = storedSellPrice(site, good);
+    G.s.gold += p; earned += p;
+    town.stock[good]++;
+    st[good]--;
+    sold++;
+  }
+  return { sold, earned };
+}
+
 export function dailyEconomy() {
   for (const s of G.world.sites) {
     const town = G.s.towns[s.id];

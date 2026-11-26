@@ -345,13 +345,15 @@ export function refreshBuildingBlocks(W) {
 }
 
 // Felder der Palisade, mit oder ohne die Toröffnung im Süden
+// Halbe Breite der Toröffnung (Bogenmaß): das gemalte Tor ist gut eine Kachel breit, offen bleibt das mittlere Feld
+export const PAL_GATE = 0.15;
 export function palisadeBand(s, withGate) {
   const list = [];
   const r = s.palisade;
   for (let y = s.ty - 6; y <= s.ty + 6; y++) for (let x = s.tx - 6; x <= s.tx + 6; x++) {
     const d = Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y);
     const a = Math.atan2(y + 0.5 - s.y, x + 0.5 - s.x);
-    if (d >= r - 0.55 && d <= r + 0.45 && (withGate || Math.abs(a - Math.PI / 2) > 0.3)) list.push([x, y]);
+    if (d >= r - 0.55 && d <= r + 0.45 && (withGate || Math.abs(a - Math.PI / 2) > PAL_GATE)) list.push([x, y]);
   }
   return list;
 }
@@ -546,6 +548,9 @@ const CAMP_KINDS = [
   { kind: 'reisende', name: 'Rastplatz', roles: ['reisender', 'pilger', 'reisender'] },
   { kind: 'jaeger', name: 'Jägerfeuer', roles: ['jaeger', 'waldmann'] },
   { kind: 'hirten', name: 'Hirtenfeuer', roles: ['hirte', 'reisender'] },
+  { kind: 'holzfaeller', name: 'Holzfällerlager', roles: ['holzer', 'holzer'] },
+  { kind: 'steinbruch', name: 'Steinbruch', roles: ['bergmann', 'bergmann'], hills: true },
+  { kind: 'soeldner', name: 'Waldlager', roles: ['waldmann', 'waldmann', 'reisender'] },
 ];
 function placeCamps(W) {
   const N = W.N, rng = mulberry32((W.seed ^ 0xC0FFEE) >>> 0);
@@ -560,7 +565,9 @@ function placeCamps(W) {
     if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < s.clear + 9)) continue;
     if (W.farms.some((f) => Math.hypot(f.tx - x, f.ty - y) < 7)) continue;
     if (W.camps.some((c) => Math.hypot(c.tx - x, c.ty - y) < 22)) continue;
-    const kind = CAMP_KINDS[Math.floor(rng() * CAMP_KINDS.length)];
+    let kind = CAMP_KINDS[Math.floor(rng() * CAMP_KINDS.length)];
+    // Steinbrüche nur am Hang; sonst wird es ein anderes Lager
+    if (kind.hills && countAround(W, x, y, 4, T.HILLS) < 3) kind = CAMP_KINDS[Math.floor(rng() * 4)];
     const c = { id: `feuer${W.camps.length}`, type: 'lagerfeuer', camp: kind.kind, roles: kind.roles, name: kind.name, tx: x, ty: y, x: x + 0.5, y: y + 0.5, clear: 2, land: W.landId[i] };
     W.camps.push(c);
     W.tiles[i] = T.GRASS;
@@ -571,6 +578,28 @@ function placeCamps(W) {
     if (kind.kind === 'koehler') push({ kind: 'prop', prop: 'meiler', x: c.x + 1.6, y: c.y - 1.0, v: rng() });
     else if (rng() < 0.7) push({ kind: 'tent', x: c.x - 0.6, y: c.y - 1.3, wx: 0.9, wy: 0.9, color: ['#6d6a4a', '#7a6a4a', '#8a7a5a'][Math.floor(rng() * 3)], noCost: true });
     if (kind.kind === 'jaeger') push({ kind: 'prop', prop: 'wildbret', x: c.x + 1.0, y: c.y - 0.4, v: rng() });
+    if (kind.kind === 'holzfaeller') { push({ kind: 'prop', prop: 'holzstapel', x: c.x + 1.3, y: c.y - 0.6, v: rng() }); push({ kind: 'prop', prop: 'holzstapel', x: c.x + 1.0, y: c.y + 0.9, v: rng() }); }
+    if (kind.kind === 'steinbruch') { push({ kind: 'prop', prop: 'erzhaufen', x: c.x + 1.3, y: c.y - 0.5, v: rng() }); push({ kind: 'prop', prop: 'erzhaufen', x: c.x - 1.2, y: c.y - 0.9, v: rng() }); }
+    if (kind.kind === 'soeldner') push({ kind: 'tent', x: c.x + 1.1, y: c.y - 1.1, wx: 0.9, wy: 0.9, color: '#6a5a3a', noCost: true });
+  }
+  // Steinbrüche am Fuß der Hügel und Berge, auch ohne Wald ringsum
+  const quarry = CAMP_KINDS.find((k) => k.kind === 'steinbruch');
+  let nq = W.camps.filter((c) => c.camp === 'steinbruch').length;
+  for (let tries = 0; tries < 30000 && nq < 14; tries++) {
+    const x = 8 + Math.floor(rng() * (N - 16)), y = 8 + Math.floor(rng() * (N - 16));
+    const i = y * N + x;
+    if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
+    if (countAround(W, x, y, 3, T.HILLS) < 7 || countAround(W, x, y, 2, T.WATER) || countAround(W, x, y, 1, T.ROAD)) continue;
+    if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < s.clear + 8)) continue;
+    if (W.farms.some((f) => Math.hypot(f.tx - x, f.ty - y) < 7)) continue;
+    if (W.camps.some((c) => Math.hypot(c.tx - x, c.ty - y) < 18)) continue;
+    const c = { id: `feuer${W.camps.length}`, type: 'lagerfeuer', camp: quarry.kind, roles: quarry.roles, name: quarry.name, tx: x, ty: y, x: x + 0.5, y: y + 0.5, clear: 2, land: W.landId[i] };
+    W.camps.push(c); nq++;
+    const push = (b) => { b.site = c.id; b.idx = W.buildings.length; W.buildings.push(b); };
+    push({ kind: 'fire', x: c.x, y: c.y, noCost: true, camp: true });
+    push({ kind: 'prop', prop: 'sitzstamm', x: c.x - 0.9, y: c.y + 0.3, v: rng() });
+    push({ kind: 'prop', prop: 'erzhaufen', x: c.x + 1.3, y: c.y - 0.5, v: rng() });
+    push({ kind: 'prop', prop: 'erzhaufen', x: c.x - 1.2, y: c.y - 0.9, v: rng() });
   }
 }
 
@@ -1215,12 +1244,30 @@ function placeCemetery(W, s) {
   if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei') return;
   const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
   const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
-  const wx = 2.6, wy = 2.0;
-  for (let r = 0; r <= 6; r += 0.5) {
+  const wx = 2.6, wy = 2.0, N = W.N;
+  // Abstand halten: zum Wasser mindestens anderthalb Felder (kein Zaun im Fluss), kein Ufersand und kein Acker unter
+  // den Gräbern, und bei Hallen ganz außerhalb der Palisade
+  const clearOf = (x, y) => {
+    for (let ty = Math.floor(y - wy / 2 - 1.5); ty <= Math.floor(y + wy / 2 + 1.5); ty++) for (let tx = Math.floor(x - wx / 2 - 1.5); tx <= Math.floor(x + wx / 2 + 1.5); tx++) {
+      if (tx < 0 || ty < 0 || tx >= N || ty >= N) return false;
+      const t = W.tiles[ty * N + tx];
+      if (t === T.WATER || t === T.BRIDGE) return false;
+      const near = tx + 1 > x - wx / 2 - 0.5 && tx < x + wx / 2 + 0.5 && ty + 1 > y - wy / 2 - 0.5 && ty < y + wy / 2 + 0.5;
+      if (near && (t === T.SAND || t === T.FIELD)) return false;
+    }
+    if (s.palisade) {
+      const nx = Math.max(x - wx / 2, Math.min(s.x, x + wx / 2)), ny = Math.max(y - wy / 2, Math.min(s.y, y + wy / 2));
+      const fx = Math.abs(s.x - x) + wx / 2, fy = Math.abs(s.y - y) + wy / 2;
+      // ganz draußen (nächster Punkt weiter weg als die Palisade) oder ganz drinnen (fernster Punkt diesseits)
+      if (!(Math.hypot(nx - s.x, ny - s.y) > s.palisade + 1 || Math.hypot(fx, fy) < s.palisade - 1)) return false;
+    }
+    return true;
+  };
+  for (const strict of [true, false]) for (let r = 0; r <= (strict ? 10 : 6); r += 0.5) {
     const n = Math.max(1, Math.round(r * 8));
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2, x = pref.x + Math.cos(a) * r, y = pref.y + Math.sin(a) * r;
-      if (!footprintFree(W, x, y, wx, wy, 0.3)) continue;
+      if (!footprintFree(W, x, y, wx, wy, 0.3) || (strict && !clearOf(x, y))) continue;
       s.cemetery = { x, y, wx, wy, old: 2 + Math.floor(hash2(Math.round(x), Math.round(y), 5) * 6) };
       markSolid(W, x, y, wx, wy);
       W.buildings.push({ kind: 'friedhof', x, y, wx, wy, site: s.id, noCost: true, label: `Friedhof von ${s.name}` });

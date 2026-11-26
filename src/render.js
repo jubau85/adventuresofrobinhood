@@ -5,7 +5,7 @@ import { G, homeName, playerColor } from './state.js';
 import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, CASTLE_PLOT, POIS, KM_PER_TILE } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
-import { groundZ, tileAt } from './world.js';
+import { groundZ, tileAt, PAL_GATE } from './world.js';
 import { conProgress, villageSpots } from './castle.js';
 import { castlePasture } from './animals.js';
 import { ART, onArt, wantArt, wantArtPrefix } from './assets.js';
@@ -1544,6 +1544,9 @@ function drawScaffold(c, x, y, wx, wy, h) {
 // sind genau ein Feld lang (x: links oben nach rechts unten, y: rechts oben nach links unten), der Fußpunkt liegt auf
 // der Mauerlinie in der Mitte. Türme stehen auf der Mitte ihres Sockels, Bergfried und Hallen auf ihrer Grundfläche.
 const P5 = {'burg_palisade_x':[33.88,54.0,0.25],'burg_palisade_x_schaden_1':[33.88,54.0,0.25],'burg_palisade_x_schaden_2':[33.88,54.0,0.25],'burg_palisade_x_schaden_3':[33.88,54.0,0.25],'burg_palisade_x_schaden_4':[33.88,54.0,0.25],'burg_palisade_y':[33.88,54.5,0.25],'burg_palisade_y_schaden_1':[33.88,54.5,0.25],'burg_palisade_y_schaden_2':[33.88,54.5,0.25],'burg_palisade_y_schaden_3':[33.88,54.5,0.25],'burg_palisade_y_schaden_4':[33.88,54.5,0.25],'burg_stein_mauer_x':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_1':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_2':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_3':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_4':[33.88,70.5,0.25],'burg_stein_mauer_y':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_1':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_2':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_3':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_4':[33.88,68.5,0.25],'burg_bergfried':[69.88,167.0,0.25],'burg_bergfried_gross':[84.88,197.25,0.25],'burg_holzhalle':[70.5,80.25,0.25],'burg_holztor':[35.5,84.0,0.25],'burg_holztor_schaden_1':[35.5,84.0,0.25],'burg_holztor_schaden_2':[35.5,84.0,0.25],'burg_holztor_schaden_3':[35.5,84.0,0.25],'burg_holztor_schaden_4':[35.5,84.0,0.25],'burg_holztor_zu':[35.5,84.0,0.25],'burg_holzturm':[32.0,97.75,0.25],'burg_holzturm_schaden_1':[32.0,97.75,0.25],'burg_holzturm_schaden_2':[32.0,97.75,0.25],'burg_holzturm_schaden_3':[32.0,97.75,0.25],'burg_holzturm_schaden_4':[32.0,97.75,0.25],'burg_palas':[78.0,99.25,0.25],'burg_stein_tor':[39.38,88.75,0.25],'burg_stein_tor_schaden_1':[39.38,88.75,0.25],'burg_stein_tor_schaden_2':[39.38,88.75,0.25],'burg_stein_tor_schaden_3':[39.38,88.75,0.25],'burg_stein_tor_schaden_4':[39.38,88.75,0.25],'burg_stein_tor_zu':[39.38,88.75,0.25],'burg_stein_turm':[35.75,104.88,0.25],'burg_stein_turm_schaden_1':[35.75,104.88,0.25],'burg_stein_turm_schaden_2':[35.75,104.88,0.25],'burg_stein_turm_schaden_3':[35.75,104.88,0.25],'burg_stein_turm_schaden_4':[35.75,104.88,0.25],'burg_ruine_mauer_1':[33.88,34.25,0.25],'burg_ruine_mauer_1_y':[33.88,33.75,0.25],'burg_ruine_mauer_2':[33.75,21.75,0.25],'burg_ruine_mauer_2_y':[34.0,24.0,0.25],'burg_ruine_turm':[37.5,66.88,0.25],'burg_schutt':[27.88,22.75,0.25],'feld_brach_x':[34.0,35.75,0.25],'feld_hoch_x':[34.0,35.75,0.25],'feld_jung_x':[34.0,35.75,0.25],'feld_jung_y':[34.0,35.75,0.25],'feld_reif_x':[34.0,35.75,0.25],'feld_reif_y':[34.0,35.75,0.25],'feld_winter_x':[34.0,35.75,0.25],'feld_winter_y':[34.0,35.75,0.25],'garben_1':[9.88,21.5,0.25],'garben_2':[9.88,22.0,0.25],'schneefleck_1':[31.75,15.75,0.5],'schneefleck_2':[28.75,15.88,0.5],'schneefleck_3':[28.38,15.12,0.5],'schneefleck_4':[23.25,11.75,0.5],'schneefleck_5':[22.75,12.38,0.5],'schneefleck_6':[18.88,10.12,0.5],'schneefleck_7':[18.38,10.5,0.5],'schneefleck_8':[15.25,9.5,0.5]};
+// Gemalte Pfähle und Palisadentor (tools/palisade.py)
+Object.assign(P5, {pal_pfahl_1:[1.68,27.53,0.3333],pal_pfahl_2:[1.94,28.94,0.3333],pal_pfahl_3:[1.59,26.65,0.3333],pal_pfahl_4:[1.76,29.29,0.3333],pal_pfahl_5:[1.94,29.12,0.3333],pal_pfahl_6:[1.76,27.88,0.3333],pal_pfahl_7:[1.94,28.76,0.3333],pal_pfahl_8:[2.91,28.24,0.3333],pal_pfahl_9:[1.85,28.41,0.3333],pal_pfahl_10:[1.76,29.29,0.3333],pal_pfahl_11:[1.76,27.0,0.3333],pal_pfahl_12:[1.94,28.41,0.3333],pal_pfahl_13:[1.85,30.18,0.3333],pal_pfahl_14:[1.5,28.06,0.3333],pal_pfahl_15:[1.85,29.12,0.3333],pal_pfahl_16:[1.85,27.71,0.3333],pal_pfahl_17:[1.94,28.76,0.3333],pal_pfahl_18:[1.76,27.88,0.3333],pal_pfahl_19:[2.03,29.12,0.3333],pal_pfahl_20:[1.76,29.12,0.3333],pal_pfahl_21:[1.59,26.47,0.3333],pal_pfahl_22:[2.03,28.94,0.3333],pal_pfahl_23:[1.76,27.53,0.3333],pal_pfahl_24:[1.85,29.65,0.3333],pal_palisade_tor:[20.47,34.94,0.3333],pal_pfahl_1_winter:[1.06,27.35,0.3333],pal_pfahl_2_winter:[1.41,28.76,0.3333],pal_pfahl_3_winter:[1.06,26.65,0.3333],pal_pfahl_4_winter:[1.41,29.29,0.3333],pal_pfahl_5_winter:[1.24,29.12,0.3333],pal_pfahl_6_winter:[1.24,27.71,0.3333],pal_pfahl_7_winter:[1.41,29.12,0.3333],pal_pfahl_8_winter:[1.32,28.41,0.3333],pal_pfahl_9_winter:[1.06,26.47,0.3333],pal_pfahl_10_winter:[1.5,28.24,0.3333],pal_pfahl_11_winter:[1.24,29.29,0.3333],pal_pfahl_12_winter:[1.5,27.0,0.3333],pal_pfahl_13_winter:[1.06,28.41,0.3333],pal_pfahl_14_winter:[1.24,30.35,0.3333],pal_pfahl_15_winter:[1.15,27.88,0.3333],pal_pfahl_16_winter:[1.32,29.12,0.3333],pal_pfahl_17_winter:[1.5,27.35,0.3333],pal_pfahl_18_winter:[1.32,28.59,0.3333],pal_pfahl_19_winter:[1.24,27.88,0.3333],pal_pfahl_20_winter:[1.15,29.12,0.3333],pal_pfahl_21_winter:[1.24,28.94,0.3333],pal_pfahl_22_winter:[1.59,28.94,0.3333],pal_pfahl_23_winter:[1.24,27.35,0.3333],pal_pfahl_24_winter:[1.06,29.47,0.3333],pal_palisade_tor_winter:[20.47,34.76,0.3333]});
+const PAL_N = [24, 24];
 // Friedhof und Gefallene (tools/friedhof.py), siehe drawCemeteryArt
 Object.assign(P5, {fh_grab_offen:[10.2,16.12,0.3333],fh_grab_offen_winter:[10.33,16.2,0.3333],fh_grab_frisch:[11.56,17.47,0.3333],fh_grab_frisch_winter:[11.02,17.58,0.3333],fh_grab_steinkreuz:[11.44,16.27,0.3333],fh_grab_steinkreuz_winter:[11.48,16.38,0.3333],fh_grab_stein:[9.4,16.28,0.3333],fh_grab_stein_winter:[11.35,16.64,0.3333],fh_grab_alt:[11.16,15.37,0.3333],fh_grab_alt_winter:[10.88,15.88,0.3333],fh_friedhofskreuz:[8.68,26.21,0.3333],fh_friedhofskreuz_winter:[8.89,25.42,0.3333],fh_friedhof_zaun:[1.4,16.3,0.3333],fh_friedhof_zaun_winter:[0.85,16.5,0.3333],fh_friedhof_tor:[10.3,21.15,0.3333],fh_friedhof_tor_winter:[10.4,26.0,0.3333],fh_toter_rot_1:[12.22,6.72,0.3333],fh_toter_rot_2:[10.18,6.91,0.3333],fh_toter_rot_3:[9.55,6.05,0.3333],fh_toter_rot_4:[10.69,7.8,0.3333],fh_toter_gruen_1:[10.58,6.25,0.3333],fh_toter_gruen_2:[13.84,6.98,0.3333],fh_toter_gruen_3:[9.58,4.73,0.3333],fh_toter_gruen_4:[11.98,7.04,0.3333],fh_toter_braun_1:[12.27,6.92,0.3333],fh_toter_braun_2:[12.72,6.62,0.3333],fh_toter_braun_3:[10.94,6.37,0.3333],fh_toter_braun_4:[10.93,6.0,0.3333]});
 // Zeichnen mit Fußpunkt auf (x, y): sc vergrößert, flip spiegelt (vertauscht x und y der Schrägansicht),
@@ -1793,10 +1796,67 @@ function drawStake(c, x, y, h, k) {
   for (const f of [0.3, 0.75]) if (h * f < h - 2) { c.beginPath(); c.ellipse(px, py - h * f, w, w * 0.45, 0, 0.15, Math.PI - 0.15); c.stroke(); }
 }
 
+// Gemalter Pfahl (Sommer oder Winter), etwas breiter als gemalt, damit die Palisade dicht wirkt; f: Anteil der Höhe
+// (Schaden: oben abgebrochen)
+function drawStakeArt(c, x, y, k, f = 1) {
+  const win = lookSeason() === 3 && ART.pal_pfahl_1_winter, n = PAL_N[win ? 1 : 0];
+  const id = `pal_pfahl_${1 + (k % n)}${win ? '_winter' : ''}`, a = P5[id];
+  if (!a || !ART[id]) return false;
+  const [px, py] = P(x, y);
+  c.save();
+  if (f < 1) { c.beginPath(); c.rect(px - 12, py - 30 * f, 24, 30 * f + 8); c.clip(); }
+  const wd = win ? 1.75 : 1.3;   // die Winterpfähle sind schmaler gemalt
+  c.translate(px, py); c.scale(k % 3 === 1 ? -wd : wd, 1); c.translate(-px, -py);
+  const ok = p5(c, id, x, y);
+  c.restore();
+  return ok;
+}
+// Palisadentor schräg in die Richtung der Mauer gelegt (die Lücke liegt im Süden, die Mauer läuft dort längs x)
+function drawPalisadeGate(c, x, y) {
+  const id = lookSeason() === 3 && ART.pal_palisade_tor_winter ? 'pal_palisade_tor_winter' : 'pal_palisade_tor', a = P5[id];
+  const spr = a && ART[id] ? figSprite(id, '#808080') : null;
+  if (!spr) return;
+  const [px, py] = P(x, y);
+  c.save(); c.translate(px, py); c.transform(1, 0.5, 0, 1, 0, 0);
+  c.drawImage(lodOf(spr.mips[0], c, a[2]), -a[0], -a[1], spr.w * a[2], spr.h * a[2]);
+  c.restore();
+}
 function palisadeRing(site, r) {
   const parts = [];
+  const wood = '#8a6440';
   const z0 = groundZ(G.world, site.x, site.y);
-  // Pfähle dicht an dicht, damit sie als Wand lesen
+  const W = G.world, N = W.N;
+  if (ART.pal_pfahl_1) {
+    // Gemalte Pfähle dicht an dicht: der Schritt richtet sich nach der Breite auf dem Bildschirm (vorn und hinten enger)
+    const open = (x, y) => { const t = W.tiles[Math.floor(y) * N + Math.floor(x)]; return t === T.ROAD || t === T.BRIDGE || t === T.WATER; };
+    const stakes = [];
+    for (let a = Math.PI / 2 + PAL_GATE, k = 0; a < Math.PI / 2 + Math.PI * 2 - PAL_GATE; k++) {
+      const x = site.x + Math.cos(a) * r, y = site.y + Math.sin(a) * r;
+      if (!open(x, y)) stakes.push({ x, y, k: Math.floor(hash2(k, site.tx, 71) * 97) });
+      const hs = 32 * r * Math.abs(Math.sin(a) + Math.cos(a));
+      a += Math.max(0.012, Math.min(0.06, 3.6 / Math.max(hs, 1)));
+    }
+    // je gut eine Viertelkachel ein Stück für die Tiefensortierung
+    for (let i = 0; i < stakes.length;) {
+      const grp = [stakes[i]];
+      while (++i < stakes.length && Math.hypot(stakes[i].x - grp[0].x, stakes[i].y - grp[0].y) < 0.28) grp.push(stakes[i]);
+      grp.sort((p, q) => p.x + p.y - (q.x + q.y));
+      const m = grp[grp.length >> 1];
+      parts.push({ x: m.x, y: m.y, d: m.x + m.y, z: z0, f: (c) => {
+        for (const st of grp) {
+          const hit = wallHit(site, st.x, st.y);
+          if (!hit) drawStakeArt(c, st.x, st.y, st.k);
+          else if (hit.gone) { if (st.k % 2) drawStakeArt(c, st.x, st.y, st.k, 0.18); }
+          else drawStakeArt(c, st.x, st.y, st.k, 1 - 0.6 * hit.dmg * (st.k % 2 ? 1 : 0.4));
+        }
+        const h0 = wallHit(site, m.x, m.y);
+        if (h0 && h0.repair) drawScaffold(c, m.x, m.y, 0.5, 0.5, 30);
+      } });
+    }
+    const gx = site.x, gy = site.y + r;
+    parts.push({ x: gx, y: gy, d: gx + gy, z: z0, f: (c) => drawPalisadeGate(c, gx, gy) });
+    return parts;
+  }
   const n = Math.round(Math.PI * 2 * r / 0.27);
   for (let k = 0; k < n; k++) {
     const a = (k / n) * Math.PI * 2;
@@ -1963,7 +2023,36 @@ function drawPlot(c, x, y, wx, wy) {
 }
 
 // Kleine Arbeiterfigur mit Werkzeug (hämmert, hackt, schlägt)
+// Arbeiter an Bauplätzen und in der Burg als 3D-Figur: Handwerker hämmern und hacken mit dem gemalten Werkzeug,
+// Bauern hacken auf dem Feld, Soldaten üben Hiebe, Mönche segnen, Wachen stehen auf dem Turm. Je Stelle eine feste Figur.
+const workerUnits = new Map();
+const WORKER_ROLE = { hammer: 'handwerker', axt: 'handwerker', hacke: 'bauer', schwert: 'soldat' };
+function workerUnit(x, y, tool, phase, o) {
+  const key = `${x.toFixed(2)}|${y.toFixed(2)}|${tool}|${o.role || ''}`;
+  let u = workerUnits.get(key);
+  if (!u) {
+    const role = o.role || WORKER_ROLE[tool] || 'bauer', soldier = role === 'soldat' || role === 'wache';
+    const f = o.flip ? -1 : 1;
+    u = soldier
+      ? { kind: 'npc', cls: 'soldat', look: 'soldat', eq: { waffe: tool === 'schwert' ? 'kurzschwert' : 'speer', ruestung: 'gambeson', schild: tool === 'schwert' ? 'rundschild' : null } }
+      : { kind: 'peasant', role, eq: {}, staff: !!o.staff };
+    Object.assign(u, { x, y, id: 7000 + Math.round(phase * 37) % 997, hp: 1, st: { maxHp: 1 }, facing: f, dirX: f > 0 ? 1 : -0.35, dirY: f > 0 ? 0.35 : 1,
+      tunic: o.col, act: o.act || (tool && tool !== 'schwert' ? tool : null), task: o.apron ? { anvil: true } : null, moving: false, worker: true });
+    workerUnits.set(key, u);
+    if (workerUnits.size > 300) workerUnits.delete(workerUnits.keys().next().value);
+  }
+  return u;
+}
 function drawWorker(c, x, y, tool, phase, o = {}) {
+  const u = workerUnit(x, y, tool, phase, o);
+  if (modelFor(u, false)) {
+    const t = G.time * (o.speed || 5) + phase;
+    // Übungshiebe: kurz ausholen und zuschlagen, dann Pause
+    if (tool === 'schwert') { const p = ((G.time * (o.speed || 5) / 7 + phase / 6.28) % 1 + 1) % 1; u.swing = p < 0.3 ? 0.3 * (1 - p / 0.3) : 0; }
+    const [px, py] = P(x, y, o.z || 0);
+    drawFigure(c, u, px, py);
+    return Math.sin(t);
+  }
   if (tool === 'hammer' || tool === 'axt' || tool === 'hacke') emitWork(x, y, tool === 'hammer' && o.apron ? 'amboss' : tool, o.speed || 5, phase);
   const [px, py] = P(x, y, o.z || 0);
   const t = G.time * (o.speed || 5) + phase;
@@ -2116,8 +2205,8 @@ function addCastleBuilding(add, id, L, p, s) {
       if (L >= 2) { add(t.x + 0.1, t.y - 0.4, (c) => drawDummy(c, t.x + 0.1, t.y - 0.4)); add(t.x + 0.6, t.y + 0.4, (c) => drawTarget(c, t.x + 0.6, t.y + 0.4)); }
       if (L >= 2) add(p.x + 0.4, p.y + 0.85, (c) => drawRack(c, p.x + 0.4, p.y + 0.85));
       if (L === 3) {
-        add(t.x - 0.4, t.y + 0.35, (c) => drawWorker(c, t.x - 0.4, t.y + 0.35, 'schwert', 0, { col: '#4d74ad', hat: '#9aa1a6', speed: 6 }));
-        add(t.x + 0.1, t.y + 0.55, (c) => drawWorker(c, t.x + 0.1, t.y + 0.55, 'schwert', 2.5, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, flip: true }));
+        add(t.x - 0.4, t.y + 0.35, (c) => drawWorker(c, t.x - 0.4, t.y + 0.35, 'schwert', 0, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, role: 'soldat' }));
+        add(t.x + 0.1, t.y + 0.55, (c) => drawWorker(c, t.x + 0.1, t.y + 0.55, 'schwert', 2.5, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, flip: true, role: 'soldat' }));
       }
       break;
     }
@@ -2220,7 +2309,7 @@ function addCastleBuilding(add, id, L, p, s) {
       for (let k = 0; k < n; k++) {
         const x = p.x - 0.9 + (k % 3) * 0.95, y = p.y - 0.6 + Math.floor(k / 3) * 1.25;
         add(x, y, (c) => drawStall(c, { x, y, color: cols[k % cols.length] }));
-        if (L >= 2 && k % 2 === 0) add(x + 0.1, y + 0.55, (c) => drawWorker(c, x + 0.1, y + 0.55, null, k, { col: cols[(k + 2) % cols.length], speed: 1 }));
+        if (L >= 2 && k % 2 === 0) add(x + 0.1, y + 0.55, (c) => drawWorker(c, x + 0.1, y + 0.55, null, k, { col: cols[(k + 2) % cols.length], speed: 1, role: 'buerger', act: 'verkaufen' }));
       }
       if (L >= 2) add(p.x + 1.8, p.y + 0.3, (c) => drawWell(c, { x: p.x + 1.8, y: p.y + 0.3 }));
       if (L === 3) add(p.x + 0.1, p.y + 0.15, (c) => { drawBox(c, p.x + 0.1, p.y + 0.15, 0.4, 0.4, 6, '#9a958a', 0, 'stone'); drawBox(c, p.x + 0.1, p.y + 0.15, 0.14, 0.14, 26, '#a8a296', 6); const tp = P(p.x + 0.1, p.y + 0.15, 32); c.fillStyle = '#a8a296'; c.fillRect(tp[0] - 4, tp[1] - 2, 8, 2); });
@@ -2400,8 +2489,8 @@ function addNewCastleBuilding(add, addFlat, id, L, p, s) {
         add(bx, by, (c) => drawProp(c, { prop: 'beet', x: bx, y: by, v: 0.2 + k * 0.2 }));
       }
       if (L >= 2) add(p.x - 1.0, p.y - 1.05, (c) => drawWell(c, { x: p.x - 1.0, y: p.y - 1.05 }));
-      add(p.x - 0.4, p.y + 1.15, (c) => drawWorker(c, p.x - 0.4, p.y + 1.15, null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2 }));
-      if (L === 3) add(p.x + 0.4, p.y + 1.2, (c) => drawWorker(c, p.x + 0.4, p.y + 1.2, null, 2.4, { col: '#e8e0cc', hat: '#e8e0cc', speed: 1, flip: true }));
+      add(p.x - 0.4, p.y + 1.15, (c) => drawWorker(c, p.x - 0.4, p.y + 1.15, null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2, role: 'moench', act: 'segnen' }));
+      if (L === 3) add(p.x + 0.4, p.y + 1.2, (c) => drawWorker(c, p.x + 0.4, p.y + 1.2, null, 2.4, { col: '#e8e0cc', hat: '#e8e0cc', speed: 1, flip: true, role: 'moench' }));
       break;
     }
     case 'schafzucht': {
@@ -2421,7 +2510,7 @@ function addNewCastleBuilding(add, addFlat, id, L, p, s) {
         drawGableRoof(c, p.x + 1.5, p.y - 1.55, 0.9, 0.8, 12, 7, ROOFS.thatch, '#8a6a40', true);
       });
       if (L >= 2) add(p.x + 2.4, p.y - 0.85, (c) => drawWoolBales(c, p.x + 2.4, p.y - 0.85, L === 3 ? 6 : 3));
-      add(p.x - 1.3, p.y + 0.4, (c) => drawWorker(c, p.x - 1.3, p.y + 0.4, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8 }));
+      add(p.x - 1.3, p.y + 0.4, (c) => drawWorker(c, p.x - 1.3, p.y + 0.4, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8, role: 'hirte', staff: true }));
       break;
     }
     case 'felder': {
@@ -2451,7 +2540,7 @@ function addTower(add, s, k, L) {
     faceQuad(c, x, y, 0.9, 0.9, 'L', 0.4, 0.6, h * 0.55, h * 0.7, '#2c2622');
     if (stone) drawMerlons(c, x, y, 0.9, 0.9, h, '#a5a092');
     else { drawBox(c, x, y, 1.1, 1.1, 3, '#6e5236', h); }
-    drawWorker(c, x + 0.1, y + 0.1, null, k, { z: h + (stone ? 0 : 3), col: '#4d74ad', hat: '#9aa1a6', speed: 0.5 });
+    drawWorker(c, x + 0.1, y + 0.1, null, k, { z: h + (stone ? 0 : 3), col: '#4d74ad', hat: '#9aa1a6', speed: 0.5, role: 'wache' });
     if (L >= 3 || (stone && k === 0)) drawBrazier(c, x - 0.25, y - 0.25, h + 2);
   });
 }
@@ -3474,6 +3563,12 @@ function drawFigure(c, u, x, y) {
     c.strokeStyle = u.kind === 'player' ? 'rgba(255,214,90,0.9)' : 'rgba(150,190,255,0.7)';
     c.lineWidth = 1.4;
     c.beginPath(); c.ellipse(0, 0, m ? 16 : 10, m ? 6 : 4.4, 0, 0, Math.PI * 2); c.stroke();
+  }
+  else if (u.livery && !u.dead) {
+    // Ring in der Farbe der Partei: im Getümmel sieht man sofort, wer zu wem gehört
+    c.strokeStyle = u.livery; c.globalAlpha = 0.85; c.lineWidth = 1.6;
+    c.beginPath(); c.ellipse(0, 0, m ? 15 : 9, m ? 5.6 : 4, 0, 0, Math.PI * 2); c.stroke();
+    c.globalAlpha = 1;
   }
   const key = modelFor(u, m);
   const sc = u.small && !key ? 0.8 : 1.14;
@@ -4592,7 +4687,7 @@ onArt((id) => {
   if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
   if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
-  if (id.startsWith('bau_')) { partCache.clear(); G.staticDirty = true; }
+  if (id.startsWith('bau_') || id.startsWith('pal_')) { partCache.clear(); G.staticDirty = true; }
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }

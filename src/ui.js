@@ -3,10 +3,10 @@
 import { G, log, homeName } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, GROUP_TYPES,
+  TYPE_NAME, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, FOOD_GOODS, GROUP_TYPES,
 } from './data.js';
 import {
-  buy, sell, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
+  buy, sell, sellStored, storedSellPrice, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
 } from './economy.js';
 import {
   repStatus, isHostileFaction, isAlly, alliesCount, acceptQuest, canDeliver, deliverQuest, claimQuest,
@@ -29,6 +29,7 @@ import { siegeAt, siegeStatus, sideBlock, sideOffer, joinSiege, canCallStorm, ca
 import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
+import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, hireInTown } from './camps.js';
 
 export function byId(id) { return document.getElementById(id); }
 
@@ -97,7 +98,7 @@ export function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c', siege: 's' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c', siege: 's', camp: 'c' };
 
 export function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -130,7 +131,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel, camp: campPanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -228,6 +229,7 @@ function townInfo(site) {
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen ${esc(beiFaction(f))} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
       ${mineAction(site)}
+      ${townMercActions(site)}
       ${tourneyAction(site)}
       ${tavernAction(site)}
       ${harbourActions(site)}
@@ -416,11 +418,13 @@ function harbourActions(site) {
   }).join('')}`;
 }
 
+// Was beim Verkauf des ganzen Lagers liegen bleibt: Nahrung für sieben Tage
+function storeKeep(g) { return FOOD_GOODS.includes(g) ? Math.ceil((foodNeed() * 7) / FOOD_GOODS.length) : 0; }
 function marketTable(site) {
   const town = G.s.towns[site.id];
   const rows = GOOD_IDS.map((g) => {
     const tag = site.produces.includes(g) ? '<span class="tag cheap">billig</span>' : site.demands.includes(g) ? '<span class="tag dear">gefragt</span>' : '';
-    const have = G.s.cargo[g] || 0;
+    const have = G.s.cargo[g] || 0, stored = G.s.castle.storage[g] || 0;
     return `<tr>
       <th scope="row">${GOODS[g].name} ${tag}</th>
       <td class="num">${town.stock[g]}</td>
@@ -429,13 +433,18 @@ function marketTable(site) {
       <td class="num">${sellPrice(site, g)}</td>
       <td class="btns"><button class="btn sm" data-act="sell" data-good="${g}" data-n="1" ${have ? '' : 'disabled'}>−1</button><button class="btn sm" data-act="sell" data-good="${g}" data-n="all" ${have ? '' : 'disabled'}>alle</button></td>
       <td class="num strong">${have}</td>
+      <td class="num">${stored}</td>
+      <td class="btns"><button class="btn sm" data-act="sellstore" data-good="${g}" ${stored ? '' : 'disabled'} title="Alles davon aus dem Burglager verkaufen, je ${storedSellPrice(site, g)} Gold">verkaufen</button></td>
     </tr>`;
   }).join('');
+  const storeVal = GOOD_IDS.reduce((a, g) => a + Math.max(0, (G.s.castle.storage[g] || 0) - storeKeep(g)) * storedSellPrice(site, g), 0);
   return `<p class="meta">Ladung <b>${cargoUsed()}/${cargoCap()}</b> · Gold <b>${fmt(G.s.gold)}</b>${isAlly('gilde') ? ' · Gildenrabatt aktiv' : ''}</p>
   <div class="table-wrap"><table class="market">
-    <thead><tr><th>Ware</th><th>Vorrat</th><th>Kauf</th><th></th><th>Verkauf</th><th></th><th>Ladung</th></tr></thead>
+    <thead><tr><th>Ware</th><th>Vorrat</th><th>Kauf</th><th></th><th>Verkauf</th><th></th><th>Ladung</th><th>Lager</th><th></th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>
+  <div class="row"><button class="btn" data-act="sellstoreall" ${storeVal ? '' : 'disabled'}>Lager verkaufen (etwa ${fmt(storeVal)} Gold)</button></div>
+  <p class="hint">Aus dem Burglager verkaufen: Händler holen die Ware ab und behalten ein Zehntel als Fuhrlohn. „Lager verkaufen“ lässt Getreide und Fleisch für sieben Tage am Tisch liegen.</p>
   <p class="hint">Was hier billig ist, ist anderswo gefragt. Die Preise ändern sich mit jedem Verkauf.</p>`;
 }
 
@@ -569,6 +578,39 @@ function castleBuild() {
 
 function unitStatsLine(u) {
   return `LP ${u.st.maxHp} · Angriff ${Math.round(u.st.atk)} · Schutz ${Math.round(u.st.def)}${u.st.ranged ? ` · Reichweite ${u.st.range}` : ''}`;
+}
+
+// Anwärter als Karte (Rittersaal, Waldlager, Söldner im Ort); act: Aktion beim Anwerben
+function recruitCard(u, i, act) {
+  return `<article class="recruit">
+    <header><b>${esc(u.name)}</b><span class="muted">${u.title ? `${esc(u.title)} · ` : ''}${CLASSES[u.cls].name} · Stufe ${u.level}</span></header>
+    <p>${unitStatsLine(u)}</p>
+    <p class="muted">${SLOTS.filter((s) => u.eq[s]).map((s) => ITEMS[u.eq[s]].name).join(', ') || 'ohne Ausrüstung'}</p>
+    <div class="chips">${u.cost ? goldChip(u.cost) : '<span class="chip">ohne Handgeld</span>'}<span class="chip">Sold ${u.wage}/Tag</span></div>
+    <button class="btn primary" data-act="${act}" data-i="${i}" ${G.s.gold >= u.cost ? '' : 'disabled'}>Anwerben</button>
+  </article>`;
+}
+
+// Lager im Wald: Ware an der Quelle kaufen, im Waldlager Söldner anheuern
+function campPanel() {
+  const c = G.ui.arg;
+  const goods = campGoods(c), rec = campRecruits(c);
+  const rows = goods.map((r) => `<tr><th scope="row">${GOODS[r.good].name}</th><td class="num">${r.stock}</td><td class="num">${r.price}</td>
+    <td class="btns"><button class="btn sm" data-act="campbuy" data-good="${r.good}" data-n="1" ${r.stock ? '' : 'disabled'}>+1</button><button class="btn sm" data-act="campbuy" data-good="${r.good}" data-n="5" ${r.stock ? '' : 'disabled'}>+5</button><button class="btn sm" data-act="campbuy" data-good="${r.good}" data-n="999" ${r.stock ? '' : 'disabled'}>alles</button></td>
+    <td class="num strong">${G.s.cargo[r.good] || 0}</td></tr>`).join('');
+  const body = `<p class="lede">${esc(CAMP_TEXT[c.camp] || '')}</p>
+    ${rows ? `<p class="meta">Ladung <b>${cargoUsed()}/${cargoCap()}</b> · Gold <b>${fmt(G.s.gold)}</b></p>
+    <div class="table-wrap"><table class="market"><thead><tr><th>Ware</th><th>Vorrat</th><th>Preis</th><th></th><th>Ladung</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">Was heute weg ist, kommt morgen nach.</p>` : ''}
+    ${rec.length ? `<h3>Anwerben</h3><p class="meta">Im Feld ${partyMembers().length}/${partyCap()}</p><div class="rgrid">${rec.map((u, i) => recruitCard(u, i, 'camphire')).join('')}</div>` : ''}`;
+  return { title: c.name, sub: 'Lager im Wald', tabs: [], body };
+}
+
+// Söldner der Herren im Ort (Normannen, Sachsen)
+function townMercActions(site) {
+  const l = townMercs(site);
+  if (!l) return '';
+  return `<h3>Söldner</h3>${l.length ? `<div class="rgrid">${l.map((u, i) => recruitCard(u, i, 'mercHire')).join('')}</div>` : '<p class="muted">Heute bietet sich niemand an. In ein paar Tagen wieder.</p>'}`;
 }
 
 function castleHall() {
@@ -981,6 +1023,16 @@ const ACTIONS = {
   sell: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg; sell(site, d.good, d.n === 'all' ? 9999 : Number(d.n)); },
   buyitem: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg; buyItem(site, d.id); },
   sellitem: (d) => sellItem(Number(d.i)),
+  campbuy: (d) => buyAtCamp(G.ui.arg, d.good, Number(d.n)),
+  camphire: (d) => hireAtCamp(G.ui.arg, Number(d.i)),
+  mercHire: (d) => hireInTown(G.ui.arg, Number(d.i)),
+  sellstore: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
+  sellstoreall: () => {
+    const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg;
+    let n = 0, gold = 0;
+    for (const g of GOOD_IDS) { const r = sellStored(site, g, 9999, storeKeep(g)); n += r.sold; gold += r.earned; }
+    if (n) log(`Das Lager ist verkauft: ${n} Waren für ${fmt(gold)} Gold (Vorrat für sieben Tage behalten).`, 'gold');
+  },
   accept: (d) => acceptQuest(G.ui.arg.id, Number(d.q)),
   deliver: (d) => { const q = questById(d.q); if (q) deliverQuest(q); },
   claim: (d) => { const q = questById(d.q); if (q) claimQuest(q); },

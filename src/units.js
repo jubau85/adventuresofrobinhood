@@ -4,6 +4,7 @@ import { G, uid, log, homeName, playerColor } from './state.js';
 import {
   CLASSES, ITEMS, NPC_TYPES, GROUP_TYPES, T, TERRAIN_SPEED, NAMES_M, NAMES_F, EPITHETS,
   GOODS, GOOD_IDS, PEASANT_TUNICS, HAIR, LOOKS, FERRIES, FACTIONS, CASTLE_TOWERS,
+  LIVERY,
 } from './data.js';
 import { isWalkable, findPath, tileAt, nearestWalkable, landAt, groundZ } from './world.js';
 import { isoX, isoY } from './iso.js';
@@ -170,7 +171,7 @@ export const WALK = 0.55;
 function wantsRun(u) {
   if (u.kind === 'peasant') return !!u.flee || !!(u.task && u.task.speed >= 1.4);
   if (u.combatT > 0 || u.attackTarget) return true;
-  if (u.kind === 'player') return !!u.runClick && (!!u.path || !!G.input.dx || !!G.input.dy);
+  if (u.kind === 'player') return (!!u.runClick || !!G.input.shift) && (!!u.path || !!G.input.dx || !!G.input.dy);
   if (u.kind === 'companion') return !!G.s.player.run || !!u.catchUp;
   if (u.group) return !!(u.group.engaged || u.group.feud) || !!u.catchUp;
   return !!u.catchUp;
@@ -250,6 +251,35 @@ export function chaseTo(u, tx, ty, dt, stop, mult = 1) {
   if (!ch.path || ch.i >= ch.path.length) return moveToward(u, tx, ty, dt, stop, mult);
   const wp = ch.path[ch.i];
   if (moveToward(u, wp.x, wp.y, dt, 0.25, mult)) ch.i++;
+  return false;
+}
+
+// Einem Platz in einer Formation gleichmäßig folgen: mit der Geschwindigkeit des Ankers (vx, vy) und einer sanften
+// Korrektur zum Platz hin, statt anzulaufen, anzuhalten und wieder anzulaufen. Die Blickrichtung dreht gedämpft.
+// Steht der Anker, bleibt man in der Nähe des Platzes ruhig stehen (mit Spielraum, damit nichts flackert).
+function followSlot(u, tx, ty, vx, vy, dt, mult = 1.15) {
+  const ex = tx - u.x, ey = ty - u.y, d = Math.hypot(ex, ey);
+  if (d > 1.2 && !lineClear(u.x, u.y, tx, ty)) { u._settled = false; return chaseTo(u, tx, ty, dt, 0.3, mult); }
+  u.chase = null;
+  const still = Math.hypot(vx, vy) < 0.05;
+  if (still && d < (u._settled ? 0.55 : 0.12)) { u._settled = true; return true; }
+  u._settled = false;
+  let wx = vx + ex * 1.6, wy = vy + ey * 1.6;
+  const vmax = unitSpeed(u) * mult, w = Math.hypot(wx, wy);
+  if (w > vmax) { wx *= vmax / w; wy *= vmax / w; }
+  const sp = Math.hypot(wx, wy);
+  if (sp < 0.04) return true;
+  const nx = u.x + wx * dt, ny = u.y + wy * dt, W = G.world;
+  if (isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
+  else if (isWalkable(W, nx, u.y)) u.x = nx;
+  else if (isWalkable(W, u.x, ny)) u.y = ny;
+  else return false;
+  u.moving = true;
+  const k = Math.min(1, dt * 5);
+  let fx = (u.dirX ?? wx / sp) + (wx / sp - (u.dirX ?? wx / sp)) * k, fy = (u.dirY ?? wy / sp) + (wy / sp - (u.dirY ?? wy / sp)) * k;
+  const fl = Math.hypot(fx, fy) || 1; u.dirX = fx / fl; u.dirY = fy / fl;
+  const sx = u.dirX - u.dirY;
+  if (Math.abs(sx) > 0.2) u.facing = sx > 0 ? 1 : -1;
   return false;
 }
 
@@ -498,7 +528,8 @@ export function provokeGroup(g) {
 function formationSlot(k) {
   const p = G.s.player;
   const row = Math.floor(k / 2) + 1, side = k % 2 ? 1 : -1;
-  const dx = p.dirX || 0.7, dy = p.dirY || 0.7;
+  // gedämpfte Blickrichtung des Helden: das Gefolge schwenkt nicht bei jedem Wegpunkt mit
+  const dx = G.pHead ? G.pHead.x : p.dirX || 0.7, dy = G.pHead ? G.pHead.y : p.dirY || 0.7;
   return {
     x: p.x - dx * row * 1.05 + -dy * side * 0.75,
     y: p.y - dy * row * 1.05 + dx * side * 0.75,
@@ -528,7 +559,16 @@ export function updateUnits(dt) {
   }
   if (G.s.safeTime > 0) G.s.safeTime -= dt;
 
+  const px0 = p.x, py0 = p.y;
   updatePlayer(p, dt);
+  // Geschwindigkeit des Helden: ihr folgt das Gefolge gleichmäßig
+  if (dt > 0) { const vx = (p.x - px0) / dt, vy = (p.y - py0) / dt; G.playerVel = Math.hypot(vx, vy) > 8 ? { x: 0, y: 0 } : { x: vx, y: vy }; }
+  if (!G.pHead) G.pHead = { x: p.dirX || 0.7, y: p.dirY || 0.7 };
+  if (p.moving && dt > 0) {
+    const k = Math.min(1, dt * 1.5), h = G.pHead;
+    h.x += ((p.dirX ?? h.x) - h.x) * k; h.y += ((p.dirY ?? h.y) - h.y) * k;
+    const l = Math.hypot(h.x, h.y) || 1; h.x /= l; h.y /= l;
+  }
   const party = partyMembers();
   party.forEach((c, k) => { if (!c.dead) updateCompanion(c, k, dt); });
   for (const g of G.groups) {
@@ -634,12 +674,12 @@ function updateCompanion(u, k, dt) {
   const d = Math.hypot(slot.x - u.x, slot.y - u.y);
   if (d > 24) { placeNear(u, p.x, p.y, 1.5); return; }
   if (d > 3) u.catchUp = true;
-  if (d > 0.45) chaseTo(u, slot.x, slot.y, dt, 0.3, d > 3 ? 1.4 : 1.05);
+  followSlot(u, slot.x, slot.y, G.playerVel ? G.playerVel.x : 0, G.playerVel ? G.playerVel.y : 0, dt, d > 3 ? 1.4 : 1.1);
 }
 
 // Heere ziehen in Blöcken: acht Mann nebeneinander, Reihe hinter Reihe
 function armyOffset(g, k) {
-  const fx = g.dirX || 1, fy = g.dirY || 0;
+  const fx = g.fdx ?? (g.dirX || 1), fy = g.fdy ?? (g.dirY || 0);
   const col = (k % 8) - 3.5, row = Math.floor(k / 8);
   return { x: -fy * col * 0.85 - fx * row * 0.85, y: fx * col * 0.85 - fy * row * 0.85 };
 }
@@ -680,7 +720,7 @@ function updateGroupMember(m, g, k, dt) {
   const d = Math.hypot(tx - m.x, ty - m.y);
   if (d > 30) { m.x = tx; m.y = ty; return; }
   if (d > 2) m.catchUp = true;
-  if (d > 0.3) chaseTo(m, tx, ty, dt, 0.2, d > 2 ? 1.5 : 1.1);
+  followSlot(m, tx, ty, g.vx || 0, g.vy || 0, dt, d > 2 ? 1.5 : 1.15);
 }
 
 
@@ -804,7 +844,7 @@ export function spawnGroup(type, opts = {}) {
     members: [], fallen: [], engaged: false, provoked: false, path: null, pathI: 0, wait: rand(0, 4),
     questId: opts.questId || null, aggro: gt.hostile ? 7 : gt.army ? 12 : 6, army: !!gt.army,
   };
-  const bonus = Math.floor((G.s.day - 1) / 8);
+  const bonus = Math.floor((G.s.day - 1) / 8) + (opts.luck || 0);
   if (opts.membersUnits) {
     for (const m of opts.membersUnits) { m.team = 'group'; m.group = g; g.members.push(m); }
   } else if (opts.members) {
@@ -825,6 +865,9 @@ export function spawnGroup(type, opts = {}) {
     }
   }
   if (!g.members.length) return null;
+  // Bewaffnete einer Partei tragen deren Livree (Heere, Wachen, Streifen); Wegelagerer und Zivile bleiben, wie sie sind
+  const liv = LIVERY[g.faction];
+  if (liv) for (const m of g.members) if (m.cls === 'soldat' || m.cls === 'ritter') { m.tunic = liv; m.livery = liv; }
   G.groups.push(g);
   for (const m of g.members) G.units.push(m);
   return g;
@@ -868,6 +911,12 @@ export function updateGroups(dt) {
   if (G.feudT <= 0) { G.feudT = 0.5; checkFeuds(); }
   for (const g of G.groups) {
     if (!g.members.length) continue;
+    // Geschwindigkeit des Ankers (aus dem letzten Bild): ihr folgen die Mitglieder gleichmäßig
+    if (g._lx !== undefined && dt > 0) {
+      g.vx = (g.x - g._lx) / dt; g.vy = (g.y - g._ly) / dt;
+      if (Math.hypot(g.vx, g.vy) > 6) { g.vx = 0; g.vy = 0; }
+    }
+    g._lx = g.x; g._ly = g.y;
     const gt = GROUP_TYPES[g.type];
     const lead = g.members[0];
     if (g.army) updateArmy(g, p);
@@ -904,7 +953,17 @@ export function updateGroups(dt) {
       continue;
     }
     const target = g.path[g.pathI];
-    if (g.army) { const dd = Math.hypot(target.x - g.x, target.y - g.y) || 1; g.dirX = (target.x - g.x) / dd; g.dirY = (target.y - g.y) / dd; }
+    if (g.army) {
+      const dd = Math.hypot(target.x - g.x, target.y - g.y) || 1; g.dirX = (target.x - g.x) / dd; g.dirY = (target.y - g.y) / dd;
+      // Die Formation dreht langsam und blickt ein paar Wegpunkte voraus, statt an jeder Ecke herumzuschwenken
+      const far = g.path[Math.min(g.path.length - 1, g.pathI + 4)], fd = Math.hypot(far.x - g.x, far.y - g.y);
+      if (fd > 0.5) {
+        const k = Math.min(1, dt * 0.6);
+        g.fdx = (g.fdx ?? g.dirX) + ((far.x - g.x) / fd - (g.fdx ?? g.dirX)) * k;
+        g.fdy = (g.fdy ?? g.dirY) + ((far.y - g.y) / fd - (g.fdy ?? g.dirY)) * k;
+        const l = Math.hypot(g.fdx, g.fdy) || 1; g.fdx /= l; g.fdy /= l;
+      }
+    }
     const t = tileAt(G.world, g.x, g.y);
     const sp = gt.speed * TERRAIN_SPEED[t] * dt * WALK;
     const dx = target.x - g.x, dy = target.y - g.y, d = Math.hypot(dx, dy);
@@ -1114,9 +1173,16 @@ function updateTowers(dt) {
 // ---------------------------------------------------------------- Schlachten
 // Ab und zu ziehen zwei Heere heran und schlagen sich, je 50 Mann (bei knapper Leistung weniger).
 // Du kannst zuschauen oder eingreifen. Nur ein Heer, dessen Fraktion dir feindlich ist, greift auch dich an.
-function battleSize() {
+// Höchstzahl beider Heere zusammen, nach Bildrate
+function battleCap() {
   const f = G.fpsAvg || 60;
-  return f >= 40 ? 50 : f >= 30 ? 40 : 30;
+  return f >= 40 ? 140 : f >= 30 ? 100 : 70;
+}
+// Heerstärke: je Seite 30 bis 100 Mann, unabhängig voneinander (Kriegsglück); zusammen nicht mehr als battleCap
+function battleSizes() {
+  let na = randInt(30, 100), nb = randInt(30, 100);
+  const k = Math.min(1, battleCap() / (na + nb));
+  return [Math.max(15, Math.round(na * k)), Math.max(15, Math.round(nb * k))];
 }
 
 export function maybeBattle() {
@@ -1124,7 +1190,7 @@ export function maybeBattle() {
   if (Math.random() < 0.35) startBattle();
 }
 
-export function startBattle() {
+export function startBattle(force = null) {
   const W = G.world, p = G.s.player;
   if (G.battle) return false;
   const land = landAt(W, p.x, p.y);
@@ -1151,16 +1217,18 @@ export function startBattle() {
     if (!pa || !pb) continue;
     const patha = findPath(W, pa.x, pa.y, bx, by, 60000), pathb = findPath(W, pb.x, pb.y, bx, by, 60000);
     if (!patha || !pathb) continue;
-    const scale = battleSize() / 50;
-    const A = spawnGroup(ta, { pos: pa, scale }), B = spawnGroup(tb, { pos: pb, scale });
+    // Beide Heere sind 50 Mann stark angelegt; die Stärke im Feld wird ausgewürfelt (force: feste Größen zum Testen)
+    const [na, nb] = force || battleSizes();
+    // Kriegsglück: gut geführt, ausgeruht und satt (+1) oder müde, schlecht verpflegt (−1)
+    const luck = () => (force ? 0 : pick([-1, 0, 0, 1]));
+    const A = spawnGroup(ta, { pos: pa, scale: na / 50, luck: luck() }), B = spawnGroup(tb, { pos: pb, scale: nb / 50, luck: luck() });
     if (!A || !B) return false;
     for (const [g, path] of [[A, patha], [B, pathb]]) { g.path = path; g.pathI = 0; g.wait = 0; g.foe = g === A ? B : A; g.peace = 0; }
     G.battle = { x: bx, y: by, a: A, b: B };
     rebuildUnits();
-    const na = GROUP_TYPES[ta], nb = GROUP_TYPES[tb];
     const dx = bx - p.x, dy = by - p.y, ang = (Math.atan2(dx, -dy) * 180) / Math.PI;
     const dir = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'][Math.round(((ang + 360) % 360) / 45) % 8];
-    log(`Zwei Heere ziehen heran! ${na.nom} und ${nb.acc}, je ${A.members.length} Mann, treffen im ${dir} von dir aufeinander. Halte dich heraus oder greif ein.`, 'bad');
+    log(`Zwei Heere ziehen heran! ${GROUP_TYPES[ta].nom} mit ${A.members.length} Mann und ${GROUP_TYPES[tb].acc} mit ${B.members.length} Mann treffen im ${dir} von dir aufeinander. Halte dich heraus oder greif ein.`, 'bad');
     return true;
   }
   return false;

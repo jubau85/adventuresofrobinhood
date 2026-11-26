@@ -4,7 +4,7 @@
 // Wer den Mut hat, schneidet ihn vorher los, und die Wachen greifen an.
 
 import { G, log } from './state.js';
-import { T } from './data.js';
+import { T, dirText } from './data.js';
 import { rand, randInt, pick } from './rng.js';
 import { isWalkable, landAt } from './world.js';
 import { hourOf, passHours } from './sim.js';
@@ -14,6 +14,7 @@ import { isoX, isoY } from './iso.js';
 import { changeRep, addRenown } from './politics.js';
 import { DEFENDER_NPC, countDead } from './siege.js';
 import { isBlighted } from './dynamics.js';
+import { freedToCamp } from './camps.js';
 
 const GALLOWS_TYPES = { burg: 1, stadt: 1, markt: 1 };
 const CRIMES = [['Wilderei im Forst des Königs', 'Wilderer'], ['Diebstahl', 'Dieb'], ['Viehdiebstahl', 'Viehdieb'], ['Straßenraub', 'Wegelagerer']];
@@ -227,6 +228,9 @@ export function rescueCondemned(u) {
   if (grp) { grp.faction = s.faction; grp.engaged = true; grp.provoked = true; grp.wait = 99999; grp.path = null; }
   h.done = true;
   log(`Du schneidest ${h.name} vom Strick los! Er rennt in die Wälder. Die Wachen gehen auf dich los!`, 'gold');
+  // Er wartet im nächsten Waldlager und dient dir dort ohne Handgeld
+  const camp = freedToCamp(h.name, c.x, c.y);
+  if (camp) log(`${h.name} ruft dir zu: „Ich warte ${/(lager|bruch)$/.test(camp.name) ? 'im' : 'am'} ${camp.name}, ${dirText(s, camp)}! Ich stehe in Eurer Schuld.“ Dort kannst du ihn ohne Handgeld anwerben.`, 'good');
   if (s.faction) changeRep(s.faction, -12);
   changeRep('waldleute', 6);
   if (s.faction === 'normannen') changeRep('sachsen', 3);

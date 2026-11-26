@@ -39,16 +39,16 @@ def box_mean(m, r):
     s = c[2 * r + 1:, 2 * r + 1:] - c[:h, 2 * r + 1:] - c[2 * r + 1:, :w] + c[:h, :w]
     return s / (2 * r + 1) ** 2
 
-def cut(a, holes=False):
+def cut(a, holes=False, lines=True, bg_max=150):
     """Hintergrund vom Rand her fluten: erst das dunkle Grau samt Gitter, dann dünne helle Linien daneben
     (Grundrissraute), die wieder an Hintergrund grenzen. Schnee und helle Wände bleiben, weil sie breit sind."""
     h, w, _ = a.shape
     ai = a.astype(int); mx, mn = ai.max(2), ai.min(2); sat = mx - mn
-    strict = (sat < 16) & (mx > 45) & (mx < 150)
+    strict = (sat < 16) & (mx > 45) & (mx < bg_max)
     light = (sat < 22) & (mx >= 150) & (mx < 242)
     border = np.zeros((h, w), bool); border[0, :] = border[-1, :] = True; border[:, 0] = border[:, -1] = True
     seen = flood(strict, border & strict)
-    for _ in range(4):
+    for _ in range(4 if lines else 0):
         add = light & ~seen & (box_mean(seen, 4) > 0.42)
         if not add.any(): break
         seen = flood(strict | add, seen | add)

@@ -159,6 +159,7 @@ export const NPC_TYPES = {
   haendler: { cls: 'zivil', name: 'Händler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'haendler' },
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
+  huskarl: { cls: 'soldat', name: 'Huskarl', eq: { waffe: 'streitaxt', ruestung: 'kettenhemd', schild: 'rundschild' }, lv: [2, 3], look: 'sachsen' },
   freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
   sachs_bogen: { cls: 'soldat', name: 'Sächsischer Bogner', eq: { waffe: 'kurzbogen', ruestung: 'lederwams' }, lv: [1, 2], look: 'sachsen' },
   ritter_n: { cls: 'ritter', name: 'Normannischer Ritter', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'drachenschild', pferd: 'klepper' }, lv: [2, 3], look: 'soldat' },
@@ -212,7 +213,8 @@ export const GROUP_TYPES = {
   },
   heer_richard: {
     name: 'Das Heer der Getreuen König Richards', nom: 'Das Heer der Getreuen', acc: 'das Heer der Getreuen', pl: false, faction: 'sachsen', army: true,
-    members: [['thane', 6, 6], ['freisasse', 22, 22], ['sachs_bogen', 14, 14], ['bandit', 8, 8]],
+    // Richards Getreue: Thane und Huskarle in Kettenhemd, Freisassen, Langbogenschützen aus den Wäldern
+    members: [['thane', 6, 6], ['huskarl', 4, 4], ['freisasse', 20, 20], ['waldmann', 4, 4], ['sachs_bogen', 13, 13], ['bandit', 3, 3]],
     gold: [260, 480], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['en', 'wa'],
     kill: { sachsen: -14, normannen: 12 },
   },
@@ -604,6 +606,8 @@ export const LOOKS = {
   bauer: { tunic: '#9a8461', trim: '#6e5c40' },
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
+// Livree der Bewaffneten je Partei: kräftig, damit man die Seiten im Gewühl unterscheidet (Waffenrock und Ring am Boden)
+export const LIVERY = { normannen: '#d2382a', sachsen: '#3f9e32', franken: '#2c62d6', waldleute: '#8a9a2a', gilde: '#a052d0', kirche: '#e0c25a' };
 // Wappenfarben zur Wahl im Startmenü
 export const HERALDRY = [
   { id: 'blau', name: 'Königsblau', color: '#2c4f86' },

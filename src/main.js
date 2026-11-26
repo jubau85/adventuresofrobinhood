@@ -230,12 +230,20 @@ function nearestSite() {
 }
 
 // E oder Klick auf die Statuszeile: Ort betreten, sonst ins Feldlager einer Belagerung
+// Lager im Wald (Jäger, Köhler, Holzfäller, Steinbruch, Hirten, Rastplatz, Waldlager) in Reichweite
+function nearestForestCamp() {
+  const p = G.s.player;
+  let best = null, bd = 3.2;
+  for (const c of G.world.camps || []) { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; best = c; } }
+  return best;
+}
 function interactHere() {
   if (posternNear()) { usePostern(); return; }
   G.pendingPostern = null;
   const s = nearestSite();
   if (s) enterSite(s);
   else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
+  else { const fc = nearestForestCamp(); if (fc && !inCombat()) { G.s.player.path = null; openPanel('camp', fc); } }
 }
 
 // Eigene Burg: Ein Klick auf ein Gebäude oder einen Bauplatz öffnet nur dieses Gebäude,
@@ -296,6 +304,9 @@ function checkNearSite() {
   } else if (!s && nearSiegeCamp() && !inCombat()) {
     const sg = siegeStatus();
     showPrompt(`<kbd>E</kbd> Feldlager vor ${esc(sg.name)}${sg.side ? '' : ': Seite wählen'}${battleText(' · ')}`);
+  } else if (!s && nearestForestCamp() && !inCombat()) {
+    const fc = nearestForestCamp();
+    showPrompt(`<kbd>E</kbd> ${esc(fc.name)}: ${fc.camp === 'soeldner' ? 'Söldner anheuern, handeln' : 'handeln'}${G.s.freedAt && G.s.freedAt[fc.id] ? ' · <b>ein Geretteter wartet</b>' : ''}${battleText(' · ')}`);
   } else if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
     showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
@@ -555,8 +566,9 @@ function readInput() {
   const l = Math.hypot(dx, dy);
   G.input.dx = l ? dx / l : 0;
   G.input.dy = l ? dy / l : 0;
-  // Mit gedrückter Umschalttaste läuft der Held auch bei Tastensteuerung
-  if (l) G.s.player.runClick = keys.has('shift');
+  // Mit gedrückter Umschalttaste läuft (sprintet) der Held, mit Tasten wie mit der Maus, solange sie gehalten wird
+  G.input.shift = keys.has('shift');
+  if (l) G.s.player.runClick = false;
 }
 
 function bindInput() {
@@ -575,7 +587,7 @@ function bindInput() {
       const now = performance.now();
       const dbl = !!lastClick && now - lastClick.t < 400 && Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 28;
       lastClick = dbl ? null : { t: now, x: e.clientX, y: e.clientY };
-      clickWorld(e.clientX - r.left, e.clientY - r.top, dbl);
+      clickWorld(e.clientX - r.left, e.clientY - r.top, dbl || e.shiftKey);
     }
   });
   viewCanvas.addEventListener('pointermove', (e) => {
@@ -804,4 +816,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, step: (dt) => { G.time += dt; step(dt); } };
