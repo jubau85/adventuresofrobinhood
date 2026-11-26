@@ -65,13 +65,14 @@ export function updateHUD() {
   const fast = document.querySelector('[data-tool="fast"]');
   if (fast) fast.classList.toggle('on', G.fast);
   const now = performance.now();
-  for (const el of byId('log').children) el.classList.toggle('old', now - Number(el.dataset.t) > 14000);
+  for (const el of byId('log').children) el.classList.toggle('old', now - Number(el.dataset.t) > 25000);
 }
 
 export function renderLog() {
   const el = byId('log');
-  const msgs = G.messages.slice(-7);
-  el.innerHTML = msgs.map((m) => `<p class="msg ${m.kind}" data-t="${m.t}">${esc(m.text)}</p>`).join('');
+  const msgs = G.messages.slice(-8);
+  if (G.ui && G.ui.panel === 'chronik') refreshPanel();
+  el.innerHTML = msgs.map((m) => `<p class="msg ${m.kind}" data-t="${m.t}" title="Chronik öffnen (N)">${esc(m.text)}</p>`).join('');
 }
 
 export function showPrompt(text) {
@@ -99,7 +100,7 @@ export function closeDialog(accept) {
 }
 
 // ---------------------------------------------------------------- Tafeln
-const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', victory: 'v', cheat: 'c', siege: 's', camp: 'c' };
+const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', chronik: 'alle', victory: 'v', cheat: 'c', siege: 's', camp: 'c' };
 
 export function openPanel(kind, arg = null, tab = null) {
   G.ui.panel = kind;
@@ -132,7 +133,7 @@ function renderPanel() {
   const k = G.ui.panel;
   const out = ({
     town: townPanel, castle: castlePanel, party: partyPanel, quests: questsPanel, politics: politicsPanel,
-    map: mapPanel, menu: menuPanel, help: helpPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel, camp: campPanel,
+    map: mapPanel, menu: menuPanel, help: helpPanel, chronik: chronikPanel, victory: victoryPanel, cheat: cheatPanel, siege: siegePanel, camp: campPanel,
   })[k]();
   byId('panel-title').textContent = out.title;
   byId('panel-sub').innerHTML = out.sub || '';
@@ -878,6 +879,7 @@ function menuPanel() {
         <button class="btn sm${G.sfxOn && G.sfxOn() ? ' primary' : ''}" data-act="sfx" aria-pressed="${!!(G.sfxOn && G.sfxOn())}">Geräusche ${G.sfxOn && G.sfxOn() ? 'an' : 'aus'}</button>
       </div>
       <button class="btn" data-act="help">Steuerung & Tipps</button>
+      <button class="btn" data-act="chronik">Chronik</button>
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
@@ -900,6 +902,28 @@ function cheatPanel() {
   };
 }
 
+// Chronik: alle Meldungen nach Tagen, die neuesten oben, wahlweise nur Kampf, nur Erfolge oder das Übrige
+const CHRONIK_FILTER = { alle: () => true, kampf: (m) => m.kind === 'bad', erfolge: (m) => m.kind === 'good' || m.kind === 'gold', sonst: (m) => m.kind !== 'bad' && m.kind !== 'good' && m.kind !== 'gold' };
+function chronikPanel() {
+  const all = G.s.chronik || [];
+  const list = all.filter(CHRONIK_FILTER[G.ui.tab] || CHRONIK_FILTER.alle).reverse();
+  let html = '', day = null;
+  for (const m of list) {
+    if (m.day !== day) {
+      if (day !== null) html += '</ol>';
+      day = m.day;
+      html += `<h3 class="chronik-tag">Tag ${m.day} · ${SEASONS[seasonIndex(m.day)]} ${yearOf(m.day)}</h3><ol class="chronik">`;
+    }
+    html += `<li class="msg ${m.kind}"><time>${clockText(m.time)}</time>${esc(m.text)}</li>`;
+  }
+  if (day !== null) html += '</ol>';
+  return {
+    title: 'Chronik', sub: `${all.length} Einträge, die neuesten oben`,
+    tabs: [['alle', 'Alles'], ['kampf', 'Kampf und Gefahr'], ['erfolge', 'Erfolge'], ['sonst', 'Übriges']],
+    body: html || '<p class="muted">Noch nichts verzeichnet.</p>',
+  };
+}
+
 function helpPanel() {
   return {
     title: 'Steuerung & Tipps', tabs: [],
@@ -916,6 +940,7 @@ function helpPanel() {
         <dt>F oder 1 2 3</dt><dd>Gefolge: folgen, Stellung halten, angreifen</dd>
         <dt>T</dt><dd>Zeitraffer auf Reisen</dd>
         <dt>I J P M</dt><dd>Gefolge, Aufträge, Politik, Karte</dd>
+        <dt>N</dt><dd>Chronik: alle Meldungen zum Nachlesen</dd>
         <dt>Mausrad, + −</dt><dd>Zoomen</dd>
         <dt>L</dt><dd>Musik an und aus</dd>
         <dt>K</dt><dd>Geräusche an und aus</dd>
@@ -967,6 +992,7 @@ const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
+  chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
@@ -1087,6 +1113,8 @@ const ACTIONS = {
 
 export function initUI() {
   G.onLog = renderLog;
+  // Ein Klick auf eine Meldung öffnet die Chronik
+  byId('log').addEventListener('click', (e) => { if (e.target.closest('.msg') && G.started) openPanel('chronik'); });
   G.rumor = rumor;
   byId('panel').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');

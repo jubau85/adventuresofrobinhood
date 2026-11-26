@@ -15,14 +15,14 @@ import { dailyJustice } from './justice.js';
 import { passWeather } from './weather.js';
 import { dailyMines } from './mines.js';
 
-export function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
+export function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
 export function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
 
 export function yearOf(day = G.s.day) { return 1194 + Math.floor((day - 1) / (DAYS_PER_SEASON * 4)); }
 
-export function clockText() {
-  const h = hourOf();
+export function clockText(time = G.s.time) {
+  const h = hourOf(time);
   const hh = Math.floor(h), mm = Math.floor((h - hh) * 60 / 15) * 15;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }

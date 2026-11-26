@@ -34,6 +34,12 @@ export function uid() { return G.nextId++; }
 export function log(text, kind = 'info') {
   G.messages.push({ text, kind, t: performance.now() });
   if (G.messages.length > 60) G.messages.shift();
+  // Chronik: alles zum Nachlesen, mit Tag und Uhrzeit (wird mit dem Spielstand gesichert)
+  if (G.s) {
+    const c = G.s.chronik || (G.s.chronik = []);
+    c.push({ text, kind, day: G.s.day, time: Math.round(G.s.time) });
+    if (c.length > 500) c.splice(0, c.length - 500);
+  }
   if (G.onLog) G.onLog();
 }
 
