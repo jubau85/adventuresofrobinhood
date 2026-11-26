@@ -367,6 +367,12 @@ export const CASTLE_LAYOUT = {
 };
 // Wachtürme der eigenen Burg (relativ zur Burgmitte), in der Reihenfolge des Ausbaus
 export const CASTLE_TOWERS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
+// Bauplätze der eigenen Burg: Breite und Tiefe in Feldern
+export const CASTLE_PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0], hospiz: [2.0, 2.4], schafzucht: [3.0, 2.6], felder: [1.8, 1.6] };
+// Gebäude, die man nicht durchschreiten kann (Markt, Weide und Äcker bleiben begehbar)
+export const CASTLE_SOLID = ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'kapelle', 'hospiz'];
+// Bergfried je Burgstufe: Mitte relativ zur Burgmitte und Kantenlänge
+export const CASTLE_KEEP = [{ dx: -1.2, dy: -1.2, w: 2.1 }, { dx: -1.2, dy: -1.2, w: 1.6 }, { dx: -1.1, dy: -1.1, w: 2.2 }, { dx: -1.1, dy: -1.1, w: 2.8 }];
 // Kampfbonus innerhalb der eigenen Mauern je Burgstufe (Anteil an Angriff und Abwehr)
 export const CASTLE_BONUS = [{ atk: 0, def: 0.1 }, { atk: 0.1, def: 0.25 }, { atk: 0.2, def: 0.5 }, { atk: 0.3, def: 0.8 }];
 // Verpflegung: Waren, die als Nahrung zählen, und Preis für Zukauf je Ration

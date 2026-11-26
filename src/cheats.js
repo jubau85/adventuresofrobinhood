@@ -4,14 +4,14 @@
 import { G, log } from './state.js';
 import { GOOD_IDS, FACTION_IDS, BUILDINGS, BUILDING_IDS, DAYS_PER_SEASON, DAY_LEN } from './data.js';
 import { passHours } from './sim.js';
-import { finishConstruction, castleSite } from './castle.js';
+import { finishConstruction, castleSite, refreshCastleBlock } from './castle.js';
 import { partyMembers, placeNear, rebuildUnits, startBattle, computeStats, grantXp, xpNeeded, spawnPeasants } from './units.js';
 import { changeRep, addRenown } from './politics.js';
 import { startSiege } from './siege.js';
 import { igniteHouse, siteHouses, standing } from './dynamics.js';
 import { cheatTourney } from './tournament.js';
 import { cheatHanging } from './justice.js';
-import { setPlayerWalls, groundZ } from './world.js';
+import { groundZ } from './world.js';
 import { refreshCastleHerd } from './animals.js';
 import { isoX, isoY } from './iso.js';
 
@@ -98,7 +98,7 @@ const CHEAT_ACTIONS = {
     cs.level = BUILDINGS.burg.levels.length - 1;
     for (const id of BUILDING_IDS) if (id !== 'burg') cs.b[id] = BUILDINGS[id].levels.length - 1;
     cs.construction = null;
-    setPlayerWalls(G.world, true);
+    refreshCastleBlock();
     refreshCastleHerd();
     spawnPeasants(); rebuildUnits();
     G.castleDirty = true;

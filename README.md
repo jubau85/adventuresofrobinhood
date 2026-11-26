@@ -69,7 +69,9 @@ node tools/build.mjs
   - jede Stufe sichtbar anders, mit Arbeitern: Schmied mit Funken, Holzfäller, Steinmetze mit Kran, Pferde auf der Koppel, Soldaten auf dem Übungsplatz, Wachen auf den Türmen
   - eine Burgsiedlung, die mit der Burgstufe wächst
   - goldene Funken, wenn etwas fertig wird
-- **Mauern halten auf:** Palisaden und Steinmauern (Ashcombe ab der Holzburg, die Burgen der Barone, die Halle von Rotherwood) sind für alle Figuren undurchlässig. Man kommt nur durchs Tor hinein. Angreifer, Gefolge und Gruppen suchen sich den Weg dorthin.
+  - ein Klick auf ein Gebäude oder einen Bauplatz öffnet nur dieses Gebäude (Ausbau und, wo vorhanden, Anwerben, Rüstkammer oder Markt); der Bergfried öffnet die ganze Burg, ein Klick auf den Boden führt einfach dorthin
+- **Mauern und Häuser halten auf:** Palisaden und Steinmauern (Ashcombe ab der Holzburg, die Burgen der Barone, die Halle von Rotherwood) sind für alle Figuren undurchlässig. Man kommt nur durchs Tor hinein. Auch Häuser, Kirchen, Hallen, Wahrzeichen, Bergfriede und die Gebäude deiner Burg kann niemand durchschreiten; die Tür bleibt immer frei. Angreifer, Gefolge und Gruppen suchen sich den Weg drumherum.
+- **Weitläufige Orte:** Dörfer, Märkte, Burgen und Abteien nehmen etwa ein Drittel mehr Fläche ein, zwischen den Häusern liegen Gärten und Wege. Städte sind größer, in den Häuserzeilen bleiben Höfe frei, und jede Hauptstraße hat ihre Brücke über den Fluss. Häuser, deren Tür man nicht erreichen könnte (zum Fluss hin, in einer Flussschleife), werden gar nicht erst gebaut.
 - **Gefolge:** Leute im Rittersaal anwerben, ausrüsten (Waffe, Rüstung, Schild, Pferd) und in Scharmützel führen. Dazu Befehle (folgen, Stellung halten, angreifen), Erfahrung und Stufen, Sold, Garnison und Verwundete.
 - **Jagd:** Mit Bogen oder Armbrust Hirsche und Enten jagen. Hirsche fliehen, Bogenschützen im Gefolge schießen mit. Fleisch und Felle lassen sich einlagern oder in Städten verkaufen. Wilderei kann den Normannen auffallen, fremdes Vieh zu schießen gilt als Diebstahl. Die Bestände wachsen täglich nach.
 - **Handel:** Jeder Ort erzeugt und braucht andere Waren. Die Preise richten sich nach dem Vorrat. Holz, Stein und Eisen braucht man auch für den Burgbau.
@@ -129,6 +131,7 @@ node tools/build.mjs
 | `src/main.js` | Start, Hauptschleife, Eingabe |
 | `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
 | `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |
+| `tools/wege.mjs` | Prüft für drei Welten, ob jede Haustür und jede Ortsmitte erreichbar ist, wenn Häuser und Mauern ihre Felder sperren, und misst den Abstand zwischen den Häusern (`node tools/wege.mjs`, zum Vergleich `--ohne-haeuser`) |
 | `tools/ton.py` | Macht aus gelieferten Tönen spielfertige MP3s: nahtlose Schleifen für Hintergründe, Stille weg bei Musikstücken (`python3 tools/ton.py schleife|stueck <quelle> <ziel.mp3>`) |
 | `tools/sprites.py` | Rendert eine animierte 3D-Figur (GLB) mit Blender in Sprite-Bögen: 2:1-Schrägansicht, 8 Richtungen, Umrisse, Fußpunkt (`/opt/blender-venv/bin/python tools/sprites.py <figur.glb> <ordner>`) |
 | `tools/waffen.py` | Baut einfache Waffen als 3D-Modelle für die Sprite-Strecke |

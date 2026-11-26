@@ -178,7 +178,9 @@ function moveToward(u, tx, ty, dt, stop = 0.05, mult = 1) {
   const step = Math.min(unitSpeed(u) * mult * dt, d - stop * 0.5);
   const nx = u.x + (dx / d) * step, ny = u.y + (dy / d) * step;
   const W = G.world;
-  if (isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
+  // Wer in einem gesperrten Feld steht (ein Haus wurde fertig, ein Tor ging zu), darf hinausgehen
+  const stuck = !isWalkable(W, u.x, u.y) && tileAt(W, nx, ny) !== T.WATER;
+  if (stuck || isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
   else if (isWalkable(W, nx, u.y)) u.x = nx;
   else if (isWalkable(W, u.x, ny)) u.y = ny;
   else return false;

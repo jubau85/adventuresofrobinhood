@@ -59,6 +59,9 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - Fünf Auftragsarten (Lieferung, Banditen, Wilderer, Steuerkasse, Botengang)
 - Neun Burggebäude mit je drei Stufen und Bauzeit, vier Burgstufen
 - Überfälle auf die Burg, Garnison, Wachtürme
+- Gebäudekollision: Häuser, Kirchen, Wahrzeichen, Bergfriede und Burggebäude sperren ihre Felder, die Tür bleibt frei; Orte ohne erreichbare Tür werden nicht gebaut (geprüft mit tools/wege.mjs)
+- Eigene Burg: Klick auf Gebäude oder Bauplatz öffnet nur dieses Gebäude, der Boden ist begehbar
+- Weitläufige Orte mit Gärten und Höfen zwischen den Häusern
 - Speichern und Laden, Einzeldatei-Build
 
 ## Ausbauplan
@@ -68,7 +71,6 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - **Belagerungen ausbauen:** Leitern und Rammbock, Aushungern, eigene Belagerungen feindlicher Burgen mit dem Gefolge.
 - **Gefährten mit Geschichte:** Benannte Figuren mit eigenen Quests und Loyalität, etwa ein Mönch, eine Bogenschützin oder ein abtrünniger Templer.
 - **Diplomatie-Tafel:** Gesandte schicken, Tribute zahlen, Bündnisse förmlich schließen oder brechen.
-- **Gebäudekollision:** Auch Häuser sollen den Weg versperren. Mauern tun das bereits.
 
 ### Mittelfristig
 - **Gefangene und Lösegeld:** Raubritter gefangen nehmen statt erschlagen.

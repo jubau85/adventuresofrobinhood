@@ -210,6 +210,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .quest header b, .bcard header b, .recruit header b, .faction header b { font-family: var(--font-head); font-weight: 400; font-size: 19px; }
 .quest .row { margin-top: auto; padding-top: 6px; font-family: var(--font-ui); font-size: 13px; }
 .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.bgrid.one { grid-template-columns: minmax(0, 560px); margin-bottom: 10px; }
 .bcard p { font-size: 14px; margin-bottom: 4px; }
 .bcard .btn { margin-top: auto; align-self: flex-start; }
 .bcard.built { background: rgba(210,166,69,0.12); border-color: rgba(156,116,38,0.45); }
@@ -847,6 +848,12 @@ const CASTLE_LAYOUT = {
 };
 // Wachtürme der eigenen Burg (relativ zur Burgmitte), in der Reihenfolge des Ausbaus
 const CASTLE_TOWERS = [[6.4, 6.4], [-6.4, -6.4], [6.4, -6.4]];
+// Bauplätze der eigenen Burg: Breite und Tiefe in Feldern
+const CASTLE_PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0], hospiz: [2.0, 2.4], schafzucht: [3.0, 2.6], felder: [1.8, 1.6] };
+// Gebäude, die man nicht durchschreiten kann (Markt, Weide und Äcker bleiben begehbar)
+const CASTLE_SOLID = ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'kapelle', 'hospiz'];
+// Bergfried je Burgstufe: Mitte relativ zur Burgmitte und Kantenlänge
+const CASTLE_KEEP = [{ dx: -1.2, dy: -1.2, w: 2.1 }, { dx: -1.2, dy: -1.2, w: 1.6 }, { dx: -1.1, dy: -1.1, w: 2.2 }, { dx: -1.1, dy: -1.1, w: 2.8 }];
 // Kampfbonus innerhalb der eigenen Mauern je Burgstufe (Anteil an Angriff und Abwehr)
 const CASTLE_BONUS = [{ atk: 0, def: 0.1 }, { atk: 0.1, def: 0.25 }, { atk: 0.2, def: 0.5 }, { atk: 0.3, def: 0.8 }];
 // Verpflegung: Waren, die als Nahrung zählen, und Preis für Zukauf je Ration
@@ -1556,14 +1563,149 @@ function blockTiles(W, arr, list) {
 }
 
 function buildStaticWalls(W) {
-  const N = W.N;
-  W.blockStatic = new Uint8Array(N * N);
+  W.wallStatic = new Uint8Array(W.N * W.N);
+  markWalls(W, W.wallStatic);
+  refreshBuildingBlocks(W);
+}
+
+// Stadtmauern, Burgmauern mit Bergfried (wie in render.js castlePieces gezeichnet) und Palisaden
+function markWalls(W, arr) {
   for (const s of W.sites) {
-    if (s.cityWall) blockTiles(W, W.blockStatic, s.cityWall);
-    if (s.type === 'burg') blockTiles(W, W.blockStatic, wallRing(W, s, 4));
-    if (s.palisade) blockTiles(W, W.blockStatic, palisadeBand(s, false));
+    if (s.cityWall) blockTiles(W, arr, s.cityWall);
+    if (s.type === 'burg') {
+      blockTiles(W, arr, wallRing(W, s, 4));
+      const kw = s.castleLevel >= 3 ? 2.8 : 2.2;
+      for (const [x, y] of footprintTiles(W, s.x - 1.1, s.y - 1.1, kw, kw, 0.2)) arr[y * W.N + x] = 1;
+    }
+    if (s.palisade) blockTiles(W, arr, palisadeBand(s, false));
   }
-  W.block = new Uint8Array(W.blockStatic);
+}
+
+// ---------------------------------------------------------------- Gebäude als Hindernis
+// Häuser, Kirchen, Hallen, Wahrzeichen, Klausen und Stollen kann niemand durchschreiten.
+// Gesperrt sind die Felder, deren Mitte in der (leicht eingerückten) Grundfläche liegt, dazu das Feld
+// der Gebäudemitte. Das Feld vor der Tür bleibt immer frei, ebenso Straßen und Brücken.
+const SOLID_KINDS = { house: 1, church: 1, longhall: 1, klause: 1, stollen: 1, halde: 1, landmark: 1 };
+function solidRects(b) {
+  if (!SOLID_KINDS[b.kind] || !b.wx) return null;
+  if (b.kind === 'landmark') {
+    if (b.lm === 'tor') return null;
+    // Kathedrale: Langhaus und Querschiff statt des ganzen Rechtecks
+    if (b.lm === 'kathedrale') { const L = (b.len || 4) * 1.3; return [[b.x, b.y, L, 1.5], [b.x + L * 0.12, b.y, 1.3, Math.min(b.wy, 3.2)]]; }
+    if (b.lm === 'motte') return [[b.x, b.y, b.wx * 0.7, b.wy * 0.7]];
+  }
+  return [[b.x, b.y, b.wx, b.wy]];
+}
+// Tür eines Gebäudes: meist vorn (Richtung +y). Liegt dort Wasser, ist sie auf einer anderen Seite.
+function doorOf(b, W) {
+  if (b._door) return b._door;
+  let d;
+  if (b.kind === 'church') d = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
+  else if (b.kind === 'landmark' && b.lm === 'kathedrale') d = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
+  else if (b.kind === 'stollen') d = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
+  else if (b.kind === 'klause') d = { x: b.x - 0.1, y: b.y + b.wy / 2 + 0.3 };
+  else d = { x: b.x - 0.15, y: b.y + b.wy / 2 + 0.3 };
+  if (!W) return d;
+  const wet = (p) => W.tiles[Math.floor(p.y) * W.N + Math.floor(p.x)] === T.WATER;
+  if (wet(d) && b.kind !== 'landmark') {
+    const alt = [{ x: b.x + 0.15, y: b.y - b.wy / 2 - 0.3 }, { x: b.x + b.wx / 2 + 0.3, y: b.y + 0.1 }, { x: b.x - b.wx / 2 - 0.3, y: b.y + 0.1 }].find((p) => !wet(p));
+    if (alt) d = alt;
+  }
+  return (b._door = d);
+}
+// Felder einer Grundfläche (Mitte x, y; Breite wx, Tiefe wy). m: Einrückung am Rand
+function footprintTiles(W, x, y, wx, wy, m = 0.25) {
+  const N = W.N, out = [], seen = new Set();
+  const put = (tx, ty) => { const i = ty * N + tx; if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1 || seen.has(i)) return; seen.add(i); out.push([tx, ty]); };
+  const x0 = x - wx / 2 + m, x1 = x + wx / 2 - m, y0 = y - wy / 2 + m, y1 = y + wy / 2 - m;
+  for (let ty = Math.floor(y0); ty <= Math.floor(y1); ty++) for (let tx = Math.floor(x0); tx <= Math.floor(x1); tx++) {
+    if (tx + 0.5 >= x0 && tx + 0.5 < x1 && ty + 0.5 >= y0 && ty + 0.5 < y1) put(tx, ty);
+  }
+  put(Math.floor(x), Math.floor(y));
+  return out;
+}
+function buildingTiles(W, b) {
+  if (b._bt) return b._bt;
+  const rects = solidRects(b);
+  if (!rects) return (b._bt = []);
+  const N = W.N, d = doorOf(b, W), di = Math.floor(d.y) * N + Math.floor(d.x);
+  const out = [];
+  for (const [x, y, wx, wy] of rects) for (const [tx, ty] of footprintTiles(W, x, y, wx, wy)) {
+    const i = ty * N + tx, t = W.tiles[i];
+    if (i === di || t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
+    if (!out.some((q) => q[0] === tx && q[1] === ty)) out.push([tx, ty]);
+  }
+  return (b._bt = out);
+}
+// Häuser, deren Tür niemand erreicht (Tür zum Fluss, in einer Flussschleife ohne Brücke,
+// zwischen Mauer und Nachbarhäusern eingeklemmt), werden gar nicht erst gebaut.
+function siteFlood(W, s, block, pad = 16) {
+  const N = W.N, R = Math.ceil((s.clear || 4) + pad), D = 2 * R + 1;
+  const seen = new Uint8Array(D * D), q = [];
+  const id = (x, y) => (Math.abs(x - s.tx) > R || Math.abs(y - s.ty) > R ? -1 : (y - s.ty + R) * D + (x - s.tx + R));
+  const open = (x, y) => x > 0 && y > 0 && x < N - 1 && y < N - 1 && W.tiles[y * N + x] !== T.WATER && !block[y * N + x];
+  const push = (x, y) => { const k = id(x, y); if (k >= 0 && !seen[k] && open(x, y)) { seen[k] = 1; q.push(x, y); } };
+  for (let k = -R; k <= R; k++) { push(s.tx + k, s.ty - R); push(s.tx + k, s.ty + R); push(s.tx - R, s.ty + k); push(s.tx + R, s.ty + k); }
+  while (q.length) {
+    const y = q.pop(), x = q.pop();
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+  }
+  return (x, y) => { const k = id(Math.floor(x), Math.floor(y)); return k >= 0 && seen[k] === 1; };
+}
+function pruneLockedHouses(W) {
+  const N = W.N, drop = new Set();
+  const canDrop = (b) => b.kind === 'house' || (b.kind === 'church' && !b.big);
+  for (let pass = 0; pass < 3; pass++) {
+    const block = new Uint8Array(N * N);
+    markWalls(W, block);
+    for (const b of W.buildings) if (!drop.has(b)) for (const [x, y] of buildingTiles(W, b)) block[y * N + x] = 1;
+    let changed = false;
+    for (const s of W.sites) {
+      const bs = W.buildings.filter((b) => b.site === s.id && !drop.has(b) && buildingTiles(W, b).length);
+      if (!bs.length) continue;
+      const reach = siteFlood(W, s, block);
+      for (const b of bs) {
+        const d = doorOf(b, W);
+        if (reach(d.x, d.y)) continue;
+        if (canDrop(b)) { drop.add(b); changed = true; continue; }
+        // Kirche oder Wahrzeichen mit versperrter Tür: Die Häuser davor weichen
+        for (const h of bs) if (h !== b && canDrop(h) && !drop.has(h) && Math.hypot(h.x - d.x, h.y - d.y) < 2.6) { drop.add(h); changed = true; }
+      }
+    }
+    if (!changed) break;
+  }
+  if (!drop.size) return;
+  // Mit dem Haus verschwinden Fässer, Heu und Beete, die daneben standen
+  const near = (p) => [...drop].some((b) => b.site === p.site && Math.abs(p.x - b.x) < b.wx / 2 + 0.75 && Math.abs(p.y - b.y) < b.wy / 2 + 0.75);
+  W.buildings = W.buildings.filter((b) => !drop.has(b) && !(b.kind === 'prop' && near(b)));
+  // Gasthäuser neu zuordnen, falls eines wegfiel
+  for (const s of W.sites) {
+    if (!s.tavern) continue;
+    const tv = W.buildings.filter((b) => b.site === s.id && b.tavern);
+    s.taverns = tv.map((b) => ({ x: b.x, y: b.y + 0.85 }));
+    s.tavern = tv.length ? { x: tv[0].x, y: tv[0].y + 0.85, name: s.tavern.name } : null;
+  }
+}
+
+// Fingerabdruck des Weltaufbaus. Häuser werden im Spielstand über ihre Nummer gespeichert;
+// ändert eine neue Version die Ortsanlage, passen alte Nummern nicht mehr (main.js prüft das).
+function worldSig(W) {
+  let h = W.buildings.length;
+  for (const b of W.buildings) h = (Math.imul(h, 31) + Math.round(b.x * 10) * 7 + Math.round(b.y * 10)) >>> 0;
+  return h;
+}
+// Steht das Haus (oder sind die Wände schon hoch)? Ruinen und leere Bauplätze bleiben begehbar.
+function buildingUp(b) { return !(b.cons < 0.3); }
+function refreshBuildingBlocks(W) {
+  const N = W.N;
+  W.bblock = new Uint8Array(N * N);
+  for (const b of W.buildings) {
+    if (!buildingUp(b)) continue;
+    for (const [x, y] of buildingTiles(W, b)) W.bblock[y * N + x] = 1;
+  }
+  W.blockStatic = new Uint8Array(N * N);
+  for (let i = 0; i < N * N; i++) W.blockStatic[i] = W.wallStatic[i] | W.bblock[i];
+  setPlayerWalls(W, !!W.playerWalls, W.castleTiles);
 }
 
 // Felder der Palisade, mit oder ohne die Toröffnung im Süden
@@ -1578,13 +1720,18 @@ function palisadeBand(s, withGate) {
   return list;
 }
 
-// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten
-function setPlayerWalls(W, on) {
+// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten. extra: Felder der Burggebäude
+// (Bergfried, Saal, Türme ...), die castle.js je nach Ausbau liefert; ohne Angabe bleiben die alten.
+function setPlayerWalls(W, on, extra) {
+  W.playerWalls = on;
+  if (extra) W.castleTiles = extra;
   W.block = new Uint8Array(W.blockStatic);
   if (on) {
     const s = W.sites.find((x) => x.type === 'spieler');
     blockTiles(W, W.block, wallRing(W, s, 4));
   }
+  // Burggebäude sperren auch Straßenfelder (ein Wachturm kann am Weg stehen)
+  if (W.castleTiles) for (const [x, y] of W.castleTiles) { const i = y * W.N + x; if (W.tiles[i] !== T.WATER) W.block[i] = 1; }
   // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
   if (W.afterBlock) W.afterBlock();
 }
@@ -1699,6 +1846,7 @@ function generateWorld(seed) {
   for (const f of W.farms) genFarm(W, f, rng);
   placePois(W, rng);
   for (const s of W.sites) placeCemetery(W, s);
+  pruneLockedHouses(W);
   // Feste Nummer je Gebäude: Schäden werden darüber gespeichert
   W.buildings.forEach((b, i) => { b.idx = i; });
   assignPlots(W);
@@ -2049,9 +2197,11 @@ function siteGap(a, b) {
 }
 
 // Größe eines Ortes in Feldern (Radius): Großstädte füllen mehrere Bildschirme
+// Dörfer, Märkte, Burgen und Abteien sind weitläufig angelegt: Zwischen den Häusern liegen Gärten und Wege.
+const SPREAD = { markt: 1.3, dorf: 1.3, burg: 1.3, abtei: 1.3 };
 function siteRadius(def) {
-  if (def.type === 'stadt') return def.cityR || 13;
-  return def.clear + ({ markt: 2, dorf: 2, burg: 2, abtei: 1, halle: 1 }[def.type] || 0);
+  if (def.type === 'stadt') return Math.round((def.cityR || 13) * 1.15);
+  return Math.round(def.clear * (SPREAD[def.type] || 1)) + ({ markt: 2, dorf: 2, burg: 2, abtei: 1, halle: 1 }[def.type] || 0);
 }
 
 // Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse).
@@ -2438,7 +2588,7 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
     const bend = (rng() - 0.5) * 0.04;
     for (let r = 2.4; r < R + 2; r += 0.4) {
       const aa = a + bend * r;
-      street(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r, k % 2 === 0);
+      street(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r, true);
     }
   }
   // Ringgassen
@@ -2497,19 +2647,23 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
   for (let k = 0; k < 1 + Math.floor(R / 7); k++) tavern(3, R * 0.8);
   for (let k = 0; k < 1 + Math.floor(R / 6); k++) smithy();
   // Häuserzeilen entlang der Gassen, die Längsseite zur Straße
-  const list = [...streets];
+  // Nicht jede Gasse ist zugebaut: höchstens so viele Häuser, dass Höfe und Gärten Platz haben
+  const list = [...streets], rowHouses = [], maxRow = Math.round(R * R * 0.21);
   for (let k = list.length - 1; k > 0; k--) { const j = Math.floor(rng() * (k + 1)); [list[k], list[j]] = [list[j], list[k]]; }
   for (const i of list) {
     const x = i % N, y = (i / N) | 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      if (rng() > 0.78) continue;
+      if (rng() > 0.78 || rowHouses.length >= maxRow) continue;
       const hx = x + dx, hy = y + dy;
-      if (!inCity(hx, hy) || Math.hypot(hx + 0.5 - cx, hy + 0.5 - cy) < 3.2) continue;
+      if (!inCity(hx, hy) || Math.hypot(hx + 0.5 - cx, hy + 0.5 - cy) < 3.6) continue;
       const t = W.tiles[hy * N + hx];
       if (t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
       const px = hx + 0.5 - dx * 0.08, py = hy + 0.5 - dy * 0.08;
       if (!freeSpot(W, px, py, 1.02)) continue;
       const alongX = dy !== 0;
+      // Lücken in der Zeile: Oft bleibt neben dem Nachbarhaus ein Hof oder Garten frei
+      if (rng() < 0.6 && rowHouses.some((o) => (alongX ? Math.abs(o.y - py) < 0.6 && Math.abs(o.x - px) < 2.5 : Math.abs(o.x - px) < 0.6 && Math.abs(o.y - py) < 2.5))) continue;
+      rowHouses.push({ x: px, y: py });
       const big = rng() < 0.3;
       props(add(house(px, py, {
         wx: alongX ? 0.95 + rng() * 0.25 : 0.8 + rng() * 0.12, wy: alongX ? 0.8 + rng() * 0.12 : 0.95 + rng() * 0.25,
@@ -2597,7 +2751,7 @@ function genBuildings(W, s, rng) {
       W.buildings.push({ kind: 'prop', prop: rpick(rng, kinds), x, y, v: rng(), site: s.id });
     }
   };
-  const ring = (count, rMin, rMax, mk, gap = 1.7) => {
+  const ring = (count, rMin, rMax, mk, gap = 2.3) => {
     let placed = 0;
     for (let tries = 0; placed < count && tries < count * 60; tries++) {
       const a = rng() * Math.PI * 2, r = rMin + rng() * (rMax - rMin);
@@ -2627,7 +2781,7 @@ function genBuildings(W, s, rng) {
     for (let k = 0; k < 40; k++) {
       const a = rng() * Math.PI * 2, r = 3 + rng() * Math.max(3, s.clear * 0.6);
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
-      if (!freeSpot(W, x, y, 1.7) || Math.hypot(x - s.x, y - s.y) < 2) continue;
+      if (!freeSpot(W, x, y, 2.3) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       add({ kind: 'house', x, y, wx: 1.0, wy: 0.9, h: 13, rh: 10, wall: 'timber', roof: 'thatch', chimney: true, lit: true, smithy: true });
       W.buildings.push({ kind: 'prop', prop: 'amboss', x: x + 0.9, y: y + 0.3, v: rng(), site: s.id });
       return;
@@ -2639,7 +2793,7 @@ function genBuildings(W, s, rng) {
     for (let k = 0; k < 60; k++) {
       const a = rng() * Math.PI * 2, r = rMin + rng() * rSpan;
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
-      if (!freeSpot(W, x, y, 2.1) || Math.hypot(x - s.x, y - s.y) < 2) continue;
+      if (!freeSpot(W, x, y, 2.5) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       if (s.type === 'burg' && Math.hypot(x - s.x, y - s.y) < 5.8) continue;
       add({ kind: 'house', x, y, wx: 1.5, wy: 1.1, h: 17, rh: 12, wall: 'timber', roof: 'thatch', chimney: true, lit: true, tavern: true, sign: rpick(rng, TAVERN_SIGNS) });
       W.buildings.push({ kind: 'prop', prop: 'fass', x: x + 0.95, y: y - 0.2, v: rng(), site: s.id });
@@ -2668,12 +2822,12 @@ function genBuildings(W, s, rng) {
         if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
       }
       smithy();
-      ring(9, 6, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
-      ring(7, 2.5, 5.5, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
+      ring(9, 7, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
+      ring(7, 3.2, 6.6, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
       break;
     }
     case 'dorf':
-      ring(8 + Math.floor(rng() * 4), 1.8, s.clear - 0.8, (x, y) => house(x, y));
+      ring(8 + Math.floor(rng() * 4), 2.4, s.clear - 0.8, (x, y) => house(x, y));
       smithy();
       { const wl = freeArea(W, s.x + 0.9, s.y + 0.7, 0.6, 0.6, 0.2, 3); if (wl) add({ kind: 'well', x: wl.x, y: wl.y, wx: 0.6, wy: 0.6, noCost: true }); }
       break;
@@ -2682,13 +2836,13 @@ function genBuildings(W, s, rng) {
       add({ kind: 'longhall', x: lh.x, y: lh.y, wx: 3.2, wy: 1.4, h: 20 });
       tavern(2.4, 1.2);
       if (!s.tavern) tavern(5.6, 2.5);
-      ring(3, 2.2, 3.4, (x, y) => house(x, y, { wall: 'wood' }));
+      ring(3, 2.2, 3.4, (x, y) => house(x, y, { wall: 'wood' }), 1.7);
       s.palisade = 4.5;
       break;
     }
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
-      ring(12, 6.2, s.clear - 0.5, (x, y) => house(x, y));
+      ring(12, 6.4, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;
     case 'abtei':
@@ -2698,7 +2852,7 @@ function genBuildings(W, s, rng) {
         const sp = freeArea(W, s.x + dx, s.y + dy, wx, wy, 0.3, 3.5);
         if (sp) add({ kind: 'house', x: sp.x, y: sp.y, wx, wy, h, rh, wall: 'stone', roof: 'tile', lit: true });
       }
-      ring(7, 3.5, s.clear - 0.5, (x, y) => house(x, y));
+      ring(7, 3.8, s.clear - 0.5, (x, y) => house(x, y));
       { const wl = freeArea(W, s.x + 0.4, s.y + 1.1, 0.6, 0.6, 0.2, 2.5); if (wl) add({ kind: 'well', x: wl.x, y: wl.y, wx: 0.6, wy: 0.6, noCost: true }); }
       break;
     case 'mine':
@@ -2708,7 +2862,7 @@ function genBuildings(W, s, rng) {
       W.buildings.push({ kind: 'prop', prop: 'erzhaufen', ore: s.ore, x: s.x + 0.7, y: s.y + 0.1, v: rng(), site: s.id });
       W.buildings.push({ kind: 'prop', prop: 'karren', x: s.x - 0.5, y: s.y + 0.5, v: rng(), site: s.id });
       W.buildings.push({ kind: 'prop', prop: 'holzstapel', x: s.x - 2.2, y: s.y + 0.4, v: rng(), site: s.id });
-      ring(3, 2.6, s.clear + 0.5, (x, y) => house(x, y, { wall: rng() < 0.5 ? 'wood' : 'stone', roof: 'thatch', wx: 1.0, wy: 0.85 }));
+      ring(3, 2.6, s.clear + 0.5, (x, y) => house(x, y, { wall: rng() < 0.5 ? 'wood' : 'stone', roof: 'thatch', wx: 1.0, wy: 0.85 }), 1.9);
       break;
     case 'einsiedelei':
       // Klause des Einsiedlers und der heilige Ort daneben
@@ -3037,7 +3191,9 @@ function moveToward(u, tx, ty, dt, stop = 0.05, mult = 1) {
   const step = Math.min(unitSpeed(u) * mult * dt, d - stop * 0.5);
   const nx = u.x + (dx / d) * step, ny = u.y + (dy / d) * step;
   const W = G.world;
-  if (isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
+  // Wer in einem gesperrten Feld steht (ein Haus wurde fertig, ein Tor ging zu), darf hinausgehen
+  const stuck = !isWalkable(W, u.x, u.y) && tileAt(W, nx, ny) !== T.WATER;
+  if (stuck || isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
   else if (isWalkable(W, nx, u.y)) u.x = nx;
   else if (isWalkable(W, u.x, ny)) u.y = ny;
   else return false;
@@ -4284,15 +4440,15 @@ function siteSpots(s) {
   const bs = W.buildings.filter((b) => b.site === s.id);
   const sp = { houses: [], stalls: [], wells: [], anvils: [], wood: [], hay: [], gardens: [], fields: [], church: null, fire: null, water: null, sheep: null };
   for (const b of bs) {
-    if (b.kind === 'house' || b.kind === 'longhall') sp.houses.push({ x: b.x - 0.15, y: b.y + b.wy / 2 + 0.3, b });
+    if (b.kind === 'house' || b.kind === 'longhall') sp.houses.push({ ...doorOf(b, W), b });
     else if (b.kind === 'stall' || b.kind === 'tent') sp.stalls.push({ x: b.x, y: b.y, front: { x: b.x + 0.05, y: b.y + 0.62 }, back: { x: b.x, y: b.y - 0.5 } });
     else if (b.kind === 'well') sp.wells.push({ x: b.x + 0.45, y: b.y + 0.35 });
     else if (b.kind === 'fire') sp.fire = { x: b.x, y: b.y };
-    else if (b.kind === 'stollen') sp.adit = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
+    else if (b.kind === 'stollen') sp.adit = doorOf(b, W);
     else if (b.kind === 'mystic') sp.mystic = { x: b.x - 0.2, y: b.y + b.wy / 2 + 0.2 };
-    else if (b.kind === 'klause') sp.houses.push({ x: b.x - 0.1, y: b.y + b.wy / 2 + 0.3 });
-    else if (b.kind === 'church') sp.church = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
-    else if (b.kind === 'landmark' && b.lm === 'kathedrale') sp.church = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
+    else if (b.kind === 'klause') sp.houses.push(doorOf(b, W));
+    else if (b.kind === 'church') sp.church = doorOf(b, W);
+    else if (b.kind === 'landmark' && b.lm === 'kathedrale') sp.church = doorOf(b, W);
     else if (b.kind === 'landmark' && b.lm === 'tuchhalle') for (let k = 0; k < 3; k++) { const x = b.x - 1 + k, y = b.y + b.wy / 2 + 0.55; sp.stalls.push({ x, y, front: { x, y: y + 0.6 }, back: { x, y: y - 0.45 } }); }
     else if (b.kind === 'prop') {
       const p = { x: b.x + 0.35, y: b.y + 0.3 };
@@ -5626,6 +5782,7 @@ function sideOutcome(sg, how, quiet) {
 
 
 
+
 const GROWING = { stadt: 1, markt: 1, dorf: 1, burg: 1, halle: 1 };
 
 // ---------------------------------------------------------------- Zustand eines Hauses
@@ -5634,10 +5791,15 @@ function standing(b) { return !(b.cons < 1); }
 function underConstruction(b) { return b.cons >= 0 && b.cons < 1; }
 
 function setCons(b, v) {
-  if (!b.plot && v >= 1) { b.cons = undefined; delete G.s.cons[b.idx]; return; }
-  b.cons = v;
-  if (b.plot && v === -2) delete G.s.cons[b.idx];
-  else G.s.cons[b.idx] = Math.round(v * 1000) / 1000;
+  const was = buildingUp(b);
+  if (!b.plot && v >= 1) { b.cons = undefined; delete G.s.cons[b.idx]; }
+  else {
+    b.cons = v;
+    if (b.plot && v === -2) delete G.s.cons[b.idx];
+    else G.s.cons[b.idx] = Math.round(v * 1000) / 1000;
+  }
+  // Wände hoch oder Haus gefallen: Das Haus sperrt nun seine Felder oder gibt sie frei
+  if (buildingUp(b) !== was) refreshBuildingBlocks(G.world);
 }
 
 // Häuser je Ort, einmal je Welt gesammelt
@@ -5683,6 +5845,7 @@ function applyCons() {
     const v = G.s.cons[b.idx];
     b.cons = v !== undefined ? v : b.plot ? -2 : undefined;
   }
+  refreshBuildingBlocks(G.world);
   G.fires = [];
   G.raid = null;
 }
@@ -6890,7 +7053,7 @@ const CHEAT_ACTIONS = {
     cs.level = BUILDINGS.burg.levels.length - 1;
     for (const id of BUILDING_IDS) if (id !== 'burg') cs.b[id] = BUILDINGS[id].levels.length - 1;
     cs.construction = null;
-    setPlayerWalls(G.world, true);
+    refreshCastleBlock();
     refreshCastleHerd();
     spawnPeasants(); rebuildUnits();
     G.castleDirty = true;
@@ -7302,6 +7465,57 @@ function conProgress() {
 // Häuser der Burgsiedlung je Burgstufe
 function villageHouses() { return [0, 2, 5, 9][G.s.castle.level]; }
 
+// Häuser der Burgsiedlung rund um die Burg (fest je Welt), gezeichnet in render.js
+function villageSpots(s) {
+  if (s.villageSpots) return s.villageSpots;
+  const W = G.world;
+  const r = mulberry32(W.seed + 991);
+  const avoid = Object.values(CASTLE_LAYOUT).map((o) => ({ x: s.x + o.dx, y: s.y + o.dy, r: 2.4 }));
+  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.0, y: s.y + 2.6, r: 1.8 });
+  for (const [dx, dy] of CASTLE_TOWERS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.5 });
+  const spots = [];
+  for (let tries = 0; tries < 600 && spots.length < 9; tries++) {
+    const a = r() * Math.PI * 2, d = 7.6 + r() * 3.2;
+    const x = Math.floor(s.x + Math.cos(a) * d) + 0.5, y = Math.floor(s.y + Math.sin(a) * d) + 0.5;
+    const t = tileAt(W, x, y);
+    if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) continue;
+    if (Math.hypot(x - s.x, y - s.y) < 6) continue;
+    if (avoid.some((o) => Math.hypot(o.x - x, o.y - y) < o.r)) continue;
+    if (spots.some((o) => Math.hypot(o.x - x, o.y - y) < 1.9)) continue;
+    const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: (13 + r() * 6) * 1.6, rh: (11 + r() * 5) * 1.5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
+    if (r() < 0.6) b.prop = { prop: ['heu', 'holzstapel', 'fass', 'beet'][Math.floor(r() * 4)], x: x + 0.75, y: y + (r() - 0.5) * 0.6, v: r() };
+    spots.push(b);
+  }
+  s.villageSpots = spots;
+  spots.forEach((b, k) => { b.idx = `v${k}`; const d = G.s && G.s.damage && G.s.damage[b.idx]; if (d) b.dmg = d; });
+  return spots;
+}
+
+// Felder, die Bergfried, fertige Burggebäude, Wachtürme und die Häuser der Burgsiedlung belegen.
+// Dort geht niemand hindurch; Markt, Weide und Äcker bleiben begehbar.
+function castleBlockTiles() {
+  const W = G.world, s = castleSite(), C = G.s.castle;
+  const out = [];
+  const k = CASTLE_KEEP[C.level];
+  out.push(...footprintTiles(W, s.x + k.dx, s.y + k.dy, k.w, k.w, 0.2));
+  for (const id of CASTLE_SOLID) {
+    if (!C.b[id]) continue;
+    const [pw, ph] = CASTLE_PLOT[id];
+    out.push(...footprintTiles(W, s.x + CASTLE_LAYOUT[id].dx, s.y + CASTLE_LAYOUT[id].dy, pw, ph));
+  }
+  for (let t = 0; t < (C.b.wehr || 0); t++) out.push(...footprintTiles(W, s.x + CASTLE_TOWERS[t][0], s.y + CASTLE_TOWERS[t][1], 0.9, 0.9));
+  for (const b of villageSpots(s).slice(0, villageHouses())) {
+    const di = Math.floor(b.y + b.wy / 2 + 0.3) * W.N + Math.floor(b.x - 0.15);
+    for (const q of footprintTiles(W, b.x, b.y, b.wx, b.wy)) if (q[1] * W.N + q[0] !== di) out.push(q);
+  }
+  return out;
+}
+
+// Mauern und Burggebäude neu eintragen (nach Ausbau, Laden, Schummeln)
+function refreshCastleBlock() {
+  setPlayerWalls(G.world, G.s.castle.level >= 1, castleBlockTiles());
+}
+
 function levelName() { return BUILDINGS.burg.levels[G.s.castle.level].name; }
 
 function partyCap() { return 2 + bLevel('kaserne') * 2 + (G.s.castle.level >= 3 ? 2 : 0); }
@@ -7356,7 +7570,6 @@ function finishConstruction() {
   if (!c || G.s.day < c.done) return;
   if (c.id === 'burg') {
     G.s.castle.level = c.level;
-    setPlayerWalls(G.world, c.level >= 1);
     log(`${homeName()} ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
     addRenown(5 * c.level);
     spawnPeasants();
@@ -7369,6 +7582,7 @@ function finishConstruction() {
     if (c.id === 'schafzucht') refreshCastleHerd();
   }
   G.s.castle.construction = null;
+  refreshCastleBlock();
   G.castleDirty = true;
   G.celebrate = { id: c.id, level: c.level, t0: G.time };
 }
@@ -9487,7 +9701,7 @@ function buildStaticParts() {
 
 // ---------------------------------------------------------------- Eigene Burg: sichtbarer Ausbau
 const BUILD_ICON = { halle: 'krone', kaserne: 'schwerter', schmiede: 'amboss', stall: 'hufeisen', holzfaeller: 'axt', steinbruch: 'hacke', markt: 'muenze', kapelle: 'kreuz', wehr: 'turm', hospiz: 'kraut', schafzucht: 'schaf', felder: 'aehre' };
-const PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0], hospiz: [2.0, 2.4], schafzucht: [3.0, 2.6], felder: [1.8, 1.6] };
+const PLOT = CASTLE_PLOT;
 const TOWER_SPOTS = CASTLE_TOWERS;
 const STONE_BUILDINGS = { halle: 1, kapelle: 1, schmiede: 1, steinbruch: 1, wehr: 1, hospiz: 1 };
 let castleAnchors = [];
@@ -10001,7 +10215,7 @@ function buildPlayerCastle() {
   const lv = (id) => C.b[id] || 0;
   const pos = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
   const con = C.construction;
-  castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
+  castleAnchors = [{ id: 'burg', castle: true, x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
 
   for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle', 'hospiz', 'schafzucht', 'felder']) {
     const L = lv(id), p = pos(id), building = con && con.id === id;
@@ -10011,13 +10225,13 @@ function buildPlayerCastle() {
     if (!L && !building) {
       add(p.x - 0.5, p.y - 0.5, (c) => drawPlot(c, p.x, p.y, pw, ph));
       add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], true));
-      castleAnchors.push({ x: p.x, y: p.y, h: 20, label: `Bauplatz: ${name}` });
+      castleAnchors.push({ id, castle: true, plot: true, x: p.x, y: p.y, h: 20, label: `Bauplatz: ${name}` });
       continue;
     }
     if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
     if (building) addConstruction(add, id, p, L);
     add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], false));
-    castleAnchors.push({ x: p.x, y: p.y, h: 40, label: `${name} · Stufe ${L}${building ? ` (Ausbau auf Stufe ${con.level} läuft)` : ''}` });
+    castleAnchors.push({ id, castle: true, x: p.x, y: p.y, h: 40, label: `${name} · Stufe ${L}${building ? ` (Ausbau auf Stufe ${con.level} läuft)` : ''}` });
   }
 
   // Wachtürme
@@ -10028,9 +10242,9 @@ function buildPlayerCastle() {
     const tx = s.x + TOWER_SPOTS[nextT][0], ty = s.y + TOWER_SPOTS[nextT][1];
     if (con && con.id === 'wehr') addConstruction(add, 'wehr', { x: tx, y: ty }, 0);
     else { add(tx - 0.3, ty - 0.3, (c) => drawPlot(c, tx, ty, 1.0, 1.0)); add(tx - 0.7, ty + 0.65, (c) => drawSign(c, tx - 0.7, ty + 0.65, 'turm', true)); }
-    castleAnchors.push({ x: tx, y: ty, h: 30, label: con && con.id === 'wehr' ? `Wachturm im Bau` : 'Bauplatz: Wachturm' });
+    castleAnchors.push({ id: 'wehr', castle: true, plot: true, x: tx, y: ty, h: 30, label: con && con.id === 'wehr' ? `Wachturm im Bau` : 'Bauplatz: Wachturm' });
   }
-  for (let k = 0; k < WE; k++) castleAnchors.push({ x: s.x + TOWER_SPOTS[k][0], y: s.y + TOWER_SPOTS[k][1], h: 60, label: `Wachturm · Stufe ${WE}` });
+  for (let k = 0; k < WE; k++) castleAnchors.push({ id: 'wehr', castle: true, x: s.x + TOWER_SPOTS[k][0], y: s.y + TOWER_SPOTS[k][1], h: 60, label: `Wachturm · Stufe ${WE}` });
 
   // Burgsiedlung
   const spots = villageSpots(s);
@@ -10103,31 +10317,6 @@ function addConstruction(add, id, p, L) {
 }
 
 // Feste Bauplätze für die Häuser der Burgsiedlung
-function villageSpots(s) {
-  if (s.villageSpots) return s.villageSpots;
-  const W = G.world;
-  const r = mulberry32(W.seed + 991);
-  const avoid = Object.values(CASTLE_LAYOUT).map((o) => ({ x: s.x + o.dx, y: s.y + o.dy, r: 2.4 }));
-  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.0, y: s.y + 2.6, r: 1.8 });
-  for (const [dx, dy] of TOWER_SPOTS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.5 });
-  const spots = [];
-  for (let tries = 0; tries < 600 && spots.length < 9; tries++) {
-    const a = r() * Math.PI * 2, d = 7.6 + r() * 3.2;
-    const x = Math.floor(s.x + Math.cos(a) * d) + 0.5, y = Math.floor(s.y + Math.sin(a) * d) + 0.5;
-    const t = tileAt(W, x, y);
-    if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) continue;
-    if (Math.hypot(x - s.x, y - s.y) < 6) continue;
-    if (avoid.some((o) => Math.hypot(o.x - x, o.y - y) < o.r)) continue;
-    if (spots.some((o) => Math.hypot(o.x - x, o.y - y) < 1.9)) continue;
-    const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: (13 + r() * 6) * 1.6, rh: (11 + r() * 5) * 1.5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
-    if (r() < 0.6) b.prop = { prop: ['heu', 'holzstapel', 'fass', 'beet'][Math.floor(r() * 4)], x: x + 0.75, y: y + (r() - 0.5) * 0.6, v: r() };
-    spots.push(b);
-  }
-  s.villageSpots = spots;
-  spots.forEach((b, k) => { b.idx = `v${k}`; const d = G.s && G.s.damage && G.s.damage[b.idx]; if (d) b.dmg = d; });
-  return spots;
-}
-
 // Name eines Burggebäudes unter dem Mauszeiger
 let landmarkAnchors = null, landmarkWorld = null;
 function buildingAtScreen(px, py) {
@@ -11492,6 +11681,8 @@ function screenToGround(px, py) {
   return wp;
 }
 
+// Für Tests: Weltpunkt auf dem Bildschirm
+function tileToScreen(x, y) { return toScreen(x, y); }
 function toScreen(x, y) {
   const { w, h } = G.view, cam = G.cam;
   return { x: (isoX(x, y) - cam.x) * cam.zoom + w / 2, y: (isoY(x, y) - zAt(x, y) - cam.y) * cam.zoom + h / 2 };
@@ -13300,6 +13491,8 @@ function townQuests(site) {
 
 // ---------------------------------------------------------------- Burg
 function castlePanel() {
+  const f = G.ui.arg && G.ui.arg.focus;
+  if (f && f !== 'burg') return castleFocusPanel(f);
   const tabs = [['ausbau', 'Ausbau'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager']];
   if (bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', 'Rüstkammer']);
   if (bLevel('markt')) tabs.push(['markt', 'Markt']);
@@ -13318,6 +13511,31 @@ function castlePanel() {
   return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
+// Ein einzelnes Burggebäude (Klick auf Gebäude oder Bauplatz in der Burg)
+const FOCUS_TAB = { halle: ['halle', 'Anwerben'], kaserne: ['gefolge', 'Gefolge'], schmiede: ['ruest', 'Rüstkammer'], stall: ['ruest', 'Rüstkammer'], markt: ['markt', 'Markt'] };
+function castleFocusTab(id) { return bLevel(id) && FOCUS_TAB[id] ? FOCUS_TAB[id][0] : 'ausbau'; }
+function castleFocusPanel(id) {
+  const L = bLevel(id), def = BUILDINGS[id], con = G.s.castle.construction;
+  const site = castleSite();
+  const tabs = [['ausbau', L ? 'Ausbau' : 'Bauplatz']];
+  if (L && FOCUS_TAB[id]) tabs.push(FOCUS_TAB[id]);
+  let body = '';
+  switch (G.ui.tab) {
+    case 'halle': body = castleHall(); break;
+    case 'gefolge': body = partyView(true); break;
+    case 'ruest': body = shopView(site); break;
+    case 'markt': body = marketTable(site); break;
+    default: {
+      const building = con && con.id === id;
+      const note = building ? `<div class="notice"><b>Im Bau:</b> Stufe ${con.level}, fertig an Tag ${con.done}.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>`
+        : con ? `<div class="notice"><p>Die Bauleute arbeiten gerade an ${con.id === 'burg' ? 'der Burg' : esc(BUILDINGS[con.id].name)}. Erst danach kann hier gebaut werden.</p></div>` : '';
+      body = `${note}<div class="bgrid one">${buildCard(id)}</div>
+        <div class="row"><button class="btn" data-act="castleall">Ganze Burg</button></div>`;
+    }
+  }
+  return { title: def.name, sub: `Burg ${esc(homeName())} · ${L ? `Stufe ${L}/3` : 'Bauplatz'}`, tabs, body };
+}
+
 // Burgtor: von Hand öffnen und schließen
 function gateAction() {
   if (!hasHomeGate()) return `<div class="actions gate"><div class="action"><div><b>Burgtor</b><p>Die Ruine hat noch kein Tor. Ab der Holzburg kannst du es schließen.</p></div></div></div>`;
@@ -13328,29 +13546,32 @@ function gateAction() {
   return `<div class="actions gate"><div class="action"><div><b>Burgtor: ${closed ? 'geschlossen' : 'offen'}</b><p>${txt}</p></div><button class="btn${closed ? '' : ' primary'}" data-act="tor">${closed ? 'Öffnen' : 'Schließen'}</button></div></div>`;
 }
 
+// Karte eines Burggebäudes: was es jetzt leistet, was die nächste Stufe bringt und kostet
+function buildCard(id) {
+  const info = buildInfo(id);
+  const def = BUILDINGS[id];
+  const isBurg = id === 'burg';
+  const name = isBurg ? `${def.levels[info.cur].name}` : def.name;
+  const now = isBurg ? def.levels[info.cur].eff : info.cur ? def.levels[info.cur].eff : 'Noch nicht errichtet';
+  const nextName = isBurg && info.lv ? `Ausbau zur ${info.lv.name}` : 'Nächste Stufe';
+  const btnLabel = info.ok ? (info.cur || isBurg ? 'Ausbauen' : 'Errichten') : esc(info.reasons[0]);
+  return `<article class="bcard${info.cur ? ' built' : ''}">
+    <header><b>${esc(name)}</b><span class="lvl">${isBurg ? `Stufe ${info.cur}/3` : `${info.cur}/3`}</span></header>
+    ${def.desc ? `<p class="muted">${esc(def.desc)}</p>` : ''}
+    <p><span class="label">Jetzt</span> ${esc(now)}</p>
+    ${info.lv ? `<p><span class="label">${nextName}</span> ${esc(info.lv.eff)}</p>
+    <div class="chips">${costChips(info.lv.cost)}<span class="chip">${info.lv.days} ${info.lv.days === 1 ? 'Tag' : 'Tage'}</span>${info.lv.need && info.lv.need.renown ? `<span class="chip ${G.s.renown >= info.lv.need.renown ? 'ok' : 'miss'}">${info.lv.need.renown} Ruhm</span>` : ''}${info.lv.need && info.lv.need.allies ? `<span class="chip ${alliesCount() >= info.lv.need.allies ? 'ok' : 'miss'}">${info.lv.need.allies} Verbündete</span>` : ''}</div>
+    <button class="btn${info.ok ? ' primary' : ''}" data-act="build" data-id="${id}" ${info.ok ? '' : 'disabled'}>${btnLabel}</button>` : '<p class="muted">Vollständig ausgebaut.</p>'}
+  </article>`;
+}
+
 function castleBuild() {
   const c = G.s.castle;
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0), cost = bal.costs.reduce((a, [, v]) => a + v, 0);
   const con = c.construction;
   const conText = con ? `<div class="notice"><b>Im Bau:</b> ${con.id === 'burg' ? BUILDINGS.burg.levels[con.level].name : `${BUILDINGS[con.id].name} Stufe ${con.level}`}, fertig an Tag ${con.done}. Die Bauleute arbeiten schon auf dem Bauplatz.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>` : '';
-  const cards = BUILDING_IDS.map((id) => {
-    const info = buildInfo(id);
-    const def = BUILDINGS[id];
-    const isBurg = id === 'burg';
-    const name = isBurg ? `${def.levels[info.cur].name}` : def.name;
-    const now = isBurg ? def.levels[info.cur].eff : info.cur ? def.levels[info.cur].eff : 'Noch nicht errichtet';
-    const nextName = isBurg && info.lv ? `Ausbau zur ${info.lv.name}` : 'Nächste Stufe';
-    const btnLabel = info.ok ? (info.cur || isBurg ? 'Ausbauen' : 'Errichten') : esc(info.reasons[0]);
-    return `<article class="bcard${info.cur ? ' built' : ''}">
-      <header><b>${esc(name)}</b><span class="lvl">${isBurg ? `Stufe ${info.cur}/3` : `${info.cur}/3`}</span></header>
-      ${def.desc ? `<p class="muted">${esc(def.desc)}</p>` : ''}
-      <p><span class="label">Jetzt</span> ${esc(now)}</p>
-      ${info.lv ? `<p><span class="label">${nextName}</span> ${esc(info.lv.eff)}</p>
-      <div class="chips">${costChips(info.lv.cost)}<span class="chip">${info.lv.days} ${info.lv.days === 1 ? 'Tag' : 'Tage'}</span>${info.lv.need && info.lv.need.renown ? `<span class="chip ${G.s.renown >= info.lv.need.renown ? 'ok' : 'miss'}">${info.lv.need.renown} Ruhm</span>` : ''}${info.lv.need && info.lv.need.allies ? `<span class="chip ${alliesCount() >= info.lv.need.allies ? 'ok' : 'miss'}">${info.lv.need.allies} Verbündete</span>` : ''}</div>
-      <button class="btn${info.ok ? ' primary' : ''}" data-act="build" data-id="${id}" ${info.ok ? '' : 'disabled'}>${btnLabel}</button>` : '<p class="muted">Vollständig ausgebaut.</p>'}
-    </article>`;
-  }).join('');
+  const cards = BUILDING_IDS.map(buildCard).join('');
   const st = c.storage;
   return `${conText}
     <div class="summary">
@@ -13678,6 +13899,7 @@ function helpPanel() {
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
         <li>In ${esc(homeName())} zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
+        <li>In deiner Burg öffnet ein Klick auf ein <b>Gebäude</b> oder einen <b>Bauplatz</b> nur dieses Gebäude, der Bergfried (oder <kbd>E</kbd>) die ganze Burg. Ein Klick auf den Boden dazwischen führt dich einfach dorthin, etwa um hinter den Mauern Schutz zu suchen. Häuser, Kirchen und Burggebäude kann niemand durchschreiten.</li>
         <li>Siedlungen vergeben <b>Aufträge</b>. Sie bringen Gold, Ruhm und Ansehen.</li>
         <li><b>Handel</b> lohnt sich: Was ein Ort erzeugt, ist dort billig und anderswo gefragt. Stein und Eisen brauchst du für den Burgbau.</li>
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
@@ -13801,6 +14023,7 @@ const ACTIONS = {
     } else log('Dorthin führt kein Weg.', 'bad');
   },
   build: (d) => startBuild(d.id),
+  castleall: () => { G.ui.arg = null; G.ui.tab = 'ausbau'; byId('panel-body').scrollTop = 0; },
   hire: (d) => hire(Number(d.i)),
   sel: (d) => { G.ui.sel = Number(d.u); },
   equip: (d) => equip(selectedUnit(), Number(d.i)),
@@ -13993,6 +14216,7 @@ function newGame(opts) {
   G.s.companions.push(squire);
   initTowns();
   initDynamics();
+  G.s.worldSig = worldSig(G.world);
   G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = []; G.extras = []; G.tour = null; G.exec = null;
   spawnPeasants();
   maintainGroups(true);
@@ -14007,7 +14231,14 @@ function newGame(opts) {
 function startWorld() {
   const home = G.world.sites.find((s) => s.type === 'spieler');
   home.name = homeName();
-  setPlayerWalls(G.world, G.s.castle.level >= 1);
+  // Spielstand aus einer Version mit anderer Ortsanlage: Bau- und Schadensstand der Häuser neu auswürfeln
+  const sig = worldSig(G.world);
+  if (G.s.worldSig !== sig) {
+    for (const k of Object.keys(G.s.damage || {})) if (k[0] !== 'v') delete G.s.damage[k];
+    G.s.cons = null;
+    G.s.worldSig = sig;
+  }
+  refreshCastleBlock();
   applyDamage();
   applyCons();
   initWeather();
@@ -14018,7 +14249,7 @@ function startWorld() {
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
-  G.pendingSite = null;
+  G.pendingSite = null; G.pendingBuild = null;
   closePanel();
   byId('title').hidden = true;
   renderLog();
@@ -14163,6 +14394,29 @@ function interactHere() {
   else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
 }
 
+// Eigene Burg: Ein Klick auf ein Gebäude oder einen Bauplatz öffnet nur dieses Gebäude,
+// der Bergfried die ganze Burg. Steht man zu weit weg, geht man erst hin.
+function buildingReach(id) {
+  if (id === 'burg') return 4.2;
+  const [w, h] = CASTLE_PLOT[id] || [1, 1];
+  return Math.max(w, h) / 2 + 1.9;
+}
+function openCastleBuilding(id) {
+  G.pendingBuild = null;
+  G.s.player.path = null;
+  if (id === 'burg') openPanel('castle');
+  else openPanel('castle', { focus: id }, castleFocusTab(id));
+}
+function goBuilding(a) {
+  const p = G.s.player, r = buildingReach(a.id);
+  if (Math.hypot(a.x - p.x, a.y - p.y) < r) { openCastleBuilding(a.id); return; }
+  G.pendingSite = null; G.pendingPostern = null;
+  const pb = { id: a.id, x: a.x, y: a.y, r };
+  if (setPlayerPath(a.x, a.y)) { G.pendingBuild = pb; G.clickMarker = { x: a.x, y: a.y, t: 0 }; return; }
+  const pt = posternRoute(a.x, a.y);
+  if (pt && setPlayerPath(pt.x, pt.y)) { G.pendingPostern = { x: a.x, y: a.y, site: null, build: pb }; G.clickMarker = { x: a.x, y: a.y, t: 0 }; }
+}
+
 function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
@@ -14180,12 +14434,15 @@ function checkNearSite() {
   const ts = tourneyStatus();
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
+  const pb = G.pendingBuild;
+  if (pb && !inCombat() && Math.hypot(pb.x - G.s.player.x, pb.y - G.s.player.y) < pb.r) { openCastleBuilding(pb.id); return; }
+  if (pb && !G.s.player.path) G.pendingBuild = null;
   if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
   const pp = G.pendingPostern;
   if (pp && posternNear()) {
     G.pendingPostern = null;
     usePostern();
-    if (setPlayerPath(pp.x, pp.y)) G.pendingSite = pp.site;
+    if (setPlayerPath(pp.x, pp.y)) { G.pendingSite = pp.site; G.pendingBuild = pp.build || null; }
     return;
   }
   if (pp && !G.s.player.path) G.pendingPostern = null;
@@ -14294,6 +14551,7 @@ function startHunt(a) {
 function clickWorld(px, py) {
   if (!G.started || panelOpen() || dialogOpen()) return;
   if (joustPress() || (G.tour && G.tour.lock)) return;
+  G.pendingBuild = null;
   const u = unitAtScreen(px, py);
   if (u && clickUnit(u)) return;
   const an = animalAtScreen(px, py);
@@ -14302,8 +14560,11 @@ function clickWorld(px, py) {
   const p = G.s.player;
   p.attackTarget = null;
   p.huntTarget = null;
+  const ba = buildingAtScreen(px, py);
+  if (ba && ba.castle) { goBuilding(ba); return; }
+  // Der Boden der eigenen Burg ist zum Hingehen da (dort sucht man Schutz), nur Gebäude öffnen sich
   let site = null;
-  for (const s of G.world.sites) if (Math.hypot(s.x - wp.x, s.y - wp.y) < (s.type === 'spieler' ? 4.5 : 2.5)) site = s;
+  for (const s of G.world.sites) if (s.type !== 'spieler' && Math.hypot(s.x - wp.x, s.y - wp.y) < 2.5) site = s;
   G.pendingCamp = false;
   const sgc = G.siege && G.siege.stage !== 'anmarsch' && G.siege.site.type !== 'spieler' ? G.siege.camp : null;
   if (!site && sgc && Math.hypot(sgc.x - wp.x, sgc.y - wp.y) < 3.2) {
@@ -14690,8 +14951,8 @@ else boot((hot && hot.data) || {});
 window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
-window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
+window.__ritterWalls = () => refreshCastleBlock();
+window.__ritterDebug = { tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
 
 })();
 </script>

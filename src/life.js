@@ -5,7 +5,7 @@
 import { G, homeName, log } from './state.js';
 import { changeRep, addRenown } from './politics.js';
 import { T, PEASANT_TUNICS, HAIR, GOODS, FACTIONS } from './data.js';
-import { isWalkable } from './world.js';
+import { isWalkable, doorOf } from './world.js';
 import { rand, pick } from './rng.js';
 import { makeUnit, placeNear, chaseTo, rebuildUnits } from './units.js';
 import { hourOf, seasonIndex } from './sim.js';
@@ -74,15 +74,15 @@ function siteSpots(s) {
   const bs = W.buildings.filter((b) => b.site === s.id);
   const sp = { houses: [], stalls: [], wells: [], anvils: [], wood: [], hay: [], gardens: [], fields: [], church: null, fire: null, water: null, sheep: null };
   for (const b of bs) {
-    if (b.kind === 'house' || b.kind === 'longhall') sp.houses.push({ x: b.x - 0.15, y: b.y + b.wy / 2 + 0.3, b });
+    if (b.kind === 'house' || b.kind === 'longhall') sp.houses.push({ ...doorOf(b, W), b });
     else if (b.kind === 'stall' || b.kind === 'tent') sp.stalls.push({ x: b.x, y: b.y, front: { x: b.x + 0.05, y: b.y + 0.62 }, back: { x: b.x, y: b.y - 0.5 } });
     else if (b.kind === 'well') sp.wells.push({ x: b.x + 0.45, y: b.y + 0.35 });
     else if (b.kind === 'fire') sp.fire = { x: b.x, y: b.y };
-    else if (b.kind === 'stollen') sp.adit = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
+    else if (b.kind === 'stollen') sp.adit = doorOf(b, W);
     else if (b.kind === 'mystic') sp.mystic = { x: b.x - 0.2, y: b.y + b.wy / 2 + 0.2 };
-    else if (b.kind === 'klause') sp.houses.push({ x: b.x - 0.1, y: b.y + b.wy / 2 + 0.3 });
-    else if (b.kind === 'church') sp.church = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
-    else if (b.kind === 'landmark' && b.lm === 'kathedrale') sp.church = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
+    else if (b.kind === 'klause') sp.houses.push(doorOf(b, W));
+    else if (b.kind === 'church') sp.church = doorOf(b, W);
+    else if (b.kind === 'landmark' && b.lm === 'kathedrale') sp.church = doorOf(b, W);
     else if (b.kind === 'landmark' && b.lm === 'tuchhalle') for (let k = 0; k < 3; k++) { const x = b.x - 1 + k, y = b.y + b.wy / 2 + 0.55; sp.stalls.push({ x, y, front: { x, y: y + 0.6 }, back: { x, y: y - 0.45 } }); }
     else if (b.kind === 'prop') {
       const p = { x: b.x + 0.35, y: b.y + 0.3 };

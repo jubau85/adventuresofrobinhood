@@ -141,14 +141,149 @@ function blockTiles(W, arr, list) {
 }
 
 function buildStaticWalls(W) {
-  const N = W.N;
-  W.blockStatic = new Uint8Array(N * N);
+  W.wallStatic = new Uint8Array(W.N * W.N);
+  markWalls(W, W.wallStatic);
+  refreshBuildingBlocks(W);
+}
+
+// Stadtmauern, Burgmauern mit Bergfried (wie in render.js castlePieces gezeichnet) und Palisaden
+function markWalls(W, arr) {
   for (const s of W.sites) {
-    if (s.cityWall) blockTiles(W, W.blockStatic, s.cityWall);
-    if (s.type === 'burg') blockTiles(W, W.blockStatic, wallRing(W, s, 4));
-    if (s.palisade) blockTiles(W, W.blockStatic, palisadeBand(s, false));
+    if (s.cityWall) blockTiles(W, arr, s.cityWall);
+    if (s.type === 'burg') {
+      blockTiles(W, arr, wallRing(W, s, 4));
+      const kw = s.castleLevel >= 3 ? 2.8 : 2.2;
+      for (const [x, y] of footprintTiles(W, s.x - 1.1, s.y - 1.1, kw, kw, 0.2)) arr[y * W.N + x] = 1;
+    }
+    if (s.palisade) blockTiles(W, arr, palisadeBand(s, false));
   }
-  W.block = new Uint8Array(W.blockStatic);
+}
+
+// ---------------------------------------------------------------- Gebäude als Hindernis
+// Häuser, Kirchen, Hallen, Wahrzeichen, Klausen und Stollen kann niemand durchschreiten.
+// Gesperrt sind die Felder, deren Mitte in der (leicht eingerückten) Grundfläche liegt, dazu das Feld
+// der Gebäudemitte. Das Feld vor der Tür bleibt immer frei, ebenso Straßen und Brücken.
+const SOLID_KINDS = { house: 1, church: 1, longhall: 1, klause: 1, stollen: 1, halde: 1, landmark: 1 };
+function solidRects(b) {
+  if (!SOLID_KINDS[b.kind] || !b.wx) return null;
+  if (b.kind === 'landmark') {
+    if (b.lm === 'tor') return null;
+    // Kathedrale: Langhaus und Querschiff statt des ganzen Rechtecks
+    if (b.lm === 'kathedrale') { const L = (b.len || 4) * 1.3; return [[b.x, b.y, L, 1.5], [b.x + L * 0.12, b.y, 1.3, Math.min(b.wy, 3.2)]]; }
+    if (b.lm === 'motte') return [[b.x, b.y, b.wx * 0.7, b.wy * 0.7]];
+  }
+  return [[b.x, b.y, b.wx, b.wy]];
+}
+// Tür eines Gebäudes: meist vorn (Richtung +y). Liegt dort Wasser, ist sie auf einer anderen Seite.
+export function doorOf(b, W) {
+  if (b._door) return b._door;
+  let d;
+  if (b.kind === 'church') d = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
+  else if (b.kind === 'landmark' && b.lm === 'kathedrale') d = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
+  else if (b.kind === 'stollen') d = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
+  else if (b.kind === 'klause') d = { x: b.x - 0.1, y: b.y + b.wy / 2 + 0.3 };
+  else d = { x: b.x - 0.15, y: b.y + b.wy / 2 + 0.3 };
+  if (!W) return d;
+  const wet = (p) => W.tiles[Math.floor(p.y) * W.N + Math.floor(p.x)] === T.WATER;
+  if (wet(d) && b.kind !== 'landmark') {
+    const alt = [{ x: b.x + 0.15, y: b.y - b.wy / 2 - 0.3 }, { x: b.x + b.wx / 2 + 0.3, y: b.y + 0.1 }, { x: b.x - b.wx / 2 - 0.3, y: b.y + 0.1 }].find((p) => !wet(p));
+    if (alt) d = alt;
+  }
+  return (b._door = d);
+}
+// Felder einer Grundfläche (Mitte x, y; Breite wx, Tiefe wy). m: Einrückung am Rand
+export function footprintTiles(W, x, y, wx, wy, m = 0.25) {
+  const N = W.N, out = [], seen = new Set();
+  const put = (tx, ty) => { const i = ty * N + tx; if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1 || seen.has(i)) return; seen.add(i); out.push([tx, ty]); };
+  const x0 = x - wx / 2 + m, x1 = x + wx / 2 - m, y0 = y - wy / 2 + m, y1 = y + wy / 2 - m;
+  for (let ty = Math.floor(y0); ty <= Math.floor(y1); ty++) for (let tx = Math.floor(x0); tx <= Math.floor(x1); tx++) {
+    if (tx + 0.5 >= x0 && tx + 0.5 < x1 && ty + 0.5 >= y0 && ty + 0.5 < y1) put(tx, ty);
+  }
+  put(Math.floor(x), Math.floor(y));
+  return out;
+}
+export function buildingTiles(W, b) {
+  if (b._bt) return b._bt;
+  const rects = solidRects(b);
+  if (!rects) return (b._bt = []);
+  const N = W.N, d = doorOf(b, W), di = Math.floor(d.y) * N + Math.floor(d.x);
+  const out = [];
+  for (const [x, y, wx, wy] of rects) for (const [tx, ty] of footprintTiles(W, x, y, wx, wy)) {
+    const i = ty * N + tx, t = W.tiles[i];
+    if (i === di || t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
+    if (!out.some((q) => q[0] === tx && q[1] === ty)) out.push([tx, ty]);
+  }
+  return (b._bt = out);
+}
+// Häuser, deren Tür niemand erreicht (Tür zum Fluss, in einer Flussschleife ohne Brücke,
+// zwischen Mauer und Nachbarhäusern eingeklemmt), werden gar nicht erst gebaut.
+export function siteFlood(W, s, block, pad = 16) {
+  const N = W.N, R = Math.ceil((s.clear || 4) + pad), D = 2 * R + 1;
+  const seen = new Uint8Array(D * D), q = [];
+  const id = (x, y) => (Math.abs(x - s.tx) > R || Math.abs(y - s.ty) > R ? -1 : (y - s.ty + R) * D + (x - s.tx + R));
+  const open = (x, y) => x > 0 && y > 0 && x < N - 1 && y < N - 1 && W.tiles[y * N + x] !== T.WATER && !block[y * N + x];
+  const push = (x, y) => { const k = id(x, y); if (k >= 0 && !seen[k] && open(x, y)) { seen[k] = 1; q.push(x, y); } };
+  for (let k = -R; k <= R; k++) { push(s.tx + k, s.ty - R); push(s.tx + k, s.ty + R); push(s.tx - R, s.ty + k); push(s.tx + R, s.ty + k); }
+  while (q.length) {
+    const y = q.pop(), x = q.pop();
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+  }
+  return (x, y) => { const k = id(Math.floor(x), Math.floor(y)); return k >= 0 && seen[k] === 1; };
+}
+function pruneLockedHouses(W) {
+  const N = W.N, drop = new Set();
+  const canDrop = (b) => b.kind === 'house' || (b.kind === 'church' && !b.big);
+  for (let pass = 0; pass < 3; pass++) {
+    const block = new Uint8Array(N * N);
+    markWalls(W, block);
+    for (const b of W.buildings) if (!drop.has(b)) for (const [x, y] of buildingTiles(W, b)) block[y * N + x] = 1;
+    let changed = false;
+    for (const s of W.sites) {
+      const bs = W.buildings.filter((b) => b.site === s.id && !drop.has(b) && buildingTiles(W, b).length);
+      if (!bs.length) continue;
+      const reach = siteFlood(W, s, block);
+      for (const b of bs) {
+        const d = doorOf(b, W);
+        if (reach(d.x, d.y)) continue;
+        if (canDrop(b)) { drop.add(b); changed = true; continue; }
+        // Kirche oder Wahrzeichen mit versperrter Tür: Die Häuser davor weichen
+        for (const h of bs) if (h !== b && canDrop(h) && !drop.has(h) && Math.hypot(h.x - d.x, h.y - d.y) < 2.6) { drop.add(h); changed = true; }
+      }
+    }
+    if (!changed) break;
+  }
+  if (!drop.size) return;
+  // Mit dem Haus verschwinden Fässer, Heu und Beete, die daneben standen
+  const near = (p) => [...drop].some((b) => b.site === p.site && Math.abs(p.x - b.x) < b.wx / 2 + 0.75 && Math.abs(p.y - b.y) < b.wy / 2 + 0.75);
+  W.buildings = W.buildings.filter((b) => !drop.has(b) && !(b.kind === 'prop' && near(b)));
+  // Gasthäuser neu zuordnen, falls eines wegfiel
+  for (const s of W.sites) {
+    if (!s.tavern) continue;
+    const tv = W.buildings.filter((b) => b.site === s.id && b.tavern);
+    s.taverns = tv.map((b) => ({ x: b.x, y: b.y + 0.85 }));
+    s.tavern = tv.length ? { x: tv[0].x, y: tv[0].y + 0.85, name: s.tavern.name } : null;
+  }
+}
+
+// Fingerabdruck des Weltaufbaus. Häuser werden im Spielstand über ihre Nummer gespeichert;
+// ändert eine neue Version die Ortsanlage, passen alte Nummern nicht mehr (main.js prüft das).
+export function worldSig(W) {
+  let h = W.buildings.length;
+  for (const b of W.buildings) h = (Math.imul(h, 31) + Math.round(b.x * 10) * 7 + Math.round(b.y * 10)) >>> 0;
+  return h;
+}
+// Steht das Haus (oder sind die Wände schon hoch)? Ruinen und leere Bauplätze bleiben begehbar.
+export function buildingUp(b) { return !(b.cons < 0.3); }
+export function refreshBuildingBlocks(W) {
+  const N = W.N;
+  W.bblock = new Uint8Array(N * N);
+  for (const b of W.buildings) {
+    if (!buildingUp(b)) continue;
+    for (const [x, y] of buildingTiles(W, b)) W.bblock[y * N + x] = 1;
+  }
+  W.blockStatic = new Uint8Array(N * N);
+  for (let i = 0; i < N * N; i++) W.blockStatic[i] = W.wallStatic[i] | W.bblock[i];
+  setPlayerWalls(W, !!W.playerWalls, W.castleTiles);
 }
 
 // Felder der Palisade, mit oder ohne die Toröffnung im Süden
@@ -163,13 +298,18 @@ export function palisadeBand(s, withGate) {
   return list;
 }
 
-// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten
-export function setPlayerWalls(W, on) {
+// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten. extra: Felder der Burggebäude
+// (Bergfried, Saal, Türme ...), die castle.js je nach Ausbau liefert; ohne Angabe bleiben die alten.
+export function setPlayerWalls(W, on, extra) {
+  W.playerWalls = on;
+  if (extra) W.castleTiles = extra;
   W.block = new Uint8Array(W.blockStatic);
   if (on) {
     const s = W.sites.find((x) => x.type === 'spieler');
     blockTiles(W, W.block, wallRing(W, s, 4));
   }
+  // Burggebäude sperren auch Straßenfelder (ein Wachturm kann am Weg stehen)
+  if (W.castleTiles) for (const [x, y] of W.castleTiles) { const i = y * W.N + x; if (W.tiles[i] !== T.WATER) W.block[i] = 1; }
   // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
   if (W.afterBlock) W.afterBlock();
 }
@@ -284,6 +424,7 @@ export function generateWorld(seed) {
   for (const f of W.farms) genFarm(W, f, rng);
   placePois(W, rng);
   for (const s of W.sites) placeCemetery(W, s);
+  pruneLockedHouses(W);
   // Feste Nummer je Gebäude: Schäden werden darüber gespeichert
   W.buildings.forEach((b, i) => { b.idx = i; });
   assignPlots(W);
@@ -634,9 +775,11 @@ function siteGap(a, b) {
 }
 
 // Größe eines Ortes in Feldern (Radius): Großstädte füllen mehrere Bildschirme
+// Dörfer, Märkte, Burgen und Abteien sind weitläufig angelegt: Zwischen den Häusern liegen Gärten und Wege.
+const SPREAD = { markt: 1.3, dorf: 1.3, burg: 1.3, abtei: 1.3 };
 function siteRadius(def) {
-  if (def.type === 'stadt') return def.cityR || 13;
-  return def.clear + ({ markt: 2, dorf: 2, burg: 2, abtei: 1, halle: 1 }[def.type] || 0);
+  if (def.type === 'stadt') return Math.round((def.cityR || 13) * 1.15);
+  return Math.round(def.clear * (SPREAD[def.type] || 1)) + ({ markt: 2, dorf: 2, burg: 2, abtei: 1, halle: 1 }[def.type] || 0);
 }
 
 // Jeder Ort startet an seiner echten Lage und rückt bei Bedarf zur Seite (auf derselben Landmasse).
@@ -1023,7 +1166,7 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
     const bend = (rng() - 0.5) * 0.04;
     for (let r = 2.4; r < R + 2; r += 0.4) {
       const aa = a + bend * r;
-      street(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r, k % 2 === 0);
+      street(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r, true);
     }
   }
   // Ringgassen
@@ -1082,19 +1225,23 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
   for (let k = 0; k < 1 + Math.floor(R / 7); k++) tavern(3, R * 0.8);
   for (let k = 0; k < 1 + Math.floor(R / 6); k++) smithy();
   // Häuserzeilen entlang der Gassen, die Längsseite zur Straße
-  const list = [...streets];
+  // Nicht jede Gasse ist zugebaut: höchstens so viele Häuser, dass Höfe und Gärten Platz haben
+  const list = [...streets], rowHouses = [], maxRow = Math.round(R * R * 0.21);
   for (let k = list.length - 1; k > 0; k--) { const j = Math.floor(rng() * (k + 1)); [list[k], list[j]] = [list[j], list[k]]; }
   for (const i of list) {
     const x = i % N, y = (i / N) | 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      if (rng() > 0.78) continue;
+      if (rng() > 0.78 || rowHouses.length >= maxRow) continue;
       const hx = x + dx, hy = y + dy;
-      if (!inCity(hx, hy) || Math.hypot(hx + 0.5 - cx, hy + 0.5 - cy) < 3.2) continue;
+      if (!inCity(hx, hy) || Math.hypot(hx + 0.5 - cx, hy + 0.5 - cy) < 3.6) continue;
       const t = W.tiles[hy * N + hx];
       if (t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
       const px = hx + 0.5 - dx * 0.08, py = hy + 0.5 - dy * 0.08;
       if (!freeSpot(W, px, py, 1.02)) continue;
       const alongX = dy !== 0;
+      // Lücken in der Zeile: Oft bleibt neben dem Nachbarhaus ein Hof oder Garten frei
+      if (rng() < 0.6 && rowHouses.some((o) => (alongX ? Math.abs(o.y - py) < 0.6 && Math.abs(o.x - px) < 2.5 : Math.abs(o.x - px) < 0.6 && Math.abs(o.y - py) < 2.5))) continue;
+      rowHouses.push({ x: px, y: py });
       const big = rng() < 0.3;
       props(add(house(px, py, {
         wx: alongX ? 0.95 + rng() * 0.25 : 0.8 + rng() * 0.12, wy: alongX ? 0.8 + rng() * 0.12 : 0.95 + rng() * 0.25,
@@ -1182,7 +1329,7 @@ function genBuildings(W, s, rng) {
       W.buildings.push({ kind: 'prop', prop: rpick(rng, kinds), x, y, v: rng(), site: s.id });
     }
   };
-  const ring = (count, rMin, rMax, mk, gap = 1.7) => {
+  const ring = (count, rMin, rMax, mk, gap = 2.3) => {
     let placed = 0;
     for (let tries = 0; placed < count && tries < count * 60; tries++) {
       const a = rng() * Math.PI * 2, r = rMin + rng() * (rMax - rMin);
@@ -1212,7 +1359,7 @@ function genBuildings(W, s, rng) {
     for (let k = 0; k < 40; k++) {
       const a = rng() * Math.PI * 2, r = 3 + rng() * Math.max(3, s.clear * 0.6);
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
-      if (!freeSpot(W, x, y, 1.7) || Math.hypot(x - s.x, y - s.y) < 2) continue;
+      if (!freeSpot(W, x, y, 2.3) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       add({ kind: 'house', x, y, wx: 1.0, wy: 0.9, h: 13, rh: 10, wall: 'timber', roof: 'thatch', chimney: true, lit: true, smithy: true });
       W.buildings.push({ kind: 'prop', prop: 'amboss', x: x + 0.9, y: y + 0.3, v: rng(), site: s.id });
       return;
@@ -1224,7 +1371,7 @@ function genBuildings(W, s, rng) {
     for (let k = 0; k < 60; k++) {
       const a = rng() * Math.PI * 2, r = rMin + rng() * rSpan;
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
-      if (!freeSpot(W, x, y, 2.1) || Math.hypot(x - s.x, y - s.y) < 2) continue;
+      if (!freeSpot(W, x, y, 2.5) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       if (s.type === 'burg' && Math.hypot(x - s.x, y - s.y) < 5.8) continue;
       add({ kind: 'house', x, y, wx: 1.5, wy: 1.1, h: 17, rh: 12, wall: 'timber', roof: 'thatch', chimney: true, lit: true, tavern: true, sign: rpick(rng, TAVERN_SIGNS) });
       W.buildings.push({ kind: 'prop', prop: 'fass', x: x + 0.95, y: y - 0.2, v: rng(), site: s.id });
@@ -1253,12 +1400,12 @@ function genBuildings(W, s, rng) {
         if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
       }
       smithy();
-      ring(9, 6, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
-      ring(7, 2.5, 5.5, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
+      ring(9, 7, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
+      ring(7, 3.2, 6.6, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
       break;
     }
     case 'dorf':
-      ring(8 + Math.floor(rng() * 4), 1.8, s.clear - 0.8, (x, y) => house(x, y));
+      ring(8 + Math.floor(rng() * 4), 2.4, s.clear - 0.8, (x, y) => house(x, y));
       smithy();
       { const wl = freeArea(W, s.x + 0.9, s.y + 0.7, 0.6, 0.6, 0.2, 3); if (wl) add({ kind: 'well', x: wl.x, y: wl.y, wx: 0.6, wy: 0.6, noCost: true }); }
       break;
@@ -1267,13 +1414,13 @@ function genBuildings(W, s, rng) {
       add({ kind: 'longhall', x: lh.x, y: lh.y, wx: 3.2, wy: 1.4, h: 20 });
       tavern(2.4, 1.2);
       if (!s.tavern) tavern(5.6, 2.5);
-      ring(3, 2.2, 3.4, (x, y) => house(x, y, { wall: 'wood' }));
+      ring(3, 2.2, 3.4, (x, y) => house(x, y, { wall: 'wood' }), 1.7);
       s.palisade = 4.5;
       break;
     }
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
-      ring(12, 6.2, s.clear - 0.5, (x, y) => house(x, y));
+      ring(12, 6.4, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;
     case 'abtei':
@@ -1283,7 +1430,7 @@ function genBuildings(W, s, rng) {
         const sp = freeArea(W, s.x + dx, s.y + dy, wx, wy, 0.3, 3.5);
         if (sp) add({ kind: 'house', x: sp.x, y: sp.y, wx, wy, h, rh, wall: 'stone', roof: 'tile', lit: true });
       }
-      ring(7, 3.5, s.clear - 0.5, (x, y) => house(x, y));
+      ring(7, 3.8, s.clear - 0.5, (x, y) => house(x, y));
       { const wl = freeArea(W, s.x + 0.4, s.y + 1.1, 0.6, 0.6, 0.2, 2.5); if (wl) add({ kind: 'well', x: wl.x, y: wl.y, wx: 0.6, wy: 0.6, noCost: true }); }
       break;
     case 'mine':
@@ -1293,7 +1440,7 @@ function genBuildings(W, s, rng) {
       W.buildings.push({ kind: 'prop', prop: 'erzhaufen', ore: s.ore, x: s.x + 0.7, y: s.y + 0.1, v: rng(), site: s.id });
       W.buildings.push({ kind: 'prop', prop: 'karren', x: s.x - 0.5, y: s.y + 0.5, v: rng(), site: s.id });
       W.buildings.push({ kind: 'prop', prop: 'holzstapel', x: s.x - 2.2, y: s.y + 0.4, v: rng(), site: s.id });
-      ring(3, 2.6, s.clear + 0.5, (x, y) => house(x, y, { wall: rng() < 0.5 ? 'wood' : 'stone', roof: 'thatch', wx: 1.0, wy: 0.85 }));
+      ring(3, 2.6, s.clear + 0.5, (x, y) => house(x, y, { wall: rng() < 0.5 ? 'wood' : 'stone', roof: 'thatch', wx: 1.0, wy: 0.85 }), 1.9);
       break;
     case 'einsiedelei':
       // Klause des Einsiedlers und der heilige Ort daneben

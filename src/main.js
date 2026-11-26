@@ -1,11 +1,11 @@
 // Einstieg: Spielstart, Hauptschleife, Eingabe, Kamera.
 
 import { G, log, homeName } from './state.js';
-import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
+import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY, CASTLE_PLOT } from './data.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
 import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, sfxEnabled, setSfxEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
-import { generateWorld, groundZ, setPlayerWalls } from './world.js';
+import { generateWorld, groundZ, worldSig } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
@@ -13,16 +13,16 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance, dailyCastle } from './castle.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock } from './castle.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
 import { initWeather, updateWeather, precip } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
-import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters } from './render.js';
+import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen } from './render.js';
 import {
-  initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
+  initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog, castleFocusTab,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { giveAlms } from './life.js';
@@ -60,6 +60,7 @@ function newGame(opts) {
   G.s.companions.push(squire);
   initTowns();
   initDynamics();
+  G.s.worldSig = worldSig(G.world);
   G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = []; G.extras = []; G.tour = null; G.exec = null;
   spawnPeasants();
   maintainGroups(true);
@@ -74,7 +75,14 @@ function newGame(opts) {
 function startWorld() {
   const home = G.world.sites.find((s) => s.type === 'spieler');
   home.name = homeName();
-  setPlayerWalls(G.world, G.s.castle.level >= 1);
+  // Spielstand aus einer Version mit anderer Ortsanlage: Bau- und Schadensstand der Häuser neu auswürfeln
+  const sig = worldSig(G.world);
+  if (G.s.worldSig !== sig) {
+    for (const k of Object.keys(G.s.damage || {})) if (k[0] !== 'v') delete G.s.damage[k];
+    G.s.cons = null;
+    G.s.worldSig = sig;
+  }
+  refreshCastleBlock();
   applyDamage();
   applyCons();
   initWeather();
@@ -85,7 +93,7 @@ function startWorld() {
   G.started = true;
   G.fast = false;
   G.ui.sel = null;
-  G.pendingSite = null;
+  G.pendingSite = null; G.pendingBuild = null;
   closePanel();
   byId('title').hidden = true;
   renderLog();
@@ -230,6 +238,29 @@ function interactHere() {
   else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
 }
 
+// Eigene Burg: Ein Klick auf ein Gebäude oder einen Bauplatz öffnet nur dieses Gebäude,
+// der Bergfried die ganze Burg. Steht man zu weit weg, geht man erst hin.
+function buildingReach(id) {
+  if (id === 'burg') return 4.2;
+  const [w, h] = CASTLE_PLOT[id] || [1, 1];
+  return Math.max(w, h) / 2 + 1.9;
+}
+function openCastleBuilding(id) {
+  G.pendingBuild = null;
+  G.s.player.path = null;
+  if (id === 'burg') openPanel('castle');
+  else openPanel('castle', { focus: id }, castleFocusTab(id));
+}
+function goBuilding(a) {
+  const p = G.s.player, r = buildingReach(a.id);
+  if (Math.hypot(a.x - p.x, a.y - p.y) < r) { openCastleBuilding(a.id); return; }
+  G.pendingSite = null; G.pendingPostern = null;
+  const pb = { id: a.id, x: a.x, y: a.y, r };
+  if (setPlayerPath(a.x, a.y)) { G.pendingBuild = pb; G.clickMarker = { x: a.x, y: a.y, t: 0 }; return; }
+  const pt = posternRoute(a.x, a.y);
+  if (pt && setPlayerPath(pt.x, pt.y)) { G.pendingPostern = { x: a.x, y: a.y, site: null, build: pb }; G.clickMarker = { x: a.x, y: a.y, t: 0 }; }
+}
+
 function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
@@ -247,12 +278,15 @@ function checkNearSite() {
   const ts = tourneyStatus();
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
+  const pb = G.pendingBuild;
+  if (pb && !inCombat() && Math.hypot(pb.x - G.s.player.x, pb.y - G.s.player.y) < pb.r) { openCastleBuilding(pb.id); return; }
+  if (pb && !G.s.player.path) G.pendingBuild = null;
   if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
   const pp = G.pendingPostern;
   if (pp && posternNear()) {
     G.pendingPostern = null;
     usePostern();
-    if (setPlayerPath(pp.x, pp.y)) G.pendingSite = pp.site;
+    if (setPlayerPath(pp.x, pp.y)) { G.pendingSite = pp.site; G.pendingBuild = pp.build || null; }
     return;
   }
   if (pp && !G.s.player.path) G.pendingPostern = null;
@@ -361,6 +395,7 @@ function startHunt(a) {
 function clickWorld(px, py) {
   if (!G.started || panelOpen() || dialogOpen()) return;
   if (joustPress() || (G.tour && G.tour.lock)) return;
+  G.pendingBuild = null;
   const u = unitAtScreen(px, py);
   if (u && clickUnit(u)) return;
   const an = animalAtScreen(px, py);
@@ -369,8 +404,11 @@ function clickWorld(px, py) {
   const p = G.s.player;
   p.attackTarget = null;
   p.huntTarget = null;
+  const ba = buildingAtScreen(px, py);
+  if (ba && ba.castle) { goBuilding(ba); return; }
+  // Der Boden der eigenen Burg ist zum Hingehen da (dort sucht man Schutz), nur Gebäude öffnen sich
   let site = null;
-  for (const s of G.world.sites) if (Math.hypot(s.x - wp.x, s.y - wp.y) < (s.type === 'spieler' ? 4.5 : 2.5)) site = s;
+  for (const s of G.world.sites) if (s.type !== 'spieler' && Math.hypot(s.x - wp.x, s.y - wp.y) < 2.5) site = s;
   G.pendingCamp = false;
   const sgc = G.siege && G.siege.stage !== 'anmarsch' && G.siege.site.type !== 'spieler' ? G.siege.camp : null;
   if (!site && sgc && Math.hypot(sgc.x - wp.x, sgc.y - wp.y) < 3.2) {
@@ -757,5 +795,5 @@ else boot((hot && hot.data) || {});
 window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
-window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
+window.__ritterWalls = () => refreshCastleBlock();
+window.__ritterDebug = { tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };

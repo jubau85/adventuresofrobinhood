@@ -2,11 +2,11 @@
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
 
 import { G, homeName, playerColor } from './state.js';
-import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, POIS, KM_PER_TILE } from './data.js';
+import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, CASTLE_PLOT, POIS, KM_PER_TILE } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt } from './world.js';
-import { conProgress } from './castle.js';
+import { conProgress, villageSpots } from './castle.js';
 import { castlePasture } from './animals.js';
 import { ART, onArt } from './assets.js';
 import { graveSlot, graveCount, funeralProps } from './life.js';
@@ -1691,7 +1691,7 @@ function buildStaticParts() {
 
 // ---------------------------------------------------------------- Eigene Burg: sichtbarer Ausbau
 const BUILD_ICON = { halle: 'krone', kaserne: 'schwerter', schmiede: 'amboss', stall: 'hufeisen', holzfaeller: 'axt', steinbruch: 'hacke', markt: 'muenze', kapelle: 'kreuz', wehr: 'turm', hospiz: 'kraut', schafzucht: 'schaf', felder: 'aehre' };
-const PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [1.8, 1.5], stall: [1.4, 3.0], holzfaeller: [1.4, 1.2], steinbruch: [2.2, 1.8], markt: [2.8, 2.4], kapelle: [2.6, 1.3], wehr: [1.0, 1.0], hospiz: [2.0, 2.4], schafzucht: [3.0, 2.6], felder: [1.8, 1.6] };
+const PLOT = CASTLE_PLOT;
 const TOWER_SPOTS = CASTLE_TOWERS;
 const STONE_BUILDINGS = { halle: 1, kapelle: 1, schmiede: 1, steinbruch: 1, wehr: 1, hospiz: 1 };
 let castleAnchors = [];
@@ -2205,7 +2205,7 @@ function buildPlayerCastle() {
   const lv = (id) => C.b[id] || 0;
   const pos = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
   const con = C.construction;
-  castleAnchors = [{ x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
+  castleAnchors = [{ id: 'burg', castle: true, x: s.x - 1, y: s.y - 1, h: 90, label: `Burg ${homeName()} · ${BUILDINGS.burg.levels[C.level].name}${con && con.id === 'burg' ? ' (Ausbau läuft)' : ''}` }];
 
   for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'markt', 'kapelle', 'hospiz', 'schafzucht', 'felder']) {
     const L = lv(id), p = pos(id), building = con && con.id === id;
@@ -2215,13 +2215,13 @@ function buildPlayerCastle() {
     if (!L && !building) {
       add(p.x - 0.5, p.y - 0.5, (c) => drawPlot(c, p.x, p.y, pw, ph));
       add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], true));
-      castleAnchors.push({ x: p.x, y: p.y, h: 20, label: `Bauplatz: ${name}` });
+      castleAnchors.push({ id, castle: true, plot: true, x: p.x, y: p.y, h: 20, label: `Bauplatz: ${name}` });
       continue;
     }
     if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
     if (building) addConstruction(add, id, p, L);
     add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], false));
-    castleAnchors.push({ x: p.x, y: p.y, h: 40, label: `${name} · Stufe ${L}${building ? ` (Ausbau auf Stufe ${con.level} läuft)` : ''}` });
+    castleAnchors.push({ id, castle: true, x: p.x, y: p.y, h: 40, label: `${name} · Stufe ${L}${building ? ` (Ausbau auf Stufe ${con.level} läuft)` : ''}` });
   }
 
   // Wachtürme
@@ -2232,9 +2232,9 @@ function buildPlayerCastle() {
     const tx = s.x + TOWER_SPOTS[nextT][0], ty = s.y + TOWER_SPOTS[nextT][1];
     if (con && con.id === 'wehr') addConstruction(add, 'wehr', { x: tx, y: ty }, 0);
     else { add(tx - 0.3, ty - 0.3, (c) => drawPlot(c, tx, ty, 1.0, 1.0)); add(tx - 0.7, ty + 0.65, (c) => drawSign(c, tx - 0.7, ty + 0.65, 'turm', true)); }
-    castleAnchors.push({ x: tx, y: ty, h: 30, label: con && con.id === 'wehr' ? `Wachturm im Bau` : 'Bauplatz: Wachturm' });
+    castleAnchors.push({ id: 'wehr', castle: true, plot: true, x: tx, y: ty, h: 30, label: con && con.id === 'wehr' ? `Wachturm im Bau` : 'Bauplatz: Wachturm' });
   }
-  for (let k = 0; k < WE; k++) castleAnchors.push({ x: s.x + TOWER_SPOTS[k][0], y: s.y + TOWER_SPOTS[k][1], h: 60, label: `Wachturm · Stufe ${WE}` });
+  for (let k = 0; k < WE; k++) castleAnchors.push({ id: 'wehr', castle: true, x: s.x + TOWER_SPOTS[k][0], y: s.y + TOWER_SPOTS[k][1], h: 60, label: `Wachturm · Stufe ${WE}` });
 
   // Burgsiedlung
   const spots = villageSpots(s);
@@ -2307,31 +2307,6 @@ function addConstruction(add, id, p, L) {
 }
 
 // Feste Bauplätze für die Häuser der Burgsiedlung
-function villageSpots(s) {
-  if (s.villageSpots) return s.villageSpots;
-  const W = G.world;
-  const r = mulberry32(W.seed + 991);
-  const avoid = Object.values(CASTLE_LAYOUT).map((o) => ({ x: s.x + o.dx, y: s.y + o.dy, r: 2.4 }));
-  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.0, y: s.y + 2.6, r: 1.8 });
-  for (const [dx, dy] of TOWER_SPOTS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.5 });
-  const spots = [];
-  for (let tries = 0; tries < 600 && spots.length < 9; tries++) {
-    const a = r() * Math.PI * 2, d = 7.6 + r() * 3.2;
-    const x = Math.floor(s.x + Math.cos(a) * d) + 0.5, y = Math.floor(s.y + Math.sin(a) * d) + 0.5;
-    const t = tileAt(W, x, y);
-    if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) continue;
-    if (Math.hypot(x - s.x, y - s.y) < 6) continue;
-    if (avoid.some((o) => Math.hypot(o.x - x, o.y - y) < o.r)) continue;
-    if (spots.some((o) => Math.hypot(o.x - x, o.y - y) < 1.9)) continue;
-    const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: (13 + r() * 6) * 1.6, rh: (11 + r() * 5) * 1.5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
-    if (r() < 0.6) b.prop = { prop: ['heu', 'holzstapel', 'fass', 'beet'][Math.floor(r() * 4)], x: x + 0.75, y: y + (r() - 0.5) * 0.6, v: r() };
-    spots.push(b);
-  }
-  s.villageSpots = spots;
-  spots.forEach((b, k) => { b.idx = `v${k}`; const d = G.s && G.s.damage && G.s.damage[b.idx]; if (d) b.dmg = d; });
-  return spots;
-}
-
 // Name eines Burggebäudes unter dem Mauszeiger
 let landmarkAnchors = null, landmarkWorld = null;
 export function buildingAtScreen(px, py) {
@@ -3696,6 +3671,8 @@ export function screenToGround(px, py) {
   return wp;
 }
 
+// Für Tests: Weltpunkt auf dem Bildschirm
+export function tileToScreen(x, y) { return toScreen(x, y); }
 function toScreen(x, y) {
   const { w, h } = G.view, cam = G.cam;
   return { x: (isoX(x, y) - cam.x) * cam.zoom + w / 2, y: (isoY(x, y) - zAt(x, y) - cam.y) * cam.zoom + h / 2 };

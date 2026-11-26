@@ -9,6 +9,7 @@ import { changeRep } from './politics.js';
 import { spawnGroup, rebuildUnits, makeNpc, removeGroup } from './units.js';
 import { addCargo, cargoFree } from './economy.js';
 import { hourOf } from './sim.js';
+import { buildingUp, refreshBuildingBlocks } from './world.js';
 import { DEFENDER_NPC, repairBuilding } from './siege.js';
 
 const GROWING = { stadt: 1, markt: 1, dorf: 1, burg: 1, halle: 1 };
@@ -19,10 +20,15 @@ export function standing(b) { return !(b.cons < 1); }
 export function underConstruction(b) { return b.cons >= 0 && b.cons < 1; }
 
 function setCons(b, v) {
-  if (!b.plot && v >= 1) { b.cons = undefined; delete G.s.cons[b.idx]; return; }
-  b.cons = v;
-  if (b.plot && v === -2) delete G.s.cons[b.idx];
-  else G.s.cons[b.idx] = Math.round(v * 1000) / 1000;
+  const was = buildingUp(b);
+  if (!b.plot && v >= 1) { b.cons = undefined; delete G.s.cons[b.idx]; }
+  else {
+    b.cons = v;
+    if (b.plot && v === -2) delete G.s.cons[b.idx];
+    else G.s.cons[b.idx] = Math.round(v * 1000) / 1000;
+  }
+  // Wände hoch oder Haus gefallen: Das Haus sperrt nun seine Felder oder gibt sie frei
+  if (buildingUp(b) !== was) refreshBuildingBlocks(G.world);
 }
 
 // Häuser je Ort, einmal je Welt gesammelt
@@ -68,6 +74,7 @@ export function applyCons() {
     const v = G.s.cons[b.idx];
     b.cons = v !== undefined ? v : b.plot ? -2 : undefined;
   }
+  refreshBuildingBlocks(G.world);
   G.fires = [];
   G.raid = null;
 }

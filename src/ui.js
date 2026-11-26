@@ -460,6 +460,8 @@ function townQuests(site) {
 
 // ---------------------------------------------------------------- Burg
 function castlePanel() {
+  const f = G.ui.arg && G.ui.arg.focus;
+  if (f && f !== 'burg') return castleFocusPanel(f);
   const tabs = [['ausbau', 'Ausbau'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager']];
   if (bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', 'Rüstkammer']);
   if (bLevel('markt')) tabs.push(['markt', 'Markt']);
@@ -478,6 +480,31 @@ function castlePanel() {
   return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
+// Ein einzelnes Burggebäude (Klick auf Gebäude oder Bauplatz in der Burg)
+const FOCUS_TAB = { halle: ['halle', 'Anwerben'], kaserne: ['gefolge', 'Gefolge'], schmiede: ['ruest', 'Rüstkammer'], stall: ['ruest', 'Rüstkammer'], markt: ['markt', 'Markt'] };
+export function castleFocusTab(id) { return bLevel(id) && FOCUS_TAB[id] ? FOCUS_TAB[id][0] : 'ausbau'; }
+function castleFocusPanel(id) {
+  const L = bLevel(id), def = BUILDINGS[id], con = G.s.castle.construction;
+  const site = castleSite();
+  const tabs = [['ausbau', L ? 'Ausbau' : 'Bauplatz']];
+  if (L && FOCUS_TAB[id]) tabs.push(FOCUS_TAB[id]);
+  let body = '';
+  switch (G.ui.tab) {
+    case 'halle': body = castleHall(); break;
+    case 'gefolge': body = partyView(true); break;
+    case 'ruest': body = shopView(site); break;
+    case 'markt': body = marketTable(site); break;
+    default: {
+      const building = con && con.id === id;
+      const note = building ? `<div class="notice"><b>Im Bau:</b> Stufe ${con.level}, fertig an Tag ${con.done}.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>`
+        : con ? `<div class="notice"><p>Die Bauleute arbeiten gerade an ${con.id === 'burg' ? 'der Burg' : esc(BUILDINGS[con.id].name)}. Erst danach kann hier gebaut werden.</p></div>` : '';
+      body = `${note}<div class="bgrid one">${buildCard(id)}</div>
+        <div class="row"><button class="btn" data-act="castleall">Ganze Burg</button></div>`;
+    }
+  }
+  return { title: def.name, sub: `Burg ${esc(homeName())} · ${L ? `Stufe ${L}/3` : 'Bauplatz'}`, tabs, body };
+}
+
 // Burgtor: von Hand öffnen und schließen
 function gateAction() {
   if (!hasHomeGate()) return `<div class="actions gate"><div class="action"><div><b>Burgtor</b><p>Die Ruine hat noch kein Tor. Ab der Holzburg kannst du es schließen.</p></div></div></div>`;
@@ -488,29 +515,32 @@ function gateAction() {
   return `<div class="actions gate"><div class="action"><div><b>Burgtor: ${closed ? 'geschlossen' : 'offen'}</b><p>${txt}</p></div><button class="btn${closed ? '' : ' primary'}" data-act="tor">${closed ? 'Öffnen' : 'Schließen'}</button></div></div>`;
 }
 
+// Karte eines Burggebäudes: was es jetzt leistet, was die nächste Stufe bringt und kostet
+function buildCard(id) {
+  const info = buildInfo(id);
+  const def = BUILDINGS[id];
+  const isBurg = id === 'burg';
+  const name = isBurg ? `${def.levels[info.cur].name}` : def.name;
+  const now = isBurg ? def.levels[info.cur].eff : info.cur ? def.levels[info.cur].eff : 'Noch nicht errichtet';
+  const nextName = isBurg && info.lv ? `Ausbau zur ${info.lv.name}` : 'Nächste Stufe';
+  const btnLabel = info.ok ? (info.cur || isBurg ? 'Ausbauen' : 'Errichten') : esc(info.reasons[0]);
+  return `<article class="bcard${info.cur ? ' built' : ''}">
+    <header><b>${esc(name)}</b><span class="lvl">${isBurg ? `Stufe ${info.cur}/3` : `${info.cur}/3`}</span></header>
+    ${def.desc ? `<p class="muted">${esc(def.desc)}</p>` : ''}
+    <p><span class="label">Jetzt</span> ${esc(now)}</p>
+    ${info.lv ? `<p><span class="label">${nextName}</span> ${esc(info.lv.eff)}</p>
+    <div class="chips">${costChips(info.lv.cost)}<span class="chip">${info.lv.days} ${info.lv.days === 1 ? 'Tag' : 'Tage'}</span>${info.lv.need && info.lv.need.renown ? `<span class="chip ${G.s.renown >= info.lv.need.renown ? 'ok' : 'miss'}">${info.lv.need.renown} Ruhm</span>` : ''}${info.lv.need && info.lv.need.allies ? `<span class="chip ${alliesCount() >= info.lv.need.allies ? 'ok' : 'miss'}">${info.lv.need.allies} Verbündete</span>` : ''}</div>
+    <button class="btn${info.ok ? ' primary' : ''}" data-act="build" data-id="${id}" ${info.ok ? '' : 'disabled'}>${btnLabel}</button>` : '<p class="muted">Vollständig ausgebaut.</p>'}
+  </article>`;
+}
+
 function castleBuild() {
   const c = G.s.castle;
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0), cost = bal.costs.reduce((a, [, v]) => a + v, 0);
   const con = c.construction;
   const conText = con ? `<div class="notice"><b>Im Bau:</b> ${con.id === 'burg' ? BUILDINGS.burg.levels[con.level].name : `${BUILDINGS[con.id].name} Stufe ${con.level}`}, fertig an Tag ${con.done}. Die Bauleute arbeiten schon auf dem Bauplatz.<div class="progress" role="progressbar" aria-valuenow="${Math.round(conProgress() * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(conProgress() * 100)}%"></span></div></div>` : '';
-  const cards = BUILDING_IDS.map((id) => {
-    const info = buildInfo(id);
-    const def = BUILDINGS[id];
-    const isBurg = id === 'burg';
-    const name = isBurg ? `${def.levels[info.cur].name}` : def.name;
-    const now = isBurg ? def.levels[info.cur].eff : info.cur ? def.levels[info.cur].eff : 'Noch nicht errichtet';
-    const nextName = isBurg && info.lv ? `Ausbau zur ${info.lv.name}` : 'Nächste Stufe';
-    const btnLabel = info.ok ? (info.cur || isBurg ? 'Ausbauen' : 'Errichten') : esc(info.reasons[0]);
-    return `<article class="bcard${info.cur ? ' built' : ''}">
-      <header><b>${esc(name)}</b><span class="lvl">${isBurg ? `Stufe ${info.cur}/3` : `${info.cur}/3`}</span></header>
-      ${def.desc ? `<p class="muted">${esc(def.desc)}</p>` : ''}
-      <p><span class="label">Jetzt</span> ${esc(now)}</p>
-      ${info.lv ? `<p><span class="label">${nextName}</span> ${esc(info.lv.eff)}</p>
-      <div class="chips">${costChips(info.lv.cost)}<span class="chip">${info.lv.days} ${info.lv.days === 1 ? 'Tag' : 'Tage'}</span>${info.lv.need && info.lv.need.renown ? `<span class="chip ${G.s.renown >= info.lv.need.renown ? 'ok' : 'miss'}">${info.lv.need.renown} Ruhm</span>` : ''}${info.lv.need && info.lv.need.allies ? `<span class="chip ${alliesCount() >= info.lv.need.allies ? 'ok' : 'miss'}">${info.lv.need.allies} Verbündete</span>` : ''}</div>
-      <button class="btn${info.ok ? ' primary' : ''}" data-act="build" data-id="${id}" ${info.ok ? '' : 'disabled'}>${btnLabel}</button>` : '<p class="muted">Vollständig ausgebaut.</p>'}
-    </article>`;
-  }).join('');
+  const cards = BUILDING_IDS.map(buildCard).join('');
   const st = c.storage;
   return `${conText}
     <div class="summary">
@@ -838,6 +868,7 @@ function helpPanel() {
       </dl></div>
       <div><h3>So kommst du voran</h3><ol class="tips">
         <li>In ${esc(homeName())} zuerst ein <b>Holzfällerlager</b> und einen <b>Rittersaal</b> errichten. Dann zur <b>Holzburg</b> ausbauen.</li>
+        <li>In deiner Burg öffnet ein Klick auf ein <b>Gebäude</b> oder einen <b>Bauplatz</b> nur dieses Gebäude, der Bergfried (oder <kbd>E</kbd>) die ganze Burg. Ein Klick auf den Boden dazwischen führt dich einfach dorthin, etwa um hinter den Mauern Schutz zu suchen. Häuser, Kirchen und Burggebäude kann niemand durchschreiten.</li>
         <li>Siedlungen vergeben <b>Aufträge</b>. Sie bringen Gold, Ruhm und Ansehen.</li>
         <li><b>Handel</b> lohnt sich: Was ein Ort erzeugt, ist dort billig und anderswo gefragt. Stein und Eisen brauchst du für den Burgbau.</li>
         <li>Rüste dein Gefolge in der Gefolge-Tafel mit besseren Waffen und Rüstungen aus. Bogenschützen bleiben auf Abstand.</li>
@@ -961,6 +992,7 @@ const ACTIONS = {
     } else log('Dorthin führt kein Weg.', 'bad');
   },
   build: (d) => startBuild(d.id),
+  castleall: () => { G.ui.arg = null; G.ui.tab = 'ausbau'; byId('panel-body').scrollTop = 0; },
   hire: (d) => hire(Number(d.i)),
   sel: (d) => { G.ui.sel = Number(d.u); },
   equip: (d) => equip(selectedUnit(), Number(d.i)),

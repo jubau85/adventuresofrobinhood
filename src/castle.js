@@ -1,12 +1,12 @@
 // Die eigene Burg: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
 import { G, log, homeName } from './state.js';
-import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE } from './data.js';
-import { rand, randInt, pick } from './rng.js';
+import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE, T, CASTLE_LAYOUT, CASTLE_TOWERS, CASTLE_PLOT, CASTLE_SOLID, CASTLE_KEEP } from './data.js';
+import { rand, randInt, pick, mulberry32 } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
 import { cargoUsed } from './economy.js';
-import { setPlayerWalls } from './world.js';
+import { setPlayerWalls, tileAt, footprintTiles } from './world.js';
 import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
 import { startSiege, homeGateClosed } from './siege.js';
@@ -27,6 +27,57 @@ export function conProgress() {
 
 // Häuser der Burgsiedlung je Burgstufe
 export function villageHouses() { return [0, 2, 5, 9][G.s.castle.level]; }
+
+// Häuser der Burgsiedlung rund um die Burg (fest je Welt), gezeichnet in render.js
+export function villageSpots(s) {
+  if (s.villageSpots) return s.villageSpots;
+  const W = G.world;
+  const r = mulberry32(W.seed + 991);
+  const avoid = Object.values(CASTLE_LAYOUT).map((o) => ({ x: s.x + o.dx, y: s.y + o.dy, r: 2.4 }));
+  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.0, y: s.y + 2.6, r: 1.8 });
+  for (const [dx, dy] of CASTLE_TOWERS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.5 });
+  const spots = [];
+  for (let tries = 0; tries < 600 && spots.length < 9; tries++) {
+    const a = r() * Math.PI * 2, d = 7.6 + r() * 3.2;
+    const x = Math.floor(s.x + Math.cos(a) * d) + 0.5, y = Math.floor(s.y + Math.sin(a) * d) + 0.5;
+    const t = tileAt(W, x, y);
+    if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) continue;
+    if (Math.hypot(x - s.x, y - s.y) < 6) continue;
+    if (avoid.some((o) => Math.hypot(o.x - x, o.y - y) < o.r)) continue;
+    if (spots.some((o) => Math.hypot(o.x - x, o.y - y) < 1.9)) continue;
+    const b = { kind: 'house', x, y, wx: 0.9 + r() * 0.4, wy: 0.8 + r() * 0.3, h: (13 + r() * 6) * 1.6, rh: (11 + r() * 5) * 1.5, wall: r() < 0.6 ? 'timber' : 'plaster', roof: 'thatch', chimney: r() < 0.6, lit: true, v: r() };
+    if (r() < 0.6) b.prop = { prop: ['heu', 'holzstapel', 'fass', 'beet'][Math.floor(r() * 4)], x: x + 0.75, y: y + (r() - 0.5) * 0.6, v: r() };
+    spots.push(b);
+  }
+  s.villageSpots = spots;
+  spots.forEach((b, k) => { b.idx = `v${k}`; const d = G.s && G.s.damage && G.s.damage[b.idx]; if (d) b.dmg = d; });
+  return spots;
+}
+
+// Felder, die Bergfried, fertige Burggebäude, Wachtürme und die Häuser der Burgsiedlung belegen.
+// Dort geht niemand hindurch; Markt, Weide und Äcker bleiben begehbar.
+export function castleBlockTiles() {
+  const W = G.world, s = castleSite(), C = G.s.castle;
+  const out = [];
+  const k = CASTLE_KEEP[C.level];
+  out.push(...footprintTiles(W, s.x + k.dx, s.y + k.dy, k.w, k.w, 0.2));
+  for (const id of CASTLE_SOLID) {
+    if (!C.b[id]) continue;
+    const [pw, ph] = CASTLE_PLOT[id];
+    out.push(...footprintTiles(W, s.x + CASTLE_LAYOUT[id].dx, s.y + CASTLE_LAYOUT[id].dy, pw, ph));
+  }
+  for (let t = 0; t < (C.b.wehr || 0); t++) out.push(...footprintTiles(W, s.x + CASTLE_TOWERS[t][0], s.y + CASTLE_TOWERS[t][1], 0.9, 0.9));
+  for (const b of villageSpots(s).slice(0, villageHouses())) {
+    const di = Math.floor(b.y + b.wy / 2 + 0.3) * W.N + Math.floor(b.x - 0.15);
+    for (const q of footprintTiles(W, b.x, b.y, b.wx, b.wy)) if (q[1] * W.N + q[0] !== di) out.push(q);
+  }
+  return out;
+}
+
+// Mauern und Burggebäude neu eintragen (nach Ausbau, Laden, Schummeln)
+export function refreshCastleBlock() {
+  setPlayerWalls(G.world, G.s.castle.level >= 1, castleBlockTiles());
+}
 
 export function levelName() { return BUILDINGS.burg.levels[G.s.castle.level].name; }
 
@@ -82,7 +133,6 @@ export function finishConstruction() {
   if (!c || G.s.day < c.done) return;
   if (c.id === 'burg') {
     G.s.castle.level = c.level;
-    setPlayerWalls(G.world, c.level >= 1);
     log(`${homeName()} ist jetzt eine ${BUILDINGS.burg.levels[c.level].name}!`, 'gold');
     addRenown(5 * c.level);
     spawnPeasants();
@@ -95,6 +145,7 @@ export function finishConstruction() {
     if (c.id === 'schafzucht') refreshCastleHerd();
   }
   G.s.castle.construction = null;
+  refreshCastleBlock();
   G.castleDirty = true;
   G.celebrate = { id: c.id, level: c.level, t0: G.time };
 }
