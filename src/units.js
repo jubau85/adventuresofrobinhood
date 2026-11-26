@@ -583,7 +583,28 @@ function memberOffset(k) {
   return { x: Math.cos(a) * r, y: Math.sin(a) * r };
 }
 
+// Besatzung einer Belagerung: Jeder hat seinen Posten hinter der Mauer. Schützen schießen über die Mauer,
+// Nahkämpfer stellen sich nur Feinden, die schon drinnen sind (oder direkt vor ihnen in der Bresche stehen).
+function updateDefender(m, g, dt) {
+  const sg = G.siege;
+  const inside = sg && sg.def === g && sg.walls ? sg.walls.inside : null;
+  if (g.engaged || g.feud) {
+    const e = nearestEnemy(m, 16);
+    if (e) {
+      const d = Math.hypot(e.x - m.x, e.y - m.y);
+      if (d <= m.st.range + 0.15) {
+        if (m.cd <= 0) attack(m, e);
+        return;
+      }
+      if (!m.st.ranged && (!inside || inside(e.x, e.y))) { engage(m, e, dt); return; }
+    }
+  }
+  const post = m.post;
+  if (Math.hypot(post.x - m.x, post.y - m.y) > 0.35) chaseTo(m, post.x, post.y, dt, 0.3, 1.1);
+}
+
 function updateGroupMember(m, g, k, dt) {
+  if (g.defender && m.post) { updateDefender(m, g, dt); return; }
   if (g.engaged || g.feud) {
     const e = nearestEnemy(m, 22);
     if (e) { engage(m, e, dt); return; }
@@ -786,7 +807,7 @@ export function updateGroups(dt) {
     if (g.feud) {
       const f = g.feud;
       g.x = lead.x; g.y = lead.y;
-      if (!f.members.length || !G.groups.includes(f) || Math.hypot(f.x - g.x, f.y - g.y) > 26) endFeud(g);
+      if (!f.members.length || !G.groups.includes(f) || Math.hypot(f.x - g.x, f.y - g.y) > (g.siege || g.defender ? 60 : 26)) endFeud(g);
       else if (!g.engaged && Math.hypot(g.x - p.x, g.y - p.y) > 70) resolveFeud(g, f);
       if (!g.engaged) continue;
     }

@@ -124,7 +124,7 @@ export function isWalkable(W, x, y) {
 
 // ---------------------------------------------------------------- Mauern
 // Burgmauern und Palisaden sperren ihre Felder. Straßenfelder bleiben offen: Dort ist das Tor.
-function wallRing(W, s, R) {
+export function wallRing(W, s, R) {
   const out = [];
   for (let k = -R; k <= R; k++) out.push([s.tx + k, s.ty - R], [s.tx + k, s.ty + R], [s.tx - R, s.ty + k], [s.tx + R, s.ty + k]);
   return out;
@@ -146,26 +146,32 @@ function buildStaticWalls(W) {
   for (const s of W.sites) {
     if (s.cityWall) blockTiles(W, W.blockStatic, s.cityWall);
     if (s.type === 'burg') blockTiles(W, W.blockStatic, wallRing(W, s, 4));
-    if (s.palisade) {
-      const list = [];
-      const r = s.palisade;
-      for (let y = s.ty - 6; y <= s.ty + 6; y++) for (let x = s.tx - 6; x <= s.tx + 6; x++) {
-        const d = Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y);
-        const a = Math.atan2(y + 0.5 - s.y, x + 0.5 - s.x);
-        if (d >= r - 0.55 && d <= r + 0.45 && Math.abs(a - Math.PI / 2) > 0.3) list.push([x, y]);
-      }
-      blockTiles(W, W.blockStatic, list);
-    }
+    if (s.palisade) blockTiles(W, W.blockStatic, palisadeBand(s, false));
   }
   W.block = new Uint8Array(W.blockStatic);
+}
+
+// Felder der Palisade, mit oder ohne die Toröffnung im Süden
+export function palisadeBand(s, withGate) {
+  const list = [];
+  const r = s.palisade;
+  for (let y = s.ty - 6; y <= s.ty + 6; y++) for (let x = s.tx - 6; x <= s.tx + 6; x++) {
+    const d = Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y);
+    const a = Math.atan2(y + 0.5 - s.y, x + 0.5 - s.x);
+    if (d >= r - 0.55 && d <= r + 0.45 && (withGate || Math.abs(a - Math.PI / 2) > 0.3)) list.push([x, y]);
+  }
+  return list;
 }
 
 // Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten
 export function setPlayerWalls(W, on) {
   W.block = new Uint8Array(W.blockStatic);
-  if (!on) return;
-  const s = W.sites.find((x) => x.type === 'spieler');
-  blockTiles(W, W.block, wallRing(W, s, 4));
+  if (on) {
+    const s = W.sites.find((x) => x.type === 'spieler');
+    blockTiles(W, W.block, wallRing(W, s, 4));
+  }
+  // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
+  if (W.afterBlock) W.afterBlock();
 }
 
 export function isBlockedTile(W, x, y) {

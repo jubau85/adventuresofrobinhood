@@ -13,8 +13,8 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance } from './castle.js';
-import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup } from './siege.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle } from './castle.js';
+import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
 import { initWeather, updateWeather } from './weather.js';
@@ -216,6 +216,7 @@ function nearestSite() {
 
 // E oder Klick auf die Statuszeile: Ort betreten, sonst ins Feldlager einer Belagerung
 function interactHere() {
+  if (posternNear()) { usePostern(); return; }
   const s = nearestSite();
   if (s) enterSite(s);
   else if (nearSiegeCamp()) { G.pendingCamp = false; G.s.player.path = null; openPanel('siege'); }
@@ -239,7 +240,10 @@ function checkNearSite() {
   if (ts && G.tour && Math.hypot(G.tour.lx - G.s.player.x, G.tour.ly - G.s.player.y) < 16) { showPrompt(ts); return; }
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (!s && G.pendingCamp && nearSiegeCamp() && !inCombat()) { interactHere(); return; }
-  if (!s && nearSiegeCamp() && !inCombat()) {
+  const pf = posternNear();
+  if (pf) {
+    showPrompt(`<kbd>E</kbd> ${pf.inside ? 'Durch die Pforte hinaus' : 'An die Pforte klopfen und hinein'}${battleText(' · ')}`);
+  } else if (!s && nearSiegeCamp() && !inCombat()) {
     const sg = siegeStatus();
     showPrompt(`<kbd>E</kbd> Feldlager vor ${esc(sg.name)}${sg.side ? '' : ': Seite wählen'}${battleText(' · ')}`);
   } else if (s && !inCombat()) {
@@ -258,7 +262,8 @@ function battleText(prefix) {
   if (sg && Math.hypot(sg.x - G.s.player.x, sg.y - G.s.player.y) < 50) {
     const st = { anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage];
     const side = sg.side === 'def' ? ' · du hilfst den Verteidigern' : sg.side === 'att' ? ' · du dienst den Belagerern' : '';
-    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>${side}`;
+    const wall = sg.wall === null ? '' : sg.wall < 0 ? ' · <span class="warn">Bresche offen</span>' : sg.stage !== 'anmarsch' ? ` · Mauer ${100 - sg.wall} %` : '';
+    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>${wall}${side}`;
   }
   const b = battleStatus();
   if (!b || Math.hypot(b.x - G.s.player.x, b.y - G.s.player.y) > 45) return '';
@@ -681,4 +686,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, dailyCastle, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };

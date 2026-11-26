@@ -286,7 +286,13 @@ function hermitPanel(site) {
 }
 
 // Belagerung: Lage und Seitenwahl (im Feldlager oder in der belagerten Stadt)
-const SIEGE_STAGE = { anmarsch: 'Das Heer ist auf dem Anmarsch.', belagerung: 'Das Trebuchet beschießt die Häuser.', sturm: 'Sturm aufs Tor!' };
+function siegeStageText(sg) {
+  if (sg.stage === 'anmarsch') return 'Das Heer ist auf dem Anmarsch.';
+  const w = sg.walls;
+  if (sg.stage === 'sturm') return w ? 'Sturm! Die Angreifer drängen durch die Bresche.' : 'Sturm! Die Angreifer rennen gegen die Verteidiger an.';
+  if (!w) return 'Das Trebuchet beschießt die Häuser.';
+  return w.st.open ? 'Die Mauer ist gebrochen, durch die Bresche sieht man in die Gassen.' : `Das Trebuchet hämmert auf die Mauer (Schaden ${Math.round((w.st.dmg || 0) * 100)} %).`;
+}
 function siegePanel() {
   const sg = G.siege, st = siegeStatus();
   if (!sg) return { title: 'Belagerung', tabs: [], body: '<div class="notice"><p>Die Belagerung ist vorbei.</p></div>' };
@@ -298,7 +304,7 @@ function siegePanel() {
     tabs: [],
     body: `<div class="cols">
       <div>
-        <p class="lede">${inside ? `Die Tore von ${esc(s.name)} sind verrammelt, auf den Mauern stehen Bogenschützen. ` : 'Zelte, Feuer und das Knarren des Trebuchets. '}${SIEGE_STAGE[sg.stage]}</p>
+        <p class="lede">${inside ? `Die Tore von ${esc(s.name)} sind verrammelt, hinter der Mauer steht die Besatzung. ` : 'Zelte, Feuer und das Knarren des Trebuchets. '}${siegeStageText(sg)}</p>
         <dl class="facts">
           <dt>Belagerer</dt><dd>${swatch(off.fa)}${esc(st.army)}: <b>${st.att}</b> Mann · ${repPill(off.fa)}</dd>
           <dt>Verteidiger</dt><dd>${swatch(off.fs)}${sg.def ? `Besatzung: <b>${st.def}</b> Mann` : 'Die Besatzung hinter den Mauern'} · ${repPill(off.fs)}</dd>
@@ -314,15 +320,15 @@ function siegeActions() {
   if (!sg || sg.site.type === 'spieler') return '';
   const s = sg.site, off = sideOffer(), fa = FACTIONS[off.fa].short, fs = FACTIONS[off.fs].short;
   if (sg.side) {
-    const storm = canCallStorm() ? `<div class="action"><div><b>Zum Sturm blasen</b><p>Der Hauptmann wartet auf dein Zeichen. Dann rennen alle gegen das Tor an.</p></div><button class="btn danger" data-act="ssturm">Sturm!</button></div>` : '';
+    const storm = canCallStorm() ? `<div class="action"><div><b>Zum Sturm blasen</b><p>${sg.walls && !sg.walls.st.open ? 'Die Mauer hält noch. Auf dein Zeichen wirft das Trebuchet ohne Pause, und sobald die Bresche offen ist, stürmen alle.' : 'Der Hauptmann wartet auf dein Zeichen. Dann stürmen alle durch die Bresche.'}</p></div><button class="btn danger" data-act="ssturm">Sturm!</button></div>` : '';
     const what = sg.side === 'def'
-      ? `Du kämpfst für ${esc(s.name)}. ${sg.sortie ? 'Die Besatzung ist mit dir draußen vor den Mauern.' : 'Greif das Feldlager an, dann wagt die Besatzung einen Ausfall.'} Hält die Stadt, dankt sie dir.`
+      ? `Du kämpfst für ${esc(s.name)}. ${sg.walls ? 'Die Besatzung bleibt hinter der Mauer und hält die Bresche. Am Tor lassen dich die Wachen durch die Pforte ein und aus (E).' : 'Kämpf mit der Besatzung gegen das Heer.'} Hält die Stadt, dankt sie dir.`
       : `Du dienst im Heer vor ${esc(s.name)}. Die Besatzung greift dich an, wo sie dich sieht. Fällt die Stadt, bekommst du deinen Beuteanteil.`;
     return `<h3>Belagerung</h3><div class="notice ${sg.side === 'def' ? 'good' : ''}"><p>${what}</p></div>${storm}`;
   }
   const bD = sideBlock('def'), bA = sideBlock('att');
   return `<h3>Belagerung · wähle deine Seite</h3>
-    <div class="action"><div><b>Den Verteidigern beistehen</b><p>Greif das Feldlager an, dann wagt die Besatzung einen Ausfall. Hält ${esc(s.name)}, dankt dir die Stadt mit etwa ${fmt(off.thanks)} Gold, Ansehen bei den ${esc(fs)} +10 und Ruhm +15. Die ${esc(fa)} sehen das ungern (−5, mehr, wenn du ihr Heer zerschlägst).</p>${bD ? `<p class="muted">${esc(bD)}</p>` : ''}</div><button class="btn primary" data-act="sdef" ${bD ? 'disabled' : ''}>Beistehen</button></div>
+    <div class="action"><div><b>Den Verteidigern beistehen</b><p>${sg.walls ? 'Die Wachen lassen dich durch die Pforte im Tor ein (E). Die Besatzung bleibt hinter der Mauer, gemeinsam haltet ihr die Bresche.' : 'Du kämpfst mit der Besatzung gegen das Heer.'} Hält ${esc(s.name)}, dankt dir die Stadt mit etwa ${fmt(off.thanks)} Gold, Ansehen bei den ${esc(fs)} +10 und Ruhm +15. Die ${esc(fa)} sehen das ungern (−5, mehr, wenn du ihr Heer zerschlägst).</p>${bD ? `<p class="muted">${esc(bD)}</p>` : ''}</div><button class="btn primary" data-act="sdef" ${bD ? 'disabled' : ''}>Beistehen</button></div>
     <div class="action"><div><b>Den Belagerern dienen</b><p>Du kämpfst für ${esc(GROUP_TYPES[sg.army.type].acc)} und stürmst mit, die Besatzung greift dich an. Fällt ${esc(s.name)}, bekommst du einen Beuteanteil (etwa ${fmt(off.share)} Gold und Waren aus der Stadt) und Ansehen bei den ${esc(fa)} +8. Die ${esc(fs)} vergessen das nicht (−8 sofort, −6 beim Fall).</p>${bA ? `<p class="muted">${esc(bA)}</p>` : ''}</div><button class="btn danger" data-act="satt" ${bA ? 'disabled' : ''}>Dienen</button></div>
     <p class="muted">Oder du schaust nur zu. Entfernst du dich zu weit, entscheidet sich die Belagerung ohne dich.</p>`;
 }
@@ -826,8 +832,8 @@ function helpPanel() {
         <li>Die Fraktionen <b>bekämpfen einander</b>: Banden überfallen Händler, Sachsen und Normannen gehen aufeinander los. Trupps einer Fraktion, die dich mag, kommen dir im Kampf zu Hilfe, verfeindete schließen sich deinen Angreifern an.</li>
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
-        <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> beschießt ein Heer eine Burg oder Stadt und stürmt das Tor. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben.</li>
-        <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (die Besatzung wagt einen Ausfall, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
+        <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> schließen sich die Tore, die Besatzung bezieht Stellung hinter der Mauer, und das Trebuchet schlägt eine <b>Bresche</b>. Durch sie stürmen die Angreifer. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben. Sind dir Normannen oder Sachsen feindlich, ziehen sie auch gegen deine Burg. Durch die <b>Pforte</b> am Tor (<kbd>E</kbd>) kommst du hinein.</li>
+        <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (durch die Pforte hinein, gemeinsam die Bresche halten, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>

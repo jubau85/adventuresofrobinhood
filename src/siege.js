@@ -3,13 +3,13 @@
 // werden beschädigt. Danach bauen die Bewohner wieder auf, und die Toten werden begraben.
 
 import { G, log, homeName } from './state.js';
-import { GROUP_TYPES, FACTIONS, GOODS, dirText } from './data.js';
+import { GROUP_TYPES, FACTIONS, GOODS, T, dirText } from './data.js';
 import { rand, pick, randInt } from './rng.js';
 import { changeRep, addRenown, isHostileFaction } from './politics.js';
 import { cargoFree, addCargo } from './economy.js';
-import { spawnGroup, rebuildUnits, inCombat, makeNpc } from './units.js';
-import { isWalkable, landAt, findPath } from './world.js';
-import { villageHouses } from './castle.js';
+import { spawnGroup, rebuildUnits, inCombat, makeNpc, partyMembers } from './units.js';
+import { isWalkable, landAt, findPath, wallRing, palisadeBand, nearestWalkable } from './world.js';
+import { villageHouses, castleDefense } from './castle.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
@@ -50,6 +50,9 @@ function buildingByKey(k) {
 export function applyDamage() {
   if (!G.s.damage) G.s.damage = {};
   for (const [i, d] of Object.entries(G.s.damage)) { const b = buildingByKey(i); if (b) b.dmg = d; else if (i[0] !== 'v') delete G.s.damage[i]; }
+  if (!G.s.walls) G.s.walls = {};
+  G.world.afterBlock = applyWallState;
+  applyWallState();
 }
 
 // Jeden Tag bauen die Leute weiter, auch wenn du nicht hinsiehst
@@ -63,6 +66,19 @@ export function dailyRepairs() {
       if ((s && (G.s.blight[s.id] || 0) > G.s.day) || b.dmg >= 0.9) continue;
     }
     repairBuilding(b, 0.22);
+  }
+  // Breschen: zwei Tage liegt der Schutt, dann wird die Lücke vermauert und das Gerüst steht noch eine Weile
+  const W = G.world;
+  for (const [id, st] of Object.entries(G.s.walls || {})) {
+    if (G.siege && G.siege.site.id === id) continue;
+    if (st.open) {
+      if (G.s.day - (st.since ?? G.s.day) < 2) continue;
+      st.open = false; st.dmg = 0.75;
+      for (const [x, y] of st.tiles) W.block[y * W.N + x] = 1;
+      continue;
+    }
+    st.dmg -= 0.25;
+    if (st.dmg <= 0) delete G.s.walls[id];
   }
 }
 
@@ -101,22 +117,24 @@ export function startSiege(target = null, armyType = null, scale = null) {
     target = pick(cand);
     armyType = ATTACKER[target.faction][target.realm];
   }
-  // Lager vor der Stadt, auf der Seite der Straße zum Tor
-  let camp = null;
-  for (let k = 0; k < 40 && !camp; k++) {
-    const a = Math.PI * 0.5 + rand(-1.1, 1.1) + (k > 20 ? Math.PI : 0), r = (target.clear || 7) + 6 + rand(0, 3);
-    const x = target.x + Math.cos(a) * r, y = target.y + Math.sin(a) * r;
-    if (isWalkable(W, x, y) && landAt(W, x, y) === target.land) camp = { x, y };
+  // Lager vor der Stadt, bevorzugt auf der Seite der Straße zum Tor. Das Heer zieht von weiter draußen heran.
+  // Mehrere Versuche: Liegt hinter dem Lager Wasser oder fremdes Land, wird eine andere Richtung probiert.
+  let camp = null, from = null, path = null;
+  for (let tries = 0; tries < 8 && !path; tries++) {
+    camp = null; from = null;
+    for (let k = 0; k < 40 && !camp; k++) {
+      const a = Math.PI * 0.5 + rand(-1.1, 1.1) + (tries % 2 ? Math.PI : 0) + (tries >= 4 ? rand(-1.6, 1.6) : 0), r = (target.clear || 7) + 6 + rand(0, 3);
+      const x = target.x + Math.cos(a) * r, y = target.y + Math.sin(a) * r;
+      if (isWalkable(W, x, y) && landAt(W, x, y) === target.land) camp = { x, y };
+    }
+    if (!camp) continue;
+    for (let k = 0; k < 60 && !from; k++) {
+      const a = Math.atan2(camp.y - target.y, camp.x - target.x) + rand(-0.5, 0.5) * (1 + k / 15), r = 22 + (k % 20) * 0.6;
+      const x = camp.x + Math.cos(a) * r, y = camp.y + Math.sin(a) * r;
+      if (isWalkable(W, x, y) && landAt(W, x, y) === target.land && Math.hypot(x - target.x, y - target.y) > (target.clear || 7) + 12) from = { x, y };
+    }
+    if (from) path = findPath(W, from.x, from.y, camp.x, camp.y, 80000);
   }
-  if (!camp) return false;
-  let from = null;
-  for (let k = 0; k < 40 && !from; k++) {
-    const a = Math.atan2(camp.y - target.y, camp.x - target.x) + rand(-0.5, 0.5), r = 28 + k * 0.5;
-    const x = camp.x + Math.cos(a) * r, y = camp.y + Math.sin(a) * r;
-    if (isWalkable(W, x, y) && landAt(W, x, y) === target.land) from = { x, y };
-  }
-  if (!from) return false;
-  const path = findPath(W, from.x, from.y, camp.x, camp.y, 80000);
   if (!path) return false;
   const sz = scale ?? ((G.fpsAvg || 60) >= 40 ? 0.8 : 0.6);
   const army = spawnGroup(armyType, { pos: from, scale: sz });
@@ -132,29 +150,222 @@ export function startSiege(target = null, armyType = null, scale = null) {
   rebuildUnits();
   const own = target.type === 'spieler';
   const where = dirText(p, target);
-  log(own ? `${GROUP_TYPES[armyType].nom} zieht gegen ${homeName()}! Eine Belagerung steht bevor.` : `Ein Bote meldet: ${GROUP_TYPES[armyType].nom} zieht vor ${target.name} (${where}) und will die ${target.type === 'burg' ? 'Burg' : 'Stadt'} belagern! Auf der Karte ist der Ort markiert. Im Feldlager oder in ${target.name} kannst du dich einer Seite anschließen.`, 'bad');
+  log(own ? `${GROUP_TYPES[armyType].nom} zieht gegen ${homeName()} (${where})! Sobald das Heer da ist, schließen sich die Tore und die Garnison bezieht Stellung. Eile zurück, durch die Pforte am Tor kommst du hinein.` : `Ein Bote meldet: ${GROUP_TYPES[armyType].nom} zieht vor ${target.name} (${where}) und will die ${target.type === 'burg' ? 'Burg' : 'Stadt'} belagern! Auf der Karte ist der Ort markiert. Im Feldlager oder in ${target.name} kannst du dich einer Seite anschließen.`, 'bad');
   return true;
 }
 
-// Besatzung aufstellen: Wachen hinter dem Tor
+// ---------------------------------------------------------------- Mauern, Tore, Bresche
+// Mauerband eines Ortes: Stadtmauer, Burgmauer (auch deine eigene ab der Holzburg) oder Palisade
+function wallBand(s) {
+  const W = G.world;
+  if (s.cityWall) return { band: s.cityWall, square: false };
+  if (s.type === 'burg' || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, 4), square: true };
+  if (s.palisade) return { band: palisadeBand(s, true), square: false };
+  return null;
+}
+
+function walkPt(x, y) {
+  const W = G.world;
+  if (isWalkable(W, x, y)) return { x, y };
+  const q = nearestWalkable(W, Math.floor(x), Math.floor(y), 3);
+  return q ? { x: q.x + 0.5, y: q.y + 0.5 } : { x, y };
+}
+
+// Tore und Bresche bestimmen: Offene Felder im Mauerring sind Tore. Die Bresche liegt dort,
+// wo die Mauer dem Lager am nächsten ist, aber nicht direkt neben einem Tor.
+function setupWalls(sg) {
+  const s = sg.site, W = G.world, N = W.N, wb = wallBand(s);
+  if (!wb) return;
+  if (!G.s.walls) G.s.walls = {};
+  const prev = G.s.walls[s.id];
+  const inBreach = (x, y) => !!prev && prev.open && prev.tiles.some((t) => t[0] === x && t[1] === y);
+  const seen = new Set(), wall = [], open = [];
+  for (const [x, y] of wb.band) {
+    if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1) continue;
+    const i = y * N + x;
+    if (seen.has(i) || W.tiles[i] === T.WATER) continue;
+    seen.add(i);
+    (W.block[i] || inBreach(x, y) ? wall : open).push([x, y]);
+  }
+  if (!wall.length) return;
+  let inside;
+  if (wb.square) inside = (x, y) => Math.abs(x - s.x) < 3.4 && Math.abs(y - s.y) < 3.4;
+  else {
+    const r = wall.reduce((a, [x, y]) => a + Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y), 0) / wall.length - 0.75;
+    inside = (x, y) => Math.hypot(x - s.x, y - s.y) < r;
+  }
+  let st = prev && prev.open ? prev : null;
+  if (!st) {
+    let best = null, bd = Infinity;
+    for (const t of wall) {
+      if (open.some((o) => Math.hypot(o[0] - t[0], o[1] - t[1]) < 2.6)) continue;
+      // Bei Burgen nicht an den Ecktürmen, sondern mitten in der Mauer
+      if (wb.square && Math.abs(t[0] - s.tx) >= 3 && Math.abs(t[1] - s.ty) >= 3) continue;
+      const d = Math.hypot(t[0] + 0.5 - sg.camp.x, t[1] + 0.5 - sg.camp.y);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) best = wall[0];
+    const tiles = wall.filter((t) => Math.hypot(t[0] - best[0], t[1] - best[1]) < 1.5);
+    const bx = tiles.reduce((a, t) => a + t[0], 0) / tiles.length + 0.5, by = tiles.reduce((a, t) => a + t[1], 0) / tiles.length + 0.5;
+    st = { bx, by, tiles, dmg: prev ? Math.max(0, prev.dmg || 0) : 0, open: false };
+    G.s.walls[s.id] = st;
+  }
+  const toward = (x, y, d) => { const dx = s.x - x, dy = s.y - y, l = Math.hypot(dx, dy) || 1; return walkPt(x + (dx / l) * d, y + (dy / l) * d); };
+  const gx = open.length ? open.reduce((a, t) => a + t[0], 0) / open.length + 0.5 : null, gy = open.length ? open.reduce((a, t) => a + t[1], 0) / open.length + 0.5 : null;
+  sg.walls = { inside, gates: open, st, square: wb.square, breachIn: toward(st.bx, st.by, 1.9), breachOut: toward(st.bx, st.by, -2.4), gateIn: open.length ? toward(gx, gy, 1.9) : null };
+}
+
+// Tore zu: Die Torfelder werden gesperrt. Wer im Tor steht, tritt beiseite.
+function closeGates(sg) {
+  const w = sg.walls, W = G.world;
+  if (!w || sg.gatesClosed) return;
+  sg.gatesClosed = true;
+  for (const [x, y] of w.gates) W.block[y * W.N + x] = 1;
+  for (const u of G.units) {
+    if (u.dead || isWalkable(W, u.x, u.y) || Math.hypot(u.x - sg.site.x, u.y - sg.site.y) > 20) continue;
+    const q = nearestWalkable(W, Math.floor(u.x), Math.floor(u.y), 3);
+    if (q) { u.x = q.x + 0.5; u.y = q.y + 0.5; u.path = null; }
+  }
+}
+
+function openGates(sg) {
+  const w = sg.walls, W = G.world;
+  if (!w || !sg.gatesClosed) return;
+  sg.gatesClosed = false;
+  for (const [x, y] of w.gates) W.block[y * W.N + x] = 0;
+}
+
+// Nach dem Neuaufbau der Sperrkarte (Burgausbau, Laden): Breschen offen, Tore der laufenden Belagerung zu
+export function applyWallState() {
+  const W = G.world;
+  if (!W || !G.s) return;
+  const N = W.N;
+  for (const st of Object.values(G.s.walls || {})) if (st.open) for (const [x, y] of st.tiles) W.block[y * N + x] = 0;
+  const sg = G.siege;
+  if (sg && sg.walls && sg.gatesClosed) for (const [x, y] of sg.walls.gates) W.block[y * N + x] = 1;
+}
+
+function siteName(s) { return s.type === 'spieler' ? homeName() : s.name; }
+
+// Ein Stein trifft die Mauer: Staub, Splitter, Schaden. Bei vollem Schaden bricht die Bresche auf.
+function hitWall(sg) {
+  const st = sg.walls.st;
+  st.dmg = Math.min(1, (st.dmg || 0) + rand(0.13, 0.21));
+  G.fx.push({ kind: 'staub', x: st.bx, y: st.by, t: 0, dur: 1.5, col: '#a49a88' });
+  for (let k = 0; k < 6; k++) G.fx.push({ kind: 'splitter', x: st.bx, y: st.by, vx: rand(-2, 2), vy: rand(-2, 2), z0: 24, t: 0, dur: 0.9, col: '#8f897c' });
+  if (st.dmg >= 1) openBreach(sg);
+}
+
+function openBreach(sg) {
+  const st = sg.walls.st, W = G.world, p = G.s.player;
+  if (st.open) return;
+  st.open = true; st.dmg = 1; st.since = G.s.day;
+  for (const [x, y] of st.tiles) W.block[y * W.N + x] = 0;
+  // Führt kein Weg durch die Lücke (Mauer mit Treppenstufen), wird sie verbreitert
+  const w = sg.walls;
+  if (!findPath(W, w.breachOut.x, w.breachOut.y, w.breachIn.x, w.breachIn.y, 3000) || (findPath(W, w.breachOut.x, w.breachOut.y, w.breachIn.x, w.breachIn.y, 3000) || []).length > 8) {
+    const N = W.N, bx = Math.floor(st.bx), by = Math.floor(st.by);
+    for (let y = by - 2; y <= by + 2; y++) for (let x = bx - 2; x <= bx + 2; x++) {
+      const i = y * N + x;
+      if (!W.block[i] || Math.hypot(x + 0.5 - st.bx, y + 0.5 - st.by) > 2.2 || w.gates.some((g) => g[0] === x && g[1] === y)) continue;
+      W.block[i] = 0;
+      st.tiles.push([x, y]);
+    }
+  }
+  G.fx.push({ kind: 'staub', x: st.bx, y: st.by, t: 0, dur: 2.6, col: '#8a8070' });
+  if (Math.hypot(sg.site.x - p.x, sg.site.y - p.y) < 80) log(`Die Mauer von ${siteName(sg.site)} bricht! Eine Bresche klafft, Schutt liegt im Graben.`, 'bad');
+}
+
+// Wo die Besatzung herauskommt: aus dem Bergfried, bei Städten aus den Häusern
+function musterPoints(sg) {
+  const s = sg.site, w = sg.walls;
+  if (s.type === 'burg' || s.type === 'spieler') return [walkPt(s.x - 0.6, s.y + 0.9), walkPt(s.x + 0.4, s.y + 0.4)];
+  const houses = siteBuildings(s.id).filter((b) => !w || w.inside(b.x, b.y)).sort(() => Math.random() - 0.5).slice(0, 6);
+  const pts = houses.map((b) => walkPt(b.x, b.y + b.wy / 2 + 0.35));
+  return pts.length ? pts : [walkPt(s.x, s.y + 1)];
+}
+
+// Posten: Nahkämpfer in zwei Reihen hinter der Bresche, ein Teil am Tor, Schützen dicht hinter der Mauer.
+// Jeder Posten liegt sicher innerhalb der Mauer, sonst rückt er zur Mitte hin nach.
+function insidePt(sg, p) {
+  const s = sg.site, w = sg.walls;
+  let q = walkPt(p.x, p.y);
+  for (let k = 1; k <= 8 && !(w.inside(q.x, q.y) && isWalkable(G.world, q.x, q.y)); k++) {
+    const t = k / 8;
+    q = walkPt(p.x + (s.x - p.x) * t * 0.6, p.y + (s.y - p.y) * t * 0.6);
+  }
+  return q;
+}
+
+function defenderPosts(sg, members) {
+  const posts = rawPosts(sg, members);
+  return sg.walls ? posts.map((p) => insidePt(sg, p)) : posts;
+}
+
+function rawPosts(sg, members) {
+  const s = sg.site, w = sg.walls;
+  if (!w) return members.map(() => walkPt(s.x + rand(-1.6, 1.6), s.y + 1 + rand(-1, 1)));
+  const b = w.breachIn, dx = b.x - w.st.bx, dy = b.y - w.st.by, l = Math.hypot(dx, dy) || 1;
+  const ix = dx / l, iy = dy / l, lx = -iy, ly = ix;
+  let melee = 0, ranged = 0;
+  return members.map((m) => {
+    if (m.st.ranged) {
+      const k = ranged++;
+      const side = ((k % 6) - 2.5) * 0.9;
+      return walkPt(w.st.bx + ix * 1.1 + lx * side, w.st.by + iy * 1.1 + ly * side);
+    }
+    const k = melee++;
+    if (w.gateIn && k % 3 === 2) return walkPt(w.gateIn.x + rand(-0.7, 0.7), w.gateIn.y + rand(-0.7, 0.7));
+    const j = k - Math.floor(k / 3);
+    const row = Math.floor(j / 4), col = (j % 4) - 1.5;
+    return walkPt(b.x + ix * row * 0.75 + lx * col * 0.8, b.y + iy * row * 0.75 + ly * col * 0.8);
+  });
+}
+
+// Besatzung aufstellen: Die Garnison kommt heraus und bezieht ihre Posten hinter der Mauer
 function raiseDefenders(sg) {
   const s = sg.site, own = s.type === 'spieler';
   const types = own ? ['wache'] : DEFENDER_NPC[s.faction] || ['wache'];
-  const n = own ? 3 + G.s.companions.filter((c) => c.status === 'garnison').length + (G.s.castle.b.wehr || 0) * 2 : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
-  const walled = s.type === 'burg' || s.type === 'spieler' || s.palisade;
-  const pos = walled ? { x: s.x + 0.4, y: s.y + 2.2 } : { x: s.x, y: s.y + 1 };
+  const n = own ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + (G.s.castle.b.wehr || 0) * 2 : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
+  const muster = musterPoints(sg);
   const members = [];
   for (let k = 0; k < n; k++) {
-    const m = makeNpc(k % 3 === 2 ? types[1] || types[0] : types[0], pos.x + rand(-1, 1), pos.y + rand(-1, 1), Math.floor(G.s.day / 8));
+    const at = muster[k % muster.length];
+    const m = makeNpc(k % 3 === 2 ? types[1] || types[0] : types[0], at.x + rand(-0.3, 0.3), at.y + rand(-0.3, 0.3), Math.floor(G.s.day / 8));
     if (own) m.lookObj = null;
     members.push(m);
   }
-  const g = spawnGroup('verteidiger', { pos, membersUnits: members });
+  const posts = defenderPosts(sg, members);
+  members.forEach((m, k) => { m.post = posts[k]; });
+  const g = spawnGroup('verteidiger', { pos: posts[0] || muster[0], membersUnits: members });
   if (!g) return null;
   g.faction = own ? null : s.faction; g.defender = s.id; g.wait = 99999; g.path = null; g.homeGuard = own;
   if (sg.side === 'att') g.engaged = true;
   rebuildUnits();
   return g;
+}
+
+// Pforte im Tor: Wer zur Stadt hält, wird eingelassen oder hinausgelassen
+export function posternNear() {
+  const sg = G.siege;
+  if (!sg || !sg.walls || !sg.gatesClosed) return null;
+  const p = G.s.player, s = sg.site;
+  if (s.type !== 'spieler' && (sg.side === 'att' || isHostileFaction(s.faction))) return null;
+  for (const [x, y] of sg.walls.gates) {
+    if (Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) < 1.9) return { x: x + 0.5, y: y + 0.5, inside: sg.walls.inside(p.x, p.y) };
+  }
+  return null;
+}
+export function usePostern() {
+  const pf = posternNear();
+  if (!pf) return false;
+  const s = G.siege.site, p = G.s.player;
+  const dx = s.x - pf.x, dy = s.y - pf.y, l = Math.hypot(dx, dy) || 1, k = pf.inside ? -1.8 : 1.8;
+  const to = walkPt(pf.x + (dx / l) * k, pf.y + (dy / l) * k);
+  p.x = to.x; p.y = to.y; p.path = null; p.attackTarget = null;
+  for (const c of partyMembers()) { c.x = to.x + rand(-0.4, 0.4); c.y = to.y + rand(-0.4, 0.4); c.path = null; c.chase = null; }
+  log(pf.inside ? 'Die Wachen öffnen die Pforte einen Spalt und lassen dich hinaus.' : 'Die Wachen öffnen die Pforte einen Spalt und lassen dich ein. Hinter dir fällt der Riegel.', 'good');
+  return true;
 }
 
 // ---------------------------------------------------------------- Ablauf
@@ -167,7 +378,13 @@ export function updateSiege(dt) {
   const far = Math.hypot(s.x - p.x, s.y - p.y) > 95;
   // Flugbahnen der Steine
   for (const sh of sg.shots) sh.t += dt;
-  for (const sh of sg.shots) if (sh.t >= sh.dur && !sh.hit) { sh.hit = true; damageBuilding(sh.b, rand(0.25, 0.4)); G.fx.push({ kind: 'staub', x: sh.x1, y: sh.y1, t: 0, dur: 1.2 }); }
+  for (const sh of sg.shots) {
+    if (sh.t < sh.dur || sh.hit) continue;
+    sh.hit = true;
+    if (sh.wall) { if (sg.walls) hitWall(sg); continue; }
+    damageBuilding(sh.b, rand(0.25, 0.4));
+    G.fx.push({ kind: 'staub', x: sh.x1, y: sh.y1, t: 0, dur: 1.2 });
+  }
   sg.shots = sg.shots.filter((sh) => sh.t < sh.dur + 0.1);
 
   if (!alive(army)) return endSiege(sg, 'abgewehrt');
@@ -175,8 +392,10 @@ export function updateSiege(dt) {
   if (sg.stage === 'anmarsch') {
     if (Math.hypot(army.x - sg.camp.x, army.y - sg.camp.y) < 3 || (!army.path && sg.t > 30)) {
       sg.stage = 'belagerung'; sg.t = 0;
+      setupWalls(sg);
+      closeGates(sg);
       sg.def = raiseDefenders(sg);
-      if (Math.hypot(s.x - p.x, s.y - p.y) < 70) log(`Die Belagerung von ${s.type === 'spieler' ? homeName() : s.name} beginnt. Das Trebuchet wird aufgestellt.`, 'bad');
+      if (Math.hypot(s.x - p.x, s.y - p.y) < 70) log(sg.walls ? `Die Tore von ${siteName(s)} schlagen zu, die Riegel fallen. Die Besatzung rückt aus und bezieht Stellung hinter der Mauer. Draußen wird das Trebuchet aufgestellt.` : `Die Belagerung von ${siteName(s)} beginnt. Das Trebuchet wird aufgestellt.`, 'bad');
     } else if (sg.t > 260) return endSiege(sg, 'abgezogen');
     return;
   }
@@ -184,24 +403,31 @@ export function updateSiege(dt) {
   if (sg.stage === 'belagerung') {
     sg.shotT -= dt;
     if (sg.shotT <= 0) {
-      sg.shotT = rand(5, 8);
+      sg.shotT = sg.storm ? rand(2.2, 3.4) : rand(5, 8);
       const houses = siteBuildings(s.id).filter((b) => (b.dmg || 0) < 0.95);
       const vh = s.type === 'spieler' ? (s.villageSpots || []).slice(0, villageHouses()) : [];
       const pool = houses.length ? houses : vh;
-      if (pool.length) {
+      // Meist zielt das Trebuchet auf die Mauer, bis die Bresche offen ist, sonst auf die Dächer
+      if (sg.walls && !sg.walls.st.open && (Math.random() < 0.75 || !pool.length)) {
+        sg.tre.fired = G.time;
+        sg.shots.push({ x0: sg.tre.x, y0: sg.tre.y, x1: sg.walls.st.bx, y1: sg.walls.st.by, t: -0.35, dur: 1.6, wall: true });
+      } else if (pool.length) {
         const b = pick(pool);
         if (!b.idx && b.idx !== 0) b.idx = `v${(s.villageSpots || []).indexOf(b)}`;
         sg.tre.fired = G.time;
         sg.shots.push({ x0: sg.tre.x, y0: sg.tre.y, x1: b.x, y1: b.y, t: -0.35, dur: 1.6, b });
       }
     }
-    // Der Sturm wartet, bis du nah genug bist (höchstens bis 160 s), damit du noch rechtzeitig kommst
+    // Ummauerte Orte: Gestürmt wird erst durch die Bresche. Hält die Mauer zu lange, bricht sie zuletzt doch.
+    // Der Sturm wartet, bis du nah genug bist (höchstens bis 160 s), damit du noch rechtzeitig kommst.
     const dS = Math.hypot(s.x - p.x, s.y - p.y);
-    if (sg.storm || (sg.t > 70 && (dS < 35 || sg.t > 160))) {
+    if (sg.walls && !sg.walls.st.open && sg.t > 150) openBreach(sg);
+    const ready = sg.walls ? sg.walls.st.open : sg.t > 70 || sg.storm;
+    if (ready && (sg.storm || dS < 35 || sg.t > 160)) {
       sg.stage = 'sturm';
       if (alive(sg.def)) { army.feud = sg.def; sg.def.feud = army; army.path = null; }
       if (s.type === 'spieler' && Math.hypot(s.x - p.x, s.y - p.y) < 60) army.engaged = true;
-      if (Math.hypot(s.x - p.x, s.y - p.y) < 70) log(`Sturm auf ${s.type === 'spieler' ? homeName() : s.name}! Die Angreifer rennen gegen das Tor an.`, 'bad');
+      if (Math.hypot(s.x - p.x, s.y - p.y) < 70) log(sg.walls ? `Sturm auf ${siteName(s)}! Die Angreifer drängen durch die Bresche, die Besatzung hält dagegen.` : `Sturm auf ${siteName(s)}! Die Angreifer rennen gegen die Verteidiger an.`, 'bad');
     }
     return;
   }
@@ -218,7 +444,10 @@ function resolveAbstract(sg) {
   const pd = G.s.pendingDead || (G.s.pendingDead = {});
   if (sg.site.cemetery) pd[sg.site.id] = (pd[sg.site.id] || 0) + Math.floor(rand(4, 12));
   (G.s.deadDay || (G.s.deadDay = {}))[sg.site.id] = G.s.day;
-  endSiege(sg, Math.random() < 0.5 ? 'gefallen' : 'abgewehrt', true);
+  // Deine eigene Burg hält, wenn Mauern, Türme und Garnison stark genug sind
+  const held = sg.site.type === 'spieler' ? castleDefense() >= (40 + G.s.day * 3) * rand(0.8, 1.2) : Math.random() < 0.5;
+  if (sg.site.type === 'spieler' && held) log(`Nachricht aus ${homeName()}: Die Besatzung hat die Belagerer abgewehrt.`, 'good');
+  endSiege(sg, held ? 'abgewehrt' : 'gefallen', !held && sg.site.type === 'spieler' ? false : true);
 }
 
 function endSiege(sg, how, quiet = false) {
@@ -240,7 +469,8 @@ function endSiege(sg, how, quiet = false) {
     if (near) log(s.type === 'spieler' ? `Die Belagerung von ${name} ist abgeschlagen!` : `Die Belagerung von ${name} ist abgeschlagen. Die Verteidiger jubeln.`, 'good');
   } else if (near) log(`Die Belagerer ziehen von ${name} ab.`);
   sideOutcome(sg, how, quiet);
-  // Heer zieht heim, Besatzung kehrt in die Häuser zurück
+  // Tore wieder auf (die Bresche bleibt, bis sie vermauert ist). Heer zieht heim, Besatzung kehrt in die Häuser zurück.
+  openGates(sg);
   const army = sg.army;
   if (army && G.groups.includes(army)) { army.siegeDone = true; army.feud = null; army.engaged = false; army.path = null; army.wait = rand(2, 5); army.peace = G.time + 120; }
   if (sg.def && G.groups.includes(sg.def)) { const i = G.groups.indexOf(sg.def); G.groups.splice(i, 1); for (const m of sg.def.members) m.dead = true; }
@@ -256,12 +486,13 @@ export function siegeStatus() {
   return {
     name: sg.site.type === 'spieler' ? homeName() : sg.site.name, stage: sg.stage, att: sg.army.members.length, def: sg.def ? sg.def.members.length : 0,
     x: sg.site.x, y: sg.site.y, army: GROUP_TYPES[sg.army.type].name, side: sg.side || null, camp: sg.camp, own: sg.site.type === 'spieler',
+    wall: sg.walls ? (sg.walls.st.open ? -1 : Math.round((sg.walls.st.dmg || 0) * 100)) : null, gates: !!sg.gatesClosed,
   };
 }
 
 // ---------------------------------------------------------------- Seitenwahl
 // Im Feldlager oder in der belagerten Stadt kannst du dich einer Seite anschließen.
-// Verteidiger: Die Besatzung wagt einen Ausfall, wenn du am Lager angreifst. Hält die Stadt, dankt sie dir.
+// Verteidiger: Die Wachen lassen dich durch die Pforte ein, ihr haltet gemeinsam die Bresche. Hält die Stadt, dankt sie dir.
 // Belagerer: Du bläst mit zum Sturm, die Besatzung greift dich an. Fällt die Stadt, bekommst du einen Beuteanteil.
 export function siegeAt(site) { return G.siege && G.siege.site === site ? G.siege : null; }
 export function nearSiegeCamp(r = 5) {
@@ -306,7 +537,7 @@ export function joinSiege(side) {
   if (side === 'def') {
     army.provoked = true;
     changeRep(army.faction, -5);
-    log(`Du stellst dich auf die Seite von ${s.name}. Greif das Feldlager an, dann wagt die Besatzung einen Ausfall und kämpft mit dir.`, 'good');
+    log(sg.walls ? `Du stellst dich auf die Seite von ${s.name}. Am Tor lassen dich die Wachen durch die Pforte ein (E). Halte mit der Besatzung die Bresche!` : `Du stellst dich auf die Seite von ${s.name}. Kämpf mit der Besatzung gegen das Heer!`, 'good');
   } else {
     changeRep(s.faction, -8);
     changeRep(army.faction, 3);
@@ -319,8 +550,10 @@ export function joinSiege(side) {
 export function canCallStorm() { const sg = G.siege; return !!sg && sg.side === 'att' && sg.stage === 'belagerung' && !sg.storm; }
 export function callStorm() {
   if (!canCallStorm()) return false;
-  G.siege.storm = true;
-  log(`Die Hörner blasen zum Sturm auf ${G.siege.site.name}!`, 'bad');
+  const sg = G.siege;
+  sg.storm = true;
+  if (sg.walls && !sg.walls.st.open) { sg.shotT = Math.min(sg.shotT, 1); log(`Auf dein Zeichen wirft das Trebuchet ohne Pause gegen die Mauer von ${sg.site.name}. Sobald die Bresche offen ist, stürmen alle.`, 'bad'); }
+  else log(`Die Hörner blasen zum Sturm auf ${sg.site.name}!`, 'bad');
   return true;
 }
 
@@ -333,11 +566,6 @@ function keepSides(sg) {
   if (p.dead) return;
   if (sg.side === 'def') {
     if (!army.engaged && near(army, 30)) army.engaged = true;
-    if (!sg.sortie && alive(def) && sg.stage === 'belagerung' && (army.engaged || Math.hypot(sg.camp.x - p.x, sg.camp.y - p.y) < 14)) {
-      sg.sortie = true;
-      army.feud = def; def.feud = army;
-      log(`Das Tor von ${sg.site.name} öffnet sich: Die Besatzung wagt einen Ausfall und kämpft an deiner Seite!`, 'good');
-    }
   } else if (alive(def) && !def.engaged && near(def, 26)) def.engaged = true;
 }
 
@@ -352,7 +580,7 @@ function sideOutcome(sg, how, quiet) {
   }
   const offer = sideOffer();
   if (side === 'def') {
-    if (how !== 'abgewehrt') { log(`Trotz deiner Hilfe ${how === 'gefallen' ? `ist ${s.name} gefallen` : `ist die Belagerung von ${s.name} zu Ende gegangen`}.`, how === 'gefallen' ? 'bad' : ''); return; }
+    if (how !== 'abgewehrt') { log(how === 'gefallen' ? `Trotz deiner Hilfe ist ${s.name} gefallen.` : `Die Belagerer ziehen von ${s.name} ab.`, how === 'gefallen' ? 'bad' : ''); return; }
     const gold = Math.round((offer.thanks * rand(0.85, 1.15)) / 10) * 10;
     G.s.gold += gold;
     changeRep(s.faction, 10);

@@ -381,6 +381,95 @@ function drawCityWallPiece(c, o) {
   drawMerlons(c, o.x, o.y, 1.0, 1.0, 38, col, 0.16);
 }
 
+// ---------------------------------------------------------------- Mauerschäden, Bresche, Tore (siege.js)
+// Schaden eines Mauerstücks an (x, y): Nahe der Bresche wächst er mit jedem Treffer. Ist die Bresche offen,
+// liegt dort nur noch Schutt. Nach der Belagerung wird vermauert, solange steht ein Gerüst.
+function wallHit(site, x, y) {
+  const st = G.s && G.s.walls && G.s.walls[site.id];
+  if (!st) return null;
+  const d = Math.hypot(x - st.bx, y - st.by);
+  if (d > 2.4) return null;
+  if (st.open && d < 1.55) return { gone: true };
+  const dmg = (st.open ? 1 : st.dmg || 0) * Math.max(0, 1 - Math.max(0, d - 0.6) / 1.8);
+  if (dmg < 0.08) return null;
+  return { gone: false, dmg, repair: !st.open && !(G.siege && G.siege.site === site) };
+}
+
+function drawWallRuined(c, x, y, wx, wy, h, col, hit) {
+  const along = wx >= wy;
+  if (hit.gone) {
+    // Schutt: ein flacher Haufen und ein paar Mauerstümpfe
+    const g = P(x, y);
+    c.fillStyle = 'rgba(60,52,44,0.35)';
+    c.beginPath(); c.ellipse(g[0], g[1], 26, 12, 0, 0, Math.PI * 2); c.fill();
+    drawBox(c, x, y, wx * 0.95, wy * 0.95, 4, mix(col, '#6f685e', 0.35), 0, 'stone');
+    const stub = (Math.abs(Math.floor(x * 7 + y * 13)) % 3) * 4 + 3;
+    drawBox(c, along ? x - wx * 0.3 : x, along ? y : y - wy * 0.3, along ? wx * 0.35 : wx, along ? wy : wy * 0.35, stub, mix(col, '#7a7266', 0.3), 0, 'stone');
+    drawStones(c, x + 0.25, y + 0.25, 7);
+    return;
+  }
+  // Beschädigt: oben ausgebrochen in Stufen, Risse und Löcher, Steine am Fuß
+  const d = hit.dmg;
+  const dark = mix(col, '#6a6258', 0.35 * d);
+  const cuts = [0.15, 0.6, 0.35];
+  for (let k = 0; k < 3; k++) {
+    const hh = h * (1 - cuts[k] * d * 1.1);
+    const sx = along ? x - wx / 3 + (k * wx) / 3 : x, sy = along ? y : y - wy / 3 + (k * wy) / 3;
+    drawBox(c, sx, sy, along ? wx / 3 + 0.01 : wx, along ? wy : wy / 3 + 0.01, hh, dark, 0, 'stone');
+    if (d < 0.3) drawMerlons(c, sx, sy, along ? wx / 3 : wx, along ? wy : wy / 3, hh, col, 0.16);
+  }
+  const hh = h * (1 - 0.45 * d);
+  c.strokeStyle = 'rgba(35,30,26,0.9)'; c.lineWidth = 1.3;
+  for (const face of ['L', 'R']) {
+    const n = 1 + Math.round(d * 3);
+    for (let k = 0; k < n; k++) {
+      const u = 0.15 + ((k * 0.29) % 0.68);
+      c.beginPath();
+      let pt = facePoint(x, y, wx, wy, face, u, hh);
+      c.moveTo(pt[0], pt[1]);
+      for (let j = 1; j <= 4; j++) { pt = facePoint(x, y, wx, wy, face, u + (j % 2 ? 0.07 : -0.05), hh * (1 - j * 0.17 * (0.6 + d))); c.lineTo(pt[0], pt[1]); }
+      c.stroke();
+    }
+    if (d > 0.35) faceQuad(c, x, y, wx, wy, face, 0.28, 0.28 + 0.4 * d, hh * (0.62 - 0.3 * d), hh * 0.84, 'rgba(28,24,20,0.85)');
+  }
+  if (d > 0.2) drawStones(c, x + 0.45, y + 0.45, Math.round(2 + d * 5));
+  if (hit.repair) drawScaffold(c, x, y, wx + 0.3, wy + 0.3, hh + 8);
+}
+
+// Geschlossenes Tor: Bohlen mit Eisenbändern
+function drawClosedGate(c, x, y, wx, wy, h) {
+  drawBox(c, x, y, wx, wy, h, '#6b4b2e', 0, 'plank');
+  for (const face of ['L', 'R']) {
+    for (const z of [h * 0.22, h * 0.6]) faceQuad(c, x, y, wx, wy, face, 0.02, 0.98, z, z + 2.2, '#2c2622');
+    faceQuad(c, x, y, wx, wy, face, 0.485, 0.515, 0, h, '#2c2622');
+  }
+}
+
+// Tore der laufenden Belagerung als Objekte für die Tiefensortierung
+function siegeGateParts() {
+  const sg = G.siege;
+  if (!sg || !sg.walls || !sg.gatesClosed) return [];
+  const s = sg.site, W = G.world, out = [];
+  if (sg.walls.square) {
+    const lvl = s.type === 'spieler' ? G.s.castle.level : s.castleLevel || 0;
+    const x = s.x, y = s.y + 4, h = lvl >= 2 ? (lvl >= 3 ? 36 : 26) : 22;
+    out.push({ x, y, d: x + y, z: groundZ(W, x, y), f: (c) => drawClosedGate(c, x, y, 1.7, 0.42, h), box: [x - 0.85, x + 0.85, y - 0.21, y + 0.21], big: true });
+    return out;
+  }
+  const h = s.cityWall ? 30 : 18;
+  for (const [tx, ty] of sg.walls.gates) {
+    const x = tx + 0.5, y = ty + 0.5;
+    // Torflügel quer zur Straße: liegt das Tor im Osten oder Westen, verläuft die Mauer von Nord nach Süd
+    const ew = Math.abs(x - s.x) > Math.abs(y - s.y);
+    const wx = ew ? 0.42 : 1.0, wy = ew ? 1.0 : 0.42;
+    out.push({ x, y, d: x + y, z: groundZ(W, x, y), f: (c) => {
+      drawClosedGate(c, x, y, wx, wy, h);
+      if (s.cityWall) { drawBox(c, x, y, ew ? 0.9 : 1.0, ew ? 1.0 : 0.9, 8, '#b9b1a1', h, 'stone'); drawMerlons(c, x, y, ew ? 0.9 : 1.0, ew ? 1.0 : 0.9, h + 8, '#b9b1a1', 0.16); }
+    }, box: [x - wx / 2, x + wx / 2, y - wy / 2, y + wy / 2], big: true });
+  }
+  return out;
+}
+
 // Wirtshaus: Ausleger mit Schild, Bänke und Tisch vor der Tür
 function drawTavernFront(c, b) {
   const [ax, ay] = P(b.x + b.wx / 2, b.y + b.wy / 2, b.h * 0.85);
@@ -1381,11 +1470,16 @@ function castlePieces(site, level, bannerCol) {
     for (const s of sides) {
       if (s.gate) continue;
       add(s.x, s.y, (c) => {
+        const hit = wallHit(site, s.x, s.y);
         for (let k = -1; k <= 1; k++) {
           const px = s.along === 'x' ? s.x + k * 0.33 : s.x, py = s.along === 'y' ? s.y + k * 0.33 : s.y;
-          drawBox(c, px, py, 0.24, 0.24, 24, wood);
-          drawPyramid(c, px, py, 0.24, 0.24, 24, 6, wood);
+          const sh = !hit ? 24 : hit.gone ? (k === 0 ? 0 : 5) : 24 * (1 - 0.55 * hit.dmg * ((k + 2) % 3 === 0 ? 1 : 0.5));
+          if (sh <= 0) continue;
+          drawBox(c, px, py, 0.24, 0.24, sh, hit ? '#7a5a3a' : wood);
+          if (sh > 12) drawPyramid(c, px, py, 0.24, 0.24, sh, 6, wood);
         }
+        if (hit && hit.gone) drawLogs(c, s.x + 0.3, s.y + 0.3, 3);
+        if (hit && hit.repair) drawScaffold(c, s.x, s.y, 1.1, 0.6, 30);
       });
     }
     for (const gx of [-1.15, 1.15]) add(cx + gx, cy + R, (c) => { drawBox(c, cx + gx, cy + R, 0.5, 0.5, 34, wood, 0, 'plank'); drawPyramid(c, cx + gx, cy + R, 0.5, 0.5, 34, 8, ROOFS.wood); });
@@ -1407,6 +1501,8 @@ function castlePieces(site, level, bannerCol) {
     if (s.gate) continue;
     add(s.x, s.y, (c) => {
       const wx = s.along === 'x' ? 1.02 : 0.5, wy = s.along === 'y' ? 1.02 : 0.5;
+      const hit = wallHit(site, s.x, s.y);
+      if (hit) { drawWallRuined(c, s.x, s.y, wx, wy, wh, stone, hit); return; }
       drawBox(c, s.x, s.y, wx, wy, wh, stone, 0, 'stone');
       for (const k of [-0.25, 0.25]) {
         const mx = s.along === 'x' ? s.x + k : s.x, my = s.along === 'y' ? s.y + k : s.y;
@@ -1469,7 +1565,14 @@ function palisadeRing(site, r) {
     const a = (k / n) * Math.PI * 2;
     if (Math.abs(a - Math.PI * 0.5) < 0.28) continue;
     const x = site.x + Math.cos(a) * r, y = site.y + Math.sin(a) * r;
-    parts.push({ x, y, d: x + y, z: z0, f: (c) => { drawBox(c, x, y, 0.22, 0.22, 20, wood); drawPyramid(c, x, y, 0.22, 0.22, 20, 5, wood); } });
+    parts.push({ x, y, d: x + y, z: z0, f: (c) => {
+      const hit = wallHit(site, x, y);
+      if (!hit) { drawBox(c, x, y, 0.22, 0.22, 20, wood); drawPyramid(c, x, y, 0.22, 0.22, 20, 5, wood); return; }
+      if (hit.gone) { if (k % 2) drawBox(c, x, y, 0.22, 0.22, 4, '#5a4030'); return; }
+      const h = 20 * (1 - 0.6 * hit.dmg * (k % 2 ? 1 : 0.4));
+      drawBox(c, x, y, 0.22, 0.22, h, '#7a5a3a');
+      if (hit.repair && k % 3 === 0) drawScaffold(c, x, y, 0.5, 0.5, 24);
+    } });
   }
   return parts;
 }
@@ -1550,7 +1653,12 @@ function buildStaticParts() {
         const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
         const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
         const hw = o.tower ? 0.62 : 0.5;
-        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o)), box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
+        const site = s;
+        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => {
+          const hit = !o.tower && wallHit(site, o.x, o.y);
+          if (hit) drawWallRuined(c, o.x, o.y, 1.0, 1.0, 38, '#b9b1a1', hit);
+          else cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o));
+        }, box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
       });
     }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
@@ -3538,6 +3646,7 @@ export function render() {
     for (const sh of sg.shots) objs.push({ d: 1e6, z: 0, f: (c) => drawSiegeShot(c, sh) });
   }
   for (const part of tourneyParts()) if (inView(part.x, part.y)) objs.push(part);
+  for (const part of siegeGateParts()) if (inView(part.x, part.y)) objs.push(part);
   for (const s of W.sites) if (s.type === 'einsiedelei' && inView(s.x, s.y)) objs.push({ d: s.x + s.y + 3, z: zAt(s.x, s.y), f: (c) => drawMysticGlow(c, s) });
   for (const g of gallows) objs.push({ d: g.x + g.y, z: zAt(g.x, g.y), f: (c) => drawGallows(c, g, G.exec && G.exec.g === g && G.exec.hanged) });
   for (const f of G.fx) {

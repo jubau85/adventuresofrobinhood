@@ -287,13 +287,17 @@ export function dailyCastle() {
 function checkRaid() {
   if (G.s.day < 5) return;
   const threats = [];
-  if (isHostileFaction('normannen')) threats.push({ by: 'Normannische Truppen', str: 40 + G.s.day * 3, chance: 0.2, army: 'heer_john' });
+  // Feindliche Fraktionen mit Heeren belagern die Burg. Ab −60 (sehr feindlich) kommen sie öfter.
+  for (const [f, by, army] of [['normannen', 'Normannische Truppen', 'heer_john'], ['sachsen', 'Sächsische Aufgebote', 'heer_richard']]) {
+    if (!isHostileFaction(f)) continue;
+    threats.push({ by, str: 40 + G.s.day * 3, chance: G.s.rep[f] <= -60 ? 0.35 : 0.2, army });
+  }
   if (isHostileFaction('waldleute')) threats.push({ by: 'Waldleute', str: 25 + G.s.day * 2, chance: 0.15 });
   threats.push({ by: 'Raubgesindel', str: 12 + G.s.day * 1.6, chance: 0.07 });
   for (const t of threats) {
     if (Math.random() >= t.chance) continue;
     const home = castleSite(), p = G.s.player;
-    if (t.army && !G.siege && Math.hypot(home.x - p.x, home.y - p.y) < 100 && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) break;
+    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) { G.s.lastHomeSiege = G.s.day; break; }
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {
