@@ -2,7 +2,7 @@
 
 import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY, CASTLE_PLOT } from './data.js';
-import { CHARGES, CHARGE_IDS, chargeSVG, PLATE_W, PLATE_H } from './heraldry.js';
+import { CHARGES, CHARGE_IDS, chargeSVG, preloadChargeArt, PLATE_W, PLATE_H } from './heraldry.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
 import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, sfxEnabled, setSfxEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
@@ -818,6 +818,7 @@ function boot(hotData) {
   try { if (window.__aktRelease) window.__aktRelease(); } catch (e) { /* ältere Fassung ohne Aufräumen */ }
   window.__aktRelease = releaseRender;
   loadArt();
+  preloadChargeArt();
   viewCanvas = byId('view');
   mini = byId('minimap');
   initRender(viewCanvas);

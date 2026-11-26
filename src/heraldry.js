@@ -1,6 +1,6 @@
-// Wappen: Schild in der Wappenfarbe, darauf ein Tier oder Zeichen in Gold oder Silber, schwarz umrandet.
-// Die Bilder sind SVG-Pfade in einem Feld von 100 × 100; dieselben Pfade dienen dem Startmenü (SVG) und dem Spiel
-// (Canvas, Path2D) für Banner und Fahnen.
+// Wappen: Schild in der Wappenfarbe, darauf ein Tier oder Zeichen in Gold oder Silber.
+// Die Wappenbilder sind gemalt (assets/wappen, geschnitten mit tools/wappenbilder.py). Jedes gibt es außerdem als
+// SVG-Pfad in einem Feld von 100 × 100, der einspringt, solange ein Bild noch lädt.
 
 export const METALS = { gold: { name: 'Gold', color: '#e3b843' }, silber: { name: 'Silber', color: '#ecebe4' } };
 const INK = '#20160e';
@@ -119,21 +119,62 @@ export const SHIELD_PATH = 'M6 6 H94 V48 C94 82 74 102 50 112 C26 102 6 82 6 48 
 
 const fillOf = (f, arms) => (f === 'm' ? (METALS[arms.metal] || METALS.gold).color : f === 'f' ? arms.field : INK);
 
+// Gemalte Wappenbilder (tools/wappenbilder.py), je in Gold und Silber; der Rabe ist in beiden schwarz. Solange ein
+// Bild nicht geladen ist (oder ohne Bilder), zeichnen die Pfade oben dasselbe Wappenbild.
+const CHARGE_ART = {
+  loewe: ['assets/wappen/loewe_gold.webp', 'assets/wappen/loewe_silber.webp'],
+  adler: ['assets/wappen/adler_gold.webp', 'assets/wappen/adler_silber.webp'],
+  hirsch: ['assets/wappen/hirsch_gold.webp', 'assets/wappen/hirsch_silber.webp'],
+  eber: ['assets/wappen/eber_gold.webp', 'assets/wappen/eber_silber.webp'],
+  rabe: ['assets/wappen/rabe_gold.webp', 'assets/wappen/rabe_silber.webp'],
+  kreuz: ['assets/wappen/kreuz_gold.webp', 'assets/wappen/kreuz_silber.webp'],
+  lilie: ['assets/wappen/lilie_gold.webp', 'assets/wappen/lilie_silber.webp'],
+  stern: ['assets/wappen/stern_gold.webp', 'assets/wappen/stern_silber.webp'],
+  turm: ['assets/wappen/turm_gold.webp', 'assets/wappen/turm_silber.webp'],
+  mond: ['assets/wappen/mond_gold.webp', 'assets/wappen/mond_silber.webp'],
+  schwerter: ['assets/wappen/schwerter_gold.webp', 'assets/wappen/schwerter_silber.webp'],
+  rose: ['assets/wappen/rose_gold.webp', 'assets/wappen/rose_silber.webp'],
+};
+const ART_FILL = 0.94;   // Anteil des Feldes von 100 × 100, den ein gemaltes Bild höchstens einnimmt
+const artSrc = (id, metal) => CHARGE_ART[id] && CHARGE_ART[id][metal === 'silber' ? 1 : 0];
+const artImgs = {};
+function chargeArt(id, metal) {
+  const src = artSrc(id, metal);
+  if (!src || typeof Image === 'undefined') return null;
+  let im = artImgs[src];
+  if (!im) { im = new Image(); im.decoding = 'async'; im.src = src; artImgs[src] = im; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+// Alle Bilder gleich anfordern, damit sie beim ersten Zeichnen schon da sind
+export function preloadChargeArt() { for (const id of Object.keys(CHARGE_ART)) { chargeArt(id, 'gold'); chargeArt(id, 'silber'); } }
+// Breite und Höhe des Bildes als Anteil der Feldgröße (für die Helmzier, die auf dem Helm stehen soll)
+export function chargeFit(arms) {
+  const im = arms && chargeArt(arms.charge, arms.metal);
+  if (!im) return { w: 1, h: 1, art: false };
+  const r = im.naturalWidth / im.naturalHeight;
+  return { w: ART_FILL * Math.min(1, r), h: ART_FILL * Math.min(1, 1 / r), art: true };
+}
+// SVG-Inhalt eines Wappenbilds im Feld 100 × 100
+function chargeInner(id, arms, sw) {
+  const src = artSrc(id, arms.metal);
+  if (src) { const m = (100 - ART_FILL * 100) / 2; return `<image href="${src}" x="${m}" y="${m}" width="${ART_FILL * 100}" height="${ART_FILL * 100}" preserveAspectRatio="xMidYMid meet"/>`; }
+  const ch = CHARGES[id];
+  return ch ? ch.parts.map((p) => `<path d="${p.d}" fill="${fillOf(p.f, arms)}" stroke="${INK}" stroke-width="${sw}" stroke-linejoin="round"/>`).join('') : '';
+}
+
 // Wappen als SVG (Startmenü, Panels). size: Breite in Pixeln
 export function armsSVG(arms, size = 64, title = '') {
-  const ch = CHARGES[arms.charge];
-  const parts = ch ? ch.parts.map((p) => `<path d="${p.d}" fill="${fillOf(p.f, arms)}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`).join('') : '';
+  const parts = chargeInner(arms.charge, arms, 2.2);
   return `<svg viewBox="0 0 100 116" width="${size}" height="${Math.round(size * 1.16)}" role="img" aria-label="${title || 'Wappen'}">
     <defs><linearGradient id="wg${size}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="0.6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.22"/></linearGradient></defs>
     <path d="${SHIELD_PATH}" fill="${arms.field}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>
-    <g transform="translate(14 12) scale(0.72)">${parts}</g>
+    <g transform="translate(12 10) scale(0.76)">${parts}</g>
     <path d="${SHIELD_PATH}" fill="url(#wg${size})"/>
   </svg>`;
 }
 // Nur das Bild ohne Schild (Auswahlknöpfe)
 export function chargeSVG(id, arms, size = 34) {
-  const ch = CHARGES[id];
-  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${ch.parts.map((p) => `<path d="${p.d}" fill="${fillOf(p.f, arms)}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>`).join('')}</svg>`;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${chargeInner(id, arms, 3)}</svg>`;
 }
 
 // Auf der Zeichenfläche: Bild mit Mitte (cx, cy) und Größe s (Weltpixel), z. B. auf einem Banner
@@ -141,7 +182,14 @@ const pathCache = new Map();
 function path2d(d) { let p = pathCache.get(d); if (!p) { p = new Path2D(d); pathCache.set(d, p); } return p; }
 export function drawCharge(c, arms, cx, cy, s) {
   const ch = arms && CHARGES[arms.charge];
-  if (!ch || typeof Path2D === 'undefined') return;
+  if (!ch) return;
+  const im = chargeArt(arms.charge, arms.metal);
+  if (im) {
+    const f = chargeFit(arms), w = s * f.w, h = s * f.h;
+    c.drawImage(im, cx - w / 2, cy - h / 2, w, h);
+    return;
+  }
+  if (typeof Path2D === 'undefined') return;
   c.save();
   c.translate(cx - s / 2, cy - s / 2); c.scale(s / 100, s / 100);
   c.lineJoin = 'round'; c.lineWidth = Math.max(2.5, 100 / s * 0.6); c.strokeStyle = INK;
@@ -156,7 +204,7 @@ export function drawArms(c, arms, x, y, w) {
   const sh = path2d(SHIELD_PATH);
   c.fillStyle = arms.field; c.fill(sh);
   c.restore();
-  drawCharge(c, arms, x, y + 0.48 * w, w * 0.72);
+  drawCharge(c, arms, x, y + 0.48 * w, w * 0.76);
   c.save(); c.translate(x - w / 2, y); c.scale(k, k);
   c.lineWidth = 4; c.strokeStyle = INK; c.stroke(sh);
   c.restore();
@@ -486,7 +534,7 @@ export function drawKnightPlate(c, w, h, arms, t = 0, opt = {}) {
   for (const [x, y] of [[121, 155], [124.5, 155], [121, 159], [124.5, 159], [122.7, 163]]) { c.beginPath(); c.arc(x, y, 0.75, 0, Math.PI * 2); c.fill(); }
   c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(119, 134); c.quadraticCurveTo(129, 133, 134, 137); c.stroke();
   // Das Wappenbild als große Helmzier, darunter der Helmwulst in Feld und Metall
-  drawCharge(c, arms, 125, 108, 52);
+  { const cs = 52, f = chargeFit(arms); drawCharge(c, arms, 125, f.art ? 134 - (cs * f.h) / 2 : 108, cs); }
   for (let i = 0; i < 6; i++) { c.beginPath(); c.ellipse(112.5 + i * 5.1, 131, 3, 2.6, 0.5, 0, Math.PI * 2); msInk(c, i % 2 ? metal : field, 0.7); }
   // Arm in Kettenhemd, Faust um den Schaft
   const armPath = () => msLimb(c, [[138, 172], [112, 186], [90, 180]], [11, 10, 9]);
