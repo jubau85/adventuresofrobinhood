@@ -20,7 +20,7 @@ import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } f
 import { initWeather, updateWeather } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
-import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
+import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog,
 } from './ui.js';
@@ -496,8 +496,9 @@ function bindInput() {
 }
 
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const r = viewCanvas.getBoundingClientRect();
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  while (dpr > 1 && r.width * r.height * dpr * dpr > 9e6) dpr = Math.max(1, dpr - 0.25);
   G.view.w = r.width; G.view.h = r.height; G.view.dpr = dpr;
   viewCanvas.width = Math.round(r.width * dpr);
   viewCanvas.height = Math.round(r.height * dpr);
@@ -533,8 +534,30 @@ function updateCamera(dt) {
   G.cam.y += (ty - G.cam.y) * k;
 }
 
-let last = performance.now(), hudT = 0, miniT = 0;
+// Jede neue Fassung (etwa beim Neuladen der Artifact-Seite) beendet die Schleife der alten.
+// Ein Fehler beim Zeichnen hält die Schleife nicht mehr an, sondern wird angezeigt.
+const BOOT_ID = (window.__aktBoot = (window.__aktBoot || 0) + 1);
+let faultShown = false;
+function showFault(e) {
+  console.error(e);
+  if (faultShown) return;
+  faultShown = true;
+  const box = document.createElement('div');
+  box.id = 'fault';
+  box.setAttribute('role', 'alert');
+  box.innerHTML = `<p><b>Hier ist etwas schiefgegangen.</b> ${esc(e && e.message ? e.message : String(e))}</p><p>Lade die Seite bitte neu. Passiert es wieder, schick diese Meldung.</p><button class="btn primary" type="button">Seite neu laden</button>`;
+  box.querySelector('button').addEventListener('click', () => location.reload());
+  document.body.appendChild(box);
+}
+
 function frame(now) {
+  if (window.__aktBoot !== BOOT_ID) return;
+  requestAnimationFrame(frame);
+  try { frameBody(now); } catch (e) { showFault(e); }
+}
+
+let last = performance.now(), hudT = 0, miniT = 0;
+function frameBody(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   // Mittlere Bildrate: bestimmt, wie groß Schlachten werden dürfen
@@ -564,31 +587,43 @@ function frame(now) {
     setMood(inCombat() ? 'kampf' : darkness() > 0.35 ? 'nacht' : 'welt');
   }
   if (!byId('title').hidden) {
-    drawTitleScreen();
     setMood('titel');
-    return requestAnimationFrame(frame);
+    drawTitleScreen();
+    return;
   }
   render();
-  requestAnimationFrame(frame);
 }
 
 // Titelbild und Vorschau zeichnen (nur solange das Startmenü offen ist)
 let titleCv = null, titleCtx = null;
 function drawTitleScreen() {
-  if (!titleCv) { titleCv = byId('title-art'); titleCtx = titleCv.getContext('2d'); }
+  let fault = null;
+  try { drawTitleBackground(); } catch (e) { fault = e; }
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = window.innerWidth, h = window.innerHeight;
-  if (titleCv.width !== Math.round(w * dpr) || titleCv.height !== Math.round(h * dpr)) { titleCv.width = Math.round(w * dpr); titleCv.height = Math.round(h * dpr); }
-  titleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawTitleArt(titleCtx, w, h, G.time, titleColor);
   const pv = byId('hero-preview');
   const pw = Math.round(pv.clientWidth * dpr) || 300;
   if (pv.width !== pw) { pv.width = pw; pv.height = Math.round(pw / 2); }
   drawHeroPreview(pv, titleColor, titleFemale, G.time);
+  if (fault) throw fault;
+}
+
+function drawTitleBackground() {
+  if (!titleCv || !titleCv.isConnected || !titleCtx) { titleCv = byId('title-art'); titleCtx = titleCv.getContext('2d'); }
+  if (!titleCtx) throw new Error('Der Browser gibt keine Zeichenfläche für das Titelbild her (wahrscheinlich zu wenig Grafikspeicher).');
+  // Höchstens etwa 9 Millionen Bildpunkte, damit auch Safari genug Grafikspeicher behält
+  const w = Math.min(window.innerWidth, 4000), h = Math.min(window.innerHeight, 3000);
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  while (dpr > 1 && w * h * dpr * dpr > 9e6) dpr = Math.max(1, dpr - 0.25);
+  if (titleCv.width !== Math.round(w * dpr) || titleCv.height !== Math.round(h * dpr)) { titleCv.width = Math.round(w * dpr); titleCv.height = Math.round(h * dpr); }
+  titleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawTitleArt(titleCtx, w, h, G.time, titleColor);
 }
 
 // ---------------------------------------------------------------- Boot
 function boot(hotData) {
+  // Speicher einer älteren Fassung im selben Fenster freigeben
+  try { if (window.__aktRelease) window.__aktRelease(); } catch (e) { /* ältere Fassung ohne Aufräumen */ }
+  window.__aktRelease = releaseRender;
   loadArt();
   viewCanvas = byId('view');
   mini = byId('minimap');

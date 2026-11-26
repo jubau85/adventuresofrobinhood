@@ -19,6 +19,7 @@ import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weathe
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
+let chunksVisible = 24;
 const chunkCache = new Map();
 let cacheSeason = -1;
 let sprites = null, spriteSeason = -1;
@@ -2411,7 +2412,9 @@ function getChunk(cx, cy, cs = 1) {
   if (ch) { chunkCache.delete(key); chunkCache.set(key, ch); return ch; }
   ch = renderChunk(cx, cy, cs);
   chunkCache.set(key, ch);
-  const max = Math.max(24, Math.floor(260 / (cs * cs)));
+  // Speicher für Bodenkacheln begrenzen (rund 40 Millionen Bildpunkte), aber nie weniger als gerade sichtbar
+  const px = CHUNK * TW * cs * (CHUNK * TH + PAD_TOP + 4) * cs;
+  const max = Math.max(chunksVisible + 6, Math.floor(40e6 / px));
   while (chunkCache.size > max) chunkCache.delete(chunkCache.keys().next().value);
   return ch;
 }
@@ -3170,6 +3173,16 @@ export function resetRender() {
   birds = [];
 }
 
+// Alle Zwischenbilder freigeben (beim Neuladen einer neuen Fassung im selben Fenster)
+export function releaseRender() {
+  chunkCache.clear();
+  partCache.clear();
+  sprites = null;
+  minimapBase = null;
+  lowCv = null; lowCtx = null;
+  for (const cv of [canvas]) if (cv) { cv.width = 1; cv.height = 1; }
+}
+
 export function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.castleDirty = true; }
 
 // Neue gemalte Grafik geladen: Bäume und Boden neu aufbauen
@@ -3233,17 +3246,20 @@ export function render() {
   const cy0 = Math.max(0, Math.floor(minY / CHUNK)), cy1 = Math.min(CN - 1, Math.floor(maxY / CHUNK));
   const isoL = cam.x - w / 2 / z - 80, isoR = cam.x + w / 2 / z + 80, isoT = cam.y - h / 2 / z - 140, isoB = cam.y + h / 2 / z + 120;
 
-  const cs = low ? 1 : Math.max(1, Math.min(4, Math.ceil(z * dpr - 0.15)));
+  const cs = low ? 1 : Math.max(1, Math.min(3, Math.ceil(z * dpr - 0.15)));
   cacheOn = low || z * dpr <= 2.6;
   cacheScale = low ? 1 : Math.max(1, Math.min(2, Math.ceil(z * dpr - 0.15)));
   // Platz für alles, was im letzten Bild zu sehen war, plus Reserve (kein ständiges Neuzeichnen)
   cacheMax = Math.max(Math.floor(300 / (cacheScale * cacheScale)), Math.ceil(cacheUsed * 1.3) + 20);
   cacheUsed = 0;
+  let nVis = 0;
   for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
     const ch = getChunk(cx, cy, cs);
+    nVis++;
     if (ch.x > isoR || ch.x + ch.w < isoL || ch.y > isoB || ch.y + ch.h < isoT) continue;
     wc.drawImage(ch.cvs, ch.x, ch.y, ch.w, ch.h);
   }
+  chunksVisible = nVis;
   drawSlab(wc, minX, maxX, minY, maxY);
   drawWaterShimmer(wc, minX, maxX, minY, maxY);
 

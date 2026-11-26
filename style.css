@@ -361,3 +361,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .cheat-toggles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); margin-bottom: 6px; }
 .cheat-toggles .btn { text-align: left; }
 .cheat-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Fehlermeldung statt stehenbleibender Schleife */
+#fault { position: fixed; z-index: 100; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(520px, calc(100% - 32px)); padding: 14px 18px; background: var(--parchment); color: var(--ink); border: 2px solid var(--wax); border-radius: 5px; box-shadow: 0 12px 30px rgba(0,0,0,0.5); font-family: var(--font-body); font-size: 16px; }
+#fault p { margin: 0 0 8px; }
