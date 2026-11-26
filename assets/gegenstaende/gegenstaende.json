@@ -1,0 +1,261 @@
+{
+ "knueppel": {
+  "art": "lang",
+  "griff": [
+   13.5,
+   10.8
+  ],
+  "meter": 0.8,
+  "winkel": 142.6,
+  "ppm": 128
+ },
+ "langschwert": {
+  "art": "lang",
+  "griff": [
+   12.3,
+   14.6
+  ],
+  "meter": 0.95,
+  "winkel": -44.6,
+  "ppm": 128
+ },
+ "kriegshammer": {
+  "art": "lang",
+  "griff": [
+   13.6,
+   21.3
+  ],
+  "meter": 0.8,
+  "winkel": 143.1,
+  "ppm": 128
+ },
+ "speer": {
+  "art": "lang",
+  "griff": [
+   103.9,
+   11.7
+  ],
+  "meter": 2.1,
+  "winkel": -43.4,
+  "ppm": 128
+ },
+ "streitaxt": {
+  "art": "lang",
+  "griff": [
+   14.6,
+   23.8
+  ],
+  "meter": 0.85,
+  "winkel": -40.7,
+  "ppm": 128
+ },
+ "kurzbogen": {
+  "art": "lang",
+  "griff": [
+   78.3,
+   5.1
+  ],
+  "meter": 1.2,
+  "winkel": -44.3,
+  "ppm": 128
+ },
+ "armbrust": {
+  "art": "lang",
+  "griff": [
+   34.4,
+   53.3
+  ],
+  "meter": 0.85,
+  "winkel": -30.4,
+  "ppm": 128
+ },
+ "axt": {
+  "art": "lang",
+  "griff": [
+   12.7,
+   17.7
+  ],
+  "meter": 0.75,
+  "winkel": -145.6,
+  "ppm": 128
+ },
+ "hammer": {
+  "art": "lang",
+  "griff": [
+   27.8,
+   36.8
+  ],
+  "meter": 0.4,
+  "winkel": 138.0,
+  "ppm": 256
+ },
+ "hacke": {
+  "art": "lang",
+  "griff": [
+   27.0,
+   57.5
+  ],
+  "meter": 1.1,
+  "winkel": -131.6,
+  "ppm": 128
+ },
+ "sichel": {
+  "art": "lang",
+  "griff": [
+   7.5,
+   20.1
+  ],
+  "meter": 0.5,
+  "winkel": -131.9,
+  "ppm": 128
+ },
+ "heugabel": {
+  "art": "lang",
+  "griff": [
+   83.9,
+   21.5
+  ],
+  "meter": 1.6,
+  "winkel": 138.9,
+  "ppm": 128
+ },
+ "besen": {
+  "art": "lang",
+  "griff": [
+   77.6,
+   25.6
+  ],
+  "meter": 1.3,
+  "winkel": 135.6,
+  "ppm": 128
+ },
+ "angelrute": {
+  "art": "lang",
+  "griff": [
+   23.6,
+   26.9
+  ],
+  "meter": 3.0,
+  "winkel": -39.7,
+  "ppm": 128
+ },
+ "wanderstab": {
+  "art": "lang",
+  "griff": [
+   133.5,
+   27.5
+  ],
+  "meter": 1.7,
+  "winkel": -132.5,
+  "ppm": 128
+ },
+ "kruecke": {
+  "art": "lang",
+  "griff": [
+   152.3,
+   31.6
+  ],
+  "meter": 1.3,
+  "winkel": -52.8,
+  "ppm": 128
+ },
+ "holzschild": {
+  "art": "aufrecht",
+  "griff": [
+   32.3,
+   38.4
+  ],
+  "meter": 0.6,
+  "ppm": 128
+ },
+ "holzschild_innen": {
+  "art": "aufrecht",
+  "griff": [
+   32.6,
+   38.4
+  ],
+  "meter": 0.6,
+  "ppm": 128
+ },
+ "rundschild": {
+  "art": "aufrecht",
+  "griff": [
+   45.0,
+   51.2
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "rundschild_innen": {
+  "art": "aufrecht",
+  "griff": [
+   45.5,
+   51.2
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "langschild": {
+  "art": "aufrecht",
+  "griff": [
+   35.2,
+   70.4
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "langschild_innen": {
+  "art": "aufrecht",
+  "griff": [
+   34.8,
+   70.4
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "wappenschild": {
+  "art": "aufrecht",
+  "griff": [
+   34.9,
+   51.2
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "wappenschild_innen": {
+  "art": "aufrecht",
+  "griff": [
+   34.9,
+   51.2
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "bettelschale": {
+  "art": "aufrecht",
+  "griff": [
+   17.9,
+   12.8
+  ],
+  "meter": 0.1,
+  "ppm": 256
+ },
+ "krug": {
+  "art": "aufrecht",
+  "griff": [
+   25.9,
+   35.8
+  ],
+  "meter": 0.28,
+  "ppm": 256
+ },
+ "becher": {
+  "art": "aufrecht",
+  "griff": [
+   11.9,
+   15.4
+  ],
+  "meter": 0.12,
+  "ppm": 256
+ }
+}

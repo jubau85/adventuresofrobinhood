@@ -516,6 +516,35 @@ const ART_FILES = {
   tier_ente: 'assets/tiere/ente.webp',
   tier_pferd: 'assets/tiere/pferd.webp',
   // Ende Tiere
+  // Gegenstände (tools/gegenstaende.py)
+  geg_knueppel: 'assets/gegenstaende/knueppel.webp',
+  geg_langschwert: 'assets/gegenstaende/langschwert.webp',
+  geg_kriegshammer: 'assets/gegenstaende/kriegshammer.webp',
+  geg_speer: 'assets/gegenstaende/speer.webp',
+  geg_streitaxt: 'assets/gegenstaende/streitaxt.webp',
+  geg_kurzbogen: 'assets/gegenstaende/kurzbogen.webp',
+  geg_armbrust: 'assets/gegenstaende/armbrust.webp',
+  geg_axt: 'assets/gegenstaende/axt.webp',
+  geg_hammer: 'assets/gegenstaende/hammer.webp',
+  geg_hacke: 'assets/gegenstaende/hacke.webp',
+  geg_sichel: 'assets/gegenstaende/sichel.webp',
+  geg_heugabel: 'assets/gegenstaende/heugabel.webp',
+  geg_besen: 'assets/gegenstaende/besen.webp',
+  geg_angelrute: 'assets/gegenstaende/angelrute.webp',
+  geg_wanderstab: 'assets/gegenstaende/wanderstab.webp',
+  geg_kruecke: 'assets/gegenstaende/kruecke.webp',
+  geg_holzschild: 'assets/gegenstaende/holzschild.webp',
+  geg_holzschild_innen: 'assets/gegenstaende/holzschild_innen.webp',
+  geg_rundschild: 'assets/gegenstaende/rundschild.webp',
+  geg_rundschild_innen: 'assets/gegenstaende/rundschild_innen.webp',
+  geg_langschild: 'assets/gegenstaende/langschild.webp',
+  geg_langschild_innen: 'assets/gegenstaende/langschild_innen.webp',
+  geg_wappenschild: 'assets/gegenstaende/wappenschild.webp',
+  geg_wappenschild_innen: 'assets/gegenstaende/wappenschild_innen.webp',
+  geg_bettelschale: 'assets/gegenstaende/bettelschale.webp',
+  geg_krug: 'assets/gegenstaende/krug.webp',
+  geg_becher: 'assets/gegenstaende/becher.webp',
+  // Ende Gegenstände
 };
 
 export const ART = {};

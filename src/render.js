@@ -3285,6 +3285,35 @@ function drawLance(c, u, by) {
   c.restore();
 }
 
+// ---------------------------------------------------------------- Gegenstände (tools/gegenstaende.py)
+// Waffen, Schilde und Werkzeuge aus den gemalten Bögen. Je Bild: Griffpunkt (x, y in Bildpunkten), Länge (lange Dinge) oder
+// Höhe (Schilde, Gefäße) in Metern, Bildpunkte je Meter und bei langen Dingen der Winkel, in dem sie gemalt waren.
+// Lange Dinge liegen waagerecht (Griffende links, Kopf rechts, Klinge unten) und werden um den Griff in die Hand gedreht.
+const GEG = {knueppel:[13.5,10.8,0.8,128,142.6],langschwert:[12.3,14.6,0.95,128,-44.6],kriegshammer:[13.6,21.3,0.8,128,143.1],speer:[103.9,11.7,2.1,128,-43.4],streitaxt:[14.6,23.8,0.85,128,-40.7],kurzbogen:[78.3,5.1,1.2,128,-44.3],armbrust:[34.4,53.3,0.85,128,-30.4],axt:[12.7,17.7,0.75,128,-145.6],hammer:[27.8,36.8,0.4,256,138.0],hacke:[27.0,57.5,1.1,128,-131.6],sichel:[7.5,20.1,0.5,128,-131.9],heugabel:[83.9,21.5,1.6,128,138.9],besen:[77.6,25.6,1.3,128,135.6],angelrute:[23.6,26.9,3.0,128,-39.7],wanderstab:[133.5,27.5,1.7,128,-132.5],kruecke:[152.3,31.6,1.3,128,-52.8],holzschild:[32.3,38.4,0.6,128],holzschild_innen:[32.6,38.4,0.6,128],rundschild:[45.0,51.2,0.8,128],rundschild_innen:[45.5,51.2,0.8,128],langschild:[35.2,70.4,1.1,128],langschild_innen:[34.8,70.4,1.1,128],wappenschild:[34.9,51.2,0.8,128],wappenschild_innen:[34.9,51.2,0.8,128],bettelschale:[17.9,12.8,0.1,256],krug:[25.9,35.8,0.28,256],becher:[11.9,15.4,0.12,256]};
+const UPM = FIG3D_H / 1.8;   // Figureneinheiten je Meter
+// Gegenstand an der aktuellen Stelle zeichnen: um den Griff gedreht (ang), vergrößert (sc), Magenta umgefärbt (color)
+function drawGeg(c, name, ang = 0, sc = 1, color = null) {
+  const g = GEG[name], id = `geg_${name}`;
+  if (!g || !ART[id]) return false;
+  const spr = figSprite(id, color || '#808080');
+  if (!spr) return false;
+  const s = (UPM / g[3]) * sc;
+  c.save();
+  if (ang) c.rotate(ang);
+  const im = lodOf(spr.mips[0], c, s);
+  c.drawImage(im, -g[0] * s, -g[1] * s, spr.w * s, spr.h * s);
+  c.restore();
+  return true;
+}
+// Waffe -> Bild und Größe (Kurzschwert, Ritterschwert und die langen Bögen nach dem Vorbild der gemalten)
+const WEAPON_GEG = {
+  knueppel: ['knueppel', 1], kurzschwert: ['langschwert', 0.74], langschwert: ['langschwert', 1], ritterschwert: ['langschwert', 1.12],
+  speer: ['speer', 1], streitaxt: ['streitaxt', 1], kriegshammer: ['kriegshammer', 1], kurzbogen: ['kurzbogen', 1],
+  langbogen: ['kurzbogen', 1.45], eibenbogen: ['kurzbogen', 1.5], armbrust: ['armbrust', 1],
+};
+const SHIELD_GEG = { holzschild: 'holzschild', rundschild: 'rundschild', drachenschild: 'langschild', wappenschild: 'wappenschild' };
+const TOOL_GEG = { hacke: 'hacke', sichel: 'sichel', axt: 'axt', hammer: 'hammer', gabel: 'heugabel', besen: 'besen' };
+
 function drawWeapon(c, u, by) {
   if (u.lance) { drawLance(c, u, by); return; }
   const it = ITEMS[u.eq.waffe];
@@ -3292,6 +3321,12 @@ function drawWeapon(c, u, by) {
   const sw = u.swing > 0 ? (u.swing / 0.3) : 0;
   c.save();
   c.translate(4, by - 12);
+  const wg = WEAPON_GEG[u.eq.waffe];
+  if (wg) {
+    // Bogen senkrecht (Bauch nach vorn), Armbrust waagerecht, Speer schräg vor, Hiebwaffen holen aus und schlagen zu
+    const ang = it.kind === 'bogen' ? -Math.PI / 2 : it.kind === 'armbrust' ? -0.12 : it.kind === 'speer' ? -0.9 + sw * 0.9 : -1.2 + sw * 2.0;
+    if (drawGeg(c, wg[0], ang, wg[1])) { c.restore(); return; }
+  }
   switch (it.kind) {
     case 'bogen':
       c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.7;
@@ -3711,7 +3746,7 @@ function drawModel3d(c, u, L, m, key) {
   const gear = () => {
     const sgn = (u.dirX ?? 0) - (u.dirY ?? 1) >= 0 ? 1 : -1;
     const rh = pt('RightHand'), lh = pt('LeftHand');
-    if (u.eq && u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x, oy + lh.y, sgn);
+    if (u.eq && u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x + 1.5 * sgn, oy + lh.y, sgn, back);
     if (rh && ((u.eq && u.eq.waffe) || u.lance)) {
       c.save(); c.translate(ox + rh.x, oy + rh.y); c.scale(sgn, 1); c.translate(-4, 12); drawWeapon(c, u, 0); c.restore();
     }
@@ -3727,13 +3762,16 @@ function drawModel3d(c, u, L, m, key) {
 }
 // Werkzeug in der rechten Hand, Bogen, Eimer, Korb oder Stab bei den Dorfleuten
 function drawHandGear(c, u, rh, lh, sgn, anim) {
-  const tool = TOOL3D[u.act];
+  let tool = TOOL3D[u.act];
   c.strokeStyle = OUTLINE; c.lineWidth = 0.9;
   if (tool === 'hammer' || tool === 'axt' || tool === 'hacke') emitWork(u.x, u.y, tool === 'hammer' && u.task && u.task.anvil ? 'amboss' : tool, ACT_SPEED[u.act] || 1, u.id % 7);
   if (tool && rh) {
     c.save(); c.translate(rh.x, rh.y); c.scale(sgn, 1);
     // Stiel von der Hand nach oben vorn; bei Schlagbewegungen folgt er der Hand
     c.rotate(anim === 'stehen' ? -1.2 : -1.9);
+    if (drawGeg(c, TOOL_GEG[tool])) { c.restore(); tool = null; }
+  }
+  if (tool && rh) {
     c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.5;
     const L2 = tool === 'besen' || tool === 'gabel' ? 11 : 8;
     c.beginPath(); c.moveTo(-2, 0); c.lineTo(L2, 0); c.stroke();
@@ -3749,18 +3787,29 @@ function drawHandGear(c, u, rh, lh, sgn, anim) {
   const bucket = (p) => { c.fillStyle = '#7a6a55'; c.fillRect(p.x - 1.6, p.y, 3.2, 3.4); c.fillStyle = '#5f86a0'; c.fillRect(p.x - 1.2, p.y, 2.4, 0.9); c.strokeStyle = '#c9b48a'; c.lineWidth = 0.6; c.beginPath(); c.arc(p.x, p.y, 1.6, Math.PI, 0); c.stroke(); };
   if ((u.carry === 'eimer' && anim !== 'eimer') || u.act === 'eimer' || u.act === 'schoepfen' || u.act === 'loeschen') { if (rh) bucket(rh); }
   if (u.carry === 'korb' && lh) { c.fillStyle = '#a07a44'; c.beginPath(); c.ellipse(lh.x, lh.y + 1.5, 2.6, 1.8, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
-  if (u.bow && lh && anim !== 'bogen') { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.2; c.beginPath(); c.arc(lh.x - 1, lh.y, 7, -Math.PI * 0.45, Math.PI * 0.45); c.stroke(); }
-  if (u.staff && rh && anim !== 'sitzen' && anim !== 'knien') { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(rh.x + 1, rh.y + 13); c.lineTo(rh.x + 1, rh.y - 10); c.stroke(); }
-  if (anim === 'trinken' && rh) { c.fillStyle = '#8a6a44'; c.fillRect(rh.x - 1.1, rh.y - 2.2, 2.2, 2.8); c.strokeRect(rh.x - 1.1, rh.y - 2.2, 2.2, 2.8); }
-  if (u.act === 'betteln' && rh) { c.fillStyle = '#8a6a44'; c.beginPath(); c.ellipse(rh.x + 1, rh.y, 2.4, 1.1, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
-  if (u.act === 'angeln' && rh) { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1; c.beginPath(); c.moveTo(rh.x, rh.y); c.lineTo(rh.x + 14 * sgn, rh.y - 10); c.stroke(); c.strokeStyle = 'rgba(230,230,220,0.7)'; c.lineWidth = 0.5; c.beginPath(); c.moveTo(rh.x + 14 * sgn, rh.y - 10); c.lineTo(rh.x + 16 * sgn, rh.y + 8); c.stroke(); }
+  // Bogen, Pilgerstab, Becher, Bettelschale und Angel gemalt, wo es das Bild gibt
+  const at = (p, f) => { c.save(); c.translate(p.x, p.y); c.scale(sgn, 1); const ok = f(); c.restore(); return ok; };
+  if (u.bow && lh && anim !== 'bogen' && at(lh, () => drawGeg(c, 'kurzbogen', -Math.PI / 2))) { /* gemalt */ }
+  else if (u.bow && lh && anim !== 'bogen') { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.2; c.beginPath(); c.arc(lh.x - 1, lh.y, 7, -Math.PI * 0.45, Math.PI * 0.45); c.stroke(); }
+  if (u.staff && rh && anim !== 'sitzen' && anim !== 'knien' && at(rh, () => drawGeg(c, 'wanderstab', -Math.PI / 2))) { /* gemalt */ }
+  else if (u.staff && rh && anim !== 'sitzen' && anim !== 'knien') { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(rh.x + 1, rh.y + 13); c.lineTo(rh.x + 1, rh.y - 10); c.stroke(); }
+  if (anim === 'trinken' && rh && at(rh, () => drawGeg(c, 'becher', 0, 1.4))) { /* gemalt */ }
+  else if (anim === 'trinken' && rh) { c.fillStyle = '#8a6a44'; c.fillRect(rh.x - 1.1, rh.y - 2.2, 2.2, 2.8); c.strokeRect(rh.x - 1.1, rh.y - 2.2, 2.2, 2.8); }
+  if (u.act === 'betteln' && rh && at({ x: rh.x + sgn, y: rh.y }, () => drawGeg(c, 'bettelschale', 0, 1.5))) { /* gemalt */ }
+  else if (u.act === 'betteln' && rh) { c.fillStyle = '#8a6a44'; c.beginPath(); c.ellipse(rh.x + 1, rh.y, 2.4, 1.1, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  // Angel im Winkel, in dem sie gemalt war: die Schnur hängt dann senkrecht ins Wasser
+  if (u.act === 'angeln' && rh && at(rh, () => drawGeg(c, 'angelrute', GEG.angelrute[4] * Math.PI / 180, 0.8))) { /* gemalt */ }
+  else if (u.act === 'angeln' && rh) { c.strokeStyle = '#6b4a2a'; c.lineWidth = 1; c.beginPath(); c.moveTo(rh.x, rh.y); c.lineTo(rh.x + 14 * sgn, rh.y - 10); c.stroke(); c.strokeStyle = 'rgba(230,230,220,0.7)'; c.lineWidth = 0.5; c.beginPath(); c.moveTo(rh.x + 14 * sgn, rh.y - 10); c.lineTo(rh.x + 16 * sgn, rh.y + 8); c.stroke(); }
   if (u.act === 'saeen' && rh && Math.sin(G.time * 3.3 + u.id) > 0.5) { c.fillStyle = '#d8c48a'; for (let q = 0; q < 4; q++) c.fillRect(rh.x + 2 + q * 1.8, rh.y + 1 + q * 1.4 + ((G.time * 9 + q) % 3), 1, 1); }
   if (u.act === 'gefesselt' && rh) { c.strokeStyle = '#b8a070'; c.lineWidth = 1; c.beginPath(); c.moveTo(rh.x - 2, rh.y); c.lineTo(rh.x + 2, rh.y); c.stroke(); }
 }
-function drawHeroShield(c, u, L, x, y, sgn) {
+function drawHeroShield(c, u, L, x, y, sgn, inner = false) {
   const it = ITEMS[u.eq.schild];
   const col = u.tunic || playerColor(), trim = '#d8b54a';
   c.save(); c.translate(x, y); c.scale(sgn, 1);
+  // Gemalter Schild: von vorn die Schauseite (Wappenschild in der Farbe des Trägers), von hinten Riemen und Griff
+  const sg = SHIELD_GEG[u.eq.schild];
+  if (sg && drawGeg(c, inner ? `${sg}_innen` : sg, 0, 0.85, u.tunic || (L && L.tunic) || col)) { c.restore(); return; }
   c.strokeStyle = OUTLINE; c.lineWidth = 0.8;
   c.fillStyle = it && it.def >= 4 ? shade(col, 1.05) : '#8a6440';
   if (it && (u.eq.schild === 'rundschild' || u.eq.schild === 'holzschild')) {
