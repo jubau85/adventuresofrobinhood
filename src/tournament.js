@@ -3,11 +3,12 @@
 // Wer ein Pferd hat und das Startgeld zahlt, reitet mit: Die Lanze im rechten Moment senken.
 
 import { G, log, homeName, playerColor } from './state.js';
-import { FACTIONS, T } from './data.js';
+import { FACTIONS, T, CHUNK } from './data.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { makeUnit, rebuildUnits, partyMembers } from './units.js';
 import { isoX, isoY } from './iso.js';
-import { isWalkable, landAt } from './world.js';
+import { isWalkable, landAt, setTempObstacles } from './world.js';
+import { gallowsFor } from './justice.js';
 import { hourOf, passHours } from './sim.js';
 import { changeRep, addRenown } from './politics.js';
 import { makeVillager } from './life.js';
@@ -30,25 +31,87 @@ const ease = (k) => 0.35 * k * k + 0.65 * k;
 const akk = (n) => n.replace(/^Der /, 'den ');
 
 // ---------------------------------------------------------------- Ankündigung
-function findLists(s) {
-  const W = G.world, N = W.N;
-  const free = (x, y) => {
-    const xi = Math.floor(x), yi = Math.floor(y);
-    if (xi < 2 || yi < 2 || xi >= N - 2 || yi >= N - 2) return false;
-    const t = W.tiles[yi * N + xi];
-    return isWalkable(W, x, y) && t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && landAt(W, x, y) === s.land && !(W.solid && W.solid[yi * N + xi]);
+// Lage der Zelte und Grundflächen des Platzes (Schranke, Tribüne, Fahnen, Zelte) – render.js malt sie genau so
+export function pavilionSpot(lx, ly, i) {
+  const sd = i % 2 === 0 ? -1 : 1, row = Math.floor(i / 2);
+  return { x: lx + sd * (8.4 + (row % 2) * 0.9), y: ly - 1.9 + row * 1.15 };
+}
+export function tourneyRects(lx, ly, n = 8) {
+  const r = [{ x: lx, y: ly, wx: 12.1, wy: 0.16 }, { x: lx, y: ly - 3, wx: 7.3, wy: 1.45 }];
+  for (const sd of [-1, 1]) r.push({ x: lx + sd * 6.4, y: ly - 0.2, wx: 0.2, wy: 0.2 });
+  for (let i = 0; i < n; i++) { const p = pavilionSpot(lx, ly, i); r.push({ x: p.x, y: p.y, wx: 0.9, wy: 0.9 }); }
+  return r;
+}
+// Kern des Platzes, der frei sein muss: alle Teile mit etwas Abstand, die Reitbahnen und der Streifen für die Zuschauer
+// hard: Teile und Reitbahnen; die übrigen (Abstand, Zuschauer) dürfen notfalls auf einem Weg oder Acker liegen
+export function tourneyCore(lx, ly, n = 8) {
+  const rs = tourneyRects(lx, ly, n), r = [];
+  for (const q of rs) r.push({ x0: q.x - q.wx / 2, x1: q.x + q.wx / 2, y0: q.y - q.wy / 2, y1: q.y + q.wy / 2, hard: true });
+  r.push({ x0: lx - 6.8, x1: lx + 6.8, y0: ly - 1.2, y1: ly + 1.2, hard: true });
+  for (const q of rs) r.push({ x0: q.x - q.wx / 2 - 0.6, x1: q.x + q.wx / 2 + 0.6, y0: q.y - q.wy / 2 - 0.6, y1: q.y + q.wy / 2 + 0.6 });
+  r.push({ x0: lx - 5.6, x1: lx + 5.6, y0: ly + 1.2, y1: ly + 3.3 });
+  return r;
+}
+
+export function findLists(s) {
+  const W = G.world, N = W.N, M = W.M;
+  const tileOk = (x, y, soft) => {
+    if (x < 2 || y < 2 || x >= N - 2 || y >= N - 2) return false;
+    const i = y * N + x, t = W.tiles[i];
+    if (soft && (t === T.ROAD || t === T.FIELD) && !W.block[i]) return true;
+    return t !== T.FOREST && t !== T.WATER && t !== T.BRIDGE && t !== T.ROAD && t !== T.FIELD && !W.block[i] && !(W.solid && W.solid[i]) && W.landId[i] === s.land;
   };
-  const near = W.buildings.filter((b) => Math.abs(b.x - s.x) < 40 && Math.abs(b.y - s.y) < 40 && b.kind !== 'prop');
-  for (let k = 0; k < 160; k++) {
-    const a = (k * 2.399) % (Math.PI * 2), r = (s.clear || 7) + 5 + (k % 9);
-    const lx = Math.round(s.x + Math.cos(a) * r) + 0.5, ly = Math.round(s.y + Math.sin(a) * r) + 0.5;
-    let ok = true;
-    for (let y = ly - 3.5; y <= ly + 3.5 && ok; y += 1) for (let x = lx - 8; x <= lx + 8 && ok; x += 1) if (!free(x, y)) ok = false;
-    if (!ok) continue;
-    if (near.some((b) => Math.abs(b.x - lx) < 9.5 && Math.abs(b.y - ly) < 4.5)) continue;
-    return { lx, ly };
+  // Was sonst noch steht: alle Gebäude (auch eingestürzte), Galgen, Lagerfeuer, Orte, Belagerungszelte
+  const box = [];
+  for (const b of W.buildings) if (Math.abs(b.x - s.x) < 60 && Math.abs(b.y - s.y) < 60) box.push([b.x, b.y, (b.wx || 1) / 2 + 0.6, (b.wy || 1) / 2 + 0.6]);
+  for (const o of W.sites) {
+    if (Math.abs(o.x - s.x) > 70 || Math.abs(o.y - s.y) > 70) continue;
+    const g = gallowsFor(o);
+    if (g) box.push([g.x, g.y, 1.6, 1.6]);
+    if (o !== s) { const R = Math.min(o.clear || 4, 6); box.push([o.x, o.y, R, R]); }
   }
-  return null;
+  for (const c of W.camps || []) if (Math.abs(c.x - s.x) < 60) box.push([c.x, c.y, 2.4, 2.4]);
+  for (const o of W.pois || []) if (o.x !== undefined && Math.abs(o.x - s.x) < 60) box.push([o.x, o.y, 2.5, 2.5]);
+  const sg = G.siege;
+  if (sg && sg.tents) for (const t of sg.tents) box.push([t.x, t.y, 1, 1]);
+  const CN = W.CN;
+  let best = null;
+  for (let k = 0; k < 840; k++) {
+    // erste Runde streng, zweite: Weg oder Acker nur unter Zuschauern und im Abstand, nie unter Bauten und Bahnen
+    const relax = k >= 420;
+    if (relax && best) break;
+    const a = (k * 2.399) % (Math.PI * 2), r = (s.clear || 7) + 4 + ((k % 420) % 21) * 1.3;
+    const lx = Math.round(s.x + Math.cos(a) * r) + 0.5, ly = Math.round(s.y + Math.sin(a) * r) + 0.5;
+    const core = tourneyCore(lx, ly);
+    let ok = true, lo = Infinity, hi = -Infinity;
+    for (const q of core) {
+      for (let y = Math.floor(q.y0); y < q.y1 && ok; y++) for (let x = Math.floor(q.x0); x < q.x1; x++) {
+        if (!tileOk(x, y, relax && !q.hard && !core.some((h) => h.hard && x + 1 > h.x0 && x < h.x1 && y + 1 > h.y0 && y < h.y1))) { ok = false; break; }
+        const h = W.vh[y * M + x]; lo = Math.min(lo, h); hi = Math.max(hi, h);
+      }
+      if (!ok) break;
+    }
+    if (!ok || hi - lo > 18) continue;
+    if (box.some(([x, y, rx, ry]) => core.some((q) => x + rx > q.x0 && x - rx < q.x1 && y + ry > q.y0 && y - ry < q.y1))) continue;
+    // Bäume, Büsche und Felsen im Kern: möglichst keine
+    let n = 0;
+    for (let cy = Math.floor((ly - 5) / CHUNK); cy <= Math.floor((ly + 4) / CHUNK); cy++) for (let cx = Math.floor((lx - 11) / CHUNK); cx <= Math.floor((lx + 11) / CHUNK); cx++) {
+      const list = cx >= 0 && cy >= 0 && cx < CN && cy < CN ? W.chunkObjs[cy * CN + cx] : null;
+      if (list) for (const o of list) if (core.some((q) => o.x > q.x0 && o.x < q.x1 && o.y > q.y0 && o.y < q.y1)) n++;
+    }
+    const score = n * 1.2 + (hi - lo) * 0.15 + r * 0.14;
+    if (!best || score < best.score) best = { lx, ly, score };
+  }
+  return best ? { lx: best.lx, ly: best.ly } : null;
+}
+
+// Schranke, Tribüne und Zelte als Hindernisse, solange sie stehen (am Vortag und am Turniertag)
+function syncObstacles() {
+  const W = G.world, L = tourneyLayout();
+  const sig = L ? `${L.lx}|${L.ly}|${L.knights.length}` : '';
+  if (W._tourSig === sig) return;
+  W._tourSig = sig;
+  setTempObstacles(W, 'turnier', L ? tourneyRects(L.lx, L.ly, L.knights.length) : null);
 }
 
 function announce() {
@@ -195,6 +258,7 @@ export function endTour() {
 }
 
 export function updateTourney(dt) {
+  syncObstacles();
   const tr = G.s.tourney, p = G.s.player;
   if (!tr || tr.done) { if (G.tour) endTour(); return; }
   const near = Math.hypot(tr.lx - p.x, tr.ly - p.y) < 70;
@@ -282,7 +346,7 @@ function updateMatch(t, m, dt) {
     for (const k of [m.a, m.b]) {
       const s = laneStart(t, m, k), u = k.u;
       const d = Math.hypot(s.x - u.x, s.y - u.y);
-      if (d > 0.15) { ready = false; rideTo(u, s.x, s.y, dt, k.player ? 5 : 3.5); } else { u.moving = false; u.facing = s.dir; }
+      if (d > 0.15) { ready = false; rideTo(u, s.x, s.y, dt, k.player ? 5 : 3.5); } else { u.moving = false; face(u, s.dir, 0); }
     }
     if (ready || m.t > 9) { m.phase = 'anlauf'; m.t = 0; A.lanceBroken = false; B.lanceBroken = false; if (m.player) startAim(t, m); }
     return;
@@ -292,7 +356,7 @@ function updateMatch(t, m, dt) {
     const k = Math.min(1, m.t / dur), e = ease(k);
     for (const kn of [m.a, m.b]) {
       const s = laneStart(t, m, kn), u = kn.u;
-      u.x = s.x + s.dir * 10.8 * e; u.y = s.y; u.facing = s.dir; u.moving = true; u.anim += dt * (0.6 + k);
+      u.x = s.x + s.dir * 10.8 * e; u.y = s.y; face(u, s.dir, 0); u.moving = true; u.anim += dt * (0.6 + k);
       u.lanceDown = k > 0.22;
     }
     if (t.aim) t.aim.m = Math.min(1, k / IMPACT);
@@ -308,9 +372,23 @@ function updateMatch(t, m, dt) {
     return;
   }
   if (m.phase === 'wenden') {
-    for (const kn of [m.a, m.b]) kn.u.anim += dt * 0.3;
-    if (m.t > (m.player ? 1.6 : 1.0)) { m.phase = 'anlauf'; m.t = 0; if (m.player) startAim(t, m); }
+    // Am Bahnende wenden die Pferde im Bogen nach außen, weg von der Schranke
+    const dur = m.player ? 1.6 : 1.0, q = Math.min(1, m.t / (dur * 0.8));
+    for (const kn of [m.a, m.b]) {
+      const s = laneStart(t, m, kn), u = kn.u, out = kn === m.a ? -1 : 1;
+      face(u, -s.dir * Math.cos(Math.PI * q), out * Math.sin(Math.PI * q));
+      u.moving = q < 1; u.anim += dt * 0.3;
+    }
+    if (m.t > dur) { m.phase = 'anlauf'; m.t = 0; if (m.player) startAim(t, m); }
   }
+}
+
+// Blickrichtung setzen: dirX/dirY für die Pferde und 3D-Figuren, facing für die gezeichneten
+function face(u, dx, dy) {
+  const d = Math.hypot(dx, dy) || 1;
+  u.dirX = dx / d; u.dirY = dy / d;
+  const sx = dx - dy;
+  if (Math.abs(sx) > 0.02) u.facing = sx > 0 ? 1 : -1;
 }
 
 function rideTo(u, x, y, dt, v) {

@@ -144,8 +144,8 @@ if opt.get('reitpose') and arm:
         m = (q.to_matrix() @ rest.to_3x3()).to_4x4(); m.translation = cur.translation
         pb.matrix = m; bpy.context.view_layer.update()
     for side, sx in (('Left', 1), ('Right', -1)):
-        aim(f'{side}UpLeg', (0.28 * sx, -0.75, -0.6))
-        aim(f'{side}Leg', (0.06 * sx, 0.12, -1))
+        aim(f'{side}UpLeg', (0.3 * sx, -0.42, -0.86))
+        aim(f'{side}Leg', (0.05 * sx, 0.2, -1))
         aim(f'{side}Arm', (0.25 * sx, -0.45, -0.85))
         aim(f'{side}ForeArm', (-0.1 * sx, -1, -0.25))
     for f in (0, 1):

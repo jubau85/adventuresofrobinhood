@@ -180,7 +180,9 @@ for side, sx in (('l', X), ('r', -X)):
     bone(f'h{side}_ober', (sx, 0.55, 1.08), (sx, 0.42, 0.78), 'koerper')
     bone(f'h{side}_mitte', (sx, 0.42, 0.78), (sx, 0.66, 0.5), f'h{side}_ober', True)
     bone(f'h{side}_unter', (sx, 0.66, 0.5), (sx, 0.63, 0.0), f'h{side}_mitte', True)
-bone('sattel', (0, -0.08, 1.56), (0, -0.08, 1.7), 'koerper', deform=False)
+# Sitz: tiefster Punkt des Sattels, etwas hinter der Mitte; Kopfmitte für die Verdeckung des Reiters von vorn
+bone('sattel', (0, 0.0, 1.55), (0, 0.0, 1.7), 'koerper', deform=False)
+bone('kopfmitte', (0, -1.2, 1.62), (0, -1.2, 1.72), 'kopf', deform=False)
 bpy.ops.object.mode_set(mode='OBJECT')
 
 # Gewichte: Körper, Mähne, Schweif, Ohren automatisch; Sattel und Schabracke fest am Rumpf

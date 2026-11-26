@@ -260,7 +260,7 @@ export function freeNear(W, p, maxR = 1.4) {
 // Steht (x, y) in einem Hindernis? animal: Tiere dürfen in ihren Pferch
 export function inObstacle(W, x, y, animal = false) {
   const i = Math.floor(y) * W.N + Math.floor(x);
-  for (const grid of [W.ogrid, W.cgrid]) {
+  for (const grid of [W.ogrid, W.cgrid, W.xgrid]) {
     const l = grid && grid.get(i);
     if (!l) continue;
     for (const o of l) {
@@ -378,8 +378,19 @@ export function setPlayerWalls(W, on, rects) {
     if (o.pen && !W.block[i]) W.penTile[i] = 1;
     W.block[i] = 1;
   }
+  for (const list of Object.values(W.tempObs || {})) for (const o of list) for (const [x, y] of obstacleTiles(W, o, false)) W.block[y * N + x] = 1;
   // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
   if (W.afterBlock) W.afterBlock();
+}
+
+// Hindernisse auf Zeit (z. B. der Turnierplatz): unter einem Schlüssel Rechtecke {x, y, wx, wy}; ohne rects wieder fort
+export function setTempObstacles(W, key, rects) {
+  W.tempObs = W.tempObs || {};
+  if (rects && rects.length) W.tempObs[key] = rects.map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { temp: key }));
+  else delete W.tempObs[key];
+  W.xgrid = new Map();
+  for (const list of Object.values(W.tempObs)) for (const o of list) gridAdd(W.xgrid, W.N, o);
+  if (W.blockStatic) setPlayerWalls(W, !!W.playerWalls);
 }
 
 export function isBlockedTile(W, x, y) {

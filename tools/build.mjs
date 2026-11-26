@@ -1,7 +1,9 @@
 // Bündelt das Spiel in eine einzige HTML-Datei (dist/a-knights-tale.html).
 // Die Module werden in Abhängigkeitsreihenfolge aneinandergehängt; import/export entfallen.
-// Aufruf: node tools/build.mjs [--fragment <pfad>]
+// Aufruf: node tools/build.mjs [--fragment <pfad>] [--extern assets/held/,assets/pferde/]
 //   --fragment schreibt zusätzlich eine Fassung ohne <html>/<head>/<body>-Gerüst.
+//   --extern bettet Dateien unter diesen Ordnern in das Fragment nicht ein: Sie bleiben relative Pfade und müssen
+//            neben der Seite liegen (Liste in <fragment>.dateien.json). Die Einzeldatei in dist/ enthält immer alles.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -50,20 +52,25 @@ if (js.includes('</script')) throw new Error('Der Code enthält „</script“ u
 
 // Handgemalte Grafiken als data-URL einbetten, damit die Einzeldatei ohne Ordner auskommt
 const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg' };
-let artBytes = 0;
-js = js.replace(/'(assets\/[^']+\.(?:jpg|jpeg|png|webp|mp3|ogg))'/g, (m, p) => {
-  const file = join(ROOT, p);
-  if (!existsSync(file)) return m;
-  const buf = readFileSync(file);
-  artBytes += buf.length;
-  return `'data:${MIME[p.slice(p.lastIndexOf('.'))]};base64,${buf.toString('base64')}'`;
-});
+function page(extern = []) {
+  let artBytes = 0;
+  const kept = [];
+  const code = js.replace(/'(assets\/[^']+\.(?:jpg|jpeg|png|webp|mp3|ogg))'/g, (m, p) => {
+    const file = join(ROOT, p);
+    if (!existsSync(file)) return m;
+    if (extern.some((e) => p.startsWith(e))) { kept.push(p); return m; }
+    const buf = readFileSync(file);
+    artBytes += buf.length;
+    return `'data:${MIME[p.slice(p.lastIndexOf('.'))]};base64,${buf.toString('base64')}'`;
+  });
+  const css = readFileSync(join(ROOT, 'style.css'), 'utf8');
+  let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  html = html.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}</style>`);
+  html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\n(function () {\n'use strict';\n${code}\n})();\n</script>`);
+  return { html, artBytes, kept };
+}
+const { html, artBytes } = page();
 if (artBytes) console.log(`Grafiken und Töne eingebettet: ${(artBytes / 1024).toFixed(0)} KB`);
-
-const css = readFileSync(join(ROOT, 'style.css'), 'utf8');
-let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-html = html.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}</style>`);
-html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\n(function () {\n'use strict';\n${js}\n})();\n</script>`);
 
 mkdirSync(join(ROOT, 'dist'), { recursive: true });
 const out = join(ROOT, 'dist', 'a-knights-tale.html');
@@ -72,10 +79,19 @@ console.log(`Geschrieben: ${out} (${(html.length / 1024).toFixed(0)} KB)`);
 
 const fi = process.argv.indexOf('--fragment');
 if (fi > 0 && process.argv[fi + 1]) {
-  const head = html.match(/<head>([\s\S]*?)<\/head>/)[1]
+  const xi = process.argv.indexOf('--extern');
+  const extern = xi > 0 && process.argv[xi + 1] ? process.argv[xi + 1].split(',').filter(Boolean) : [];
+  const fr = extern.length ? page(extern) : { html, kept: [] };
+  if (fr.kept.length) {
+    const list = [...new Set(fr.kept)].sort();
+    writeFileSync(`${process.argv[fi + 1]}.dateien.json`, JSON.stringify(list, null, 1));
+    console.log(`Neben der Seite: ${list.length} Dateien (${(list.reduce((a, p) => a + readFileSync(join(ROOT, p)).length, 0) / 1024).toFixed(0)} KB), Liste in ${process.argv[fi + 1]}.dateien.json`);
+  }
+  const html2 = fr.html;
+  const head = html2.match(/<head>([\s\S]*?)<\/head>/)[1]
     .replace(/<meta charset[^>]*>\s*/, '')
     .replace(/<meta name="viewport"[^>]*>\s*/, '');
-  const body = html.match(/<body>([\s\S]*)<\/body>/)[1];
+  const body = html2.match(/<body>([\s\S]*)<\/body>/)[1];
   writeFileSync(process.argv[fi + 1], `${head.trim()}\n${body.trim()}\n`);
   console.log(`Fragment: ${process.argv[fi + 1]}`);
 }

@@ -1,6 +1,8 @@
 # Packt gerenderte Sprite-Bögen (tools/sprites.py) für das Spiel:
-#   python3 tools/sprite_pack.py <ordner> <ziel-ordner> <name> [--zelle 112] [--namen alt=neu,...]
-# Je Bewegung zwei WebP-Bilder in halber Größe:
+#   python3 tools/sprite_pack.py <ordner> <ziel-ordner> <name> [--zelle 112] [--namen alt=neu,...] [--zuschnitt 1]
+# --zuschnitt 1 schneidet den leeren Rand ab, der in allen Bildern aller Bewegungen frei bleibt; die Zellen sind dann
+# breite × hoehe statt zelle × zelle (spart Speicher, wenn in voller Größe gepackt wird).
+# Je Bewegung zwei WebP-Bilder (bei --zelle 112 und 224er-Renderings in halber Größe):
 #   <name>_<bewegung>.webp        Körper; die Hauptkleidung (Cyan) in Grau, damit sie sich einfärben lässt
 #   <name>_<bewegung>_maske.webp  wo die Hauptkleidung ist (Deckkraft) und wie hell (Grauwert)
 # Am Ende steht die Beschreibung für render.js (Zelle, Fußpunkt, Bilder, Dauer) als JSON.
@@ -18,9 +20,25 @@ QUAL = int(opt.get('qualitaet', 90))
 RENAME = dict(p.split('=') for p in opt.get('namen', '').split(',') if '=' in p)
 os.makedirs(dst, exist_ok=True)
 meta = json.load(open(os.path.join(src, 'sprites.json')))
-k = CELL / meta['zelle']
-out = {'zelle': CELL, 'fusspunkt': [round(meta['fusspunkt'][0] * k, 1), round(meta['fusspunkt'][1] * k, 1)],
-       'figur_px': round(meta['figur_px'] * k, 1), 'richtungen': meta['richtungen'], 'bewegungen': {}}
+Z = meta['zelle']
+k = CELL / Z
+# Gemeinsamer Ausschnitt aller Zellen (Quell-Pixel): x0, y0, x1, y1
+X0, Y0, X1, Y1 = 0, 0, Z, Z
+if opt.get('zuschnitt'):
+    X0, Y0, X1, Y1 = Z, Z, 0, 0
+    for old in meta['bewegungen']:
+        al = np.asarray(Image.open(os.path.join(src, f'{old}.png')).convert('RGBA'))[..., 3]
+        for r in range(al.shape[0] // Z):
+            for q in range(al.shape[1] // Z):
+                ys, xs = np.nonzero(al[r * Z:(r + 1) * Z, q * Z:(q + 1) * Z] > 3)
+                if len(xs): X0, Y0, X1, Y1 = min(X0, xs.min()), min(Y0, ys.min()), max(X1, xs.max() + 1), max(Y1, ys.max() + 1)
+    pad = int(opt.get('rand', 3))
+    X0, Y0, X1, Y1 = max(0, X0 - pad), max(0, Y0 - pad), min(Z, X1 + pad), min(Z, Y1 + pad)
+CW, CH = max(1, round((X1 - X0) * k)), max(1, round((Y1 - Y0) * k))
+KX, KY = CW / (X1 - X0), CH / (Y1 - Y0)
+out = {'zelle': CELL, 'fusspunkt': [round((meta['fusspunkt'][0] - X0) * KX, 1), round((meta['fusspunkt'][1] - Y0) * KY, 1)],
+       'figur_px': round(meta['figur_px'] * KY, 1), 'richtungen': meta['richtungen'], 'bewegungen': {}}
+if opt.get('zuschnitt'): out['breite'], out['hoehe'] = CW, CH
 
 def hue_sat(a):
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
@@ -33,8 +51,14 @@ def hue_sat(a):
 for old, info in meta['bewegungen'].items():
     new = RENAME.get(old, old)
     im = Image.open(os.path.join(src, f'{old}.png')).convert('RGBA')
-    w, h = im.size
-    im = im.resize((round(w * k), round(h * k)), Image.LANCZOS)
+    cols, rows = im.size[0] // Z, im.size[1] // Z
+    if (X0, Y0, X1, Y1) != (0, 0, Z, Z):
+        cut = Image.new('RGBA', (cols * (X1 - X0), rows * (Y1 - Y0)))
+        for r in range(rows):
+            for q in range(cols):
+                cut.paste(im.crop((q * Z + X0, r * Z + Y0, q * Z + X1, r * Z + Y1)), (q * (X1 - X0), r * (Y1 - Y0)))
+        im = cut
+    if (CW, CH) != (X1 - X0, Y1 - Y0): im = im.resize((cols * CW, rows * CH), Image.LANCZOS)
     a = np.asarray(im).astype(np.float32) / 255
     hue, sat, val = hue_sat(a)
     # Gewicht „Cyan“: Farbton um 180°, kräftig genug gesättigt
@@ -54,6 +78,6 @@ for old, info in meta['bewegungen'].items():
     for key, arr in meta.get('punkte', {}).items():
         base, _, pn = key.partition('|')
         if base == old and arr:
-            out.setdefault('punkte', {})[new + ('|' + pn if pn else '')] = [[round(x * k, 1), round(y * k, 1)] for x, y in arr]
+            out.setdefault('punkte', {})[new + ('|' + pn if pn else '')] = [[round((x - X0) * KX, 1), round((y - Y0) * KY, 1)] for x, y in arr]
     print('gepackt', new, im.size, os.path.getsize(os.path.join(dst, f'{name}_{new}.webp')) // 1024, 'KB')
 print(json.dumps(out, ensure_ascii=False))

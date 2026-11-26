@@ -15,7 +15,7 @@ import { graveSlot, graveCount, funeralProps } from './life.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
 import { unitLook, heraldLook } from './units.js';
 import { questTarget } from './politics.js';
-import { tourneyLayout } from './tournament.js';
+import { tourneyLayout, pavilionSpot, tourneyCore } from './tournament.js';
 import { gallowsFor } from './justice.js';
 import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weather.js';
 import { abandonedId } from './dynamics.js';
@@ -100,9 +100,11 @@ function poly(c, pts, fill) {
 function P(x, y, z = 0) { return [isoX(x, y), isoY(x, y) - z - baseZ]; }
 function lerp2(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
 
-// Größe der Figuren und Tiere im Verhältnis zu den Häusern: Die Traufe einer Kate liegt gut zwei
-// Menschenhöhen über dem Boden, mit Dach ist sie drei- bis viermal so hoch wie eine Figur
-const FIG = 0.6;
+// Größe der Figuren und Tiere im Verhältnis zu den Häusern: Die Traufe einer Kate liegt knapp zwei
+// Menschenhöhen über dem Boden, mit Dach ist sie gut dreimal so hoch wie eine Figur
+const FIG = 0.72;
+// Höhe einer 1,8 m großen 3D-Figur in Figureneinheiten (vor FIG); sie sind schlanker als die gezeichneten, daher etwas größer
+const FIG3D_H = 26;
 
 function winterize(col) { const lv = snowLevel(); return lv > 0 ? mix(col, '#f0f4f4', 0.68 * lv) : col; }
 
@@ -581,8 +583,7 @@ function tourneyParts() {
   add(lx, ly - 3, (c) => drawStand(c, lx, ly - 3, host, !L.building));
   for (const side of [-1, 1]) add(lx + side * 6.4, ly - 0.2, (c) => { const [bx, by] = P(lx + side * 6.4, ly - 0.2, 0); c.strokeStyle = '#4a3322'; c.lineWidth = 2; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx, by - 18); c.stroke(); banner(c, lx + side * 6.4, ly - 0.2, 18, host); });
   L.knights.forEach((k, i) => {
-    const sd = i % 2 === 0 ? -1 : 1, row = Math.floor(i / 2);
-    const x = lx + sd * (8.4 + (row % 2) * 0.9), y = ly - 1.9 + row * 1.15;
+    const { x, y } = pavilionSpot(lx, ly, i);
     add(x, y, (c) => drawPavilion(c, x, y, k.col));
   });
   return parts;
@@ -2531,13 +2532,13 @@ function treeAnchor(id, im) {
   treeAnchorCache.set(id, foot);
   return foot;
 }
-function artSprite(id, filter = '') {
+function artSprite(id, filter = '', k = TREE_K) {
   const im = ART[id];
   if (!im) return null;
   const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
   if (filter) g.filter = filter;
   g.drawImage(im, 0, 0);
-  return { cvs: cv, ax: (im.width / 2) * TREE_K, ay: treeAnchor(id, im) * TREE_K, k: TREE_K };
+  return { cvs: cv, ax: (im.width / 2) * k, ay: treeAnchor(id, im) * k, k };
 }
 const OAK_TINT = ['saturate(1.35) hue-rotate(16deg) brightness(1.06)', 'saturate(1.3) hue-rotate(26deg) brightness(0.96)', 'saturate(1.3) hue-rotate(9deg) brightness(1.1)'];
 function artLaub(look) {
@@ -2556,9 +2557,11 @@ function artNadel(look) {
 }
 
 // Büsche: Sommerbild auch im Frühling, Winterbild (kahl, etwas Schnee) im ganzen Winter. Felsen tragen im Schnee eine Haube.
-function artSet(ids) { const set = ids.map((id) => artSprite(id)); return set.every(Boolean) ? set : null; }
-function artBusch(look) { const suf = look === 2 ? 'herbst' : look >= 3 ? 'winter' : 'sommer'; return artSet([1, 2, 3].map((n) => `busch_${n}_${suf}`)); }
-function artFels(look) { return artSet([1, 2, 3].map((n) => (look === 3 ? `fels_${n}_winter` : `fels_${n}`))); }
+// Felsen und Büsche kleiner als im gemalten Maßstab: neben den Figuren wirkten sie sonst wie Hügel und Hecken
+const FELS_K = TREE_K * 0.6, BUSCH_K = TREE_K * 0.72;
+function artSet(ids, k = TREE_K) { const set = ids.map((id) => artSprite(id, '', k)); return set.every(Boolean) ? set : null; }
+function artBusch(look) { const suf = look === 2 ? 'herbst' : look >= 3 ? 'winter' : 'sommer'; return artSet([1, 2, 3].map((n) => `busch_${n}_${suf}`), BUSCH_K); }
+function artFels(look) { return artSet([1, 2, 3].map((n) => (look === 3 ? `fels_${n}_winter` : `fels_${n}`)), FELS_K); }
 
 const SPR = 3;
 function ensureSprites() {
@@ -2595,8 +2598,9 @@ function drawTreeObj(c, o) {
   const x = isoX(o.x, o.y), y = isoY(o.x, o.y) - z;
   const w = sp.cvs.width * o.s * (sp.k || 1), h = sp.cvs.height * o.s * (sp.k || 1);
   const big = o.kind === 'laub' || o.kind === 'nadel', long = o.kind === 'stamm';
+  const f = big || long ? 1 : (sp.k || TREE_K) / TREE_K;
   c.fillStyle = 'rgba(20,35,12,0.2)';
-  if (o.kind !== 'schilf' && o.kind !== 'blumen') { c.beginPath(); c.ellipse(x + (big ? 10 : long ? 0 : 4) * o.s, y - 1, (big ? 16 : long ? 22 : 10) * o.s, (big ? 5.5 : long ? 6 : 3.5) * o.s, 0, 0, Math.PI * 2); c.fill(); }
+  if (o.kind !== 'schilf' && o.kind !== 'blumen') { c.beginPath(); c.ellipse(x + (big ? 10 : long ? 0 : 4) * o.s * f, y - 1, (big ? 16 : long ? 22 : 10) * o.s * f, (big ? 5.5 : long ? 6 : 3.5) * o.s * f, 0, 0, Math.PI * 2); c.fill(); }
   c.drawImage(sp.cvs, x - sp.ax * o.s, y - sp.ay * o.s, w, h);
 }
 
@@ -2819,43 +2823,99 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
       }
     }
   }
-  if (t === T.ROAD || t === T.BRIDGE) {
-    const bridge = t === T.BRIDGE;
-    const lift = bridge ? 4 : 0;
+}
+
+// Wege und Brücken eines Chunks in gemeinsamen Durchgängen über allen Böden: erst der Rand, dann die Wegdecke. So laufen
+// die Stücke benachbarter Kacheln ohne Ringe oder Nähte ineinander. Ein Kranz von einer Kachel um den Chunk schließt die
+// Wege an den Chunkgrenzen an; gezeichnet wird nur auf den eigenen Kacheln (minimal größer, damit keine Haarlinie bleibt).
+function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
+  const N = W.N, M = W.M, vh = W.vh;
+  const corner = (i, j) => {
+    const hT = vh[j * M + i], hR = vh[j * M + i + 1], hB = vh[(j + 1) * M + i + 1], hL = vh[(j + 1) * M + i];
+    const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
+    return (u, v) => [sx + (u - v) * HW, sy + (u + v) * HH - (hT + (hR - hT) * u + (hL - hT) * v + (hT - hR - hL + hB) * u * v)];
+  };
+  const segs = [];
+  for (let j = y0 - 1; j <= y0 + CHUNK; j++) for (let i = x0 - 1; i <= x0 + CHUNK; i++) {
+    if (!isRoadish(W, i, j)) continue;
+    const bridge = W.tiles[j * N + i] === T.BRIDGE, lift = bridge ? 4 : 0, tp = corner(i, j);
     const ctr = tp(0.5, 0.5); ctr[1] -= lift;
     const arms = [];
     if (isRoadish(W, i, j - 1)) arms.push(tp(0.5, 0));
     if (isRoadish(W, i + 1, j)) arms.push(tp(1, 0.5));
     if (isRoadish(W, i, j + 1)) arms.push(tp(0.5, 1));
     if (isRoadish(W, i - 1, j)) arms.push(tp(0, 0.5));
-    for (const a of arms) a[1] -= lift;
-    c.lineCap = 'round';
-    const rc = bridge ? '#8f6e44' : pal.road;
-    c.strokeStyle = bridge ? '#5a4128' : shade(rc, 0.82); c.lineWidth = 17;
-    for (const a of arms) { c.beginPath(); c.moveTo(ctr[0], ctr[1]); c.lineTo(a[0], a[1]); c.stroke(); }
-    // Gemalter Weg je Jahreszeit (im Schnee Matsch und Fahrspuren), in Städten Pflaster
-    const roadArt = !bridge ? texPattern(c, roadTex(W, i, j, season), ox, oy) : null;
-    c.strokeStyle = roadArt || rc; c.lineWidth = bridge ? 13 : 12.5;
-    for (const a of arms) { c.beginPath(); c.moveTo(ctr[0], ctr[1]); c.lineTo(a[0], a[1]); c.stroke(); }
-    if (!arms.length) { c.fillStyle = roadArt || rc; c.beginPath(); c.ellipse(ctr[0], ctr[1], 8, 4, 0, 0, Math.PI * 2); c.fill(); }
-    if (!bridge && !roadArt) {
+    for (const q of arms) q[1] -= lift;
+    segs.push({ i, j, bridge, ctr, arms, tex: bridge ? null : roadTex(W, i, j, season) });
+  }
+  if (!segs.length) return;
+  // nur Kacheln mit Weg in der Nähe gehören in die Schablone
+  const near = new Set();
+  for (const g of segs) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) near.add((g.j + dj) * N + g.i + di);
+  c.save();
+  c.beginPath();
+  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) {
+    if (!near.has(j * N + i)) continue;
+    const tp = corner(i, j), e = 0.03;
+    const q = [tp(-e, -e), tp(1 + e, -e), tp(1 + e, 1 + e), tp(-e, 1 + e)];
+    c.moveTo(q[0][0], q[0][1]); c.lineTo(q[1][0], q[1][1]); c.lineTo(q[2][0], q[2][1]); c.lineTo(q[3][0], q[3][1]); c.closePath();
+  }
+  c.clip();
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // Pfad aller Stücke einer Gruppe; Sackgassen als kleiner Fleck
+  const trace = (list, dot) => {
+    c.beginPath();
+    for (const g of list) {
+      if (!g.arms.length) { c.moveTo(g.ctr[0] + dot, g.ctr[1]); c.ellipse(g.ctr[0], g.ctr[1], dot, dot / 2, 0, 0, Math.PI * 2); continue; }
+      for (const q of g.arms) { c.moveTo(g.ctr[0], g.ctr[1]); c.lineTo(q[0], q[1]); }
+    }
+  };
+  const ground = segs.filter((g) => !g.bridge), bridges = segs.filter((g) => g.bridge);
+  const byTex = new Map();
+  for (const g of ground) { const k = g.tex || ''; if (!byTex.has(k)) byTex.set(k, []); byTex.get(k).push(g); }
+  const art = (k) => (k ? texPattern(c, k, ox, oy) : null);
+  const rc = pal.road;
+  // Rand: dieselbe Wegtextur, etwas dunkler, mit einem weichen Saum ins Gras
+  if (ground.length) {
+    trace(ground, 9); c.strokeStyle = 'rgba(40,28,14,0.16)'; c.lineWidth = 19.5; c.stroke();
+    for (const [k, list] of byTex) {
+      const pat = art(k);
+      trace(list, 8.5); c.strokeStyle = pat || shade(rc, 0.82); c.lineWidth = 17; c.stroke();
+      if (!pat) { c.fillStyle = shade(rc, 0.82); c.fill(); }
+    }
+    trace(ground, 8.5); c.strokeStyle = 'rgba(38,26,12,0.3)'; c.lineWidth = 17; c.stroke();
+    // Wegdecke
+    for (const [k, list] of byTex) {
+      const pat = art(k);
+      trace(list, 6.5); c.strokeStyle = pat || rc; c.lineWidth = 12.5; c.stroke();
+      c.fillStyle = pat || rc; c.fill();
+    }
+    // Ohne gemalte Textur: Fahrspuren und Steinchen wie bisher
+    for (const g of byTex.get('') || []) {
       c.strokeStyle = shade(rc, 0.88); c.lineWidth = 1.2;
-      for (const a of arms) {
-        c.beginPath(); c.moveTo(ctr[0] - 2.5, ctr[1]); c.lineTo(a[0] - 2.5, a[1]); c.moveTo(ctr[0] + 2.5, ctr[1]); c.lineTo(a[0] + 2.5, a[1]); c.stroke();
+      for (const q of g.arms) {
+        c.beginPath(); c.moveTo(g.ctr[0] - 2.5, g.ctr[1]); c.lineTo(q[0] - 2.5, q[1]); c.moveTo(g.ctr[0] + 2.5, g.ctr[1]); c.lineTo(q[0] + 2.5, q[1]); c.stroke();
       }
-      if (h1 < 0.55) { c.fillStyle = shade(rc, 0.7); c.fillRect(ctr[0] - 4 + h1 * 8, ctr[1] - 1 + h2 * 3, 2, 1.5); c.fillRect(ctr[0] + 2 - h2 * 6, ctr[1] + 1, 1.5, 1.2); }
-    } else {
-      c.strokeStyle = 'rgba(50,32,16,0.55)'; c.lineWidth = 1;
-      for (const a of arms) {
-        for (let k = 1; k < 5; k++) {
-          const px = ctr[0] + (a[0] - ctr[0]) * (k / 5), py = ctr[1] + (a[1] - ctr[1]) * (k / 5);
-          const nx = -(a[1] - ctr[1]), ny = a[0] - ctr[0], nl = Math.hypot(nx, ny) || 1;
-          c.beginPath(); c.moveTo(px + (nx / nl) * 6, py + (ny / nl) * 6); c.lineTo(px - (nx / nl) * 6, py - (ny / nl) * 6); c.stroke();
-        }
+      const h1 = hash2(g.i, g.j, 77), h2 = hash2(g.i, g.j, 991);
+      if (h1 < 0.55) { c.fillStyle = shade(rc, 0.7); c.fillRect(g.ctr[0] - 4 + h1 * 8, g.ctr[1] - 1 + h2 * 3, 2, 1.5); c.fillRect(g.ctr[0] + 2 - h2 * 6, g.ctr[1] + 1, 1.5, 1.2); }
+    }
+  }
+  // Brücken: dunkler Rahmen, Bohlen darüber
+  if (bridges.length) {
+    trace(bridges, 8.5); c.strokeStyle = '#5a4128'; c.lineWidth = 17; c.stroke();
+    trace(bridges, 6.5); c.strokeStyle = '#8f6e44'; c.lineWidth = 13; c.stroke();
+    c.strokeStyle = 'rgba(50,32,16,0.55)'; c.lineWidth = 1; c.lineCap = 'butt';
+    c.beginPath();
+    for (const g of bridges) for (const q of g.arms) {
+      const nx = -(q[1] - g.ctr[1]), ny = q[0] - g.ctr[0], nl = Math.hypot(nx, ny) || 1;
+      for (let k = 1; k < 5; k++) {
+        const px = g.ctr[0] + (q[0] - g.ctr[0]) * (k / 5), py = g.ctr[1] + (q[1] - g.ctr[1]) * (k / 5);
+        c.moveTo(px + (nx / nl) * 6, py + (ny / nl) * 6); c.lineTo(px - (nx / nl) * 6, py - (ny / nl) * 6);
       }
     }
-    c.lineCap = 'butt';
+    c.stroke();
   }
+  c.restore();
 }
 
 function renderChunk(cx, cy, cs = 1) {
@@ -2870,6 +2930,7 @@ function renderChunk(cx, cy, cs = 1) {
   const ox = -isoX(x0, y0 + CHUNK), oy = -isoY(x0, y0) + PAD_TOP;
   const noise = getPatchNoise();
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise);
+  drawRoads(c, W, x0, y0, ox, oy, pal, season);
   return { cvs, x: -ox, y: -oy, s: cs, w: cvs.width / cs, h: cvs.height / cs };
 }
 
@@ -3084,7 +3145,8 @@ function drawFigureBody(c, u, L, m) {
   if (m) {
     const hs = horse3dFor(u, L);
     if (hs) {
-      if (hs.front) late = hs; else hs.paint(c);
+      hs.paint(c);
+      if (hs.front) late = hs;
       // Reiter im Sattel: Hüfte auf dem Sattelpunkt, ein Bein hängt an der Flanke herab
       c.translate(hs.x, 0);
       by = hs.y + 6.2;
@@ -3142,7 +3204,7 @@ function drawFigureBody(c, u, L, m) {
     if (u.female) c.fillRect(-3.4, yb - 19.5, 1.6, 5);
   }
   if (u.kind === 'peasant') drawVillagerGear(c, u, yb);
-  if (late) { c.translate(-late.x, 0); late.paint(c); c.translate(late.x, 0); }
+  if (late) { c.translate(-late.x, 0); late.head(c); c.translate(late.x, 0); }
   return yb;
 }
 
@@ -3202,10 +3264,10 @@ function drawFig3d(c, u, model, L) {
   const frame = Math.floor((((G.time + (u.id % 13) * 0.37) / dur) * A.bilder)) % A.bilder;
   const cell = fig3dCell(model, anim, dir, frame, u.tunic || L.tunic || '#8a6e4b');
   if (!cell) return drawFigureBody(c, u, L, false);
-  const k = 23.5 / M.figur_px;
+  const k = FIG3D_H / M.figur_px;
   c.save();
   c.scale(u.facing || 1, 1);   // die Richtung steckt im Bild, nicht spiegeln
-  c.drawImage(cell, -M.fusspunkt[0] * k, -M.fusspunkt[1] * k, M.zelle * k, M.zelle * k);
+  c.drawImage(lodOf(cell, c, k), -M.fusspunkt[0] * k, -M.fusspunkt[1] * k, M.zelle * k, M.zelle * k);
   c.restore();
   return 0;
 }
@@ -3213,7 +3275,26 @@ function drawFig3d(c, u, model, L) {
 // ---------------------------------------------------------------- 3D-Pferde (tools/pferd.py)
 // Gleiche Bögen wie bei den 3D-Figuren. Beim Reitpferd ist das Fell einfärbbar (Klepper braun, Zelter Schimmel),
 // beim Schlachtross die Schabracke (Wappenfarbe des Reiters). Der Sattelpunkt je Bild trägt den Reiter.
-const HORSE_K = 23.5 / 60;   // gleicher Maßstab wie die 3D-Figuren
+// Verkleinerte Stufen beim Herauszoomen: Zellen in voller Auflösung flimmern sonst, wenn sie stark verkleinert gemalt werden.
+// scale: Bildschirm-Pixel je Zellen-Pixel (aus der Zeichenmatrix und dem Maßstab k der Figur)
+const lodMap = new WeakMap();
+function lodOf(cv, c, k) {
+  const t = c.getTransform(), sc = Math.hypot(t.a, t.b) * k;
+  if (sc >= 0.62) return cv;
+  const want = sc < 0.16 ? 3 : sc < 0.31 ? 2 : 1;
+  let l = lodMap.get(cv);
+  if (!l) lodMap.set(cv, (l = []));
+  let src = cv;
+  for (let i = 0; i < want; i++) {
+    if (!l[i]) {
+      const w = Math.max(1, Math.round(src.width / 2)), h = Math.max(1, Math.round(src.height / 2));
+      const d = makeCanvas(w, h), g = d.getContext('2d');
+      g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, w, h); l[i] = d;
+    }
+    src = l[i];
+  }
+  return src;
+}
 function horseReady(kind) { return !!(ART[`pferd3d_${kind}_stehen`] && ART[`pferd3d_${kind}_schritt`] && ART[`pferd3d_${kind}_galopp_maske`]); }
 function horseCell(kind, anim, dir, frame, color) {
   const key = `${kind}|${anim}|${dir}|${frame}|${color}`;
@@ -3221,14 +3302,14 @@ function horseCell(kind, anim, dir, frame, color) {
   if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
   const base = ART[`pferd3d_${kind}_${anim}`], mask = ART[`pferd3d_${kind}_${anim}_maske`];
   if (!base || !mask) return null;
-  const C = HORSE3D[kind].zelle, sx = frame * C, sy = dir * C;
-  const tmp = makeCanvas(C, C), tg = tmp.getContext('2d');
-  tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
-  tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, C, C);
-  tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
-  cv = makeCanvas(C, C);
+  const M = HORSE3D[kind], CW = M.breite || M.zelle, CH = M.hoehe || M.zelle, sx = frame * CW, sy = dir * CH;
+  const tmp = makeCanvas(CW, CH), tg = tmp.getContext('2d');
+  tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
+  tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, CW, CH);
+  tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
+  cv = makeCanvas(CW, CH);
   const g = cv.getContext('2d');
-  g.drawImage(base, sx, sy, C, C, 0, 0, C, C);
+  g.drawImage(base, sx, sy, CW, CH, 0, 0, CW, CH);
   g.drawImage(tmp, 0, 0);
   fig3dCache.set(key, cv);
   while (fig3dCache.size > 600) fig3dCache.delete(fig3dCache.keys().next().value);
@@ -3243,13 +3324,31 @@ function horseFrame(kind, anim, dir, phase, color) {
   const frame = ((Math.floor(phase * A.bilder) % A.bilder) + A.bilder) % A.bilder;
   const cell = horseCell(kind, anim, dir, frame, color);
   if (!cell) return null;
-  const k = HORSE_K, pts = M.sattel[anim], i = (dir * A.bilder + frame) * 2;
-  return { cell, x0: -M.fusspunkt[0] * k, y0: -M.fusspunkt[1] * k, size: M.zelle * k, sx: pts[i] * k, sy: pts[i + 1] * k };
+  const k = FIG3D_H / M.figur_px, pts = M.sattel[anim], hd = M.kopf && M.kopf[anim], i = (dir * A.bilder + frame) * 2;
+  return {
+    cell, k, x0: -M.fusspunkt[0] * k, y0: -M.fusspunkt[1] * k, w: (M.breite || M.zelle) * k, h: (M.hoehe || M.zelle) * k, dir,
+    sx: pts[i] * k, sy: pts[i + 1] * k, hx: hd ? hd[i] * k : null, hy: hd ? hd[i + 1] * k : null,
+  };
+}
+function paintHorse(c, h) { c.drawImage(lodOf(h.cell, c, h.k), h.x0, h.y0, h.w, h.h); }
+// Von vorn und schräg vorn (Richtung 0 bis 2) stehen Kopf und Hals vor dem Reiter: nach ihm noch einmal malen,
+// beschnitten auf eine Kapsel vom Kopf ein Stück zum Sattel hin
+function paintHorseHead(c, h) {
+  if (h.dir > 2 || h.hx === null) return;
+  const m = FIG3D_H / 1.8, ex = h.hx + (h.sx - h.hx) * 0.62, ey = h.hy + (h.sy - h.hy) * 0.62;
+  const dx = ex - h.hx, dy = ey - h.hy, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d, rn = 0.2 * m;
+  c.save();
+  c.beginPath();
+  c.arc(h.hx, h.hy, 0.3 * m, 0, Math.PI * 2);
+  c.moveTo(h.hx + nx * rn, h.hy + ny * rn); c.lineTo(ex + nx * rn, ey + ny * rn); c.lineTo(ex - nx * rn, ey - ny * rn); c.lineTo(h.hx - nx * rn, h.hy - ny * rn); c.closePath();
+  c.clip('nonzero');
+  paintHorse(c, h);
+  c.restore();
 }
 function drawHorseSprite(c, kind, anim, dir, phase, color) {
   const h = horseFrame(kind, anim, dir, phase, color);
   if (!h) return null;
-  c.drawImage(h.cell, h.x0, h.y0, h.size, h.size);
+  paintHorse(c, h);
   return { x: h.sx, y: h.sy };
 }
 // Gangart nach dem Tempo: Stehen, Schritt, Galopp. Die Beine laufen im Takt der Bewegung.
@@ -3276,8 +3375,9 @@ function horse3dFor(u, L) {
   if (!h) return null;
   const f = u.facing || 1;
   return {
-    x: h.sx * f, y: h.sy, front: dir === 1,
-    paint: (c) => { c.save(); c.scale(f, 1); c.drawImage(h.cell, h.x0, h.y0, h.size, h.size); c.restore(); },
+    x: h.sx * f, y: h.sy, front: dir <= 2,
+    paint: (c) => { c.save(); c.scale(f, 1); paintHorse(c, h); c.restore(); },
+    head: (c) => { c.save(); c.scale(f, 1); paintHorseHead(c, h); c.restore(); },
   };
 }
 
@@ -3294,15 +3394,15 @@ function heroCell(v, anim, dir, frame, color) {
   if (cv) { fig3dCache.delete(key); fig3dCache.set(key, cv); return cv; }
   const base = ART[`held_${v}_${anim}`], mask = ART[`held_${v}_${anim}_maske`];
   if (!base) return null;
-  const C = HERO3D[v].zelle, sx = frame * C, sy = dir * C;
-  cv = makeCanvas(C, C);
+  const M = HERO3D[v], CW = M.breite || M.zelle, CH = M.hoehe || M.zelle, sx = frame * CW, sy = dir * CH;
+  cv = makeCanvas(CW, CH);
   const g = cv.getContext('2d');
-  g.drawImage(base, sx, sy, C, C, 0, 0, C, C);
+  g.drawImage(base, sx, sy, CW, CH, 0, 0, CW, CH);
   if (mask) {
-    const tmp = makeCanvas(C, C), tg = tmp.getContext('2d');
-    tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
-    tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, C, C);
-    tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, C, C, 0, 0, C, C);
+    const tmp = makeCanvas(CW, CH), tg = tmp.getContext('2d');
+    tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
+    tg.globalCompositeOperation = 'multiply'; tg.fillStyle = color; tg.fillRect(0, 0, CW, CH);
+    tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, sx, sy, CW, CH, 0, 0, CW, CH);
     g.drawImage(tmp, 0, 0);
   }
   fig3dCache.set(key, cv);
@@ -3333,10 +3433,10 @@ function heroAnim(u, v, m) {
 function heroPoint(v, anim, dir, frame, which) {
   const M = HERO3D[v], A = M.bewegungen[anim], arr = M.punkte[`${anim}|${which}`];
   if (!arr) return null;
-  const i = (dir * A.bilder + frame) * 2;
-  return { x: arr[i] * HERO_K, y: arr[i + 1] * HERO_K };
+  const i = (dir * A.bilder + frame) * 2, k = heroK(M);
+  return { x: arr[i] * k, y: arr[i + 1] * k };
 }
-const HERO_K = 23.5 / 60;
+const heroK = (M) => FIG3D_H / (M.figur_px || 60);
 function drawHero3d(c, u, L, m) {
   const v = heroVariant(u);
   const M = HERO3D[v];
@@ -3344,7 +3444,7 @@ function drawHero3d(c, u, L, m) {
   const dir = dirIndex(u.dirX ?? 0, u.dirY ?? 1);
   const cell = heroCell(v, anim, dir, frame, u.tunic || playerColor());
   if (!cell) return null;
-  const f = u.facing || 1, k = HERO_K, C = M.zelle;
+  const f = u.facing || 1, k = heroK(M), CW = M.breite || M.zelle, CH = M.hoehe || M.zelle;
   c.save();
   c.scale(f, 1);   // die Richtung steckt im Bild, nicht spiegeln
   // Zu Pferd: Pferd malen, Reiter mit der Hüfte auf den Sattel
@@ -3358,8 +3458,9 @@ function drawHero3d(c, u, L, m) {
     }
     if (horse) {
       const hip = heroPoint(v, 'reiten', dir, 0, 'Hips') || { x: 0, y: -22 };
-      ox = horse.sx - hip.x; oy = horse.sy - hip.y - 1.2;
-      if (dir !== 1) c.drawImage(horse.cell, horse.x0, horse.y0, horse.size, horse.size);
+      // Das Hüftgelenk liegt rund 9 cm über der Sitzfläche
+      ox = horse.sx - hip.x; oy = horse.sy - hip.y - 0.09 * FIG3D_H / 1.8;
+      paintHorse(c, horse);
     }
   }
   // Waffe und Schild: von hinten gesehen hinter dem Körper, sonst davor
@@ -3373,9 +3474,9 @@ function drawHero3d(c, u, L, m) {
     }
   };
   if (back) gear();
-  c.drawImage(cell, ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, C * k, C * k);
+  c.drawImage(lodOf(cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
   if (!back) gear();
-  if (horse && dir === 1) c.drawImage(horse.cell, horse.x0, horse.y0, horse.size, horse.size);
+  if (horse) paintHorseHead(c, horse);
   c.restore();
   const head = heroPoint(v, anim, dir, frame, 'Hips');
   return (head ? oy + head.y : -10) - 2;
@@ -3873,30 +3974,39 @@ function drawWeather(c, w, h, dt) {
   }
 }
 
+// Vogelschwärme hoch über der Landschaft: in Weltkoordinaten (ziehen beim Scrollen nicht mit), wachsen mit dem
+// Zoom und verblassen beim nahen Hineinzoomen, denn dann fliegen sie über der Kamera hinweg.
+// Für Tests: sofort einen Schwarm losschicken
+export function birdsNow() { birdTimer = 0; return birds.length; }
 function drawBirds(c, w, h, dt) {
+  const z = G.cam.zoom, cx = G.cam.x, cy = G.cam.y;
+  const fade = z <= 1.9 ? 1 : Math.max(0, 1 - (z - 1.9) / 1.1);
+  const halfW = w / 2 / z, halfH = h / 2 / z;
   birdTimer -= dt;
   if (birdTimer <= 0) {
     birdTimer = rand(12, 28);
-    if (darkness() < 0.25 && birds.length < 3) {
+    if (darkness() < 0.25 && birds.length < 3 && fade > 0.2) {
       const left = Math.random() < 0.5;
       const n = 4 + Math.floor(Math.random() * 6);
-      const flock = { x: left ? -40 : w + 40, y: rand(h * 0.12, h * 0.55), vx: (left ? 1 : -1) * rand(45, 75), vy: rand(-8, 8), members: [] };
+      const flock = { x: cx + (left ? -1 : 1) * (halfW + 40), y: cy + rand(-0.75, 0.1) * halfH, vx: (left ? 1 : -1) * rand(40, 65), vy: rand(-6, 6), members: [] };
       for (let k = 0; k < n; k++) flock.members.push({ dx: -Math.abs(k - n / 2) * 9 * Math.sign(flock.vx), dy: (k - n / 2) * 7, p: Math.random() * 6 });
       birds.push(flock);
     }
   }
-  c.strokeStyle = 'rgba(35,30,28,0.75)';
-  c.lineWidth = 1.4;
+  const k = Math.min(1.8, Math.max(0.55, z * 0.75));
+  if (fade > 0) { c.strokeStyle = `rgba(35,30,28,${0.75 * fade})`; c.lineWidth = 1.4 * k; }
   for (let i = birds.length - 1; i >= 0; i--) {
     const f = birds[i];
     f.x += f.vx * dt; f.y += f.vy * dt;
-    c.beginPath();
-    for (const m of f.members) {
-      const x = f.x + m.dx, y = f.y + m.dy, flap = Math.sin(G.time * 11 + m.p) * 2.6;
-      c.moveTo(x - 5, y - flap); c.quadraticCurveTo(x - 2, y - 1.5, x, y); c.quadraticCurveTo(x + 2, y - 1.5, x + 5, y - flap);
+    if (fade > 0) {
+      c.beginPath();
+      for (const m of f.members) {
+        const x = (f.x + m.dx - cx) * z + w / 2, y = (f.y + m.dy - cy) * z + h / 2, flap = Math.sin(G.time * 11 + m.p) * 2.6 * k;
+        c.moveTo(x - 5 * k, y - flap); c.quadraticCurveTo(x - 2 * k, y - 1.5 * k, x, y); c.quadraticCurveTo(x + 2 * k, y - 1.5 * k, x + 5 * k, y - flap);
+      }
+      c.stroke();
     }
-    c.stroke();
-    if (f.x < -200 || f.x > w + 200) birds.splice(i, 1);
+    if (Math.abs(f.x - cx) > halfW + 400 || Math.abs(f.y - cy) > halfH + 400) birds.splice(i, 1);
   }
 }
 
@@ -4102,7 +4212,7 @@ export function render() {
   // Objekte sammeln und nach Tiefe sortieren
   const objs = [];
   const inView = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
-  const lists = tourneyLayout();
+  const lists = tourneyLayout(), listsCore = lists && tourneyCore(lists.lx, lists.ly, lists.knights.length);
   const gallows = [];
   for (const s of W.sites) {
     if (s.x < minX - 24 || s.x > maxX + 24 || s.y < minY - 24 || s.y > maxY + 24) continue;
@@ -4113,7 +4223,7 @@ export function render() {
     for (const o of W.chunkObjs[cy * CN + cx]) {
       const ix = isoX(o.x, o.y);
       if (ix < isoL || ix > isoR) continue;
-      if (lists && Math.abs(o.x - lists.lx) < 10 && Math.abs(o.y - lists.ly) < 4.6) continue;
+      if (listsCore && Math.abs(o.x - lists.lx) < 11 && Math.abs(o.y - lists.ly) < 5 && listsCore.some((q) => o.x > q.x0 && o.x < q.x1 && o.y > q.y0 && o.y < q.y1)) continue;
       if (gallows.length && gallows.some((g) => Math.abs(o.x - g.x) < 2 && Math.abs(o.y - g.y) < 2.2)) continue;
       if (o.kind === 'mauer') objs.push({ d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => drawWallRuin(c, o) });
       else objs.push({ d: o.x + o.y, z: 0, f: (c) => drawTreeObj(c, o), box: o.box || (o.box = [o.x - 0.25, o.x + 0.25, o.y - 0.25, o.y + 0.25]) });
