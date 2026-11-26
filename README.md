@@ -131,6 +131,6 @@ node tools/build.mjs
 | `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |
 | `tools/figur.py` | Stellt eine KI-Figur auf grünem Hintergrund frei, entfernt grüne Säume und verkleinert sie auf Spielgröße (`python3 tools/figur.py assets/roh/figuren/ritter_gemini.webp assets/figuren/ritter.png`). Magenta färbt das Spiel zur Wappenfarbe um. |
 
-Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet. Nach und nach kommen handgemalte Bilder dazu (Titelbild, Wiese, Eiche), der Plan dafür steht in [assets/GRAFIK-BRIEF.md](assets/GRAFIK-BRIEF.md). Der Build bettet sie in die Einzeldatei ein.
+Keine Abhängigkeiten und kein Framework, nur Canvas 2D und modernes JavaScript. Grafik und Figuren werden im Code gezeichnet. Nach und nach kommen handgemalte Bilder dazu (Titelbild, Wiese, Eiche), der Plan dafür steht in [assets/GRAFIK-BRIEF.md](assets/GRAFIK-BRIEF.md). Der Build bettet sie in die Einzeldatei ein. Musik und Geräusche sind in [assets/SOUND-BRIEF.md](assets/SOUND-BRIEF.md) beschrieben.
 
 Wie es weitergehen kann, steht in [DESIGN.md](DESIGN.md).

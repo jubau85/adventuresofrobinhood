@@ -193,7 +193,7 @@ Ist das Haus gelungen, bitte im selben Gespräch gleich die Varianten aus Punkt 
 | 7 | **neu gefasst:** Figuren als Baukasten, Lasten | 10 Körper, 27 Teile, 3 Pferde, 13 Lasten | alle Menschen |
 | 8 | Tiere | 6 Bögen | Weiden, Wald |
 | 9 | Symbole und Porträts | 66 | Tafeln und Menüs |
-| 10 | Musik (optional) | 7 Stücke | Ton |
+| 10 | Musik und Geräusche: siehe `SOUND-BRIEF.md` | etwa 170 Dateien | Ton |
 | 11 | **neu:** Wahrzeichen | 15 | Kathedralen, Tower, Tuchhallen, Stonehenge |
 | 12 | **neu:** Mystische Orte, Gruben, Lagerfeuer, Galgen, Friedhof | 23 | Land zwischen den Orten |
 | 13 | **neu:** Turnier | 4 | Turnierplatz |
@@ -669,23 +669,9 @@ Größe 1× 64 × 64, Lieferung 256 × 256.
 
 ---
 
-## Paket 10: Musik (optional)
+## Paket 10: Musik und Geräusche
 
-Falls Oakgen auch Musik kann. Bitte als OGG oder MP3 mit 160 kbit/s, nahtlos wiederholbar (Anfang und Ende passen zusammen).
-
-**Grundton:** mittelalterlich, warm, episch, aber nicht bombastisch, in Moll und dorischer Tonart.
-
-**Instrumente:** Laute, Blockflöte, Drehleier, Fiedel, Rahmentrommel, Naturhorn und ein leiser Chor. Keine bekannten Melodien nachspielen.
-
-| Datei | Länge | Stimmung |
-| --- | --- | --- |
-| `musik/titel.ogg` | 1,5 bis 2 min | episches Titelthema, langsamer Aufbau, Hörner und Chor |
-| `musik/reise.ogg` | 2 bis 3 min | Reisemusik am Tag, Dreiertakt, Laute und Flöte, leicht und hoffnungsvoll |
-| `musik/nacht.ogg` | 2 min | ruhig, Drehleier und Flöte, viel Hall |
-| `musik/kampf.ogg` | 1 min | treibende Trommeln, Fiedel, Hörner |
-| `musik/sieg.ogg` | 5 s | kurze Fanfare |
-| `musik/niederlage.ogg` | 5 s | kurzes, trauriges Motiv |
-| `musik/bau_fertig.ogg` | 3 s | festliches Glockenspiel |
+Musik, Ambiente und Geräusche stehen jetzt in einem eigenen Brief: **`assets/SOUND-BRIEF.md`**.
 
 ---
 
