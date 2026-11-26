@@ -86,7 +86,7 @@ function lookPal() {
   palKey = key; palCache = o;
   return o;
 }
-function lookKey() { return `${seasonIndex()}|${snowLevel()}`; }
+function lookKey() { return `${seasonIndex()}|${snowLevel()}|${G.s ? fieldStage() : ''}`; }
 
 // ---------------------------------------------------------------- Grundformen
 function poly(c, pts, fill) {
@@ -309,7 +309,8 @@ function drawHouse(c, b) {
   const dh = Math.min(16, b.h * 0.6);
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.36, 0.64, 0, dh + 1.5, '#6a4c34');
   faceQuad(c, b.x, b.y, b.wx, b.wy, 'L', 0.4, 0.6, 0, dh, '#3d2b1f');
-  const empty = abandonedId(b.site), lit = b.lit && !empty;
+  // Kein Licht in verlassenen, brennenden oder schwer beschädigten Häusern
+  const empty = abandonedId(b.site), lit = b.lit && !empty && !(b.fire > G.time) && !((b.dmg || 0) >= 0.45);
   windowOn(c, b, 'R', 0.38, 0.62, b.h * 0.42, b.h * 0.74, lit);
   if (b.wx >= 1.15) windowOn(c, b, 'L', 0.1, 0.26, b.h * 0.42, b.h * 0.72, lit);
   if (b.flowers && seasonIndex() < 2) {
@@ -1437,6 +1438,9 @@ function drawProp(c, b) {
       break;
     }
     case 'beet': {
+      // Gemalte Beete (Gemüse oder Blumen) von Frühling bis Herbst, im Winter das kahle gezeichnete Beet
+      const im = seasonIndex() < 3 ? ART[['beet', 'beet_2', 'beet_blumen', 'beet_blumen_2'][Math.floor(b.v * 4) % 4]] : null;
+      if (im) { const k = TREE_K * 0.95; c.drawImage(im, x - im.width * k / 2, y - im.height * k * 0.7, im.width * k, im.height * k); break; }
       poly(c, [P(b.x - 0.3, b.y - 0.25), P(b.x + 0.3, b.y - 0.25), P(b.x + 0.3, b.y + 0.25), P(b.x - 0.3, b.y + 0.25)], winter ? '#e2e6e4' : '#6b4a2e');
       if (seasonIndex() < 3) {
         const cols = seasonIndex() === 2 ? ['#c97a2a', '#7a8a3a'] : ['#5f9a3a', '#e05a4e', '#f2d65a', '#5f9a3a'];
@@ -2007,7 +2011,7 @@ function addCastleBuilding(add, id, L, p, s) {
         add(x, y, (c) => drawStall(c, { x, y, color: cols[k % cols.length] }));
         if (L >= 2 && k % 2 === 0) add(x + 0.1, y + 0.55, (c) => drawWorker(c, x + 0.1, y + 0.55, null, k, { col: cols[(k + 2) % cols.length], speed: 1 }));
       }
-      if (L >= 2) add(p.x + 1.6, p.y + 0.3, (c) => drawWell(c, { x: p.x + 1.6, y: p.y + 0.3 }));
+      if (L >= 2) add(p.x + 1.8, p.y + 0.3, (c) => drawWell(c, { x: p.x + 1.8, y: p.y + 0.3 }));
       if (L === 3) add(p.x + 0.1, p.y + 0.15, (c) => { drawBox(c, p.x + 0.1, p.y + 0.15, 0.4, 0.4, 6, '#9a958a', 0, 'stone'); drawBox(c, p.x + 0.1, p.y + 0.15, 0.14, 0.14, 26, '#a8a296', 6); const tp = P(p.x + 0.1, p.y + 0.15, 32); c.fillStyle = '#a8a296'; c.fillRect(tp[0] - 4, tp[1] - 2, 8, 2); });
       break;
     }
@@ -2108,7 +2112,7 @@ function drawWoolBales(c, x, y, n) {
 }
 
 // Feste Lage der Äcker um die Burg: nicht auf Straßen, Wasser, Häusern oder Bauplätzen
-function fieldSpots(s) {
+export function fieldSpots(s) {
   if (s.fieldSpots) return s.fieldSpots;
   const W = G.world;
   const r = mulberry32(W.seed + 4711);
@@ -2117,6 +2121,9 @@ function fieldSpots(s) {
   avoid.push({ x: fp.x, y: fp.y, r: 1.6 });
   for (const b of villageSpots(s)) avoid.push({ x: b.x, y: b.y, r: 1.5 });
   for (const [dx, dy] of TOWER_SPOTS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.6 });
+  // Übungsplatz der Unterkunft und Pferdekoppel des Stalls (größte Ausbaustufe)
+  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.3 });
+  avoid.push({ x: s.x + CASTLE_LAYOUT.stall.dx + 1.85, y: s.y + CASTLE_LAYOUT.stall.dy + 0.2, r: 1.5 });
   const cand = [];
   for (let k = 0; k < 900; k++) {
     const a = r() * Math.PI * 2, d = 6.5 + r() * 5;
@@ -2126,7 +2133,7 @@ function fieldSpots(s) {
     let ok = true;
     for (let ty = Math.floor(f.y - f.wy / 2); ty <= Math.floor(f.y + f.wy / 2) && ok; ty++) for (let tx = Math.floor(f.x - f.wx / 2); tx <= Math.floor(f.x + f.wx / 2); tx++) {
       const t = tileAt(W, tx + 0.5, ty + 0.5);
-      if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST) { ok = false; break; }
+      if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FOREST || t === T.FIELD) { ok = false; break; }
     }
     if (!ok) continue;
     if (avoid.some((o) => Math.abs(o.x - f.x) < o.r + f.wx / 2 && Math.abs(o.y - f.y) < o.r + f.wy / 2)) continue;
@@ -2159,7 +2166,7 @@ function addNewCastleBuilding(add, addFlat, id, L, p, s) {
         const bx = p.x - 0.75 + (k % 2) * 0.7, by = p.y + 0.55 + Math.floor(k / 2) * 0.55;
         add(bx, by, (c) => drawProp(c, { prop: 'beet', x: bx, y: by, v: 0.2 + k * 0.2 }));
       }
-      if (L >= 2) add(p.x - 0.75, p.y - 0.9, (c) => drawWell(c, { x: p.x - 0.75, y: p.y - 0.9 }));
+      if (L >= 2) add(p.x - 1.0, p.y - 1.05, (c) => drawWell(c, { x: p.x - 1.0, y: p.y - 1.05 }));
       add(p.x - 0.4, p.y + 1.15, (c) => drawWorker(c, p.x - 0.4, p.y + 1.15, null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2 }));
       if (L === 3) add(p.x + 0.4, p.y + 1.2, (c) => drawWorker(c, p.x + 0.4, p.y + 1.2, null, 2.4, { col: '#e8e0cc', hat: '#e8e0cc', speed: 1, flip: true }));
       break;
@@ -2170,16 +2177,17 @@ function addNewCastleBuilding(add, addFlat, id, L, p, s) {
         addFlat(pa.x - pa.w / 2, pa.y - pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, false));
         add(pa.x + pa.w / 2, pa.y + pa.h / 2, (c) => drawFenceHalf(c, pa.x, pa.y, pa.w, pa.h, true));
       }
+      // Hütte und Scherschuppen hinter dem Weidezaun (nicht darin)
       const hut = L === 3
-        ? { x: p.x - 1.2, y: p.y - 1.0, wx: 1.0, wy: 0.9, h: 12, rh: 9, wall: 'stone', roof: 'slate', lit: true, v: 0.6 }
-        : { x: p.x - 1.2, y: p.y - 1.0, wx: 0.85, wy: 0.75, h: 10, rh: 9, wall: 'wood', roof: 'thatch', lit: true, v: 0.6 };
+        ? { x: p.x - 1.2, y: p.y - 1.55, wx: 1.0, wy: 0.9, h: 12, rh: 9, wall: 'stone', roof: 'slate', lit: true, v: 0.6 }
+        : { x: p.x - 1.2, y: p.y - 1.55, wx: 0.85, wy: 0.75, h: 10, rh: 9, wall: 'wood', roof: 'thatch', lit: true, v: 0.6 };
       add(hut.x, hut.y, (c) => drawHouse(c, hut));
-      if (L >= 2) add(p.x + 1.5, p.y - 1.1, (c) => {
+      if (L >= 2) add(p.x + 1.5, p.y - 1.55, (c) => {
         // Scherschuppen: offenes Dach auf Pfosten
-        for (const [dx, dy] of [[-0.35, -0.3], [0.35, -0.3], [-0.35, 0.3], [0.35, 0.3]]) drawBox(c, p.x + 1.5 + dx, p.y - 1.1 + dy, 0.08, 0.08, 12, '#6b4a2e');
-        drawGableRoof(c, p.x + 1.5, p.y - 1.1, 0.9, 0.8, 12, 7, ROOFS.thatch, '#8a6a40', true);
+        for (const [dx, dy] of [[-0.35, -0.3], [0.35, -0.3], [-0.35, 0.3], [0.35, 0.3]]) drawBox(c, p.x + 1.5 + dx, p.y - 1.55 + dy, 0.08, 0.08, 12, '#6b4a2e');
+        drawGableRoof(c, p.x + 1.5, p.y - 1.55, 0.9, 0.8, 12, 7, ROOFS.thatch, '#8a6a40', true);
       });
-      if (L >= 2) add(p.x + 1.7, p.y - 0.35, (c) => drawWoolBales(c, p.x + 1.7, p.y - 0.35, L === 3 ? 6 : 3));
+      if (L >= 2) add(p.x + 2.4, p.y - 0.85, (c) => drawWoolBales(c, p.x + 2.4, p.y - 0.85, L === 3 ? 6 : 3));
       add(p.x - 1.3, p.y + 0.4, (c) => drawWorker(c, p.x - 1.3, p.y + 0.4, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8 }));
       break;
     }
@@ -2564,6 +2572,7 @@ function ensureSprites() {
     busch: artBusch(s) || [0, 1, 2].map((v) => makeBush(s, v)),
     // nur gemalt: ohne Bild bleiben sie weg
     schilf: artSet(['schilf']),
+    blumen: s <= 1 ? artSet(['wildblumen_1', 'wildblumen_2']) : null,
     stumpf: artSet(['baumstumpf']),
     stamm: artSet(['baum_umgestuerzt_1', 'baum_umgestuerzt_2']),
   };
@@ -2587,7 +2596,7 @@ function drawTreeObj(c, o) {
   const w = sp.cvs.width * o.s * (sp.k || 1), h = sp.cvs.height * o.s * (sp.k || 1);
   const big = o.kind === 'laub' || o.kind === 'nadel', long = o.kind === 'stamm';
   c.fillStyle = 'rgba(20,35,12,0.2)';
-  if (o.kind !== 'schilf') { c.beginPath(); c.ellipse(x + (big ? 10 : long ? 0 : 4) * o.s, y - 1, (big ? 16 : long ? 22 : 10) * o.s, (big ? 5.5 : long ? 6 : 3.5) * o.s, 0, 0, Math.PI * 2); c.fill(); }
+  if (o.kind !== 'schilf' && o.kind !== 'blumen') { c.beginPath(); c.ellipse(x + (big ? 10 : long ? 0 : 4) * o.s, y - 1, (big ? 16 : long ? 22 : 10) * o.s, (big ? 5.5 : long ? 6 : 3.5) * o.s, 0, 0, Math.PI * 2); c.fill(); }
   c.drawImage(sp.cvs, x - sp.ax * o.s, y - sp.ay * o.s, w, h);
 }
 
@@ -2633,17 +2642,58 @@ function texPattern(c, id, ox, oy) {
   return cache[id];
 }
 // Welcher gemalte Boden zu Gelände und Jahreszeit passt (look: 0 Frühling, 1 Sommer, 2 Herbst, 3 Schnee,
-// 4 kahler Winter). Unter tiefem Schnee (ganze Decke) liegt überall Schnee, nur Wege und Äcker zeichnen sich ab.
-const TEX_HERBST = { [T.GRASS]: 'wiese_herbst', [T.ROAD]: 'wiese_herbst', [T.HILLS]: 'heide_herbst', [T.FOREST]: 'waldboden_herbst' };
-const TEX_WINTER = { [T.GRASS]: 'wiese_winter', [T.ROAD]: 'wiese_winter', [T.HILLS]: 'heide_winter', [T.FOREST]: 'waldboden_winter', [T.FIELD]: 'acker_winter' };
-function groundTex(t, look, sea) {
-  if (t === T.WATER || t === T.BRIDGE) return (look === 3 || look === 4) && !sea ? 'wasser_winter' : null;
-  if (look === 3) {
-    if (tileSnow >= 1 && t !== T.FIELD && t !== T.SAND) return ART.schnee ? 'schnee' : TEX_WINTER[t];
-    return TEX_WINTER[t] || null;
+// 4 kahler Winter). Unter tiefem Schnee liegt überall Schnee, nur Wege und Äcker zeichnen sich ab.
+const TEX = {
+  0: { [T.GRASS]: 'wiese_fruehling', [T.ROAD]: 'wiese_fruehling', [T.HILLS]: 'heide_sommer', [T.FOREST]: 'waldboden_sommer' },
+  1: { [T.GRASS]: 'wiese_sommer', [T.ROAD]: 'wiese_sommer', [T.HILLS]: 'heide_sommer', [T.FOREST]: 'waldboden_sommer' },
+  2: { [T.GRASS]: 'wiese_herbst', [T.ROAD]: 'wiese_herbst', [T.HILLS]: 'heide_herbst', [T.FOREST]: 'waldboden_herbst' },
+  3: { [T.GRASS]: 'wiese_winter', [T.ROAD]: 'wiese_winter', [T.HILLS]: 'heide_winter', [T.FOREST]: 'waldboden_winter' },
+};
+TEX[4] = TEX[2];
+// Äcker im Jahreslauf: im Frühjahr gepflügt, dann junge Saat; im Sommer grün, dann reif; im Herbst nach der Ernte brach
+export function fieldStage() {
+  const look = lookSeason();
+  if (look === 3) return 'acker_winter';
+  if (look === 4) return 'acker_brach';
+  const d = G.s ? (G.s.day - 1) % 6 : 0;
+  return look === 0 ? (d < 3 ? 'acker_brach' : 'acker_jung') : look === 1 ? (d < 3 ? 'acker_jung' : 'acker_reif') : (d < 2 ? 'acker_reif' : 'acker_brach');
+}
+// Kreideküsten: Kent, Sussex und das Pays de Caux in der Normandie
+let chalkBoxes = null;
+function chalkAt(x, y) {
+  if (!chalkBoxes) chalkBoxes = [[0.9, 50.9, 1.6, 51.4], [-0.3, 50.65, 0.45, 50.9], [-0.05, 49.4, 1.6, 50.1]].map(([a, b, c2, d]) => { const p = geoToTile(a, b), q = geoToTile(c2, d); return [Math.min(p.x, q.x), Math.min(p.y, q.y), Math.max(p.x, q.x), Math.max(p.y, q.y)]; });
+  return chalkBoxes.some(([x0, y0, x1, y1]) => x >= x0 - 3 && x <= x1 + 3 && y >= y0 - 3 && y <= y1 + 3);
+}
+let campMud = null, campMudWorld = null;
+function nearCamp(W, i, j) {
+  if (campMudWorld !== W) { campMudWorld = W; campMud = new Set(); for (const c of W.camps || []) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) campMud.add((c.ty + dy) * W.N + c.tx + dx); }
+  return campMud.has(j * W.N + i);
+}
+function groundTex(W, t, look, i, j) {
+  const N = W.N, k = j * N + i;
+  if (t === T.WATER || t === T.BRIDGE) return W.sea[k] ? 'wasser_meer' : look >= 3 ? 'wasser_winter' : 'wasser_fluss';
+  if (t === T.FIELD) return fieldStage();
+  if (look === 3 && tileSnow >= 1 && t !== T.SAND) return ART.schnee ? 'schnee' : TEX[3][t];
+  if (t === T.SAND) {
+    // Küste: Sand, Kies oder Klippen (hoch über dem Meer, an Kreideküsten weiß)
+    const coast = W.sea[k - 1] || W.sea[k + 1] || W.sea[k - N] || W.sea[k + N];
+    if (coast && W.elev[k] > 0.5) return chalkAt(i, j) ? 'klippe_kreide' : 'klippe';
+    return hash2(i >> 2, j >> 2, 611) < 0.3 ? 'kies' : 'sand';
   }
-  if (look === 2 || look === 4) return TEX_HERBST[t] || null;
-  return t === T.GRASS || t === T.ROAD ? 'wiese_sommer' : null;
+  if (t === T.HILLS && W.elev[k] > 0.78) return look === 3 ? 'fels_winter' : 'fels';
+  if ((t === T.GRASS || t === T.FOREST) && nearCamp(W, i, j)) return look === 3 ? TEX[3][t] : 'schlamm';
+  return (TEX[look] || TEX[1])[t] || null;
+}
+// Gemalter Weg: trocken, im Herbst und kahlen Winter Matsch, im Schnee Winterweg, in ummauerten Städten Pflaster
+let cityStreet = null, cityStreetWorld = null;
+function roadTex(W, i, j, look) {
+  if (cityStreetWorld !== W) {
+    cityStreetWorld = W; cityStreet = new Set();
+    for (const s of W.sites) if (s.cityWall) { const R = s.clear; for (let y = Math.floor(s.y - R); y <= s.y + R; y++) for (let x = Math.floor(s.x - R); x <= s.x + R; x++) if (Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y) < R - 1) cityStreet.add(y * W.N + x); }
+  }
+  if (look === 3) return 'weg_winter';
+  if (cityStreet.has(j * W.N + i)) return 'pflaster';
+  return look === 2 || look === 4 ? 'weg_matsch' : 'weg';
 }
 
 let tileSnow = 0;
@@ -2670,7 +2720,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
   c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath();
   c.fillStyle = cR; c.fill(); c.strokeStyle = cR; c.stroke();
   // Gemalter Boden: Textur auf die Raute legen, Hangschatten und Jahreszeit leicht darüber
-  const texId = groundTex(t, season, isWater && W.sea[j * N + i]);
+  const texId = groundTex(W, t, season, i, j);
   const grassArt = texId ? texPattern(c, texId, ox, oy) : null;
   if (grassArt) {
     c.save();
@@ -2679,7 +2729,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     c.fillStyle = grassArt; c.fill();
     // Farbe der Jahreszeit darüber: Sommerwiese im Herbst und Winter stärker, eigene Herbst- und Winterbilder nur leicht;
     // kahler Winter nimmt die Herbstbilder, matter und kälter
-    const own = texId !== 'wiese_sommer';
+    const own = texId !== 'wiese_sommer' || season === 1;
     c.globalAlpha = isWater ? 0 : own ? (season === 4 ? 0.42 : season === 3 ? 0.08 : 0.14) : season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = cL; c.fill();
     c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.closePath(); c.fillStyle = cR; c.fill();
@@ -2783,8 +2833,8 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise) {
     const rc = bridge ? '#8f6e44' : pal.road;
     c.strokeStyle = bridge ? '#5a4128' : shade(rc, 0.82); c.lineWidth = 17;
     for (const a of arms) { c.beginPath(); c.moveTo(ctr[0], ctr[1]); c.lineTo(a[0], a[1]); c.stroke(); }
-    // Im Schnee: Matsch und Fahrspuren aus dem gemalten Winterweg
-    const roadArt = !bridge && season === 3 ? texPattern(c, 'weg_winter', ox, oy) : null;
+    // Gemalter Weg je Jahreszeit (im Schnee Matsch und Fahrspuren), in Städten Pflaster
+    const roadArt = !bridge ? texPattern(c, roadTex(W, i, j, season), ox, oy) : null;
     c.strokeStyle = roadArt || rc; c.lineWidth = bridge ? 13 : 12.5;
     for (const a of arms) { c.beginPath(); c.moveTo(ctr[0], ctr[1]); c.lineTo(a[0], a[1]); c.stroke(); }
     if (!arms.length) { c.fillStyle = roadArt || rc; c.beginPath(); c.ellipse(ctr[0], ctr[1], 8, 4, 0, 0, Math.PI * 2); c.fill(); }
@@ -3954,8 +4004,8 @@ export function onSeasonChanged() { chunkCache.clear(); minimapBase = null; G.ca
 
 // Neue gemalte Grafik geladen: Bäume und Boden neu aufbauen
 onArt((id) => {
-  if (/^(laub|nadel|busch|fels|schilf|baum)/.test(id)) sprites = null;
-  if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee)/.test(id)) { chunkCache.clear(); minimapBase = null; }
+  if (/^(laub|nadel|busch|fels|schilf|baum|wildblumen)/.test(id)) sprites = null;
+  if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee|fels|sand|kies|klippe|pflaster|schlamm)/.test(id)) { chunkCache.clear(); minimapBase = null; }
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }

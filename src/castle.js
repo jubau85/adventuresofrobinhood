@@ -34,8 +34,13 @@ export function villageSpots(s) {
   const W = G.world;
   const r = mulberry32(W.seed + 991);
   const avoid = Object.values(CASTLE_LAYOUT).map((o) => ({ x: s.x + o.dx, y: s.y + o.dy, r: 2.4 }));
-  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.0, y: s.y + 2.6, r: 1.8 });
+  avoid.push({ x: s.x - 2.7, y: s.y + 6.5, r: 1.8 }, { x: s.x + 9.05, y: s.y + 2.6, r: 2.4 });
   for (const [dx, dy] of CASTLE_TOWERS) avoid.push({ x: s.x + dx, y: s.y + dy, r: 1.5 });
+  // Schafhütte und Scherschuppen liegen hinter der Weide, etwas abseits des Bauplatzes
+  const sz = CASTLE_LAYOUT.schafzucht;
+  avoid.push({ x: s.x + sz.dx - 1.2, y: s.y + sz.dy - 1.55, r: 1.4 }, { x: s.x + sz.dx + 1.5, y: s.y + sz.dy - 1.55, r: 1.4 });
+  // zweite Hütte des Holzfällers (größte Stufe)
+  avoid.push({ x: s.x + CASTLE_LAYOUT.holzfaeller.dx - 0.4, y: s.y + CASTLE_LAYOUT.holzfaeller.dy - 1.4, r: 1.4 });
   const spots = [];
   for (let tries = 0; tries < 600 && spots.length < 9; tries++) {
     const a = r() * Math.PI * 2, d = 7.6 + r() * 3.2;
@@ -74,14 +79,14 @@ export function castleObstacles() {
   if ((L = lv('markt'))) {
     p = P('markt');
     for (let n = 0; n < [0, 2, 4, 6][L]; n++) r(p.x - 0.9 + (n % 3) * 0.95, p.y - 0.6 + Math.floor(n / 3) * 1.25, 0.8, 0.6);
-    if (L >= 2) r(p.x + 1.6, p.y + 0.3, 0.6, 0.6);
+    if (L >= 2) r(p.x + 1.8, p.y + 0.3, 0.6, 0.6);
   }
   if ((L = lv('kapelle'))) { p = P('kapelle'); r(p.x, p.y, [0, 1.6, 2.0, 2.6][L], [0, 1.0, 1.0, 1.2][L]); }
-  if ((L = lv('hospiz'))) { p = P('hospiz'); const h = [null, [0.2, -0.3, 1.3, 1.1], [0.3, -0.2, 1.2, 2.0], [0.3, -0.2, 1.4, 2.3]][L]; r(p.x + h[0], p.y + h[1], h[2], h[3]); if (L >= 2) r(p.x - 0.75, p.y - 0.9, 0.6, 0.6); }
+  if ((L = lv('hospiz'))) { p = P('hospiz'); const h = [null, [0.2, -0.3, 1.3, 1.1], [0.3, -0.2, 1.2, 2.0], [0.3, -0.2, 1.4, 2.3]][L]; r(p.x + h[0], p.y + h[1], h[2], h[3]); if (L >= 2) r(p.x - 1.0, p.y - 1.05, 0.6, 0.6); }
   if ((L = lv('schafzucht'))) {
     p = P('schafzucht');
-    r(p.x - 1.2, p.y - 1.0, L === 3 ? 1.0 : 0.85, L === 3 ? 0.9 : 0.75);
-    if (L >= 2) r(p.x + 1.5, p.y - 1.1, 0.9, 0.8);
+    r(p.x - 1.2, p.y - 1.55, L === 3 ? 1.0 : 0.85, L === 3 ? 0.9 : 0.75);
+    if (L >= 2) r(p.x + 1.5, p.y - 1.55, 0.9, 0.8);
     const pa = { x: p.x + 0.5, y: p.y + 0.3, w: [0, 1.9, 2.5, 2.9][L], h: [0, 1.7, 2.1, 2.5][L] };
     r(pa.x, pa.y, pa.w, pa.h, true);
   }

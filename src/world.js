@@ -1672,6 +1672,7 @@ function placeTrees(W, rng) {
         if (W.tiles[j] === T.WATER && !W.sea[j]) { extra = { kind: 'schilf', x: x + 0.5 + dx * 0.25, y: y + 0.5 + dy * 0.25 }; break; }
       }
     } else if (t === T.FOREST && hx < 0.022) extra = { kind: 'stamm', x: x + 0.5, y: y + 0.5 };
+    else if (t === T.GRASS && hash2(x, y, 522) < 0.03) extra = { kind: 'blumen', x: x + 0.2 + hash2(x, y, 523) * 0.6, y: y + 0.2 + hash2(x, y, 524) * 0.6 };
     else if (t === T.FOREST && hx < 0.045) extra = { kind: 'stumpf', x: x + 0.3 + hash2(x, y, 518) * 0.4, y: y + 0.3 + hash2(x, y, 519) * 0.4 };
     if (extra && !nearSite(extra.x, extra.y) && !nearBuilding(extra.x, extra.y)) {
       const ci = Math.floor(extra.y / CHUNK) * CN + Math.floor(extra.x / CHUNK);

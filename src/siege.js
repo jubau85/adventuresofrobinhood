@@ -459,6 +459,7 @@ export function updateSiege(dt) {
       setupWalls(sg);
       closeGates(sg);
       sg.def = raiseDefenders(sg);
+      sg.att0 = army.members.length; sg.def0 = sg.def ? sg.def.members.length : 0;
       if (Math.hypot(s.x - p.x, s.y - p.y) < 70) log(sg.walls ? `Die Tore von ${siteName(s)} schlagen zu, die Riegel fallen. Die Besatzung rückt aus und bezieht Stellung hinter der Mauer. Draußen wird das Trebuchet aufgestellt.` : `Die Belagerung von ${siteName(s)} beginnt. Das Trebuchet wird aufgestellt.`, 'bad');
     } else if (sg.t > 260) return endSiege(sg, 'abgezogen');
     return;
@@ -497,8 +498,28 @@ export function updateSiege(dt) {
   }
   if (sg.stage === 'sturm') {
     if (!alive(sg.def)) return endSiege(sg, 'gefallen');
+    // Moral: Ist die Besatzung auf ein Viertel geschmolzen, streckt der Rest die Waffen.
+    // Haben die Belagerer zwei Drittel verloren, brechen sie den Sturm ab. (Nicht an deiner eigenen Burg: Dort hält die Garnison bis zuletzt.)
+    const nearP = Math.hypot(s.x - p.x, s.y - p.y) < 70;
+    if (s.type !== 'spieler' && sg.def0 && sg.def.members.length <= Math.max(2, Math.round(sg.def0 * 0.25))) {
+      if (nearP) log(`Die Besatzung von ${siteName(s)} streckt die Waffen. Die Angreifer strömen durch die Bresche.`, 'bad');
+      for (const m of sg.def.members) m.dead = true;
+      return endSiege(sg, 'gefallen');
+    }
+    if (sg.att0 && army.members.length <= Math.round(sg.att0 * 0.33)) {
+      if (nearP) log(`Die Belagerer von ${siteName(s)} haben zu viele Männer verloren und brechen den Sturm ab.`, 'good');
+      return endSiege(sg, 'abgewehrt');
+    }
     if (sg.t > 260) return endSiege(sg, 'abgezogen');
   }
+}
+
+// Ausgang ohne Zuschauer: Kräfteverhältnis aus Heer, Besatzung und Mauern, dazu etwas Glück
+export function siegeOdds(site, attackers) {
+  const garrison = 10 + (site.type === 'burg' ? 8 : 4);
+  const walled = site.type === 'burg' || !!site.cityWall || !!site.palisade;
+  const ratio = attackers / (garrison * (walled ? 2.2 : 1.4));
+  return 1 / (1 + ratio * ratio);   // Wahrscheinlichkeit, dass die Stadt hält
 }
 
 // Fern vom Spieler: Ausgang auswürfeln, Häuser beschädigen, Tote zählen
@@ -509,7 +530,7 @@ function resolveAbstract(sg) {
   if (sg.site.cemetery) pd[sg.site.id] = (pd[sg.site.id] || 0) + Math.floor(rand(4, 12));
   (G.s.deadDay || (G.s.deadDay = {}))[sg.site.id] = G.s.day;
   // Deine eigene Burg hält, wenn Mauern, Türme und Garnison stark genug sind
-  const held = sg.site.type === 'spieler' ? castleDefense() >= (40 + G.s.day * 3) * rand(0.8, 1.2) : Math.random() < 0.5;
+  const held = sg.site.type === 'spieler' ? castleDefense() >= (40 + G.s.day * 3) * rand(0.8, 1.2) : Math.random() < siegeOdds(sg.site, sg.army ? sg.army.members.length : 40);
   if (sg.site.type === 'spieler' && held) log(`Nachricht aus ${homeName()}: Die Besatzung hat die Belagerer abgewehrt.`, 'good');
   endSiege(sg, held ? 'abgewehrt' : 'gefallen', !held && sg.site.type === 'spieler' ? false : true);
 }

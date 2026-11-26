@@ -13,14 +13,14 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock } from './castle.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles } from './castle.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney } from './tournament.js';
 import { initWeather, updateWeather, precip } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
-import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen } from './render.js';
+import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen, fieldSpots } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog, castleFocusTab,
 } from './ui.js';
@@ -796,4 +796,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
+window.__ritterDebug = { castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, giveAlms, rescueCondemned };
