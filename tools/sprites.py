@@ -16,6 +16,7 @@
 # dreht sich um 45° gegen den Uhrzeigersinn, von oben gesehen.
 
 import bpy, sys, json, math, os
+import numpy as np
 from mathutils import Vector
 from bpy_extras.object_utils import world_to_camera_view
 
@@ -41,7 +42,12 @@ sc = bpy.context.scene
 bpy.ops.import_scene.gltf(filepath=src)
 arm = next((o for o in sc.objects if o.type == 'ARMATURE'), None)
 meshes = [o for o in sc.objects if o.type == 'MESH']
-if not arm: sys.exit('Keine Figur mit Skelett in ' + src)
+# Hilfsobjekte ohne Bezug zum Skelett (Meshy legt manchmal eine Kugel bei) nicht rendern und nicht messen
+if arm:
+    for o in meshes:
+        if o.parent is not arm and o.find_armature() is not arm: o.hide_render = True
+    meshes = [o for o in meshes if not o.hide_render]
+# Ohne Skelett: unbewegtes Modell (Figur in Ruhe, Gebäude, Gegenstand), ein Bild je Richtung
 
 # Wurzel: alles unter ein Leerobjekt hängen, das wir drehen und verschieben
 root = bpy.data.objects.new('wurzel', None); sc.collection.objects.link(root)
@@ -67,7 +73,7 @@ root.location.z -= lo.z
 
 # Waffe in die rechte Hand
 hand = None
-for b in arm.data.bones:
+for b in (arm.data.bones if arm else []):
     n = b.name.lower().replace('_', '').replace(':', '')
     if ('righthand' in n or 'handr' in n or n.endswith('rhand')) and 'thumb' not in n and 'index' not in n:
         hand = b.name; break
@@ -92,7 +98,13 @@ if opt.get('waffe'):
         wroot.parent = arm; wroot.parent_type = 'BONE'; wroot.parent_bone = hand
         rot = [float(x) for x in opt.get('waffendreh', '0,0,0').split(',')]
         wroot.rotation_euler = [math.radians(r) for r in rot]
-        wroot.location = (0, 0, 0)
+        # Das Skelett kann einen eigenen Maßstab haben (Meshy: 0,01), die Waffe soll trotzdem echte Größe haben
+        asc = arm.matrix_world.to_scale()[0] or 1
+        wroot.scale = (s / asc,) * 3
+        # Angehängtes sitzt am Knochenende, das bei Händen ohne Finger weit draußen liegen kann:
+        # zurück zum Handgelenk, dann ein Stück in die Handfläche
+        palm = float(opt.get('handflaeche', 0.08)) / asc
+        wroot.location = (0, -arm.data.bones[hand].length + palm, 0)
     meshes += wm
 
 # Kamera: orthografisch, 30° von oben, um 45° gedreht – genau die 2:1-Schrägansicht des Spiels
@@ -109,42 +121,58 @@ cam.data.clip_start, cam.data.clip_end = 0.1, 100
 
 # Licht von links oben, dazu weiches Umgebungslicht, damit die gemalten Farben stehen bleiben
 sun = bpy.data.objects.new('sonne', bpy.data.lights.new('sonne', 'SUN')); sc.collection.objects.link(sun)
-sun.data.energy = 3.2; sun.data.angle = math.radians(8)
+sun.data.energy = 3.6; sun.data.angle = math.radians(8)
 sun.rotation_euler = (math.radians(50), 0, math.radians(-60))
 world = bpy.data.worlds.new('welt'); sc.world = world
 world.use_nodes = True
 world.node_tree.nodes['Background'].inputs[0].default_value = (0.62, 0.60, 0.56, 1)
-world.node_tree.nodes['Background'].inputs[1].default_value = 0.9
+world.node_tree.nodes['Background'].inputs[1].default_value = 1.25
 
 r = sc.render
 r.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = 24; sc.cycles.use_denoising = True
 r.resolution_x = r.resolution_y = CELL; r.film_transparent = True
 r.image_settings.file_format = 'PNG'; r.image_settings.color_mode = 'RGBA'
 sc.view_settings.view_transform = 'Standard'
-# Umrisse wie bei den gezeichneten Figuren
-r.use_freestyle = True; r.line_thickness_mode = 'ABSOLUTE'; r.line_thickness = float(opt.get('linie', 1.1))
-ls = sc.view_layers[0].freestyle_settings.linesets.new('umriss')
-ls.select_by_visibility = True; ls.select_silhouette = True; ls.select_border = True; ls.select_crease = False
-ls.linestyle.color = (0.16, 0.11, 0.08); ls.linestyle.alpha = 0.9
+# Umriss wie bei den gezeichneten Figuren: nach dem Rendern als dunkle Kante um die Figur gelegt.
+# Breite in Pixeln der großen Fassung, im Spiel wird daraus etwa ein Pixel.
+LINE = int(opt.get('linie', 3))
+def outline(px):
+    a = np.array(px, dtype=np.float32).reshape(CELL, CELL, 4)
+    m = a[..., 3] > 0.35
+    d = m.copy()
+    for _ in range(LINE):
+        e = d.copy()
+        e[1:] |= d[:-1]; e[:-1] |= d[1:]; e[:, 1:] |= d[:, :-1]; e[:, :-1] |= d[:, 1:]
+        d = e
+    edge = d & ~m
+    a[edge] = (0.16, 0.11, 0.08, 0.92)
+    # halbdurchsichtige Ränder der Figur selbst etwas abdunkeln, damit die Kante weich anschließt
+    soft = (a[..., 3] > 0.02) & ~m & ~edge
+    a[soft] = (0.16, 0.11, 0.08, 0.92)
+    return a.ravel()
 
 # Fußpunkt im Bild
 bpy.context.view_layer.update()
 fx, fy, _ = world_to_camera_view(sc, cam, Vector((0, 0, 0)))
 ANCHOR = (round(fx * CELL, 1), round((1 - fy) * CELL, 1))
 
-# Bewegungen
-acts = [a for a in bpy.data.actions if a.users or True]
-hips = next((b.name for b in arm.pose.bones if 'hip' in b.name.lower() or 'pelvis' in b.name.lower()), None)
+# Bewegungen (ohne Skelett: nur „statisch“)
+acts = list(bpy.data.actions) if arm else [None]
+hips = next((b.name for b in arm.pose.bones if 'hip' in b.name.lower() or 'pelvis' in b.name.lower()), None) if arm else None
 meta = {'zelle': CELL, 'fusspunkt': ANCHOR, 'figur_px': FIG_PX, 'richtungen': DIRS, 'hand': hand, 'bewegungen': {}}
 tmp = os.path.join(out, '_tmp.png')
 for act in acts:
-    name = act.name.split('|')[-1]
-    if ONLY and name not in ONLY and act.name not in ONLY: continue
-    arm.animation_data_create(); arm.animation_data.action = act
-    if hasattr(arm.animation_data, 'action_slot') and act.slots: arm.animation_data.action_slot = act.slots[0]
-    f0, f1 = act.frame_range
+    parts = act.name.split('|') if act else ['statisch']
+    name = parts[1] if len(parts) >= 3 else parts[-1]
+    if act and ONLY and name not in ONLY and act.name not in ONLY: continue
+    if act:
+        arm.animation_data_create(); arm.animation_data.action = act
+        if hasattr(arm.animation_data, 'action_slot') and act.slots: arm.animation_data.action_slot = act.slots[0]
+        f0, f1 = act.frame_range
+    else:
+        f0, f1 = 0, 0
     walk = 'walk' in name.lower() or 'run' in name.lower()
-    n = 1 if opt.get('probe') else FRAMES.get(name, 8 if walk else 6)
+    n = 1 if opt.get('probe') or not act else FRAMES.get(name, 8 if walk else 6)
     frames = [f0 + (f1 - f0) * i / (n if walk else max(1, n - 1)) for i in range(n)]
     dirs = [0] if opt.get('probe') else list(range(DIRS))
     sheet = bpy.data.images.new(f'bogen_{name}', CELL * n, CELL * len(dirs), alpha=True)
@@ -162,7 +190,7 @@ for act in acts:
             r.filepath = tmp
             bpy.ops.render.render(write_still=True)
             im = bpy.data.images.load(tmp, check_existing=False)
-            src_px = list(im.pixels)
+            src_px = outline(im.pixels[:])
             bpy.data.images.remove(im)
             # Zelle in den Bogen kopieren (Blender-Bilder beginnen unten links)
             rows = len(dirs)

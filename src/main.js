@@ -644,12 +644,13 @@ function frameBody(now) {
     // Musik und Hintergrund nach Lage: Aufnahmen, wo es welche gibt, sonst die erzeugte Musik
     const fight = inCombat(), night = darkness() > 0.35;
     setMood(fight ? 'kampf' : night ? 'nacht' : 'welt');
+    // Bis weitere Stücke da sind, läuft die aufgenommene Musik überall; die erzeugte nur, falls sie nicht lädt
     const season = seasonIndex();
-    setScene(!fight && !night && season <= 1 ? 'welt_sommer' : null, !night && season <= 2 && precip() < 0.35 ? 'wiese_tag' : null);
+    setScene('welt_sommer', !night && season <= 2 && precip() < 0.35 ? 'wiese_tag' : null);
   }
   if (!byId('title').hidden) {
     setMood('titel');
-    setScene(null, null);
+    setScene('welt_sommer', null);
     drawTitleScreen();
     return;
   }

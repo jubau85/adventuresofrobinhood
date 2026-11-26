@@ -5,7 +5,7 @@
 // Startet erst nach einer Eingabe des Spielers, so wie Browser es verlangen.
 
 import { G } from './state.js';
-import { isoX } from './iso.js';
+import { isoX, screenToWorld } from './iso.js';
 
 let ac = null, master = null, dry = null, wet = null;
 let enabled = true, started = false;
@@ -63,7 +63,7 @@ export function startAudio() {
   wet = ac.createGain(); wet.gain.value = 0.35; wet.connect(conv); conv.connect(master);
   master.gain.setTargetAtTime(0.55, ac.currentTime, 1.2);
   fileBus = ac.createGain(); fileBus.gain.value = 1; fileBus.connect(master);
-  sfxBus = ac.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(master);
+  sfxBus = ac.createGain(); sfxBus.gain.value = 1.25; sfxBus.connect(master);
   loadFiles();
   nextTime = ac.currentTime + 0.3;
   timer = setInterval(tick, 150);
@@ -248,10 +248,22 @@ let fileBus = null, want = { music: null, amb: null }, track = null, ambTrack = 
 // Was gerade laufen soll: ein Musikstück und ein Hintergrund (Namen aus FILES oder null)
 export function setScene(music, amb) { want = { music: music || null, amb: amb || null }; }
 
+// Eingebettete Dateien (data-URL) direkt entpacken: Manche Seiten erlauben keinen Abruf von data-URLs
+function urlBytes(url) {
+  if (url.startsWith('data:')) {
+    try {
+      const bin = atob(url.slice(url.indexOf(',') + 1));
+      const u = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      return Promise.resolve(u.buffer);
+    } catch (e) { return Promise.reject(e); }
+  }
+  return fetch(url).then((r) => r.arrayBuffer());
+}
+
 function loadFiles() {
   for (const [id, url] of Object.entries(FILES)) {
-    fetch(url)
-      .then((r) => r.arrayBuffer())
+    urlBytes(url)
       .then((b) => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)))
       .then((buf) => { buffers[id] = buf; })
       .catch(() => { /* ohne Datei geht es weiter wie bisher */ });
@@ -422,15 +434,15 @@ const SFX = {
 // Geräusch ohne Ort (Bedienung, Münzen)
 export function sfx(kind, vol = 1) { playSfx(kind, vol, 0, 0); }
 
-// Geräusch an einem Ort der Welt
+// Geräusch an einem Ort der Welt. Man hört von der Bildmitte aus: Was man sieht, hört man auch.
 export function sfxAt(kind, x, y, vol = 1, range = 22) {
   if (!ac || !enabled || !G.s) return;
-  const p = G.s.player;
-  const d = Math.hypot(x - p.x, y - p.y);
+  const c = screenToWorld(G.view.w / 2, G.view.h / 2, G.cam, G.view.w, G.view.h);
+  const d = Math.hypot(x - c.x, y - c.y);
   if (d > range) return;
   const k = 1 - d / range;
   const pan = Math.max(-1, Math.min(1, ((isoX(x, y) - G.cam.x) * G.cam.zoom) / (G.view.w / 2))) * 0.75;
-  playSfx(kind, vol * k * k, pan, d / range);
+  playSfx(kind, vol * Math.pow(k, 1.3), pan, d / range);
 }
 
 function playSfx(kind, vol, pan, far) {
@@ -459,7 +471,7 @@ export function playWork(list) {
   let n = 0;
   for (const e of list) {
     const a = prev * e.speed + e.phase - Math.PI, b = now * e.speed + e.phase - Math.PI;
-    if (Math.floor(b / (Math.PI * 2)) > Math.floor(a / (Math.PI * 2))) { sfxAt(e.kind, e.x, e.y, e.kind === 'amboss' ? 0.55 : 0.75, 18); if (++n >= 6) break; }
+    if (Math.floor(b / (Math.PI * 2)) > Math.floor(a / (Math.PI * 2))) { sfxAt(e.kind, e.x, e.y, e.kind === 'amboss' ? 0.7 : 0.95, 20); if (++n >= 6) break; }
   }
 }
 
