@@ -8,8 +8,6 @@ from collections import deque
 from PIL import Image
 import numpy as np
 
-SRC, DST = sys.argv[1], sys.argv[2]
-os.makedirs(DST, exist_ok=True)
 OUT_K = 3
 # name: (Bogen Sommer, Bogen Winter, Ausschnitt x0 y0 x1 y1, Fußpunkt x y, Bogenpixel je Weltpixel, Grundfläche wx wy)
 ITEMS = {
@@ -90,31 +88,38 @@ def cut(a, holes=False):
     al = np.where(keep, np.maximum(0.55, nb), 0)
     return np.dstack([a, (al * 255).astype(np.uint8)])
 
-meta = {}
-def save(name, rgba, foot, k, area, crop_xy):
-    img = Image.fromarray(rgba, 'RGBA')
-    bb = img.getbbox(); img = img.crop(bb)
-    fx, fy = foot[0] - crop_xy[0] - bb[0], foot[1] - crop_xy[1] - bb[1]
-    f = OUT_K / k
-    img = img.resize((max(1, round(img.width * f)), max(1, round(img.height * f))), Image.LANCZOS)
-    img.save(os.path.join(DST, f'{name}.webp'), quality=86, alpha_quality=90, method=6)
-    meta[name] = {'fuss': [round(fx / k, 2), round(fy / k, 2)], 'massstab': round(1 / OUT_K, 4), 'flaeche': list(area)}
+def main():
+    SRC, DST = sys.argv[1], sys.argv[2]
+    os.makedirs(DST, exist_ok=True)
+    meta = {}
+    def save(name, rgba, foot, k, area, crop_xy):
+        img = Image.fromarray(rgba, 'RGBA')
+        bb = img.getbbox(); img = img.crop(bb)
+        fx, fy = foot[0] - crop_xy[0] - bb[0], foot[1] - crop_xy[1] - bb[1]
+        f = OUT_K / k
+        img = img.resize((max(1, round(img.width * f)), max(1, round(img.height * f))), Image.LANCZOS)
+        img.save(os.path.join(DST, f'{name}.webp'), quality=86, alpha_quality=90, method=6)
+        meta[name] = {'fuss': [round(fx / k, 2), round(fy / k, 2)], 'massstab': round(1 / OUT_K, 4), 'flaeche': list(area)}
 
-sheets = {n: np.asarray(Image.open(os.path.join(SRC, f'{n}.jpg')).convert('RGB')) for n in (18, 19, 20)}
-for name, (ns, nw, box, foot, k, area) in ITEMS.items():
-    for sheet, suf in ((ns, ''), (nw, '_winter')):
-        x0, y0, x1, y1 = box
-        a = sheets[sheet][y0:y1, x0:x1].copy()
-        # Überschrift des Bogens (oben links bis x 860, y 48) mit Hintergrundgrau übermalen
-        if y0 < 48 and x0 < 860: a[:48 - y0, :max(0, 860 - x0)] = (72, 72, 72)
-        save(name + suf, cut(a), foot, k, area, (x0, y0))
-# Galgen: Fußpunkt relativ zur unteren Mitte des Umrisses der Sommerzelle, für alle vier gleich
-base = None
-for name, (x0, y0, x1, y1) in GALGEN.items():
-    rgba = cut(sheets[20][y0:y1, x0:x1], holes=True)
-    bb = Image.fromarray(rgba, 'RGBA').getbbox()
-    if base is None: base = (GALGEN_FUSS[0] - x0 - (bb[0] + bb[2]) / 2, GALGEN_FUSS[1] - y0 - bb[3])
-    foot = (x0 + (bb[0] + bb[2]) / 2 + base[0], y0 + bb[3] + base[1])
-    save(name, rgba, foot, GALGEN_K, (1.2, 0.9), (x0, y0))
-json.dump(meta, open(os.path.join(DST, 'bauten.json'), 'w'), indent=1, ensure_ascii=False)
-print(len(meta), 'Bilder', sum(os.path.getsize(os.path.join(DST, f'{k}.webp')) for k in meta) // 1024, 'KB')
+    sheets = {n: np.asarray(Image.open(os.path.join(SRC, f'{n}.jpg')).convert('RGB')) for n in (18, 19, 20)}
+    for name, (ns, nw, box, foot, k, area) in ITEMS.items():
+        for sheet, suf in ((ns, ''), (nw, '_winter')):
+            x0, y0, x1, y1 = box
+            a = sheets[sheet][y0:y1, x0:x1].copy()
+            # Überschrift des Bogens (oben links bis x 860, y 48) mit Hintergrundgrau übermalen
+            if y0 < 48 and x0 < 860: a[:48 - y0, :max(0, 860 - x0)] = (72, 72, 72)
+            save(name + suf, cut(a), foot, k, area, (x0, y0))
+    # Galgen: Fußpunkt relativ zur unteren Mitte des Umrisses der Sommerzelle, für alle vier gleich
+    base = None
+    for name, (x0, y0, x1, y1) in GALGEN.items():
+        rgba = cut(sheets[20][y0:y1, x0:x1], holes=True)
+        bb = Image.fromarray(rgba, 'RGBA').getbbox()
+        if base is None: base = (GALGEN_FUSS[0] - x0 - (bb[0] + bb[2]) / 2, GALGEN_FUSS[1] - y0 - bb[3])
+        foot = (x0 + (bb[0] + bb[2]) / 2 + base[0], y0 + bb[3] + base[1])
+        save(name, rgba, foot, GALGEN_K, (1.2, 0.9), (x0, y0))
+    json.dump(meta, open(os.path.join(DST, 'bauten.json'), 'w'), indent=1, ensure_ascii=False)
+    print(len(meta), 'Bilder', sum(os.path.getsize(os.path.join(DST, f'{k}.webp')) for k in meta) // 1024, 'KB')
+
+
+if __name__ == '__main__':
+    main()

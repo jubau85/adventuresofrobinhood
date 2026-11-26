@@ -402,6 +402,13 @@ export function grantXp(u, amount) {
   }
 }
 
+// Wie der Gefallene gemalt ist: Waffenknecht in Rüstung (rot), Wegelagerer und Waldläufer (grün), Bauer und Bürger (braun)
+function corpseOf(t) {
+  const r = t.eq && t.eq.ruestung;
+  const typ = t.cls === 'bandit' || t.cls === 'waldlaeufer' || t.look === 'bandit' || t.look === 'wald' ? 'gruen'
+    : t.kind === 'peasant' || t.cls === 'zivil' || (!r && t.cls !== 'ritter' && t.cls !== 'soldat') ? 'braun' : 'rot';
+  return { typ, v: 1 + Math.floor(Math.random() * 4), flip: Math.random() < 0.5 };
+}
 function unitDown(t, killer) {
   t.dead = true;
   t.hp = 0;
@@ -412,10 +419,10 @@ function unitDown(t, killer) {
     t.hp = 1;
     t.path = null;
     log(`${t.name} ist schwer verwundet und wird nach ${homeName()} gebracht.`, 'bad');
-    G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 6 });
+    G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 6, ...corpseOf(t) });
     return;
   }
-  G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25 });
+  G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25, ...corpseOf(t) });
   const g = t.group;
   countDead(t);
   if (t.kind === 'peasant') { villagerKilled(t); return; }

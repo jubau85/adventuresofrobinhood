@@ -173,7 +173,7 @@ export function updateJustice(dt) {
   if (e.stage === 'haengen') {
     if (e.t > 14) {
       e.stage = 'abnahme'; e.t = 0; e.hanged = false;
-      G.fx.push({ kind: 'corpse', x: front.x + 0.2, y: front.y - 0.3, look: { tunic: '#d8d0bc', trim: '#8a7a5a' }, t: 0, dur: 9 });
+      G.fx.push({ kind: 'corpse', x: front.x + 0.2, y: front.y - 0.3, look: { tunic: '#d8d0bc', trim: '#8a7a5a' }, t: 0, dur: 9, typ: 'braun', v: 2, flip: false });
       countDead({ x: g.x, y: g.y });
       h.done = true;
       speak(e.priest, 'Wir bringen ihn zum Friedhof.');

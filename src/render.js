@@ -884,7 +884,55 @@ function drawDamage(c, b) {
 }
 
 // Friedhof: hintere Hälfte mit Gräbern, vordere Zaunhälfte getrennt
+// Gemalter Friedhof (tools/friedhof.py): Gräber, Friedhofskreuz, Zaunstücke und Tor, je mit Winterbild; dazu die Gefallenen.
+// Fußpunkte in Weltpixeln (Gefallene in Figureneinheiten), Maßstab 1/3.
+const fhId = (name) => { const w = `fh_${name}_winter`; return lookSeason() === 3 && ART[w] ? w : `fh_${name}`; };
+const ZAUN_LEN = 0.51, TOR_LEN = 0.58;
+// Zaun von (ax, ay) nach (bx, by), längs x oder y: Stücke gleicher Länge, von hinten nach vorn gezeichnet.
+// Das Bild läuft vom linken Pfosten nach rechts oben (längs −y); gespiegelt läuft es nach links oben (längs −x).
+function paintFence(c, ax, ay, bx, by) {
+  const alongY = Math.abs(bx - ax) < 1e-6, len = Math.hypot(bx - ax, by - ay);
+  if (len < 0.05) return true;
+  const n = Math.max(1, Math.round(len / ZAUN_LEN)), seg = len / n, sc = seg / ZAUN_LEN;
+  // Ausgangspunkt jedes Stücks ist das vordere Ende (größeres y bzw. größeres x)
+  for (let i = n - 1; i >= 0; i--) {
+    const px = alongY ? ax : Math.max(ax, bx) - i * seg, py = alongY ? Math.max(ay, by) - i * seg : ay;
+    if (!p5(c, fhId('friedhof_zaun'), px, py, sc, !alongY)) return false;
+  }
+  return true;
+}
+function drawCemeteryArt(c, s, front) {
+  const cm = s.cemetery;
+  if (!ART.fh_friedhof_zaun) return false;
+  const x0 = cm.x - cm.wx / 2, x1 = cm.x + cm.wx / 2, y0 = cm.y - cm.wy / 2, y1 = cm.y + cm.wy / 2;
+  if (front) {
+    // vorne: rechte Seite (längs y) und die Vorderseite mit dem Tor in der Mitte
+    paintFence(c, x1, y0, x1, y1);
+    const xm = cm.x;
+    paintFence(c, x0, y1, xm - TOR_LEN / 2, y1);
+    p5(c, fhId('friedhof_tor'), xm, y1);
+    paintFence(c, xm + TOR_LEN / 2, y1, x1, y1);
+    return true;
+  }
+  paintFence(c, x0, y0, x1, y0);
+  paintFence(c, x0, y0, x0, y1);
+  // Gräber: frische mit Holzkreuz, alte verwittert, mit Steinkreuz oder (selten) als Steingrab
+  const n = graveCount(s), slots = [];
+  for (let k = 0; k < Math.min(n, 15); k++) slots.push({ ...graveSlot(s, k), fresh: k >= cm.old, k });
+  slots.sort((a, b) => a.x + a.y - (b.x + b.y));
+  const rich = s.type === 'stadt' || s.type === 'burg' || s.type === 'abtei';
+  for (const g of slots) {
+    const h = hash2(Math.round(g.x * 7), Math.round(g.y * 7), 61);
+    const name = g.fresh ? 'grab_frisch' : h < (rich ? 0.14 : 0.05) ? 'grab_stein' : h < (rich ? 0.6 : 0.35) ? 'grab_steinkreuz' : 'grab_alt';
+    p5(c, fhId(name), g.x, g.y, 0.95);
+  }
+  // Hohes Friedhofskreuz in der vorderen linken Ecke
+  p5(c, fhId('friedhofskreuz'), x0 + 0.3, y1 - 0.3, 1.1);
+  return true;
+}
+
 function drawCemetery(c, s, front) {
+  if (drawCemeteryArt(c, s, front)) return;
   const cm = s.cemetery;
   if (front) { drawFenceHalf(c, cm.x, cm.y, cm.wx, cm.wy, true); return; }
   drawFenceHalf(c, cm.x, cm.y, cm.wx, cm.wy, false);
@@ -940,6 +988,7 @@ function drawSiegeShot(c, sh) {
 }
 
 function drawOpenGrave(c, g) {
+  if (p5(c, fhId('grab_offen'), g.x + 0.05, g.y + 0.05, 0.95)) return;
   poly(c, [P(g.x - 0.18, g.y - 0.1), P(g.x + 0.18, g.y - 0.1), P(g.x + 0.18, g.y + 0.3), P(g.x - 0.18, g.y + 0.3)], '#2a1e14');
   const [px, py] = P(g.x + 0.35, g.y + 0.1);
   c.fillStyle = '#6b4a2e'; c.beginPath(); c.ellipse(px, py, 6, 3.5, 0, Math.PI, Math.PI * 2); c.fill();
@@ -1495,6 +1544,8 @@ function drawScaffold(c, x, y, wx, wy, h) {
 // sind genau ein Feld lang (x: links oben nach rechts unten, y: rechts oben nach links unten), der Fußpunkt liegt auf
 // der Mauerlinie in der Mitte. Türme stehen auf der Mitte ihres Sockels, Bergfried und Hallen auf ihrer Grundfläche.
 const P5 = {'burg_palisade_x':[33.88,54.0,0.25],'burg_palisade_x_schaden_1':[33.88,54.0,0.25],'burg_palisade_x_schaden_2':[33.88,54.0,0.25],'burg_palisade_x_schaden_3':[33.88,54.0,0.25],'burg_palisade_x_schaden_4':[33.88,54.0,0.25],'burg_palisade_y':[33.88,54.5,0.25],'burg_palisade_y_schaden_1':[33.88,54.5,0.25],'burg_palisade_y_schaden_2':[33.88,54.5,0.25],'burg_palisade_y_schaden_3':[33.88,54.5,0.25],'burg_palisade_y_schaden_4':[33.88,54.5,0.25],'burg_stein_mauer_x':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_1':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_2':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_3':[33.88,70.5,0.25],'burg_stein_mauer_x_schaden_4':[33.88,70.5,0.25],'burg_stein_mauer_y':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_1':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_2':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_3':[33.88,68.5,0.25],'burg_stein_mauer_y_schaden_4':[33.88,68.5,0.25],'burg_bergfried':[69.88,167.0,0.25],'burg_bergfried_gross':[84.88,197.25,0.25],'burg_holzhalle':[70.5,80.25,0.25],'burg_holztor':[35.5,84.0,0.25],'burg_holztor_schaden_1':[35.5,84.0,0.25],'burg_holztor_schaden_2':[35.5,84.0,0.25],'burg_holztor_schaden_3':[35.5,84.0,0.25],'burg_holztor_schaden_4':[35.5,84.0,0.25],'burg_holztor_zu':[35.5,84.0,0.25],'burg_holzturm':[32.0,97.75,0.25],'burg_holzturm_schaden_1':[32.0,97.75,0.25],'burg_holzturm_schaden_2':[32.0,97.75,0.25],'burg_holzturm_schaden_3':[32.0,97.75,0.25],'burg_holzturm_schaden_4':[32.0,97.75,0.25],'burg_palas':[78.0,99.25,0.25],'burg_stein_tor':[39.38,88.75,0.25],'burg_stein_tor_schaden_1':[39.38,88.75,0.25],'burg_stein_tor_schaden_2':[39.38,88.75,0.25],'burg_stein_tor_schaden_3':[39.38,88.75,0.25],'burg_stein_tor_schaden_4':[39.38,88.75,0.25],'burg_stein_tor_zu':[39.38,88.75,0.25],'burg_stein_turm':[35.75,104.88,0.25],'burg_stein_turm_schaden_1':[35.75,104.88,0.25],'burg_stein_turm_schaden_2':[35.75,104.88,0.25],'burg_stein_turm_schaden_3':[35.75,104.88,0.25],'burg_stein_turm_schaden_4':[35.75,104.88,0.25],'burg_ruine_mauer_1':[33.88,34.25,0.25],'burg_ruine_mauer_1_y':[33.88,33.75,0.25],'burg_ruine_mauer_2':[33.75,21.75,0.25],'burg_ruine_mauer_2_y':[34.0,24.0,0.25],'burg_ruine_turm':[37.5,66.88,0.25],'burg_schutt':[27.88,22.75,0.25],'feld_brach_x':[34.0,35.75,0.25],'feld_hoch_x':[34.0,35.75,0.25],'feld_jung_x':[34.0,35.75,0.25],'feld_jung_y':[34.0,35.75,0.25],'feld_reif_x':[34.0,35.75,0.25],'feld_reif_y':[34.0,35.75,0.25],'feld_winter_x':[34.0,35.75,0.25],'feld_winter_y':[34.0,35.75,0.25],'garben_1':[9.88,21.5,0.25],'garben_2':[9.88,22.0,0.25],'schneefleck_1':[31.75,15.75,0.5],'schneefleck_2':[28.75,15.88,0.5],'schneefleck_3':[28.38,15.12,0.5],'schneefleck_4':[23.25,11.75,0.5],'schneefleck_5':[22.75,12.38,0.5],'schneefleck_6':[18.88,10.12,0.5],'schneefleck_7':[18.38,10.5,0.5],'schneefleck_8':[15.25,9.5,0.5]};
+// Friedhof und Gefallene (tools/friedhof.py), siehe drawCemeteryArt
+Object.assign(P5, {fh_grab_offen:[10.2,16.12,0.3333],fh_grab_offen_winter:[10.33,16.2,0.3333],fh_grab_frisch:[11.56,17.47,0.3333],fh_grab_frisch_winter:[11.02,17.58,0.3333],fh_grab_steinkreuz:[11.44,16.27,0.3333],fh_grab_steinkreuz_winter:[11.48,16.38,0.3333],fh_grab_stein:[9.4,16.28,0.3333],fh_grab_stein_winter:[11.35,16.64,0.3333],fh_grab_alt:[11.16,15.37,0.3333],fh_grab_alt_winter:[10.88,15.88,0.3333],fh_friedhofskreuz:[8.68,26.21,0.3333],fh_friedhofskreuz_winter:[8.89,25.42,0.3333],fh_friedhof_zaun:[1.4,16.3,0.3333],fh_friedhof_zaun_winter:[0.85,16.5,0.3333],fh_friedhof_tor:[10.3,21.15,0.3333],fh_friedhof_tor_winter:[10.4,26.0,0.3333],fh_toter_rot_1:[12.22,6.72,0.3333],fh_toter_rot_2:[10.18,6.91,0.3333],fh_toter_rot_3:[9.55,6.05,0.3333],fh_toter_rot_4:[10.69,7.8,0.3333],fh_toter_gruen_1:[10.58,6.25,0.3333],fh_toter_gruen_2:[13.84,6.98,0.3333],fh_toter_gruen_3:[9.58,4.73,0.3333],fh_toter_gruen_4:[11.98,7.04,0.3333],fh_toter_braun_1:[12.27,6.92,0.3333],fh_toter_braun_2:[12.72,6.62,0.3333],fh_toter_braun_3:[10.94,6.37,0.3333],fh_toter_braun_4:[10.93,6.0,0.3333]});
 // Zeichnen mit Fußpunkt auf (x, y): sc vergrößert, flip spiegelt (vertauscht x und y der Schrägansicht),
 // color färbt Magenta (Banner) in diese Farbe; beim Herauszoomen nimmt es die passende verkleinerte Stufe
 function p5(c, id, x, y, sc = 1, flip = false, color = null, z = 0) {
@@ -4120,6 +4171,15 @@ function drawSpeech(c, z, inView) {
 function drawCorpse(c, f, x, y) {
   c.save(); c.translate(x, y); c.scale(FIG, FIG); x = 0; y = 0;
   c.globalAlpha = Math.min(1, (f.dur - f.t) / 3);
+  // Gemalter Gefallener: Waffenknecht (rot), Wegelagerer (grün) oder Bauer (braun), eine von vier Lagen, zufällig gespiegelt
+  const id = `fh_toter_${f.typ || 'braun'}_${f.v || 1}`, a = P5[id], spr = a && ART[id] ? figSprite(id, '#808080') : null;
+  if (spr) {
+    // so groß wie die stehenden Figuren (die zeichnet drawFigure 1,14-fach)
+    c.scale(f.flip ? -1.14 : 1.14, 1.14);
+    c.drawImage(lodOf(spr.mips[0], c, a[2]), -a[0], -a[1], spr.w * a[2], spr.h * a[2]);
+    c.restore();
+    return;
+  }
   c.fillStyle = 'rgba(0,0,0,0.22)'; c.beginPath(); c.ellipse(x, y, 9, 3.5, 0, 0, Math.PI * 2); c.fill();
   c.fillStyle = f.look.tunic; c.beginPath(); c.ellipse(x, y - 2, 6.5, 2.6, -0.2, 0, Math.PI * 2); c.fill();
   c.fillStyle = '#d9b08c'; c.beginPath(); c.arc(x + 7, y - 3.5, 2.6, 0, Math.PI * 2); c.fill();
