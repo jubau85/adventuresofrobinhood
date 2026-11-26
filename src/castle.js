@@ -11,6 +11,7 @@ import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
 import { startSiege, homeGateClosed } from './siege.js';
 import { cheatOn } from './cheats.js';
+import { shireIncome, shireGoods, shireDef, shireRenown, ownsHomeShire } from './shires.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
@@ -240,7 +241,7 @@ const FIELD_SEASON = [0.5, 1, 1.5, 0];
 
 // ---------------------------------------------------------------- Werte
 export function castleDefense() {
-  let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')];
+  let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')] + shireDef();
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
   if (homeGateClosed()) d += 10;
@@ -255,10 +256,13 @@ export function dailyBalance() {
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);
+  // Eigene Grafschaften: Abgaben ihrer Orte
+  income.push(...shireIncome());
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
-  if (!isAlly('normannen')) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
+  if (!isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
   const season = seasonIndex(), sz = bLevel('schafzucht');
   const prod = {
     holz: [0, 6, 12, 18][bLevel('holzfaeller')],
@@ -269,6 +273,8 @@ export function dailyBalance() {
     felle: [0, 0, 0, 1][sz],
   };
   if (season === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); prod.wolle = Math.floor(prod.wolle / 2); }
+  // Vorzüge eigener Grafschaften (Wolle aus dem West Riding, Caen-Stein …)
+  for (const [g, n] of Object.entries(shireGoods())) prod[g] = (prod[g] || 0) + n;
   // Verpflegung: was fehlt, kaufen die Knechte teuer zu
   const need = foodNeed();
   const avail = foodStock() + prod.getreide + prod.fleisch;
@@ -283,6 +289,8 @@ export function dailyCastle() {
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0);
   G.s.gold += inc;
+  const fame = shireRenown();
+  if (fame) addRenown(fame);
   const costOf = (name) => (bal.costs.find(([n]) => n === name) || [0, 0])[1];
   const wages = costOf('Sold'), tax = costOf('Abgaben an den Vogt');
   if (tax) {

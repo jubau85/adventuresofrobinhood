@@ -81,6 +81,15 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 #log .msg { pointer-events: auto; cursor: pointer; }
 #log .msg.old { pointer-events: none; }
 @media (max-width: 720px) { #toolbar [data-tool="chronik"] { display: none; } }
+/* Grafschaften */
+.shires { display: flex; flex-direction: column; gap: 8px; }
+.shire { padding: 8px 12px; border-left: 3px solid var(--parchment-3); background: rgba(255, 248, 230, 0.06); border-radius: 3px; }
+.shire.home { border-left-color: var(--gold); }
+.shire.mine { border-left-color: #7bc15a; }
+.shire-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.shire-head b { font-family: var(--font-head); font-size: 17px; }
+.shire p { margin: 4px 0 0; }
+.shire .goal { color: var(--gold); }
 /* Chronik: alle Meldungen nach Tagen */
 .chronik-tag { margin: 14px 0 6px; font-family: var(--font-head); font-size: 16px; font-weight: 600; }
 .chronik-tag:first-child { margin-top: 0; }

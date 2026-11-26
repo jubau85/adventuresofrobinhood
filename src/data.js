@@ -396,6 +396,8 @@ export const SETTLEMENTS = [
     desc: 'Die Burg des Sheriffs auf dem Sandsteinfelsen. Prinz Johns Leute halten sie noch immer.' },
   { id: 'torquilstone', name: 'Torquilstone', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -0.38, lat: 53.86, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
     desc: 'Die Feste eines gefürchteten normannischen Barons. Ihre Kerker sind berüchtigt.' },
+  { id: 'pontefract', name: 'Pontefract', type: 'burg', faction: 'normannen', clear: 7, realm: 'en', lon: -1.31, lat: 53.69, produces: ['getreide', 'wolle'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
+    desc: 'Die Burg über dem Aire-Tal, Sitz des West Riding. Prinz Johns Vogt hält sie und mit ihr auch dein Erbe. Wer Pontefract zurückgewinnt, beherrscht die Grafschaft.' },
   { id: 'rotherwood', name: 'Rotherwood', type: 'halle', faction: 'sachsen', clear: 7, realm: 'en', lon: -1.95, lat: 53.05, produces: ['getreide', 'bier'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
     desc: 'Die Halle eines alten sächsischen Thans. Gastfreundlich gegenüber jedem, der keine normannischen Sporen trägt.' },
   { id: 'newforest', name: 'Lager im New Forest', type: 'lager', faction: 'waldleute', clear: 3, realm: 'en', lon: -1.62, lat: 50.86, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],

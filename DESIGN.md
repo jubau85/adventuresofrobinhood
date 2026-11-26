@@ -64,6 +64,56 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - Weitläufige Orte mit Gärten und Höfen zwischen den Häusern
 - Speichern und Laden, Einzeldatei-Build
 
+## Fahrplan: Grafschaften, Burgen, Krieg, Mehrspieler
+
+Beschlossen im November 2026. Ziel ist eine strategische Ebene über dem Abenteuer: Grafschaften erobern und halten,
+Burgen frei ausbauen, Gefolgsleute als Kastellane und Boten einsetzen, am Ende ein geeintes England oder die
+zurückgewonnene Normandie, später mit mehreren Spielern.
+
+### Phase 1: Grafschaften (umgesetzt)
+- Jede Burg ist Sitz einer Grafschaft (Shire) mit historischem Namen: West Riding, Nottinghamshire, Kent, Cheshire,
+  Bessin, Vexin, Île-de-France und andere. Orte gehören zu der Burg, die man über Land am schnellsten erreicht.
+- Ashcombe liegt im West Riding; dessen Sitz Pontefract hält Prinz Johns Vogt. Es ist die einzige Grafschaft mit zwei
+  Burgen. Wer Pontefract zurückerobert, beherrscht sie, und der Vogt verlangt keine Abgaben mehr.
+- Der Herr einer Grafschaft bekommt die Abgaben ihrer Orte und einen Vorzug aus ihrer Geschichte (Wolle aus den
+  Pennines, Caen-Stein, Salz aus Cheshire, halber Fährlohn in Kent, Grenzer in Cumberland …).
+- Karte: Grenzen, Farbe des Herrn, Namen; Liste der Grafschaften in der Kartentafel.
+
+### Phase 2: Burg mit freien Bauplätzen
+- Der Bergfried bleibt der Kern: Ruine, Holzturm, normannischer Bergfried, Donjon.
+- Ringsum Bauplätze, frei mit Gebäuden zu belegen, auch mehrfach dasselbe (nur Holzfäller ist erlaubt).
+- Die Art der Burg legt die Plätze fest: Eine große Burg hat weniger Plätze, aber mehr davon innerhalb der Mauer;
+  eine kleine hat mehr Plätze, die meisten davon ungeschützt außen. Vorschlag (25 sind eher zu viel):
+  Turmburg 4 innen + 16 außen, Ringburg 8 + 10, Festung 12 + 4.
+- Bei einer Belagerung erzeugen Gebäude außerhalb der Mauer nichts, und die Belagerer brennen einige nieder;
+  sie müssen wieder aufgebaut werden. Innen läuft alles weiter.
+- Unterhalt je Gebäude und sinkende Marktpreise halten das Spezialisieren im Zaum.
+
+### Phase 3: Erobern und Halten
+- Eigene Belagerungen feindlicher Burgen mit Gefolge, Garnison und Söldnern; die Burg wechselt samt Grafschaft.
+- Eroberte Burgen baut man selbst aus oder setzt einen Kastellan ein, auch einen eigenen Gefolgsmann, mit einer
+  Vorgabe („zur Holzburg ausbauen“, „Holz erzeugen“, „Verteidigung“, „ausgewogen“).
+- Gegenangriffe der früheren Herren.
+
+### Phase 4: Gefolgsleute auf Reisen
+- Aufträge an Gefolgsleute abgeben: Botengänge, Geleit, Lieferungen.
+- Gefolgsleute als Händler zwischen den Städten, später feste Handelsrouten mit Wagenzügen (Gefahr durch Banden).
+
+### Phase 5: Kriegskarte
+- Die Parteien erobern Grafschaften auch untereinander: Richards Getreue gegen Prinz Johns Barone, Frankreich gegen
+  das normannische Aufgebot.
+- Ziel: ein geeintes England unter Richard oder die zurückgewonnene Normandie.
+
+### Phase 6: Mehrspieler (2 bis 6)
+- Jeder beginnt in einer anderen Grafschaft mit einer Burgruine, wächst, schließt Bündnisse, handelt und führt
+  Feldschlachten.
+- Technisch der größte Schritt: Es braucht einen Server (eine Artifact-Seite allein kann keine Echtzeitspiele
+  verbinden), entweder mit maßgeblicher Simulation auf dem Server oder als Gleichschritt, bei dem alle Rechner
+  dieselbe Simulation aus denselben Befehlen rechnen.
+- Vorbereitung schon im Einzelspiel: „Herren“ als eigene Einheiten im Spielstand (Gold, Burgen, Gefolge je Herr),
+  mit KI-Herren in anderen Grafschaften als Rivalen und Verbündete; alle Handlungen als Befehle; ein Zufallsgenerator
+  mit Startwert statt Math.random in der Simulation. Später übernehmen Menschen die KI-Herren.
+
 ## Ausbauplan
 
 ### Nächste Schritte

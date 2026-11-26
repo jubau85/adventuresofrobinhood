@@ -89,6 +89,15 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 #log .msg { pointer-events: auto; cursor: pointer; }
 #log .msg.old { pointer-events: none; }
 @media (max-width: 720px) { #toolbar [data-tool="chronik"] { display: none; } }
+/* Grafschaften */
+.shires { display: flex; flex-direction: column; gap: 8px; }
+.shire { padding: 8px 12px; border-left: 3px solid var(--parchment-3); background: rgba(255, 248, 230, 0.06); border-radius: 3px; }
+.shire.home { border-left-color: var(--gold); }
+.shire.mine { border-left-color: #7bc15a; }
+.shire-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.shire-head b { font-family: var(--font-head); font-size: 17px; }
+.shire p { margin: 4px 0 0; }
+.shire .goal { color: var(--gold); }
 /* Chronik: alle Meldungen nach Tagen */
 .chronik-tag { margin: 14px 0 6px; font-family: var(--font-head); font-size: 16px; font-weight: 600; }
 .chronik-tag:first-child { margin-top: 0; }
@@ -956,6 +965,8 @@ const SETTLEMENTS = [
     desc: 'Die Burg des Sheriffs auf dem Sandsteinfelsen. Prinz Johns Leute halten sie noch immer.' },
   { id: 'torquilstone', name: 'Torquilstone', type: 'burg', faction: 'normannen', clear: 8, realm: 'en', lon: -0.38, lat: 53.86, produces: ['eisen', 'stein'], demands: ['getreide', 'bier', 'wein', 'fleisch'],
     desc: 'Die Feste eines gefürchteten normannischen Barons. Ihre Kerker sind berüchtigt.' },
+  { id: 'pontefract', name: 'Pontefract', type: 'burg', faction: 'normannen', clear: 7, realm: 'en', lon: -1.31, lat: 53.69, produces: ['getreide', 'wolle'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
+    desc: 'Die Burg über dem Aire-Tal, Sitz des West Riding. Prinz Johns Vogt hält sie und mit ihr auch dein Erbe. Wer Pontefract zurückgewinnt, beherrscht die Grafschaft.' },
   { id: 'rotherwood', name: 'Rotherwood', type: 'halle', faction: 'sachsen', clear: 7, realm: 'en', lon: -1.95, lat: 53.05, produces: ['getreide', 'bier'], demands: ['wein', 'eisen', 'salz', 'fleisch'],
     desc: 'Die Halle eines alten sächsischen Thans. Gastfreundlich gegenüber jedem, der keine normannischen Sporen trägt.' },
   { id: 'newforest', name: 'Lager im New Forest', type: 'lager', faction: 'waldleute', clear: 3, realm: 'en', lon: -1.62, lat: 50.86, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
@@ -3939,6 +3950,7 @@ function placeTrees(W, rng) {
 
 
 
+
 // ---------------------------------------------------------------- Werte
 function computeStats(u) {
   const c = CLASSES[u.cls];
@@ -4976,7 +4988,7 @@ function ferryCost(route) {
   if (isAlly('franken') && (french(from) || french(to))) return 0;
   const riders = [G.s.player, ...partyMembers()];
   const horses = riders.filter((u) => u.eq && u.eq.pferd).length;
-  return route.cost * riders.length + horses * Math.ceil(route.cost / 2);
+  return Math.round((route.cost * riders.length + horses * Math.ceil(route.cost / 2)) * shireFerryFactor());
 }
 
 function sail(fromId, toId) {
@@ -5592,6 +5604,248 @@ function updateTacMember(m, g, dt) {
     return;
   }
   holdSlot(m, g, dt, vx, vy);
+}
+
+// ===== shires.js =====
+// Grafschaften (Shires). Jede Burg ist Sitz einer Grafschaft; Städte, Abteien, Hallen, Dörfer, Lager und Gruben
+// gehören zu der Burg, die man über Land am schnellsten erreicht (höchstens gut hundert Kilometer weit). Wer die Burg
+// hält, beherrscht die Grafschaft: Er bekommt die Abgaben ihrer Orte und einen Vorzug, der zu ihrer Geschichte passt.
+// Dein Erbe Ashcombe liegt im West Riding. Dessen Sitz Pontefract hält Prinz Johns Vogt: die einzige Grafschaft mit
+// zwei Burgen. Erst wer Pontefract zurückerobert, beherrscht das West Riding.
+
+
+
+
+
+// Sitz (Burg) → Name der Grafschaft, Vorzug für ihren Herrn und Erklärung
+// goods: Waren täglich ins Burglager, gold: Gold täglich, def: Verteidigung der Burg, ruhm: Ruhm täglich,
+// faehre: Fährlohn (Anteil)
+const SHIRES = {
+  pontefract: { name: 'West Riding', also: ['york'], goods: { wolle: 6 }, text: 'Schafweiden am Rand der Pennines: täglich 6 Wolle.' },
+  nottingham: { name: 'Nottinghamshire', goods: { fleisch: 4, holz: 4 }, text: 'Der Sherwood: täglich Wildbret und Holz.' },
+  torquilstone: { name: 'East Riding', goods: { getreide: 8 }, text: 'Die fruchtbaren Wolds: täglich 8 Getreide.' },
+  scarborough: { name: 'North Riding', goods: { salz: 3, felle: 2 }, text: 'Küste und Moore: täglich Salz und Felle.' },
+  warwick: { name: 'Warwickshire', gold: 25, text: 'Die Mitte Englands, wo alle Straßen kreuzen: Zölle bringen täglich 25 Gold.' },
+  gloucester: { name: 'Gloucestershire', goods: { eisen: 4 }, text: 'Eisen aus den Gruben im Forest of Dean: täglich 4 Eisen.' },
+  carlisle: { name: 'Cumberland', def: 20, text: 'Die Grenzmark gegen die Schotten: erfahrene Grenzer stärken deine Burg (+20 Verteidigung).' },
+  chester: { name: 'Cheshire', goods: { salz: 5 }, text: 'Die Pfalzgrafschaft mit den Salzpfannen von Nantwich: täglich 5 Salz.' },
+  lancaster: { name: 'Lancashire', goods: { wolle: 3, felle: 3 }, text: 'Weiden und Moore zwischen Ribble und Lune: täglich Wolle und Felle.' },
+  dover: { name: 'Kent', faehre: 0.5, gold: 10, text: 'Der Schlüssel Englands: Die Fährleute fahren dich zum halben Lohn, dazu 10 Gold Hafenzoll täglich.' },
+  windsor: { name: 'Berkshire', ruhm: 1, text: 'Königliche Burg und Forst: Wer hier gebietet, gilt etwas am Hof (täglich Ruhm).' },
+  colchester: { name: 'Essex', gold: 15, goods: { salz: 2 }, text: 'Die älteste Stadt Englands, Austernbänke und Salzgärten: täglich Gold und Salz.' },
+  pembroke: { name: 'Pembroke', def: 15, text: '„Klein-England jenseits von Wales“: walisische Langbogenschützen stärken deine Burg (+15 Verteidigung).' },
+  cardiff: { name: 'Glamorgan', goods: { eisen: 3, stein: 3 }, text: 'Die walisische Mark mit Erz und Bruchstein: täglich Eisen und Stein.' },
+  caen: { name: 'Bessin', goods: { stein: 8 }, text: 'Der Caen-Stein, aus dem man den Tower und Canterbury baute: täglich 8 Stein.' },
+  falaise: { name: 'Hiémois', ruhm: 1, text: 'Die Heimat Wilhelms des Eroberers: Wer sie hält, hat Ansehen (täglich Ruhm).' },
+  evreux: { name: 'Grafschaft Évreux', goods: { getreide: 8 }, text: 'Die Kornkammer an der Eure: täglich 8 Getreide.' },
+  gisors: { name: 'Vexin', def: 25, text: 'Die umkämpfte Grenzfeste zwischen Normandie und Frankreich (+25 Verteidigung).' },
+  compiegne: { name: 'Île-de-France', weight: 0.72, goods: { holz: 8 }, text: 'Die Krondomäne um Paris mit dem königlichen Forst von Compiègne: täglich 8 Holz.' },
+};
+const HOME_SHIRE = 'pontefract';
+// Abgaben je Ort in einer eigenen Grafschaft (Gold am Tag)
+const TAX = { stadt: 15, markt: 8, abtei: 6, halle: 6, dorf: 3, burg: 10 };
+
+const K = 4;                 // Rastergröße in Kacheln
+// Reichweite in Rastern: in England und Wales bis rund 160 km (auch Devon und Cornwall), auf dem Festland rund
+// 115 km (Flandern und die Bretagne bleiben eigene Herrschaften)
+const SHIRE_REACH = { en: 50 * 10, wa: 50 * 10, nd: 36 * 10, fr: 36 * 10 };
+
+// Schottland gehört zu keiner Grafschaft (grob: nördlich von Solway und Tweed)
+function scotland(lon, lat) {
+  if (lon < -3.3) return lat > 54.6;
+  if (lon < -3.05) return lat > 54.95;
+  if (lon < -2.0) return lat > 54.98 + (lon + 3.05) * 0.78;
+  return lat > 55.8;
+}
+
+// Raster der Grafschaften: Flutung über Land von allen Sitzen zugleich (Kosten 10 gerade, 14 schräg)
+function buildShires(W) {
+  if (W.shireGrid) return;
+  const N = W.N, S = Math.ceil(N / K);
+  const seats = W.sites.filter((s) => s.type === 'burg' && SHIRES[s.id]);
+  const grid = new Uint8Array(S * S), cost = new Int32Array(S * S).fill(1 << 30), orig = new Uint8Array(S * S);
+  const land = new Int32Array(S * S);
+  for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+    const x = i * K + K / 2, y = j * K + K / 2;
+    const l = landAt(W, x, y);
+    if (!l) continue;
+    const lon = GEO.lonW + x * GEO.dLon, lat = GEO.latN - y * GEO.dLat;
+    if (scotland(lon, lat)) continue;
+    land[j * S + i] = l;
+  }
+  const buckets = [];
+  const push = (c, v, k) => { (buckets[c] || (buckets[c] = [])).push(v, k); };
+  seats.forEach((s, n) => {
+    s.landSeat = landAt(W, s.x, s.y);
+    // Weitere Ausgangspunkte: Das Umland von York (das Ainsty) gehört zum West Riding
+    const from = [s, ...(SHIRES[s.id].also || []).map((id) => W.sites.find((o) => o.id === id)).filter(Boolean)];
+    from.forEach((o, q) => {
+      const i = Math.floor(o.x / K), j = Math.floor(o.y / K), v = j * S + i;
+      cost[v] = 0; grid[v] = n + 1; orig[v] = q ? 1 : 0; push(0, v, n + 1);
+    });
+  });
+  // Schritte je Sitz: Ein Gewicht unter 1 macht die Grafschaft größer (das West Riding reicht bis York)
+  const steps = seats.map((s) => { const f = SHIRES[s.id].weight || 1; return [Math.round(10 * f), Math.round(14 * f)]; });
+  // Die Reichweite bleibt dieselbe Strecke, auch wenn das Gewicht die Schritte verbilligt
+  const reach = seats.map((s) => Math.round((SHIRE_REACH[s.realm] || 360) * (SHIRES[s.id].weight || 1)));
+  const maxReach = Math.max(...reach);
+  const nb = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [1, 1, 1], [1, -1, 1], [-1, 1, 1], [-1, -1, 1]];
+  for (let c = 0; c <= maxReach; c++) {
+    const b = buckets[c];
+    if (!b) continue;
+    for (let q = 0; q < b.length; q += 2) {
+      const v = b[q], k = b[q + 1];
+      if (cost[v] !== c || grid[v] !== k) continue;
+      const i = v % S, j = (v - i) / S, home = seats[k - 1].landSeat;
+      for (const [di, dj, diag] of nb) {
+        const ni = i + di, nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= S || nj >= S) continue;
+        const u = nj * S + ni, nc = c + steps[k - 1][diag];
+        // Ein weiterer Ausgangspunkt (York) nimmt nur sein Umland, rund 30 km
+        if (nc > reach[k - 1] || (orig[v] && nc > 90) || land[u] !== home || nc >= cost[u]) continue;
+        cost[u] = nc; grid[u] = k; orig[u] = orig[v]; push(nc, u, k);
+      }
+    }
+  }
+  W.shireGrid = grid; W.shireS = S; W.shireSeats = seats.map((s) => s.id);
+  // Mitte jeder Grafschaft (für die Beschriftung) und Zuordnung der Orte
+  const sum = seats.map(() => ({ x: 0, y: 0, n: 0 }));
+  for (let v = 0; v < grid.length; v++) if (grid[v]) { const a = sum[grid[v] - 1], i = v % S; a.x += i; a.y += (v - i) / S; a.n++; }
+  W.shireMid = {};
+  seats.forEach((s, n) => { const a = sum[n]; W.shireMid[s.id] = a.n ? { x: (a.x / a.n + 0.5) * K, y: (a.y / a.n + 0.5) * K, cells: a.n } : { x: s.x, y: s.y, cells: 0 }; });
+  W.shireOf = {};
+  for (const s of W.sites) {
+    const k = shireAt(s.x, s.y, W);
+    if (k) W.shireOf[s.id] = k;
+  }
+  W.shireOf.ashcombe = HOME_SHIRE;
+}
+
+function shireAt(x, y, W = G.world) {
+  if (!W.shireGrid) buildShires(W);
+  const i = Math.floor(x / K), j = Math.floor(y / K), S = W.shireS;
+  if (i < 0 || j < 0 || i >= S || j >= S) return null;
+  const k = W.shireGrid[j * S + i];
+  return k ? W.shireSeats[k - 1] : null;
+}
+function shireOfSite(site) {
+  const W = G.world;
+  if (!W.shireGrid) buildShires(W);
+  return W.shireOf[site.id] || null;
+}
+function shireName(id) { return SHIRES[id] ? SHIRES[id].name : ''; }
+function shireSites(id) { return G.world.sites.filter((s) => s.id !== id && shireOfSite(s) === id); }
+
+// Besitz: im Spielstand, anfangs der Herr der Burg (Fraktion), später auch du
+function shireState() {
+  const st = G.s.shires || (G.s.shires = {});
+  for (const id of Object.keys(SHIRES)) {
+    if (st[id]) continue;
+    const seat = G.world.sites.find((s) => s.id === id);
+    st[id] = { owner: seat ? seat.faction : null };
+  }
+  return st;
+}
+function shireOwner(id) { return (shireState()[id] || {}).owner || null; }
+function ownedShires() { const st = shireState(); return Object.keys(SHIRES).filter((id) => st[id].owner === 'spieler'); }
+function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
+function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+function ownerColor(o) { return o === 'spieler' ? playerColor() : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
+
+// Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)
+function shireTax(id) {
+  let g = 10;
+  for (const s of shireSites(id)) g += TAX[s.type] || 0;
+  return g + (SHIRES[id].gold || 0);
+}
+// Für die Tagesabrechnung der Burg
+function shireIncome() { return ownedShires().map((id) => [`Abgaben ${SHIRES[id].name}`, shireTax(id)]); }
+function shireGoods() {
+  const out = {};
+  for (const id of ownedShires()) for (const [g, n] of Object.entries(SHIRES[id].goods || {})) out[g] = (out[g] || 0) + n;
+  return out;
+}
+function shireDef() { return ownedShires().reduce((a, id) => a + (SHIRES[id].def || 0), 0); }
+function shireRenown() { return ownedShires().reduce((a, id) => a + (SHIRES[id].ruhm || 0), 0); }
+function shireFerryFactor() { return ownedShires().reduce((a, id) => Math.min(a, SHIRES[id].faehre ?? 1), 1); }
+function ownsHomeShire() { return shireOwner(HOME_SHIRE) === 'spieler'; }
+
+// Grafschaft übernehmen (Eroberung, Testmodus)
+function claimShire(id, who = 'spieler') {
+  const st = shireState();
+  if (!st[id] || st[id].owner === who) return;
+  st[id].owner = who;
+  G.shireTint = null;
+  if (who === 'spieler') log(`Du beherrschst jetzt die Grafschaft ${SHIRES[id].name}. ${SHIRES[id].text}`, 'gold');
+  else log(`${SHIRES[id].name} fällt an ${ownerName(who)}.`);
+}
+
+// ---------------------------------------------------------------- Karte
+// Farbe der Herren als zarte Fläche, Grenzen als Linie, Namen in der Mitte. v: Ausschnitt aus drawMap.
+function tintCanvas(W) {
+  const key = Object.keys(SHIRES).map((id) => shireOwner(id)).join(',') + playerColor();
+  if (G.shireTint && G.shireTint.key === key) return G.shireTint.cv;
+  const S = W.shireS, cv = document.createElement('canvas');
+  cv.width = S; cv.height = S;
+  const c = cv.getContext('2d'), img = c.createImageData(S, S);
+  const cols = W.shireSeats.map((id) => { const h = ownerColor(shireOwner(id)).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  for (let v = 0; v < S * S; v++) {
+    const k = W.shireGrid[v];
+    if (!k) continue;
+    const [r, g, b] = cols[k - 1];
+    img.data[v * 4] = r; img.data[v * 4 + 1] = g; img.data[v * 4 + 2] = b; img.data[v * 4 + 3] = 75;
+  }
+  c.putImageData(img, 0, 0);
+  G.shireTint = { key, cv };
+  return cv;
+}
+function borderPath(W) {
+  if (W.shireBorder) return W.shireBorder;
+  const S = W.shireS, g = W.shireGrid, p = new Path2D();
+  for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+    const a = g[j * S + i];
+    if (i + 1 < S) { const b = g[j * S + i + 1]; if (a !== b && (a || b)) { p.moveTo((i + 1) * K, j * K); p.lineTo((i + 1) * K, (j + 1) * K); } }
+    if (j + 1 < S) { const b = g[(j + 1) * S + i]; if (a !== b && (a || b)) { p.moveTo(i * K, (j + 1) * K); p.lineTo((i + 1) * K, (j + 1) * K); } }
+  }
+  W.shireBorder = p;
+  return p;
+}
+function drawShires(c, v) {
+  const W = G.world;
+  if (typeof Path2D === 'undefined') return;
+  if (!W.shireGrid) buildShires(W);
+  const N = W.N;
+  c.save();
+  c.imageSmoothingEnabled = true;
+  c.drawImage(tintCanvas(W), v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
+  c.translate(v.dx - v.ox * v.s, v.dy - v.oy * v.s); c.scale(v.s, v.s);
+  const path = borderPath(W);
+  c.strokeStyle = 'rgba(250,236,200,0.45)'; c.lineWidth = 3.2 / v.s; c.stroke(path);
+  c.strokeStyle = 'rgba(70,22,12,0.85)'; c.lineWidth = 1.5 / v.s; c.setLineDash([5 / v.s, 3 / v.s]);
+  c.stroke(path);
+  c.restore();
+  // Namen: nur wenn die Grafschaft groß genug zu sehen ist
+  c.save();
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const fs = Math.max(10, Math.min(15, 9 + v.s * 2.2));
+  c.font = `600 ${fs}px "IM Fell English SC", "Alegreya", Georgia, serif`;
+  if ('letterSpacing' in c) c.letterSpacing = '1px';
+  // Ortsnamen stehen über und unter ihrem Ort: Der Name der Grafschaft weicht ihnen aus
+  const pts = W.sites.map((o) => ({ x: v.dx + (o.x - v.ox) * v.s, y: v.dy + (o.y - v.oy) * v.s, w: o.name.length * 3.6 + 8 }));
+  const free = (x, y, tw) => pts.every((p) => Math.abs(p.x - x) > tw / 2 + p.w || Math.abs(p.y - y) > 17);
+  const tries = [[0, 0], [0, 18], [0, -18], [0, 34], [0, -34], [46, 8], [-46, 8], [60, 24], [-60, 24]];
+  for (const id of W.shireSeats) {
+    const m = W.shireMid[id];
+    if (!m || m.cells < 6) continue;
+    const x0 = v.dx + (m.x - v.ox) * v.s, y0 = v.dy + (m.y - v.oy) * v.s + 10;
+    const name = SHIRES[id].name, tw = c.measureText(name).width;
+    const [ox, oy] = tries.find(([dx, dy]) => free(x0 + dx, y0 + dy, tw)) || [0, 0];
+    const x = x0 + ox, y = y0 + oy;
+    const own = shireOwner(id);
+    c.lineWidth = 3.5; c.strokeStyle = 'rgba(248,238,214,0.9)'; c.strokeText(name, x, y);
+    c.fillStyle = own === 'spieler' ? '#1f3f7a' : '#6a1f12'; c.fillText(name, x, y);
+  }
+  c.restore();
 }
 
 // ===== animals.js =====
@@ -8575,6 +8829,7 @@ function hermitGift(s) {
 
 
 
+
 const CHEATS = {
   gold: 'Unendlich Gold',
   res: 'Unendlich Rohstoffe und Vorräte',
@@ -8665,6 +8920,8 @@ const CHEAT_ACTIONS = {
     log(`Testmodus: ${castleSite().name} ist voll ausgebaut.`, 'gold');
   },
   repplus: () => { for (const f of FACTION_IDS) changeRep(f, 25); },
+  // Die Grafschaft, in der du stehst (sonst dein West Riding), gehört dir
+  grafschaft: () => { const p = G.s.player; claimShire(shireAt(p.x, p.y) || HOME_SHIRE); },
   repminus: () => { for (const f of FACTION_IDS) changeRep(f, -25); },
 };
 
@@ -9074,6 +9331,7 @@ function giveGift(site) {
 
 
 
+
 function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
 function bLevel(id) { return id === 'burg' ? G.s.castle.level : G.s.castle.b[id] || 0; }
@@ -9302,7 +9560,7 @@ const FIELD_SEASON = [0.5, 1, 1.5, 0];
 
 // ---------------------------------------------------------------- Werte
 function castleDefense() {
-  let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')];
+  let d = [5, 25, 55, 90][G.s.castle.level] + [0, 15, 35, 60][bLevel('wehr')] + shireDef();
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
   if (homeGateClosed()) d += 10;
@@ -9317,10 +9575,13 @@ function dailyBalance() {
   ];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   if (bLevel('felder') >= 3) income.push(['Mahlgeld der Windmühle', 10]);
+  // Eigene Grafschaften: Abgaben ihrer Orte
+  income.push(...shireIncome());
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
-  if (!isAlly('normannen')) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
+  if (!isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
   const season = seasonIndex(), sz = bLevel('schafzucht');
   const prod = {
     holz: [0, 6, 12, 18][bLevel('holzfaeller')],
@@ -9331,6 +9592,8 @@ function dailyBalance() {
     felle: [0, 0, 0, 1][sz],
   };
   if (season === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); prod.wolle = Math.floor(prod.wolle / 2); }
+  // Vorzüge eigener Grafschaften (Wolle aus dem West Riding, Caen-Stein …)
+  for (const [g, n] of Object.entries(shireGoods())) prod[g] = (prod[g] || 0) + n;
   // Verpflegung: was fehlt, kaufen die Knechte teuer zu
   const need = foodNeed();
   const avail = foodStock() + prod.getreide + prod.fleisch;
@@ -9345,6 +9608,8 @@ function dailyCastle() {
   const bal = dailyBalance();
   const inc = bal.income.reduce((a, [, v]) => a + v, 0);
   G.s.gold += inc;
+  const fame = shireRenown();
+  if (fame) addRenown(fame);
   const costOf = (name) => (bal.costs.find(([n]) => n === name) || [0, 0])[1];
   const wages = costOf('Sold'), tax = costOf('Abgaben an den Vogt');
   if (tax) {
@@ -10387,6 +10652,7 @@ function drawKnightPlate(c, w, h, arms, t = 0, opt = {}) {
 // ===== render.js =====
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
+
 
 
 
@@ -15399,7 +15665,7 @@ function drawMap(c, w, h, opts = {}) {
   c.imageSmoothingEnabled = false;
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
-  if (big) drawMapDecor(c, v);
+  if (big) { drawMapDecor(c, v); drawShires(c, v); }
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);
@@ -16507,6 +16773,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -16669,7 +16936,8 @@ function townPanel() {
   if (siegeAt(site) && G.siege.stage !== 'anmarsch') return siegePanel();
   const f = site.faction;
   const town = G.s.towns[site.id];
-  const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
+  const shire = shireOfSite(site);
+  const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
@@ -16678,7 +16946,7 @@ function townPanel() {
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
   let body = '';
-  if (G.ui.tab === 'info') body = townInfo(site);
+  if (G.ui.tab === 'info') body = (SHIRES[site.id] ? shireCard(site.id) : '') + townInfo(site);
   if (G.ui.tab === 'markt') body = marketTable(site);
   if (G.ui.tab === 'waren') body = shopView(site);
   if (G.ui.tab === 'auftraege') body = townQuests(site);
@@ -16968,7 +17236,7 @@ function castlePanel() {
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
-    case 'ausbau': body = gateAction() + castleBuild(); break;
+    case 'ausbau': body = homeShireNote() + gateAction() + castleBuild(); break;
     case 'halle': body = castleHall(); break;
     case 'gefolge': body = partyView(true); break;
     case 'lager': body = castleStore(); break;
@@ -17252,9 +17520,39 @@ function eventList() {
 
 let mapView = null;
 const mapState = { zoom: 2, cx: null, cy: null };
+// ---------------------------------------------------------------- Grafschaften
+function ownerSwatch(o) { return `<span class="swatch" style="--c:${ownerColor(o)}"></span>`; }
+function shireCard(id, withSeat = false) {
+  const seat = G.world.sites.find((s) => s.id === id), sh = SHIRES[id], own = shireOwner(id);
+  const places = shireSites(id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(TYPE_NAME[s.type])})</span>`).join(', ') : 'keine weiteren Orte';
+  const home = id === HOME_SHIRE;
+  return `<div class="shire${home ? ' home' : ''}${own === 'spieler' ? ' mine' : ''}">
+    <div class="shire-head"><b>${esc(sh.name)}</b>${withSeat && seat ? `<span class="muted">Sitz: ${esc(seat.name)}</span>` : ''}<span>${ownerSwatch(own)}Herr: ${esc(ownerName(own))}</span></div>
+    <p>${esc(sh.text)}</p>
+    <p class="muted">Orte: ${placeList}. Abgaben für den Herrn: ${shireTax(id)} Gold am Tag.</p>
+    ${home && own !== 'spieler' ? `<p class="goal">Dein Erbe ${esc(homeName())} liegt in dieser Grafschaft. Erobere ${esc(seat ? seat.name : 'den Sitz')} zurück, dann gehört das West Riding dir.</p>` : ''}
+  </div>`;
+}
+function shiresList() {
+  const realmRank = { en: 0, wa: 1, nd: 2, fr: 3 };
+  const ids = Object.keys(SHIRES).filter((id) => G.world.sites.some((s) => s.id === id));
+  const seatOf = (id) => G.world.sites.find((s) => s.id === id);
+  ids.sort((a, b) => (a === HOME_SHIRE ? -1 : b === HOME_SHIRE ? 1 : 0) || (shireOwner(a) === 'spieler' ? -1 : 0) - (shireOwner(b) === 'spieler' ? -1 : 0) || realmRank[seatOf(a).realm] - realmRank[seatOf(b).realm] || SHIRES[a].name.localeCompare(SHIRES[b].name, 'de'));
+  return `<div class="shires">${ids.map((id) => shireCard(id, true)).join('')}</div>`;
+}
+function homeShireNote() {
+  if (shireOwner(HOME_SHIRE) === 'spieler') return '';
+  const seat = G.world.sites.find((s) => s.id === HOME_SHIRE);
+  return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;
+}
+
 function mapPanel() {
+  if (G.ui.tab === 'grafschaften') {
+    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']], body: shiresList() };
+  }
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff.', tabs: [],
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']],
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span><span><span class="dash"></span>Fähre</span></p>${eventList()}`,
@@ -17371,7 +17669,7 @@ function cheatPanel() {
     title: 'Testmodus', sub: 'Cheats zum Ausprobieren. Taste F9 öffnet und schließt diese Tafel.', tabs: [],
     body: `<div class="cheat-toggles">${toggles}</div>
       ${grp('Zeit und Wetter', [['h6', '+6 Stunden'], ['tag', '+1 Tag'], ['saison', 'Nächste Jahreszeit'], ['klar', 'Klar'], ['regen', 'Regen'], ['nebel', 'Nebel'], ['schnee', 'Schneefall'], ['snow0', 'Kein Schnee'], ['snow50', 'Halbe Schneedecke'], ['snow100', 'Volle Schneedecke']])}
-      ${grp('Ereignisse', [['turnier', 'Turnier heute'], ['galgen', 'Hinrichtung jetzt'], ['feuer', 'Feuer in der Nähe'], ['belagerung', 'Belagerung starten'], ['schlacht', 'Schlacht starten']])}
+      ${grp('Ereignisse', [['turnier', 'Turnier heute'], ['galgen', 'Hinrichtung jetzt'], ['feuer', 'Feuer in der Nähe'], ['belagerung', 'Belagerung starten'], ['schlacht', 'Schlacht starten'], ['grafschaft', 'Grafschaft hier übernehmen']])}
       ${grp('Held und Burg', [['ausruestung', 'Beste Ausrüstung'], ['stufe', 'Stufe +1 (alle)'], ['ruhm', 'Ruhm +50'], ['burg', 'Burg voll ausbauen'], ['repplus', 'Ansehen +25 (alle)'], ['repminus', 'Ansehen −25 (alle)']])}
       <p class="hint">Mit Sofortreise bringt dich ein Klick auf der Karte (M) sofort ans Ziel, auch übers Meer. Der Testmodus wird mit dem Spielstand gespeichert.</p>`,
   };

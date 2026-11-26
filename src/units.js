@@ -21,6 +21,7 @@ import { companionWatch } from './tournament.js';
 import { cheatOn } from './cheats.js';
 import { sfxAt } from './audio.js';
 import { startTactics, updateTactics, updateTacMember, DEPLOY_DIST } from './tactics.js';
+import { shireFerryFactor } from './shires.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -1059,7 +1060,7 @@ export function ferryCost(route) {
   if (isAlly('franken') && (french(from) || french(to))) return 0;
   const riders = [G.s.player, ...partyMembers()];
   const horses = riders.filter((u) => u.eq && u.eq.pferd).length;
-  return route.cost * riders.length + horses * Math.ceil(route.cost / 2);
+  return Math.round((route.cost * riders.length + horses * Math.ceil(route.cost / 2)) * shireFerryFactor());
 }
 
 export function sail(fromId, toId) {

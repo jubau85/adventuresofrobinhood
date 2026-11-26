@@ -21,6 +21,7 @@ import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weathe
 import { abandonedId } from './dynamics.js';
 import { homeGateClosed, homeSite } from './siege.js';
 import { drawCharge, drawKnightPlate } from './heraldry.js';
+import { drawShires } from './shires.js';
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -5012,7 +5013,7 @@ export function drawMap(c, w, h, opts = {}) {
   c.imageSmoothingEnabled = false;
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
-  if (big) drawMapDecor(c, v);
+  if (big) { drawMapDecor(c, v); drawShires(c, v); }
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);

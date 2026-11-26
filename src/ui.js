@@ -31,6 +31,7 @@ import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
 import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, hireInTown } from './camps.js';
 import { armsSVG } from './heraldry.js';
+import { SHIRES, HOME_SHIRE, shireOfSite, shireName, shireSites, shireOwner, ownerName, ownerPhrase, ownerColor, shireTax } from './shires.js';
 
 export function byId(id) { return document.getElementById(id); }
 
@@ -194,7 +195,8 @@ function townPanel() {
   if (siegeAt(site) && G.siege.stage !== 'anmarsch') return siegePanel();
   const f = site.faction;
   const town = G.s.towns[site.id];
-  const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}`;
+  const shire = shireOfSite(site);
+  const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
@@ -203,7 +205,7 @@ function townPanel() {
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
   let body = '';
-  if (G.ui.tab === 'info') body = townInfo(site);
+  if (G.ui.tab === 'info') body = (SHIRES[site.id] ? shireCard(site.id) : '') + townInfo(site);
   if (G.ui.tab === 'markt') body = marketTable(site);
   if (G.ui.tab === 'waren') body = shopView(site);
   if (G.ui.tab === 'auftraege') body = townQuests(site);
@@ -493,7 +495,7 @@ function castlePanel() {
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
-    case 'ausbau': body = gateAction() + castleBuild(); break;
+    case 'ausbau': body = homeShireNote() + gateAction() + castleBuild(); break;
     case 'halle': body = castleHall(); break;
     case 'gefolge': body = partyView(true); break;
     case 'lager': body = castleStore(); break;
@@ -777,9 +779,39 @@ function eventList() {
 
 let mapView = null;
 const mapState = { zoom: 2, cx: null, cy: null };
+// ---------------------------------------------------------------- Grafschaften
+function ownerSwatch(o) { return `<span class="swatch" style="--c:${ownerColor(o)}"></span>`; }
+function shireCard(id, withSeat = false) {
+  const seat = G.world.sites.find((s) => s.id === id), sh = SHIRES[id], own = shireOwner(id);
+  const places = shireSites(id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(TYPE_NAME[s.type])})</span>`).join(', ') : 'keine weiteren Orte';
+  const home = id === HOME_SHIRE;
+  return `<div class="shire${home ? ' home' : ''}${own === 'spieler' ? ' mine' : ''}">
+    <div class="shire-head"><b>${esc(sh.name)}</b>${withSeat && seat ? `<span class="muted">Sitz: ${esc(seat.name)}</span>` : ''}<span>${ownerSwatch(own)}Herr: ${esc(ownerName(own))}</span></div>
+    <p>${esc(sh.text)}</p>
+    <p class="muted">Orte: ${placeList}. Abgaben für den Herrn: ${shireTax(id)} Gold am Tag.</p>
+    ${home && own !== 'spieler' ? `<p class="goal">Dein Erbe ${esc(homeName())} liegt in dieser Grafschaft. Erobere ${esc(seat ? seat.name : 'den Sitz')} zurück, dann gehört das West Riding dir.</p>` : ''}
+  </div>`;
+}
+function shiresList() {
+  const realmRank = { en: 0, wa: 1, nd: 2, fr: 3 };
+  const ids = Object.keys(SHIRES).filter((id) => G.world.sites.some((s) => s.id === id));
+  const seatOf = (id) => G.world.sites.find((s) => s.id === id);
+  ids.sort((a, b) => (a === HOME_SHIRE ? -1 : b === HOME_SHIRE ? 1 : 0) || (shireOwner(a) === 'spieler' ? -1 : 0) - (shireOwner(b) === 'spieler' ? -1 : 0) || realmRank[seatOf(a).realm] - realmRank[seatOf(b).realm] || SHIRES[a].name.localeCompare(SHIRES[b].name, 'de'));
+  return `<div class="shires">${ids.map((id) => shireCard(id, true)).join('')}</div>`;
+}
+function homeShireNote() {
+  if (shireOwner(HOME_SHIRE) === 'spieler') return '';
+  const seat = G.world.sites.find((s) => s.id === HOME_SHIRE);
+  return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;
+}
+
 function mapPanel() {
+  if (G.ui.tab === 'grafschaften') {
+    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']], body: shiresList() };
+  }
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff.', tabs: [],
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']],
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span><span><span class="dash"></span>Fähre</span></p>${eventList()}`,
@@ -896,7 +928,7 @@ function cheatPanel() {
     title: 'Testmodus', sub: 'Cheats zum Ausprobieren. Taste F9 öffnet und schließt diese Tafel.', tabs: [],
     body: `<div class="cheat-toggles">${toggles}</div>
       ${grp('Zeit und Wetter', [['h6', '+6 Stunden'], ['tag', '+1 Tag'], ['saison', 'Nächste Jahreszeit'], ['klar', 'Klar'], ['regen', 'Regen'], ['nebel', 'Nebel'], ['schnee', 'Schneefall'], ['snow0', 'Kein Schnee'], ['snow50', 'Halbe Schneedecke'], ['snow100', 'Volle Schneedecke']])}
-      ${grp('Ereignisse', [['turnier', 'Turnier heute'], ['galgen', 'Hinrichtung jetzt'], ['feuer', 'Feuer in der Nähe'], ['belagerung', 'Belagerung starten'], ['schlacht', 'Schlacht starten']])}
+      ${grp('Ereignisse', [['turnier', 'Turnier heute'], ['galgen', 'Hinrichtung jetzt'], ['feuer', 'Feuer in der Nähe'], ['belagerung', 'Belagerung starten'], ['schlacht', 'Schlacht starten'], ['grafschaft', 'Grafschaft hier übernehmen']])}
       ${grp('Held und Burg', [['ausruestung', 'Beste Ausrüstung'], ['stufe', 'Stufe +1 (alle)'], ['ruhm', 'Ruhm +50'], ['burg', 'Burg voll ausbauen'], ['repplus', 'Ansehen +25 (alle)'], ['repminus', 'Ansehen −25 (alle)']])}
       <p class="hint">Mit Sofortreise bringt dich ein Klick auf der Karte (M) sofort ans Ziel, auch übers Meer. Der Testmodus wird mit dem Spielstand gespeichert.</p>`,
   };
