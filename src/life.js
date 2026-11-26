@@ -5,7 +5,7 @@
 import { G, homeName, log } from './state.js';
 import { changeRep, addRenown } from './politics.js';
 import { T, PEASANT_TUNICS, HAIR, GOODS, FACTIONS } from './data.js';
-import { isWalkable, doorOf } from './world.js';
+import { isWalkable, doorOf, freeNear } from './world.js';
 import { rand, pick } from './rng.js';
 import { makeUnit, placeNear, chaseTo, rebuildUnits } from './units.js';
 import { hourOf, seasonIndex } from './sim.js';
@@ -68,7 +68,7 @@ function dress(role, site) {
 const spotCache = new Map();
 export function resetLife() { spotCache.clear(); }
 
-function siteSpots(s) {
+export function siteSpots(s) {
   if (spotCache.has(s.id)) return spotCache.get(s.id);
   const W = G.world, N = W.N;
   const bs = W.buildings.filter((b) => b.site === s.id);
@@ -106,6 +106,13 @@ function siteSpots(s) {
       }
     }
   }
+  // Plätze, die knapp in einem Nachbarhaus, Stand oder Brunnen liegen, rücken an die nächste freie Stelle
+  const fx = (q) => (q ? freeNear(W, q, 2.6) : q);
+  sp.houses = sp.houses.map((h) => ({ ...fx(h), b: h.b }));
+  for (const st of sp.stalls) { st.front = fx(st.front); st.back = fx(st.back); }
+  for (const k of ['wells', 'anvils', 'wood', 'hay', 'gardens']) sp[k] = sp[k].map(fx);
+  sp.church = fx(sp.church); sp.adit = fx(sp.adit); sp.mystic = fx(sp.mystic); sp.ore = fx(sp.ore);
+  if (s.tavern) sp.tavern = fx({ x: s.tavern.x + 0.5, y: s.tavern.y + 0.15 });
   if (s.type === 'burg' || s.type === 'spieler') sp.gate = [{ x: s.x + 0.4, y: s.y + 5.4 }, { x: s.x + 0.4, y: s.y + 2.5 }];
   // Bettler: vor den Toren der Stadtmauer, am Burgtor, an der Kirchentür oder am Markt
   sp.beg = [];
@@ -243,7 +250,8 @@ const near = (list, v) => {
 };
 
 function goTo(v, spot, act, dur, then = null, speed = 1) {
-  v.task = { kind: 'walk', x: spot.x, y: spot.y, act, dur, then, t: 0, speed, face: spot.face };
+  const p = freeNear(G.world, spot, 1.2);
+  v.task = { kind: 'walk', x: p.x, y: p.y, act, dur, then, t: 0, speed, face: spot.face };
 }
 
 function wander(v, s, r) {
@@ -316,7 +324,7 @@ function chooseTask(v) {
   // Nach einem Überfall bleiben viele lieber im Haus
   if (isBlighted(s) && v.role !== 'wache' && Math.random() < 0.4) { goTo(v, door(), 'heim', 9999, null, 0.9); v.task.hideFor = rand(25, 70); return; }
   const tav = s.tavern;
-  if (v.role === 'wirt' && tav && h < 22) { goTo(v, { x: tav.x + 0.5, y: tav.y + 0.15 }, 'verkaufen', rand(30, 60)); return; }
+  if (v.role === 'wirt' && tav && h < 22) { goTo(v, sp.tavern || { x: tav.x + 0.5, y: tav.y + 0.15 }, 'verkaufen', rand(30, 60)); return; }
   if (ph === 'abend' && h >= 20) {
     if (tav && Math.random() < 0.35 && v.role !== 'kind' && v.role !== 'moench') { goTo(v, { x: tav.x + rand(-1, 1.4), y: tav.y + rand(0.1, 1.1) }, 'trinken', rand(25, 50)); return; }
     goTo(v, door(), 'heim', 9999); return;

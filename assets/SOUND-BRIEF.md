@@ -17,7 +17,7 @@ Dieser Brief beschreibt alle Musikstücke und Geräusche, die das Spiel braucht.
 | `musik/welt_sommer` (Fassung B) | Passt und ist eingebaut. Lautheit −16 LUFS wie verlangt, Spitze −4,5 dBFS, 2:36 lang. Läuft vorerst überall (Titel, Tag, Nacht, Winter, Kampf): einmal ganz, dann 18 bis 40 Sekunden Pause mit nur Hintergrund, dann wieder von vorn. Die selbst erzeugte Musik springt nur noch ein, wenn die Datei nicht lädt. |
 | `sound/ambiente/wiese_tag` | Passt und ist eingebaut. Lautheit −22 LUFS wie verlangt. Die Datei war aus zwei Teilen zusammengesetzt (die erste Hälfte ohne die Höhen über 15 kHz). Ich habe beides bei 15 kHz angeglichen und Ende und Anfang zur nahtlosen Schleife überblendet (`tools/ton.py`). Läuft am Tag von Frühling bis Herbst, nicht bei starkem Regen. Für die nächsten Schleifen: am besten in einem Stück erzeugen, nicht zusammensetzen. |
 
-**Geräusche:** Bis Aufnahmen da sind, erzeugt das Spiel die wichtigsten Geräusche selbst (Amboss, Hammer, Axt, Hacke, Hieb, Klirren, Treffer, Schild, Bogen, Armbrust, Trebuchet, Einschlag, Bresche, Tor, Lanze, Münzen, Glocke, Feuer). Gelieferte Dateien ersetzen sie später einzeln.
+**Geräusche:** Bis Aufnahmen da sind, erzeugt das Spiel die wichtigsten Geräusche selbst (Amboss, Hammer, Axt, Hacke, Hieb, Klirren, Treffer, Schild, Bogen, Armbrust, Pfeiltreffer in Fleisch, Holz, Metall und Boden, Trebuchet, Einschlag, Bresche, Tor, Lanze, Münzen, Glocke, Feuer). Gelieferte Dateien ersetzen sie später einzeln.
 
 **Als Nächstes:** `musik/nacht`, `musik/welt_winter`, `sound/ambiente/nacht`, `sound/ambiente/winter` und `sound/ambiente/regen`, dann hat jede Tageszeit und Jahreszeit ihren Ton. Danach die Kampfgeräusche.
 

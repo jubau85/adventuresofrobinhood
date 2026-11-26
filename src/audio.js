@@ -354,13 +354,14 @@ function nz(out, t, { type = 'bandpass', f = 1000, f2 = null, q = 1, vol = 0.5, 
   n.connect(flt); flt.connect(g); g.connect(out);
   n.start(t, Math.random() * 0.5); n.stop(t + a + d + 0.05);
 }
-// Ein Teilton, auf Wunsch mit fallender Tonhöhe
-function tone(out, t, { f = 440, f2 = null, type = 'sine', vol = 0.3, a = 0.002, d = 0.3 }) {
+// Ein Teilton, auf Wunsch mit fallender Tonhöhe und Tiefpass (lp) gegen zu scharfe Obertöne
+function tone(out, t, { f = 440, f2 = null, type = 'sine', vol = 0.3, a = 0.002, d = 0.3, lp = 0 }) {
   const o = ac.createOscillator(); o.type = type;
   o.frequency.setValueAtTime(f, t);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + d);
   const g = envGain(t, a, vol, d);
-  o.connect(g); g.connect(out);
+  if (lp) { const flt = ac.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = lp; o.connect(flt); flt.connect(g); } else o.connect(g);
+  g.connect(out);
   o.start(t); o.stop(t + a + d + 0.05);
 }
 
@@ -392,21 +393,59 @@ const SFX = {
     [[1, 0.3, 0.35], [2.1, 0.18, 0.25], [3.7, 0.1, 0.15]].forEach(([r, v, d]) => tone(o, t, { f: f * r, vol: v, d }));
     nz(o, t, { type: 'highpass', f: 4000, vol: 0.25, d: 0.03 });
   },
+  // Nahkampf: Hieb ins Wams, kurz und dumpf, ohne Paukenton
   treffer(o, t) {
-    nz(o, t, { type: 'lowpass', f: 600, vol: 0.6, d: 0.1 });
-    tone(o, t, { f: vary(95), f2: 60, vol: 0.45, d: 0.08 });
+    nz(o, t, { type: 'lowpass', f: 1500, vol: 0.4, d: 0.06 });
+    nz(o, t, { f: vary(650, 0.15), q: 1.3, vol: 0.4, d: 0.05 });
+    tone(o, t, { f: vary(190), f2: 130, vol: 0.05, d: 0.03 });
   },
+  // Nahkampf: Schlag auf den Holzschild, ein heller, hohler Knall
   schild(o, t) {
-    nz(o, t, { f: vary(320, 0.1), q: 1.6, vol: 0.75, d: 0.14 });
-    tone(o, t, { f: vary(110), f2: 75, vol: 0.5, d: 0.12 });
+    nz(o, t, { type: 'highpass', f: 2500, vol: 0.14, d: 0.01 });
+    nz(o, t, { f: vary(720, 0.1), q: 4, vol: 0.75, d: 0.08 });
+    nz(o, t, { f: 1500, q: 2.5, vol: 0.28, d: 0.04 });
   },
+  // Bogen: Die Sehne schnellt vor (kurzes Schnarren und Klatschen), dann zischt der Pfeil davon
   bogen(o, t) {
-    tone(o, t, { f: vary(170), f2: 110, type: 'triangle', vol: 0.32, d: 0.14 });
-    nz(o, t + 0.01, { f: 1800, f2: 900, q: 1, vol: 0.12, a: 0.02, d: 0.14 });
+    const f = vary(360, 0.08);
+    tone(o, t, { f, f2: f * 0.94, type: 'sawtooth', vol: 0.16, d: 0.1, lp: 2200 });
+    tone(o, t, { f: f * 2.02, f2: f * 1.92, type: 'triangle', vol: 0.06, d: 0.07 });
+    nz(o, t, { type: 'highpass', f: 2600, vol: 0.16, d: 0.012 });
+    nz(o, t, { f: 1100, q: 2.5, vol: 0.22, d: 0.035 });
+    nz(o, t + 0.02, { f: 3200, f2: 1300, q: 0.9, vol: 0.1, a: 0.03, d: 0.24 });
   },
+  // Armbrust: harter Knall des Bügels, Schlag am Schaft, kurzes Sirren des Bolzens
   armbrust(o, t) {
-    nz(o, t, { type: 'highpass', f: 1500, vol: 0.45, d: 0.03 });
-    tone(o, t, { f: vary(240), f2: 170, type: 'triangle', vol: 0.3, d: 0.1 });
+    nz(o, t, { type: 'highpass', f: 1800, vol: 0.28, d: 0.018 });
+    tone(o, t, { f: vary(260), f2: 230, type: 'sawtooth', vol: 0.12, d: 0.06, lp: 1600 });
+    nz(o, t + 0.004, { f: 1100, q: 3, vol: 0.45, d: 0.035 });
+    nz(o, t + 0.02, { f: 3000, f2: 1300, q: 1, vol: 0.09, a: 0.02, d: 0.16 });
+  },
+  // Pfeil trifft Fleisch oder Kleidung: helles Einschlagen, kurzes „tschock“, der Schaft zittert nach
+  pfeil(o, t) {
+    nz(o, t, { type: 'highpass', f: 3000, vol: 0.12, d: 0.008 });
+    nz(o, t, { f: vary(1400, 0.15), q: 1.3, vol: 0.7, d: 0.05 });
+    nz(o, t + 0.003, { f: vary(700, 0.1), q: 1.4, vol: 0.22, d: 0.04 });
+    tone(o, t + 0.005, { f: vary(520, 0.1), f2: 470, type: 'triangle', vol: 0.022, d: 0.08 });
+  },
+  // Pfeil schlägt in Holz (Schild, Pfahl): hohles „tock“ und federnder Schaft
+  pfeilholz(o, t) {
+    nz(o, t, { type: 'highpass', f: 2500, vol: 0.12, d: 0.01 });
+    nz(o, t, { f: vary(950, 0.1), q: 4, vol: 0.9, d: 0.07 });
+    nz(o, t, { f: 1800, q: 3, vol: 0.3, d: 0.03 });
+    tone(o, t + 0.005, { f: vary(620, 0.08), f2: 560, type: 'triangle', vol: 0.035, d: 0.14 });
+  },
+  // Pfeil prallt von Kette oder Platte ab: hohes Pling
+  pfeilmetall(o, t) {
+    const f = vary(2300, 0.1);
+    tone(o, t, { f, vol: 0.14, d: 0.12 });
+    tone(o, t, { f: f * 2.7, vol: 0.06, d: 0.06 });
+    nz(o, t, { type: 'highpass', f: 4500, vol: 0.15, d: 0.012 });
+  },
+  // Pfeil verfehlt und fährt in den Boden
+  pfeilboden(o, t) {
+    nz(o, t, { type: 'lowpass', f: 1500, vol: 0.14, d: 0.03 });
+    nz(o, t, { f: 600, q: 1, vol: 0.1, d: 0.04 });
   },
   trebuchet(o, t) {
     tone(o, t, { f: 70, f2: 52, type: 'sawtooth', vol: 0.12, a: 0.05, d: 0.5 });
@@ -451,6 +490,19 @@ const SFX = {
 
 // Geräusch ohne Ort (Bedienung, Münzen)
 export function sfx(kind, vol = 1) { playSfx(kind, vol, 0, 0); }
+
+// Für Tests und Hörproben: Geräusche nacheinander in eine Tonspur rechnen. list: [[art, lautstärke, abstand s], ...]
+export async function renderSfx(list, sr = 44100) {
+  const total = list.reduce((a, q) => a + q[2], 0) + 0.8;
+  const off = new OfflineAudioContext(1, Math.ceil(total * sr), sr);
+  const saved = ac, nb = noiseBuffer;
+  ac = off; noiseBuffer = null;
+  let t = 0.1;
+  for (const [kind, vol, gap] of list) { const g = off.createGain(); g.gain.value = vol; g.connect(off.destination); SFX[kind](g, t); t += gap; }
+  ac = saved; noiseBuffer = nb;
+  const buf = await off.startRendering();
+  return Array.from(buf.getChannelData(0));
+}
 
 // Geräusch an einem Ort der Welt. Man hört von der Bildmitte aus: Was man sieht, hört man auch.
 export function sfxAt(kind, x, y, vol = 1, range = 22) {

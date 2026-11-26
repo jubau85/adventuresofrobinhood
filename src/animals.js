@@ -25,7 +25,7 @@ const DEER_TARGET = 130, DUCK_TARGET = 80;
 function animalOk(kind, x, y) {
   const t = tileAt(G.world, x, y);
   if (kind === 'ente') return t === T.WATER;
-  return t !== T.WATER && t !== T.ROAD && t !== T.BRIDGE && isWalkable(G.world, x, y);
+  return t !== T.WATER && t !== T.ROAD && t !== T.BRIDGE && isWalkable(G.world, x, y, true);
 }
 
 function spotNear(cx, cy, rMin, rMax, kind) {

@@ -1,12 +1,12 @@
 // Die eigene Burg: Ausbau, Produktion, Anwerben, Garnison, Überfälle.
 
 import { G, log, homeName } from './state.js';
-import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE, T, CASTLE_LAYOUT, CASTLE_TOWERS, CASTLE_PLOT, CASTLE_SOLID, CASTLE_KEEP } from './data.js';
+import { BUILDINGS, CLASSES, GOOD_IDS, GOODS, DAY_LEN, CASTLE_BONUS, FOOD_GOODS, FOOD_PRICE, T, CASTLE_LAYOUT, CASTLE_TOWERS, CASTLE_KEEP } from './data.js';
 import { rand, randInt, pick, mulberry32 } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
 import { cargoUsed } from './economy.js';
-import { setPlayerWalls, tileAt, footprintTiles } from './world.js';
+import { setPlayerWalls, tileAt } from './world.js';
 import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
 import { startSiege, homeGateClosed } from './siege.js';
@@ -54,29 +54,46 @@ export function villageSpots(s) {
   return spots;
 }
 
-// Felder, die Bergfried, fertige Burggebäude, Wachtürme und die Häuser der Burgsiedlung belegen.
-// Dort geht niemand hindurch; Markt, Weide und Äcker bleiben begehbar.
-export function castleBlockTiles() {
-  const W = G.world, s = castleSite(), C = G.s.castle;
-  const out = [];
+// Grundflächen der Burg, so wie render.js sie zeichnet: Bergfried, fertige Gebäude mit Nebengebäuden,
+// Wachtürme, Marktstände, die Häuser der Burgsiedlung und die eingezäunten Pferche (pen: Tiere dürfen hinein).
+// Dort geht niemand hindurch; Äcker und Wege bleiben frei.
+export function castleObstacles() {
+  const s = castleSite(), C = G.s.castle, out = [];
+  const r = (x, y, wx, wy, pen = false) => out.push({ x, y, wx, wy, pen });
   const k = CASTLE_KEEP[C.level];
-  out.push(...footprintTiles(W, s.x + k.dx, s.y + k.dy, k.w, k.w, 0.2));
-  for (const id of CASTLE_SOLID) {
-    if (!C.b[id]) continue;
-    const [pw, ph] = CASTLE_PLOT[id];
-    out.push(...footprintTiles(W, s.x + CASTLE_LAYOUT[id].dx, s.y + CASTLE_LAYOUT[id].dy, pw, ph));
+  r(s.x + k.dx, s.y + k.dy, k.w, k.w);
+  const lv = (id) => C.b[id] || 0;
+  const P = (id) => ({ x: s.x + CASTLE_LAYOUT[id].dx, y: s.y + CASTLE_LAYOUT[id].dy });
+  let L, p;
+  if ((L = lv('halle'))) { p = P('halle'); const wy = [0, 2.2, 2.6, 2.9][L]; r(p.x, p.y, 1.2 + L * 0.1, wy); if (L === 3) r(p.x + 0.1, p.y - wy / 2 - 0.35, 0.8, 0.8); }
+  if ((L = lv('kaserne'))) { p = P('kaserne'); r(p.x, p.y, [0, 2.0, 2.4, 2.6][L], L === 3 ? 1.2 : 1.0); r(s.x - 2.7, s.y + 6.5, 2.0, 1.6, true); }
+  if ((L = lv('schmiede'))) { p = P('schmiede'); if (L === 1) { r(p.x, p.y, 1.1, 1.0); r(p.x + 0.75, p.y - 0.1, 0.4, 0.4); } else r(p.x, p.y, L === 2 ? 1.4 : 1.7, L === 2 ? 1.2 : 1.4); }
+  if ((L = lv('stall'))) { p = P('stall'); r(p.x, p.y, 1.1 + L * 0.05, [0, 2.0, 2.6, 3.0][L]); r(p.x + 1.55 + L * 0.1, p.y + 0.2, [0, 1.4, 1.8, 2.2][L], [0, 1.6, 2.2, 2.8][L], true); }
+  if ((L = lv('holzfaeller'))) { p = P('holzfaeller'); r(p.x, p.y, 1.0, 0.9); if (L === 3) r(p.x - 0.4, p.y - 1.4, 0.9, 0.9); r(p.x + 1.1, p.y + 0.42, 1.0, 0.62); }
+  if ((L = lv('steinbruch'))) { p = P('steinbruch'); r(p.x, p.y, 2.0, 1.6); }
+  if ((L = lv('markt'))) {
+    p = P('markt');
+    for (let n = 0; n < [0, 2, 4, 6][L]; n++) r(p.x - 0.9 + (n % 3) * 0.95, p.y - 0.6 + Math.floor(n / 3) * 1.25, 0.8, 0.6);
+    if (L >= 2) r(p.x + 1.6, p.y + 0.3, 0.6, 0.6);
   }
-  for (let t = 0; t < (C.b.wehr || 0); t++) out.push(...footprintTiles(W, s.x + CASTLE_TOWERS[t][0], s.y + CASTLE_TOWERS[t][1], 0.9, 0.9));
-  for (const b of villageSpots(s).slice(0, villageHouses())) {
-    const di = Math.floor(b.y + b.wy / 2 + 0.3) * W.N + Math.floor(b.x - 0.15);
-    for (const q of footprintTiles(W, b.x, b.y, b.wx, b.wy)) if (q[1] * W.N + q[0] !== di) out.push(q);
+  if ((L = lv('kapelle'))) { p = P('kapelle'); r(p.x, p.y, [0, 1.6, 2.0, 2.6][L], [0, 1.0, 1.0, 1.2][L]); }
+  if ((L = lv('hospiz'))) { p = P('hospiz'); const h = [null, [0.2, -0.3, 1.3, 1.1], [0.3, -0.2, 1.2, 2.0], [0.3, -0.2, 1.4, 2.3]][L]; r(p.x + h[0], p.y + h[1], h[2], h[3]); if (L >= 2) r(p.x - 0.75, p.y - 0.9, 0.6, 0.6); }
+  if ((L = lv('schafzucht'))) {
+    p = P('schafzucht');
+    r(p.x - 1.2, p.y - 1.0, L === 3 ? 1.0 : 0.85, L === 3 ? 0.9 : 0.75);
+    if (L >= 2) r(p.x + 1.5, p.y - 1.1, 0.9, 0.8);
+    const pa = { x: p.x + 0.5, y: p.y + 0.3, w: [0, 1.9, 2.5, 2.9][L], h: [0, 1.7, 2.1, 2.5][L] };
+    r(pa.x, pa.y, pa.w, pa.h, true);
   }
+  if ((L = lv('felder'))) { p = P('felder'); if (L === 1) r(p.x, p.y, 0.8, 0.7); else r(p.x - 0.1, p.y - 0.1, 1.1, 1.6); if (L === 3) r(p.x + 1.3, p.y - 0.9, 0.75, 0.62); }
+  for (let t = 0; t < lv('wehr'); t++) r(s.x + CASTLE_TOWERS[t][0], s.y + CASTLE_TOWERS[t][1], 0.9, 0.9);
+  for (const b of villageSpots(s).slice(0, villageHouses())) r(b.x, b.y, b.wx, b.wy);
   return out;
 }
 
 // Mauern und Burggebäude neu eintragen (nach Ausbau, Laden, Schummeln)
 export function refreshCastleBlock() {
-  setPlayerWalls(G.world, G.s.castle.level >= 1, castleBlockTiles());
+  setPlayerWalls(G.world, G.s.castle.level >= 1, castleObstacles());
 }
 
 export function levelName() { return BUILDINGS.burg.levels[G.s.castle.level].name; }

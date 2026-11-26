@@ -178,9 +178,16 @@ function moveToward(u, tx, ty, dt, stop = 0.05, mult = 1) {
   const step = Math.min(unitSpeed(u) * mult * dt, d - stop * 0.5);
   const nx = u.x + (dx / d) * step, ny = u.y + (dy / d) * step;
   const W = G.world;
-  // Wer in einem gesperrten Feld steht (ein Haus wurde fertig, ein Tor ging zu), darf hinausgehen
-  const stuck = !isWalkable(W, u.x, u.y) && tileAt(W, nx, ny) !== T.WATER;
-  if (stuck || isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
+  // Eingeklemmt (ein Haus wurde fertig, ein Tor ging zu, ins Gedränge geschoben): auf kürzestem Weg ins Freie
+  if (!isWalkable(W, u.x, u.y)) {
+    const e = escapeSpot(W, u.x, u.y);
+    if (e) {
+      const ex = e.x - u.x, ey = e.y - u.y, ed = Math.hypot(ex, ey) || 1, st = Math.min(ed, unitSpeed(u) * mult * dt);
+      u.x += (ex / ed) * st; u.y += (ey / ed) * st; u.moving = true;
+      return false;
+    }
+  }
+  if (isWalkable(W, nx, ny)) { u.x = nx; u.y = ny; }
   else if (isWalkable(W, nx, u.y)) u.x = nx;
   else if (isWalkable(W, u.x, ny)) u.y = ny;
   else return false;
@@ -189,6 +196,24 @@ function moveToward(u, tx, ty, dt, stop = 0.05, mult = 1) {
   if (Math.abs(sx) > 0.05) u.facing = sx >= 0 ? 1 : -1;
   u.moving = true;
   return d - step <= stop;
+}
+
+// Nächste freie Stelle (Feldmitte oder Punkt daneben) für jemanden, der in einem Hindernis steckt
+function escapeSpot(W, x, y) {
+  const tx = Math.floor(x), ty = Math.floor(y);
+  let best = null, bd = Infinity;
+  for (let r = 0; r <= 3 && !best; r++) {
+    for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
+      if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+      for (const [fx, fy] of [[0.5, 0.5], [0.15, 0.5], [0.85, 0.5], [0.5, 0.15], [0.5, 0.85]]) {
+        const px = tx + ox + fx, py = ty + oy + fy;
+        if (!isWalkable(W, px, py)) continue;
+        const d = Math.hypot(px - x, py - y);
+        if (d < bd) { bd = d; best = { x: px, y: py }; }
+      }
+    }
+  }
+  return best;
 }
 
 // Freie Linie zwischen zwei Punkten (keine Mauer, kein Wasser)?
@@ -295,11 +320,13 @@ function attack(u, t) {
   }
 }
 
-function applyHit(a, t) {
+function applyHit(a, t, ranged = false) {
   if (t.dead) return;
   if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
   const { dmg, crit } = calcDamage(a, t);
-  sfxAt(t.eq && t.eq.schild && Math.random() < 0.4 ? 'schild' : (t.st.armorDef || 0) >= 6 ? 'klirren' : 'treffer', t.x, t.y, crit ? 1 : 0.8);
+  // Pfeile klingen anders als Hiebe: in den Schild, an der Rüstung abprallend oder ins Fleisch
+  const shield = t.eq && t.eq.schild && Math.random() < 0.4, heavy = (t.st.armorDef || 0) >= 6;
+  sfxAt(ranged ? (shield ? 'pfeilholz' : heavy ? 'pfeilmetall' : 'pfeil') : shield ? 'schild' : heavy ? 'klirren' : 'treffer', t.x, t.y, crit ? 1 : 0.8);
   t.hp -= dmg;
   t.flash = 0.18;
   t.combatT = 5;
@@ -334,8 +361,10 @@ export function updateProjectiles(dt) {
       const tg = p.target;
       if (p.animal) {
         if (p.npcHunt) { if (!tg.dead) takeAnimal(tg); }
-        else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) hitAnimal(tg, p.dmg, p.att);
-      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg);
+        else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) { sfxAt('pfeil', tg.x, tg.y, 0.7); hitAnimal(tg, p.dmg, p.att); }
+        else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
+      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true);
+      else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
       G.projectiles.splice(i, 1);
     }
   }

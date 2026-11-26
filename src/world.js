@@ -116,10 +116,14 @@ export function groundZ(W, x, y) {
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
 
-export function isWalkable(W, x, y) {
+// Kann eine Figur hier stehen? Wasser, Mauern und gesperrte Felder nicht, Gebäude genau geprüft.
+// animal: Weidetiere dürfen in ihren Pferch.
+export function isWalkable(W, x, y, animal = false) {
   if (x < 0.3 || y < 0.3 || x > W.N - 0.3 || y > W.N - 0.3) return false;
   const i = Math.floor(y) * W.N + Math.floor(x);
-  return W.tiles[i] !== T.WATER && !W.block[i];
+  if (W.tiles[i] === T.WATER) return false;
+  if (W.block[i] && !(animal && W.penTile && W.penTile[i])) return false;
+  return !inObstacle(W, x, y, animal);
 }
 
 // ---------------------------------------------------------------- Mauern
@@ -143,6 +147,9 @@ function blockTiles(W, arr, list) {
 function buildStaticWalls(W) {
   W.wallStatic = new Uint8Array(W.N * W.N);
   markWalls(W, W.wallStatic);
+  // Bergfriede der Burgen auch genau als Hindernis
+  W.keepObs = W.sites.filter((s) => s.type === 'burg').map((s) => { const kw = s.castleLevel >= 3 ? 2.8 : 2.2; return makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw); });
+  W.ogrid = null;
   refreshBuildingBlocks(W);
 }
 
@@ -153,17 +160,19 @@ function markWalls(W, arr) {
     if (s.type === 'burg') {
       blockTiles(W, arr, wallRing(W, s, 4));
       const kw = s.castleLevel >= 3 ? 2.8 : 2.2;
-      for (const [x, y] of footprintTiles(W, s.x - 1.1, s.y - 1.1, kw, kw, 0.2)) arr[y * W.N + x] = 1;
+      for (const [x, y] of obstacleTiles(W, makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw), false)) arr[y * W.N + x] = 1;
     }
     if (s.palisade) blockTiles(W, arr, palisadeBand(s, false));
   }
 }
 
 // ---------------------------------------------------------------- Gebäude als Hindernis
-// Häuser, Kirchen, Hallen, Wahrzeichen, Klausen und Stollen kann niemand durchschreiten.
-// Gesperrt sind die Felder, deren Mitte in der (leicht eingerückten) Grundfläche liegt, dazu das Feld
-// der Gebäudemitte. Das Feld vor der Tür bleibt immer frei, ebenso Straßen und Brücken.
-const SOLID_KINDS = { house: 1, church: 1, longhall: 1, klause: 1, stollen: 1, halde: 1, landmark: 1 };
+// Häuser, Kirchen, Hallen, Wahrzeichen, Stände, Brunnen, Zelte und Zäune sind Rechtecke.
+// Die Bewegung prüft sie genau, um REACH erweitert (so breit ist eine Figur). Die Wegsuche sperrt
+// jedes Feld, dessen Mitte darin liegt; dünne Zäune sperren jedes Feld, das sie berühren.
+// Straßen und Brücken sperrt ein Ortsgebäude nie, das Feld vor der Tür bleibt frei.
+export const REACH = 0.1;
+const SOLID_KINDS = { house: 1, church: 1, longhall: 1, klause: 1, stollen: 1, halde: 1, landmark: 1, stall: 1, well: 1, tent: 1, fence: 1 };
 function solidRects(b) {
   if (!SOLID_KINDS[b.kind] || !b.wx) return null;
   if (b.kind === 'landmark') {
@@ -172,12 +181,37 @@ function solidRects(b) {
     if (b.lm === 'kathedrale') { const L = (b.len || 4) * 1.3; return [[b.x, b.y, L, 1.5], [b.x + L * 0.12, b.y, 1.3, Math.min(b.wy, 3.2)]]; }
     if (b.lm === 'motte') return [[b.x, b.y, b.wx * 0.7, b.wy * 0.7]];
   }
+  if (b.kind === 'tent') return [[b.x, b.y, b.wx * 0.8, b.wy * 0.8]];
   return [[b.x, b.y, b.wx, b.wy]];
 }
+// Hindernis aus Mitte und Größe; o.b: das Gebäude (steht es?), o.pen: Pferch, den Tiere betreten
+export function makeObstacle(x, y, wx, wy, extra = {}) {
+  return { x0: x - wx / 2 - REACH, x1: x + wx / 2 + REACH, y0: y - wy / 2 - REACH, y1: y + wy / 2 + REACH, ...extra };
+}
+function obstaclesOf(b) {
+  if (b._obs) return b._obs;
+  const rs = solidRects(b);
+  return (b._obs = rs ? rs.map(([x, y, wx, wy]) => makeObstacle(x, y, wx, wy, { b })) : []);
+}
+// Felder, die ein Hindernis für die Wegsuche sperrt
+export function obstacleTiles(W, o, keepRoads = true) {
+  const N = W.N, out = [];
+  const thin = Math.min(o.x1 - o.x0, o.y1 - o.y0) < 0.6 + 2 * REACH;
+  for (let ty = Math.floor(o.y0); ty <= Math.floor(o.y1 - 1e-6); ty++) for (let tx = Math.floor(o.x0); tx <= Math.floor(o.x1 - 1e-6); tx++) {
+    if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1) continue;
+    const inside = tx + 0.5 > o.x0 && tx + 0.5 < o.x1 && ty + 0.5 > o.y0 && ty + 0.5 < o.y1;
+    if (!inside && !thin) continue;
+    const t = W.tiles[ty * N + tx];
+    if (t === T.WATER || (keepRoads && (t === T.ROAD || t === T.BRIDGE))) continue;
+    out.push([tx, ty]);
+  }
+  return out;
+}
 // Tür eines Gebäudes: meist vorn (Richtung +y). Liegt dort Wasser, ist sie auf einer anderen Seite.
+// Die Tür rückt so weit vor, dass ihr Feld frei bleibt.
 export function doorOf(b, W) {
   if (b._door) return b._door;
-  let d;
+  let d, n = [0, 1];
   if (b.kind === 'church') d = { x: b.x + b.wx / 2 - 0.45, y: b.y + b.wy / 2 + 0.55 };
   else if (b.kind === 'landmark' && b.lm === 'kathedrale') d = { x: b.x - (b.len || 4) / 2 + 0.4, y: b.y + 1.0 };
   else if (b.kind === 'stollen') d = { x: b.x - 0.3, y: b.y + b.wy / 2 + 0.45 };
@@ -186,34 +220,57 @@ export function doorOf(b, W) {
   if (!W) return d;
   const wet = (p) => W.tiles[Math.floor(p.y) * W.N + Math.floor(p.x)] === T.WATER;
   if (wet(d) && b.kind !== 'landmark') {
-    const alt = [{ x: b.x + 0.15, y: b.y - b.wy / 2 - 0.3 }, { x: b.x + b.wx / 2 + 0.3, y: b.y + 0.1 }, { x: b.x - b.wx / 2 - 0.3, y: b.y + 0.1 }].find((p) => !wet(p));
-    if (alt) d = alt;
+    const alt = [[{ x: b.x + 0.15, y: b.y - b.wy / 2 - 0.3 }, [0, -1]], [{ x: b.x + b.wx / 2 + 0.3, y: b.y + 0.1 }, [1, 0]], [{ x: b.x - b.wx / 2 - 0.3, y: b.y + 0.1 }, [-1, 0]]].find(([p]) => !wet(p));
+    if (alt) [d, n] = alt;
   }
+  const inBody = (p) => obstaclesOf(b).some((o) => { const cx = Math.floor(p.x) + 0.5, cy = Math.floor(p.y) + 0.5; return cx > o.x0 && cx < o.x1 && cy > o.y0 && cy < o.y1; });
+  for (let k = 0; k < 3 && inBody(d); k++) d = { x: d.x + n[0] * 0.5, y: d.y + n[1] * 0.5 };
   return (b._door = d);
-}
-// Felder einer Grundfläche (Mitte x, y; Breite wx, Tiefe wy). m: Einrückung am Rand
-export function footprintTiles(W, x, y, wx, wy, m = 0.25) {
-  const N = W.N, out = [], seen = new Set();
-  const put = (tx, ty) => { const i = ty * N + tx; if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1 || seen.has(i)) return; seen.add(i); out.push([tx, ty]); };
-  const x0 = x - wx / 2 + m, x1 = x + wx / 2 - m, y0 = y - wy / 2 + m, y1 = y + wy / 2 - m;
-  for (let ty = Math.floor(y0); ty <= Math.floor(y1); ty++) for (let tx = Math.floor(x0); tx <= Math.floor(x1); tx++) {
-    if (tx + 0.5 >= x0 && tx + 0.5 < x1 && ty + 0.5 >= y0 && ty + 0.5 < y1) put(tx, ty);
-  }
-  put(Math.floor(x), Math.floor(y));
-  return out;
 }
 export function buildingTiles(W, b) {
   if (b._bt) return b._bt;
-  const rects = solidRects(b);
-  if (!rects) return (b._bt = []);
-  const N = W.N, d = doorOf(b, W), di = Math.floor(d.y) * N + Math.floor(d.x);
   const out = [];
-  for (const [x, y, wx, wy] of rects) for (const [tx, ty] of footprintTiles(W, x, y, wx, wy)) {
-    const i = ty * N + tx, t = W.tiles[i];
-    if (i === di || t === T.ROAD || t === T.BRIDGE || t === T.WATER) continue;
-    if (!out.some((q) => q[0] === tx && q[1] === ty)) out.push([tx, ty]);
-  }
+  for (const o of obstaclesOf(b)) for (const q of obstacleTiles(W, o)) if (!out.some((r) => r[0] === q[0] && r[1] === q[1])) out.push(q);
   return (b._bt = out);
+}
+// Raster: Feld -> Hindernisse, die hineinragen
+function gridAdd(grid, N, o) {
+  for (let ty = Math.floor(o.y0); ty <= Math.floor(o.y1); ty++) for (let tx = Math.floor(o.x0); tx <= Math.floor(o.x1); tx++) {
+    const i = ty * N + tx;
+    const l = grid.get(i);
+    if (l) l.push(o); else grid.set(i, [o]);
+  }
+}
+function buildObstacleGrid(W) {
+  W.ogrid = new Map();
+  for (const b of W.buildings) for (const o of obstaclesOf(b)) gridAdd(W.ogrid, W.N, o);
+  for (const o of W.keepObs || []) gridAdd(W.ogrid, W.N, o);
+}
+// Nächste freie Stelle bei p (für Plätze, die knapp in einem Gebäude oder Stand liegen)
+export function freeNear(W, p, maxR = 1.4) {
+  if (isWalkable(W, p.x, p.y)) return p;
+  for (let r = 0.15; r <= maxR; r += 0.15) {
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2, x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r;
+      if (isWalkable(W, x, y)) return { ...p, x, y };
+    }
+  }
+  return p;
+}
+// Steht (x, y) in einem Hindernis? animal: Tiere dürfen in ihren Pferch
+export function inObstacle(W, x, y, animal = false) {
+  const i = Math.floor(y) * W.N + Math.floor(x);
+  for (const grid of [W.ogrid, W.cgrid]) {
+    const l = grid && grid.get(i);
+    if (!l) continue;
+    for (const o of l) {
+      if (x <= o.x0 || x >= o.x1 || y <= o.y0 || y >= o.y1) continue;
+      if (o.b && !buildingUp(o.b)) continue;
+      if (animal && o.pen) continue;
+      return o;
+    }
+  }
+  return null;
 }
 // Häuser, deren Tür niemand erreicht (Tür zum Fluss, in einer Flussschleife ohne Brücke,
 // zwischen Mauer und Nachbarhäusern eingeklemmt), werden gar nicht erst gebaut.
@@ -276,6 +333,7 @@ export function worldSig(W) {
 export function buildingUp(b) { return !(b.cons < 0.3); }
 export function refreshBuildingBlocks(W) {
   const N = W.N;
+  if (!W.ogrid) buildObstacleGrid(W);
   W.bblock = new Uint8Array(N * N);
   for (const b of W.buildings) {
     if (!buildingUp(b)) continue;
@@ -283,7 +341,7 @@ export function refreshBuildingBlocks(W) {
   }
   W.blockStatic = new Uint8Array(N * N);
   for (let i = 0; i < N * N; i++) W.blockStatic[i] = W.wallStatic[i] | W.bblock[i];
-  setPlayerWalls(W, !!W.playerWalls, W.castleTiles);
+  setPlayerWalls(W, !!W.playerWalls);
 }
 
 // Felder der Palisade, mit oder ohne die Toröffnung im Süden
@@ -298,18 +356,28 @@ export function palisadeBand(s, withGate) {
   return list;
 }
 
-// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten. extra: Felder der Burggebäude
-// (Bergfried, Saal, Türme ...), die castle.js je nach Ausbau liefert; ohne Angabe bleiben die alten.
-export function setPlayerWalls(W, on, extra) {
+// Mauern von Ashcombe (ab der Holzburg) ein- oder ausschalten. rects: Grundflächen der Burggebäude
+// (Bergfried, Saal, Türme, Hütten, Pferche ...), die castle.js je nach Ausbau liefert; ohne Angabe
+// bleiben die alten. Sie sperren auch Straßenfelder (ein Wachturm kann am Weg stehen).
+export function setPlayerWalls(W, on, rects) {
+  const N = W.N;
   W.playerWalls = on;
-  if (extra) W.castleTiles = extra;
+  if (rects) {
+    W.castleObs = rects.map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
+    W.cgrid = new Map();
+    for (const o of W.castleObs) gridAdd(W.cgrid, N, o);
+  }
   W.block = new Uint8Array(W.blockStatic);
+  W.penTile = new Uint8Array(N * N);
   if (on) {
     const s = W.sites.find((x) => x.type === 'spieler');
     blockTiles(W, W.block, wallRing(W, s, 4));
   }
-  // Burggebäude sperren auch Straßenfelder (ein Wachturm kann am Weg stehen)
-  if (W.castleTiles) for (const [x, y] of W.castleTiles) { const i = y * W.N + x; if (W.tiles[i] !== T.WATER) W.block[i] = 1; }
+  for (const o of W.castleObs || []) for (const [x, y] of obstacleTiles(W, o, false)) {
+    const i = y * N + x;
+    if (o.pen && !W.block[i]) W.penTile[i] = 1;
+    W.block[i] = 1;
+  }
   // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
   if (W.afterBlock) W.afterBlock();
 }
@@ -319,15 +387,20 @@ export function isBlockedTile(W, x, y) {
   return !!W.block[i];
 }
 
-export function nearestWalkable(W, tx, ty, maxR = 8) {
+// Nächstes freies Feld; (fx, fy): eigentlicher Zielpunkt, damit z. B. bei einer Tür das Feld davor gewählt wird
+export function nearestWalkable(W, tx, ty, maxR = 8, fx = tx + 0.5, fy = ty + 0.5) {
   const N = W.N;
   for (let r = 0; r <= maxR; r++) {
+    let best = null, bd = Infinity;
     for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
       if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
       const x = tx + ox, y = ty + oy;
       if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1) continue;
-      if (W.tiles[y * N + x] !== T.WATER && !(W.block && W.block[y * N + x])) return { x, y };
+      if (W.tiles[y * N + x] === T.WATER || (W.block && W.block[y * N + x])) continue;
+      const d = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
+      if (d < bd) { bd = d; best = { x, y }; }
     }
+    if (best) return best;
   }
   return null;
 }
@@ -343,7 +416,7 @@ export function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
     sx = a.x; sy = a.y;
   }
   if (W.tiles[gy * N + gx] === T.WATER || W.block[gy * N + gx]) {
-    const a = nearestWalkable(W, gx, gy, 8);
+    const a = nearestWalkable(W, gx, gy, 8, tx, ty);
     if (!a) return null;
     gx = a.x; gy = a.y; tx = gx + 0.5; ty = gy + 0.5;
   }
@@ -1361,7 +1434,8 @@ function genBuildings(W, s, rng) {
       const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
       if (!freeSpot(W, x, y, 2.3) || Math.hypot(x - s.x, y - s.y) < 2) continue;
       add({ kind: 'house', x, y, wx: 1.0, wy: 0.9, h: 13, rh: 10, wall: 'timber', roof: 'thatch', chimney: true, lit: true, smithy: true });
-      W.buildings.push({ kind: 'prop', prop: 'amboss', x: x + 0.9, y: y + 0.3, v: rng(), site: s.id });
+      const ax = W.tiles[Math.floor(y + 0.3) * W.N + Math.floor(x + 0.9)] === T.WATER ? x - 0.9 : x + 0.9;
+      W.buildings.push({ kind: 'prop', prop: 'amboss', x: ax, y: y + 0.3, v: rng(), site: s.id });
       return;
     }
   };
