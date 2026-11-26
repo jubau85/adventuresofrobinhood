@@ -75,6 +75,14 @@ const ART_FILES = {
   pferd3d_ross_schritt_maske: 'assets/pferde/ross_schritt_maske.webp',
   pferd3d_ross_galopp: 'assets/pferde/ross_galopp.webp',
   pferd3d_ross_galopp_maske: 'assets/pferde/ross_galopp_maske.webp',
+  // Held (tools/sprites.py)
+  held_edel_gehen: 'assets/held/held_edel_gehen.webp',
+  held_edel_getroffen: 'assets/held/held_edel_getroffen.webp',
+  held_edel_laufen: 'assets/held/held_edel_laufen.webp',
+  held_edel_reiten: 'assets/held/held_edel_reiten.webp',
+  held_edel_schlag: 'assets/held/held_edel_schlag.webp',
+  held_edel_stehen: 'assets/held/held_edel_stehen.webp',
+  // Ende Held
 };
 
 export const ART = {};
