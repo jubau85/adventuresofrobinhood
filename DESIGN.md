@@ -38,6 +38,9 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 
 - Karte von England und Frankreich (512 × 512, etwa 1,6 km je Feld) mit echten Küsten, Flüssen, Bergland und Wäldern, 41 Orten an historischen Stellen, Straßen, Brücken und Häfen
 - Fähren über den Kanal und die Nordsee
+- 63 Orte, Wahrzeichen (Kathedralen, Tower, Louvre, Tuchhallen), Stonehenge und Hadrianswall, Einzelhöfe
+- Bewohner mit Rollen und Tagesablauf
+- Hospiz, Schafzucht, Felder, Verpflegung; Fehden zwischen Fraktionen; Kampfbonus in der Burg
 - Tag und Nacht mit Lichtern, vier Jahreszeiten (Schnee, Herbstlaub)
 - Spieler und Gefolge mit Reiten, Ausrüstung, Stufen, Befehlen
 - Sechs Gruppentypen mit eigener Route und eigenem Verhalten

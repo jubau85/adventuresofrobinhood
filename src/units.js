@@ -13,6 +13,7 @@ import { cargoFree, addCargo, siteById } from './economy.js';
 import { castleSite, bLevel, castleBonusAt } from './castle.js';
 import { hourOf, passHours } from './sim.js';
 import { hitAnimal } from './animals.js';
+import { spawnVillagers, updateVillager, updateSayings } from './life.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -193,7 +194,7 @@ function lineClear(ax, ay, bx, by) {
 }
 
 // Auf ein Ziel zugehen. Versperren Mauern oder Wasser den direkten Weg, wird ein Weg gesucht (z. B. durchs Tor).
-function chaseTo(u, tx, ty, dt, stop, mult = 1) {
+export function chaseTo(u, tx, ty, dt, stop, mult = 1) {
   if (Math.hypot(tx - u.x, ty - u.y) < 1.2 || lineClear(u.x, u.y, tx, ty)) { u.chase = null; return moveToward(u, tx, ty, dt, stop, mult); }
   const c = u.chase;
   if (!c || G.time - c.t > 1.5 || Math.hypot(c.tx - tx, c.ty - ty) > 2) {
@@ -464,10 +465,10 @@ export function updateUnits(dt) {
       }
     }
   }
-  const isNight = hourOf() >= 21 || hourOf() < 5;
   for (const v of G.peasants) {
-    if (Math.abs(v.x - p.x) + Math.abs(v.y - p.y) < 60) updatePeasant(v, dt, isNight);
+    if (Math.abs(v.x - p.x) + Math.abs(v.y - p.y) < 60) updateVillager(v, dt);
   }
+  updateSayings(dt);
   separate();
   updateTowers(dt);
   // Regeneration außerhalb des Kampfes: mit Feldscher unterwegs schneller, im Hospiz der Burg rasch
@@ -571,22 +572,6 @@ function updateGroupMember(m, g, k, dt) {
   if (d > 0.3) chaseTo(m, tx, ty, dt, 0.2, d > 2 ? 1.5 : 1.1);
 }
 
-function updatePeasant(v, dt, night) {
-  v.hidden = night;
-  if (night) return;
-  if (v.wait > 0) { v.wait -= dt; return; }
-  if (!v.goal) {
-    const h = v.home;
-    const r = h.type === 'stadt' ? 5.5 : h.type === 'spieler' ? 4 : 4.2;
-    v.goal = { x: h.x + rand(-r, r), y: h.y + rand(-r, r) };
-    if (!isWalkable(G.world, v.goal.x, v.goal.y)) { v.goal = null; return; }
-    v.goalT = 0;
-  }
-  v.goalT = (v.goalT || 0) + dt;
-  const arrived = moveToward(v, v.goal.x, v.goal.y, dt, 0.2, 0.55);
-  // Angekommen, an einer Mauer hängen geblieben oder zu lange unterwegs: neues Ziel
-  if (arrived || !v.moving || v.goalT > 14) { v.goal = null; v.wait = rand(2, 7); }
-}
 
 function separate() {
   const list = G.units;
@@ -822,21 +807,8 @@ export function maintainGroups(initial = false) {
 }
 
 // ---------------------------------------------------------------- Dorfbewohner
-export function spawnPeasants() {
-  G.peasants = [];
-  const lvl = G.s.castle.level;
-  for (const site of G.world.sites) {
-    const n = { stadt: 7, markt: 5, dorf: 4, halle: 3, abtei: 3, burg: 3, lager: 3, spieler: lvl * 2 + 1 }[site.type] || 0;
-    for (let k = 0; k < n; k++) {
-      const look = site.type === 'lager' ? 'wald' : site.type === 'abtei' && k < 2 ? 'moench' : 'bauer';
-      const v = makeUnit({ kind: 'peasant', cls: 'zivil', name: look === 'moench' ? 'Mönch' : 'Bauer', look, tunic: look === 'bauer' ? pick(PEASANT_TUNICS) : null });
-      placeNear(v, site.x, site.y, 3);
-      v.home = site;
-      v.wait = rand(0, 4);
-      G.peasants.push(v);
-    }
-  }
-}
+// Bewohner der Orte und Höfe: siehe life.js
+export function spawnPeasants() { spawnVillagers(); }
 
 // ---------------------------------------------------------------- Seefahrt
 // Fähren verbinden England mit Frankreich und Flandern. Die Überfahrt kostet Gold je Kopf und Zeit.

@@ -12,7 +12,7 @@ import {
   setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers,
 } from './units.js';
 import { initTowns } from './economy.js';
-import { refreshTownQuests, isHostileFaction } from './politics.js';
+import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
 import { castleSite, castleBonusAt, dailyBalance } from './castle.js';
 import { updateTime, passHours } from './sim.js';
 import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
@@ -168,6 +168,24 @@ G.animalTitle = animalTitle;
 
 // ---------------------------------------------------------------- Interaktion
 function interactRadius(s) { return s.type === 'spieler' ? 6.5 : s.type === 'burg' || s.type === 'stadt' ? 5 : 4; }
+
+// Sehenswürdigkeiten: beim ersten Besuch ein Satz dazu und etwas Ruhm
+let poiT = 0;
+function checkPois(dt) {
+  poiT -= dt;
+  if (poiT > 0) return;
+  poiT = 1;
+  const p = G.s.player, W = G.world;
+  G.s.visited = G.s.visited || {};
+  for (const poi of W.pois || []) {
+    if (G.s.visited[poi.id]) continue;
+    const near = poi.kind === 'wall' ? W.wallRuins.some((r) => Math.hypot(r.x - p.x, r.y - p.y) < 2.2) : Math.hypot(poi.x - p.x, poi.y - p.y) < 3.5;
+    if (!near) continue;
+    G.s.visited[poi.id] = true;
+    log(`${poi.name}: ${poi.desc}`, 'gold');
+    addRenown(2);
+  }
+}
 
 function nearestSite() {
   const p = G.s.player;
@@ -479,6 +497,7 @@ function frame(now) {
       for (let k = 0; k < steps; k++) step(dt);
       updateFx(dt);
       checkNearSite();
+      checkPois(dt);
     }
     updateCamera(dt);
     hudT -= dt;

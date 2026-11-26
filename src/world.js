@@ -1,7 +1,7 @@
 // Weltgenerator: Küsten, Flüsse, Bergland, Siedlungen, Straßen, Häfen, Felder, Bäume, Gebäude.
 // Alles ist deterministisch aus dem Seed, daher muss nur der Seed gespeichert werden.
 
-import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE } from './data.js';
+import { MAP, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE, POIS } from './data.js';
 import { COAST_GB, COAST_IRELAND, COAST_CONTINENT, ISLANDS, RIVERS, UPLANDS, FORESTS } from './geo.js';
 import { mulberry32, makeNoise, fbm, rpick, hash2 } from './rng.js';
 
@@ -272,10 +272,14 @@ export function generateWorld(seed) {
   buildRoads(W);
   placeDocks(W);
   for (const s of W.sites) addFields(W, s, rng);
+  addFarms(W, rng);
   for (const s of W.sites) genBuildings(W, s, rng);
+  for (const f of W.farms) genFarm(W, f, rng);
+  placePois(W, rng);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
+  addWallRuinObjs(W);
   buildStaticWalls(W);
   return W;
 }
@@ -792,8 +796,58 @@ function freeSpot(W, x, y, minGap) {
   if (x < 2 || y < 2 || x > N - 2 || y > N - 2) return false;
   const t = W.tiles[i];
   if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FIELD) return false;
-  for (const b of W.buildings) if (Math.abs(b.x - x) < minGap && Math.abs(b.y - y) < minGap) return false;
+  for (const b of W.buildings) {
+    const gx = Math.max(minGap, (b.wx || 0) / 2 + 0.9), gy = Math.max(minGap, (b.wy || 0) / 2 + 0.9);
+    if (Math.abs(b.x - x) < gx && Math.abs(b.y - y) < gy) return false;
+  }
   return true;
+}
+
+// Ist eine Grundfläche frei von Wasser, Straßen und anderen Gebäuden?
+function footprintFree(W, x, y, wx, wy, margin = 0.4) {
+  const N = W.N;
+  for (let ty = Math.floor(y - wy / 2 - margin); ty <= Math.floor(y + wy / 2 + margin); ty++) {
+    for (let tx = Math.floor(x - wx / 2 - margin); tx <= Math.floor(x + wx / 2 + margin); tx++) {
+      if (tx < 2 || ty < 2 || tx >= N - 2 || ty >= N - 2) return false;
+      const t = W.tiles[ty * N + tx];
+      if (t === T.WATER || t === T.ROAD || t === T.BRIDGE) return false;
+    }
+  }
+  for (const b of W.buildings) {
+    if (Math.abs(b.x - x) < ((b.wx || 0.6) + wx) / 2 + margin && Math.abs(b.y - y) < ((b.wy || 0.6) + wy) / 2 + margin) return false;
+  }
+  return true;
+}
+
+const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [2.4, 2.2], motte: [3.2, 3.2], rundturm: [2.4, 2.4], tuchhalle: [3.4, 1.6], tor: [5.5, 5.5] };
+
+// Wahrzeichen zuerst setzen, die Häuser ordnen sich darum herum
+function placeLandmark(W, s, lm) {
+  const [wx, wy] = lm.kind === 'kathedrale' ? [(lm.len || 4) * 1.3, 3.4] : LANDMARK_SIZE[lm.kind];
+  let pref;
+  if (lm.near === 'dock' && s.dock) {
+    const dx = s.dock.x - s.x, dy = s.dock.y - s.y, d = Math.hypot(dx, dy) || 1;
+    pref = { x: s.x + (dx / d) * 4.5 + (dy / d) * 3.5, y: s.y + (dy / d) * 4.5 - (dx / d) * 3.5 };
+  } else {
+    const abbey = s.type === 'abtei';
+    pref = {
+      kathedrale: abbey ? { x: s.x - 0.3, y: s.y - 2.8 } : { x: s.x - 3.8, y: s.y - 4.0 },
+      tower: { x: s.x + 4.2, y: s.y + 1.6 }, motte: { x: s.x + 5, y: s.y - 4 }, rundturm: { x: s.x + 4.4, y: s.y + 2.4 },
+      tuchhalle: { x: s.x - 2.8, y: s.y - 3.2 }, tor: { x: s.x - 10, y: s.y + 7 },
+    }[lm.kind];
+  }
+  let spot = null;
+  for (let r = 0; r <= 7 && !spot; r += 0.5) {
+    for (let k = 0; k < Math.max(1, Math.round(r * 8)) && !spot; k++) {
+      const a = (k / Math.max(1, Math.round(r * 8))) * Math.PI * 2;
+      const x = pref.x + Math.cos(a) * r, y = pref.y + Math.sin(a) * r;
+      if (footprintFree(W, x, y, wx, wy, lm.kind === 'tor' ? 0 : 0.4)) spot = { x, y };
+    }
+  }
+  if (!spot) return;
+  const b = { ...lm, kind: 'landmark', lm: lm.kind, x: spot.x, y: spot.y, wx, wy, site: s.id, label: lm.name };
+  W.buildings.push(b);
+  if (lm.kind !== 'tor') markCost(W, b);
 }
 
 function genBuildings(W, s, rng) {
@@ -829,13 +883,31 @@ function genBuildings(W, s, rng) {
       placed++;
     }
   };
+  const lms = s.landmarks || [];
+  const hasCathedral = lms.some((l) => l.kind === 'kathedrale');
+  for (const lm of lms) placeLandmark(W, s, lm);
+  // Werkstatt mit Amboss (Schmied) für die Tagesarbeit der Bewohner
+  const smithy = () => {
+    if (!['stadt', 'markt', 'dorf', 'halle', 'burg'].includes(s.type)) return;
+    for (let k = 0; k < 40; k++) {
+      const a = rng() * Math.PI * 2, r = 3 + rng() * 3;
+      const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
+      if (!freeSpot(W, x, y, 1.7) || Math.hypot(x - s.x, y - s.y) < 2) continue;
+      add({ kind: 'house', x, y, wx: 1.0, wy: 0.9, h: 13, rh: 10, wall: 'timber', roof: 'thatch', chimney: true, lit: true, smithy: true });
+      W.buildings.push({ kind: 'prop', prop: 'amboss', x: x + 0.9, y: y + 0.3, v: rng(), site: s.id });
+      return;
+    }
+  };
   switch (s.type) {
     case 'stadt':
-      add({ kind: 'church', x: s.x - 2.5, y: s.y - 2.5, wx: 2.6, wy: 1.2, h: 30, big: true });
-      for (let k = 0; k < 3; k++) add({ kind: 'stall', x: s.x + Math.cos(k * 2.1) * 1.6, y: s.y + Math.sin(k * 2.1) * 1.6, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c']), noCost: true, wx: 0.8, wy: 0.6 });
-      ring(15, 2.6, 6.5, (x, y) => house(x, y, { roof: rng() < 0.55 ? 'tile' : 'thatch', wall: rpick(rng, ['timber', 'plaster', 'stone']), h: 16 + rng() * 10 }));
+      if (!hasCathedral) add({ kind: 'church', x: s.x - 2.5, y: s.y - 2.5, wx: 2.6, wy: 1.2, h: 30, big: true });
+      for (let k = 0; k < 4; k++) add({ kind: 'stall', x: s.x + Math.cos(k * 1.57 + 0.4) * 1.7, y: s.y + Math.sin(k * 1.57 + 0.4) * 1.7, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#5b8a3c']), noCost: true, wx: 0.8, wy: 0.6 });
+      add({ kind: 'well', x: s.x + 0.2, y: s.y - 0.3, wx: 0.6, wy: 0.6, noCost: true });
+      smithy();
+      ring(s.houses || 16, 2.6, Math.max(6.5, s.clear - 0.6), (x, y) => house(x, y, { roof: rng() < 0.35 ? 'tile' : 'thatch', wall: rpick(rng, ['timber', 'plaster', 'stone', 'timber']), h: 15 + rng() * 9 }));
       break;
     case 'markt':
+      smithy();
       ring(7, 2.5, 5.5, (x, y) => house(x, y, { roof: rng() < 0.4 ? 'tile' : 'thatch' }));
       for (let k = 0; k < 5; k++) add({ kind: 'tent', x: s.x + 3 + k * 1.15, y: s.y - 3.6, wx: 0.9, wy: 0.9, color: rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#e8e0cc', '#5b8a3c']), noCost: true });
       add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, noCost: true });
@@ -844,6 +916,7 @@ function genBuildings(W, s, rng) {
       break;
     case 'dorf':
       ring(5 + Math.floor(rng() * 3), 1.8, 4.8, (x, y) => house(x, y));
+      smithy();
       add({ kind: 'well', x: s.x + 0.9, y: s.y + 0.7, wx: 0.6, wy: 0.6, noCost: true });
       break;
     case 'halle':
@@ -852,11 +925,12 @@ function genBuildings(W, s, rng) {
       s.palisade = 4.5;
       break;
     case 'burg':
-      s.castleLevel = s.id === 'torquilstone' ? 3 : 2;
-      ring(5, 6.2, 7.8, (x, y) => house(x, y));
+      s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
+      ring(6, 6.2, 7.8, (x, y) => house(x, y));
+      smithy();
       break;
     case 'abtei':
-      add({ kind: 'church', x: s.x - 0.5, y: s.y - 1.8, wx: 3.2, wy: 1.3, h: 34, big: true, abbey: true });
+      if (!hasCathedral) add({ kind: 'church', x: s.x - 0.5, y: s.y - 1.8, wx: 3.2, wy: 1.3, h: 34, big: true, abbey: true });
       add({ kind: 'house', x: s.x + 2.2, y: s.y - 1.2, wx: 1.0, wy: 2.2, h: 18, rh: 12, wall: 'stone', roof: 'tile', lit: true });
       add({ kind: 'house', x: s.x - 2.6, y: s.y + 1.4, wx: 2.0, wy: 1.0, h: 16, rh: 10, wall: 'stone', roof: 'tile', lit: true });
       ring(3, 3.5, 5.2, (x, y) => house(x, y));
@@ -874,11 +948,116 @@ function genBuildings(W, s, rng) {
   }
 }
 
+// Einzelhöfe abseits der Orte, nahe an Straßen: Das Land wirkt bewohnt
+function addFarms(W, rng) {
+  const N = W.N;
+  W.farms = [];
+  const settled = new Set(W.sites.map((s) => s.land));
+  const roadNear = (x, y, r) => {
+    for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++) {
+      const tx = x + ox, ty = y + oy;
+      if (tx >= 0 && ty >= 0 && tx < N && ty < N && W.tiles[ty * N + tx] === T.ROAD) return true;
+    }
+    return false;
+  };
+  for (let tries = 0; tries < 24000 && W.farms.length < 150; tries++) {
+    const x = 10 + Math.floor(rng() * (N - 20)), y = 10 + Math.floor(rng() * (N - 20));
+    const i = y * N + x;
+    if (W.tiles[i] !== T.GRASS || !settled.has(W.landId[i])) continue;
+    if (W.sites.some((s) => Math.hypot(s.tx - x, s.ty - y) < s.clear + 7)) continue;
+    if (W.farms.some((f) => Math.hypot(f.tx - x, f.ty - y) < 10)) continue;
+    if (countAround(W, x, y, 3, T.WATER) || countAround(W, x, y, 1, T.ROAD) || countAround(W, x, y, 2, T.HILLS) > 3) continue;
+    if (!roadNear(x, y, 6)) continue;
+    W.farms.push({ id: `hof${W.farms.length}`, type: 'hof', name: 'Gehöft', tx: x, ty: y, x: x + 0.5, y: y + 0.5, clear: 3, land: W.landId[i] });
+  }
+  // Ackerstreifen neben jedem Hof
+  for (const f of W.farms) {
+    const n = 1 + Math.floor(rng() * 2);
+    for (let k = 0; k < n; k++) {
+      const a = rng() * Math.PI * 2, r = 2.6 + rng() * 1.5;
+      const cx = Math.floor(f.x + Math.cos(a) * r), cy = Math.floor(f.y + Math.sin(a) * r);
+      const w = 2 + Math.floor(rng() * 2), h = 2 + Math.floor(rng() * 2);
+      for (let yy = cy; yy < cy + h; yy++) for (let xx = cx; xx < cx + w; xx++) {
+        if (xx < 1 || yy < 1 || xx >= N - 1 || yy >= N - 1) continue;
+        if (W.tiles[yy * N + xx] === T.GRASS) W.tiles[yy * N + xx] = T.FIELD;
+      }
+    }
+  }
+}
+
+function genFarm(W, f, rng) {
+  const add = (b) => { b.site = f.id; W.buildings.push(b); if (b.wx && !b.noCost) markCost(W, b); return b; };
+  add({ kind: 'house', x: f.x, y: f.y, wx: 1.1 + rng() * 0.4, wy: 0.9 + rng() * 0.3, h: 12 + rng() * 4, rh: 12 + rng() * 4, wall: rpick(rng, ['plaster', 'timber', 'timber', 'wood']), roof: 'thatch', chimney: false, lit: rng() < 0.8 });
+  if (rng() < 0.55 && freeSpot(W, f.x + 1.8, f.y - 0.6, 1.2)) add({ kind: 'house', x: f.x + 1.8, y: f.y - 0.6, wx: 1.3, wy: 0.9, h: 11, rh: 12, wall: 'wood', roof: 'thatch', chimney: false, lit: false });
+  const kinds = ['heu', 'holzstapel', 'beet', 'karren', 'heu', 'beet'];
+  const n = 1 + Math.floor(rng() * 3);
+  for (let k = 0; k < n; k++) {
+    const x = f.x + (rng() - 0.3) * 2.6, y = f.y + 0.9 + rng() * 1.2;
+    const t = W.tiles[Math.floor(y) * W.N + Math.floor(x)];
+    if (t === T.WATER || t === T.ROAD || t === T.BRIDGE) continue;
+    W.buildings.push({ kind: 'prop', prop: rpick(rng, kinds), x, y, v: rng(), site: f.id });
+  }
+}
+
+// Sehenswürdigkeiten: Stonehenge als Steinkreis, der Hadrianswall als Kette von Mauerresten
+function placePois(W, rng) {
+  const N = W.N;
+  W.pois = [];
+  W.wallRuins = [];
+  for (const p of POIS) {
+    if (p.kind === 'wall') {
+      const P = p.pts.map(([lon, lat]) => geoToTile(lon, lat));
+      for (let k = 0; k + 1 < P.length; k++) {
+        const a = P[k], b = P[k + 1], len = Math.hypot(b.x - a.x, b.y - a.y), dir = Math.atan2(b.y - a.y, b.x - a.x);
+        for (let d = 0; d < len; d += 0.9) {
+          const x = a.x + ((b.x - a.x) * d) / len, y = a.y + ((b.y - a.y) * d) / len;
+          const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
+          if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || t === T.FIELD) continue;
+          if (rng() < 0.22) continue;
+          W.wallRuins.push({ x, y, dir, h: 6 + rng() * 10, tower: W.wallRuins.length % 9 === 4 });
+        }
+      }
+      const mid = geoToTile(p.lon, p.lat);
+      W.pois.push({ ...p, x: mid.x, y: mid.y });
+      continue;
+    }
+    const g = geoToTile(p.lon, p.lat);
+    const near = nearestWalkableTile(W, Math.floor(g.x), Math.floor(g.y));
+    let spot = { x: near.x + 0.5, y: near.y + 0.5 };
+    for (let r = 0; r < 6; r++) { if (footprintFree(W, spot.x, spot.y, 3, 3, 0)) break; spot = { x: near.x + 0.5 + r, y: near.y + 0.5 - r }; }
+    W.buildings.push({ kind: 'stonehenge', x: spot.x, y: spot.y, wx: 3, wy: 3, noCost: true, label: p.name, site: null });
+    W.pois.push({ ...p, x: spot.x, y: spot.y });
+  }
+}
+
+function addWallRuinObjs(W) {
+  for (const r of W.wallRuins) {
+    const ci = Math.floor(r.y / CHUNK) * W.CN + Math.floor(r.x / CHUNK);
+    W.chunkObjs[ci].push({ kind: 'mauer', x: r.x, y: r.y, dir: r.dir, h: r.h, tower: r.tower, v: 0, s: 1 });
+  }
+}
+
 function placeTrees(W, rng) {
   const N = W.N, CN = W.CN;
   for (let k = 0; k < CN * CN; k++) W.chunkObjs.push([]);
-  const nearSite = (x, y) => W.sites.some((s) => Math.hypot(s.x - x, s.y - y) < (s.type === 'lager' ? 2.8 : s.clear + 1));
-  const nearBuilding = (x, y) => W.buildings.some((b) => Math.abs(b.x - x) < 1.1 && Math.abs(b.y - y) < 1.1);
+  // Sperrmaske statt Schleifen über alle Orte und Gebäude
+  const keep = new Uint8Array(N * N);
+  const mark = (cx, cy, r) => {
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      if (x >= 0 && y >= 0 && x < N && y < N && Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) keep[y * N + x] = 2;
+    }
+  };
+  for (const s of W.sites) mark(s.x, s.y, s.type === 'lager' ? 2.8 : s.clear + 1);
+  for (const f of W.farms) mark(f.x, f.y, 3.6);
+  for (const b of W.buildings) {
+    const rx = (b.wx || 0.6) / 2 + 0.7, ry = (b.wy || 0.6) / 2 + 0.7;
+    for (let y = Math.floor(b.y - ry); y <= Math.floor(b.y + ry); y++) for (let x = Math.floor(b.x - rx); x <= Math.floor(b.x + rx); x++) {
+      if (x >= 0 && y >= 0 && x < N && y < N && !keep[y * N + x]) keep[y * N + x] = 1;
+    }
+  }
+  for (const r of W.wallRuins) mark(r.x, r.y, 0.9);
+  const nearSite = (x, y) => keep[Math.floor(y) * N + Math.floor(x)] === 2;
+  const nearBuilding = (x, y) => keep[Math.floor(y) * N + Math.floor(x)] >= 1;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const t = W.tiles[y * N + x];
     let n = 0, kind = 'laub';

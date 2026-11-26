@@ -28,7 +28,11 @@ node tools/build.mjs
 - **Musik:** Wird live im Browser erzeugt, mit Laute, Flöte, Hörnern, Bordun und Trommeln. Es gibt ein episches Titelthema, Reisemusik im Dreiertakt, ruhigere Nachtmusik und Trommeln im Kampf. Taste L schaltet sie an und aus.
 
 - **Karte von England und Frankreich:** 512 × 512 Felder, ein Feld sind etwa 1,6 km. Die Küsten von England, Wales, Nordfrankreich, Flandern und der Ostrand Irlands, dazu Wight, Man und die Kanalinseln. Echte Flüsse (Themse, Severn, Trent, Ouse, Seine, Marne, Oise, Somme, Schelde und andere), Bergland an den richtigen Stellen (Pennines, Lake District, Snowdonia, Dartmoor, Ardennen) und die alten Wälder (Sherwood, Barnsdale, New Forest, Weald, Fontainebleau).
-- **41 Orte an ihren historischen Stellen:** London, York, Nottingham, Lincoln, Canterbury, Dover, Winchester, Rouen, Caen, Paris, Chartres, Brügge, Troyes und viele mehr, dazu die Schauplätze aus *Ivanhoe* in Yorkshire. Straßen und Brücken verbinden die Orte auf jeder Landmasse. Die Details (Verlauf der Küste, Wälder, Straßen) unterscheiden sich mit jedem neuen Spiel ein wenig.
+- **63 Orte an ihren historischen Stellen**, über ganz England, Wales, die Normandie, Frankreich und Flandern verteilt: von Carlisle, Scarborough und Keswick im Norden über Pembroke, Cardiff und Bodmin im Westen bis Colchester, Battle, Rennes, Ypern und Provins. Dazu die Schauplätze aus *Ivanhoe* in Yorkshire. Straßen und Brücken verbinden die Orte auf jeder Landmasse.
+- **Wahrzeichen:** der Tower von London und St Paul's, die Kathedralen von Canterbury, York, Lincoln, Durham, Ely, Winchester, Hereford, Reims, Laon, Rouen und Chartres (frisch abgebrannt), Notre-Dame und der neue Louvre im Bau, Mont-Saint-Michel auf seinem Felsen, der Gravensteen in Gent, die Tuchhallen von Brügge, Ypern, Troyes und Provins, der Burghügel von York und Glastonbury Tor.
+- **Sehenswürdigkeiten:** Stonehenge und der Hadrianswall. Wer sie zum ersten Mal besucht, gewinnt Ruhm.
+- **Einzelhöfe:** Über das Land verstreut liegen Gehöfte mit Äckern, Vieh und Bauern.
+- **Lebendige Orte:** Bauern hacken und ernten je nach Jahreszeit, Mägde holen Wasser am Brunnen und kaufen auf dem Markt ein, Schmiede hämmern am Amboss, Händler stehen hinter ihren Ständen und rufen ihre Waren aus, Mönche beten und jäten, Kinder spielen Fangen, Wachen stehen am Tor. Mittags trifft man sich zum Schwatz, abends geht es nach Hause. Wer in der Nähe ist, hört Sprüche, Grüße und Gerüchte.
 - **Schiffe übers Meer:** Fähren von Dover nach Calais, von Portsmouth nach Barfleur und ein Wollschiff von London nach Brügge. Die Überfahrt kostet Fährlohn je Kopf und Pferd und dauert einige Stunden. Wer auf der Karte ein Ziel jenseits des Meeres anklickt, reitet automatisch zum passenden Hafen.
 - **Kompass und eingenordete Karte:** In der Schrägansicht liegt Norden rechts oben, der Kompass in der Ecke zeigt es an. Die Minikarte zeigt die Umgebung, die große Karte (M) England und Frankreich mit Fährlinien und Landschaftsnamen. Sie lässt sich mit Mausrad oder + und − zoomen und durch Ziehen verschieben.
 - **Iso-Grafik mit Relief:** Hügel und Flusstäler mit Licht und Schatten. Die Karte ist ein Diorama mit Erdschichten am Rand. Gebäude haben Fachwerk, Schindeln, Fensterläden, Blumenkästen und Schlagschatten. Dazu kommen Fässer, Heu und Karren.
@@ -79,7 +83,8 @@ node tools/build.mjs
 | `src/data.js` | Alle Spieldaten und Balancing-Werte: Fraktionen, Waren, Gegenstände, Klassen, Gruppen, Gebäude, Orte |
 | `src/geo.js` | Küsten, Flüsse, Bergland und Wälder als Längen- und Breitengrade |
 | `src/world.js` | Weltgenerator (Küsten rastern, Flüsse, Orte, Straßen je Landmasse, Häfen), A*-Wegfindung |
-| `src/units.js` | Einheiten, Werte, Kampf, Gefolge, KI-Gruppen, Dorfbewohner, Fähren |
+| `src/units.js` | Einheiten, Werte, Kampf, Gefolge, KI-Gruppen, Fehden, Fähren |
+| `src/life.js` | Alltag der Bewohner: Rollen, Tagesablauf, Arbeitsplätze, Sprüche |
 | `src/economy.js` | Märkte, Preise, Ladung, Ausrüstungshandel |
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |

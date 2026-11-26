@@ -62,9 +62,9 @@ export function castlePasture(s) {
 function farmHerds(s) {
   const pa = s.type === 'spieler' ? castlePasture(s) : null;
   return {
-    schaf: pa ? { n: pa.n, home: { x: pa.x, y: pa.y }, r: pa.r } : { n: { dorf: 5, halle: 4, abtei: 6, spieler: 3, markt: 3, burg: 2 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
-    kuh: { n: { dorf: 2, halle: 3, spieler: 2 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
-    huhn: { n: { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2 }[s.type] || 0, home: { x: s.x + 0.5, y: s.y + 0.8 }, r: 2.8 },
+    schaf: pa ? { n: pa.n, home: { x: pa.x, y: pa.y }, r: pa.r } : { n: { dorf: 5, halle: 4, abtei: 6, spieler: 3, markt: 3, burg: 2, hof: 3 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
+    kuh: { n: { dorf: 2, halle: 3, spieler: 2, hof: 1 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
+    huhn: { n: { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2, hof: 3 }[s.type] || 0, home: { x: s.x + 0.5, y: s.y + 0.8 }, r: 2.8 },
   };
 }
 
@@ -85,7 +85,7 @@ function spawnWild(kind, count, far) {
 
 export function spawnAnimals() {
   G.animals = [];
-  for (const s of G.world.sites) {
+  for (const s of G.world.sites.concat(G.world.farms || [])) {
     for (const [kind, h] of Object.entries(farmHerds(s))) {
       if (!h.n) continue;
       const home = h.home || spotNear(s.x, s.y, h.rMin, h.rMax, kind);
@@ -110,7 +110,7 @@ export function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
   if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 6, 25);
   if (count('ente') < DUCK_TARGET) spawnWild('ente', 3, 20);
-  for (const s of G.world.sites) {
+  for (const s of G.world.sites.concat(G.world.farms || [])) {
     for (const [kind, h] of Object.entries(farmHerds(s))) {
       if (!h.n) continue;
       const have = G.animals.filter((a) => a.kind === kind && a.site === s.id);
