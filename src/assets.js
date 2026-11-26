@@ -477,6 +477,15 @@ const ART_FILES = {
   schneefleck_7: 'assets/natur/schneefleck_7.webp',
   schneefleck_8: 'assets/natur/schneefleck_8.webp',
   // Ende Paket 5
+  // Tiere (Paket 8)
+  tier_schaf: 'assets/tiere/schaf.webp',
+  tier_kuh: 'assets/tiere/kuh.webp',
+  tier_huhn: 'assets/tiere/huhn.webp',
+  tier_hirsch: 'assets/tiere/hirsch.webp',
+  tier_reh: 'assets/tiere/reh.webp',
+  tier_ente: 'assets/tiere/ente.webp',
+  tier_pferd: 'assets/tiere/pferd.webp',
+  // Ende Tiere
 };
 
 export const ART = {};

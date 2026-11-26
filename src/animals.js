@@ -9,11 +9,14 @@ import { rand, randInt } from './rng.js';
 import { addCargo, cargoFree } from './economy.js';
 import { changeRep, isAlly } from './politics.js';
 
-const ANIMAL_SPEED = { schaf: 0.25, kuh: 0.2, huhn: 0.4, hirsch: 0.55, ente: 0.22 };
+const ANIMAL_SPEED = { schaf: 0.25, kuh: 0.2, huhn: 0.4, hirsch: 0.55, reh: 0.6, ente: 0.22 };
+// Wild im Wald: Hirsch und Reh fliehen, wenn du zu nahe kommst
+const WILD = { hirsch: 1, reh: 1 };
 
 // Jagdbeute: Fleisch und Felle, Hof-Tiere gehören einem Ort
 export const ANIMAL_INFO = {
   hirsch: { name: 'Hirsch', hp: 12, fleisch: [6, 9], felle: [1, 2] },
+  reh: { name: 'Reh', hp: 7, fleisch: [3, 5], felle: [1, 1] },
   ente: { name: 'Ente', hp: 4, fleisch: [1, 2] },
   schaf: { name: 'Schaf', hp: 10, fleisch: [3, 5], felle: [1, 1], farm: true },
   kuh: { name: 'Kuh', hp: 20, fleisch: [8, 12], felle: [1, 2], farm: true },
@@ -70,14 +73,14 @@ function farmHerds(s) {
 
 function spawnWild(kind, count, far) {
   const W = G.world, N = W.N;
-  const want = kind === 'hirsch' ? T.FOREST : T.WATER;
+  const want = WILD[kind] ? T.FOREST : T.WATER;
   for (let h = 0; h < count; h++) {
     for (let k = 0; k < 300; k++) {
       const x = 3 + Math.random() * (N - 6), y = 3 + Math.random() * (N - 6);
       if (tileAt(W, x, y) !== want) continue;
       if (kind === 'ente' && W.sea[Math.floor(y) * N + Math.floor(x)]) continue;   // Enten auf Flüssen und Seen, nicht auf hoher See
       if (far && Math.hypot(x - G.s.player.x, y - G.s.player.y) < far) continue;
-      addHerd(kind, { x, y }, kind === 'hirsch' ? 2 + Math.floor(Math.random() * 2) : 2, kind === 'hirsch' ? 6 : 2.5);
+      addHerd(kind, { x, y }, WILD[kind] ? 2 + Math.floor(Math.random() * 2) : 2, WILD[kind] ? 6 : 2.5);
       break;
     }
   }
@@ -93,6 +96,7 @@ export function spawnAnimals() {
     }
   }
   spawnWild('hirsch', 60);
+  spawnWild('reh', 45);
   spawnWild('ente', 40);
 }
 
@@ -109,6 +113,7 @@ export function refreshCastleHerd() {
 export function replenishAnimals() {
   const count = (kind) => G.animals.filter((a) => a.kind === kind).length;
   if (count('hirsch') < DEER_TARGET) spawnWild('hirsch', 6, 25);
+  if (count('reh') < DEER_TARGET * 0.7) spawnWild('reh', 5, 25);
   if (count('ente') < DUCK_TARGET) spawnWild('ente', 3, 20);
   for (const s of G.world.sites.concat(G.world.farms || [])) {
     for (const [kind, h] of Object.entries(farmHerds(s))) {
@@ -135,7 +140,7 @@ export function hitAnimal(a, dmg, shooter) {
   a.hp -= dmg;
   a.flash = 0.2;
   G.fx.push({ kind: 'text', x: a.x, y: a.y, text: String(dmg), color: '#fff4d8', t: 0, dur: 0.8 });
-  if (a.kind === 'hirsch' || a.kind === 'ente' || a.kind === 'huhn') {
+  if (WILD[a.kind] || a.kind === 'ente' || a.kind === 'huhn') {
     const d = Math.hypot(a.x - shooter.x, a.y - shooter.y) || 0.01;
     a.goal = { x: a.x + ((a.x - shooter.x) / d) * 8, y: a.y + ((a.y - shooter.y) / d) * 8 };
     a.flee = 3; a.wait = 0;
@@ -148,7 +153,7 @@ export function takeAnimal(a) {
   if (a.dead) return;
   a.dead = true;
   G.animals = G.animals.filter((x) => x !== a);
-  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, t: 0, dur: 3 });
+  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, away: a.away, t: 0, dur: 3 });
   if (G.s.player.huntTarget === a) G.s.player.huntTarget = null;
 }
 
@@ -156,7 +161,7 @@ function killAnimal(a) {
   const info = ANIMAL_INFO[a.kind];
   a.dead = true;
   G.animals = G.animals.filter((x) => x !== a);
-  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, t: 0, dur: 30 });
+  G.fx.push({ kind: 'kadaver', x: a.x, y: a.y, animal: a.kind, facing: a.facing, away: a.away, t: 0, dur: 30 });
   const loot = [];
   let lost = 0;
   for (const good of ['fleisch', 'felle']) {
@@ -176,7 +181,7 @@ function killAnimal(a) {
       log(`Viehdiebstahl! ${s.name} wird das nicht vergessen.`, 'bad');
       changeRep(s.faction, -6);
     }
-  } else if (a.kind === 'hirsch' && !isAlly('normannen') && Math.random() < 0.35) {
+  } else if (WILD[a.kind] && !isAlly('normannen') && Math.random() < 0.35) {
     log('Ein Förster hat dich beim Wildern gesehen. Das Rotwild gehört nach dem Forstrecht dem König.', 'bad');
     changeRep('normannen', -2);
     if (Math.random() < 0.5) changeRep('waldleute', 1);
@@ -191,9 +196,9 @@ export function updateAnimals(dt) {
     a.moving = false;
     if (a.flash > 0) a.flash -= dt;
     if (Math.abs(a.x - p.x) + Math.abs(a.y - p.y) > 55) continue;
-    if (a.kind === 'hirsch') {
+    if (WILD[a.kind]) {
       const d = Math.hypot(a.x - p.x, a.y - p.y) || 0.01;
-      if (d < (p.mounted ? 7 : 4.5) && a.flee <= 0) {
+      if (d < (p.mounted ? 7 : 4.5) * (a.kind === 'reh' ? 1.25 : 1) && a.flee <= 0) {
         a.goal = { x: a.x + ((a.x - p.x) / d) * 7, y: a.y + ((a.y - p.y) / d) * 7 };
         a.flee = 2.5; a.wait = 0;
       }
@@ -212,6 +217,8 @@ export function updateAnimals(dt) {
       a.x = nx; a.y = ny; a.moving = true; a.anim += dt;
       const sx = dx - dy;
       if (Math.abs(sx) > 0.02) a.facing = sx > 0 ? 1 : -1;
+      // vom Betrachter weg (nach oben im Bild) oder auf ihn zu: Rücken- oder Vorderansicht
+      if (Math.abs(dx + dy) > 0.02) a.away = dx + dy < 0;
     } else { a.goal = null; a.wait = 1; }
   }
 }

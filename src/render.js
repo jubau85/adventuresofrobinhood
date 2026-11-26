@@ -3891,12 +3891,46 @@ function drawCorpse(c, f, x, y) {
   c.restore();
 }
 
+// ---------------------------------------------------------------- Gemalte Tiere (Paket 8)
+// Bögen mit 6 Spalten (stehen, gehen 1, gehen 2, grasen/picken, rennen, erlegt) und 2 Zeilen: von vorn (schaut nach
+// links unten) und von hinten (schaut nach rechts oben). Gespiegelt ergeben sich vier Blickrichtungen.
+// TIER: Zelle (Breite, Höhe) und Fußpunkt im Bild; TIER_K: Größe eines Bildpunkts in Figureneinheiten.
+const TIER = {'schaf':[128,112,58.5,99],'kuh':[176,144,97.0,128],'huhn':[72,72,38.0,63],'hirsch':[176,176,81.5,156],'reh':[160,160,72.5,142],'ente':[80,64,41.5,56],'pferd':[224,192,105.5,171]};
+// Maßstab je Tier, aus der Höhe im Bild und der echten Größe (Schaf 0,9 m, Kuh 1,5 m, Hirsch mit Geweih 2 m, Reh 1,1 m, Huhn 0,45 m, Ente 0,3 m)
+const TIER_K = {'schaf':0.1783,'kuh':0.2327,'huhn':0.1233,'hirsch':0.3193,'reh':0.1723,'ente':0.141,'pferd':0.2616};
+// Spalte und Zeile malen; flip spiegelt. Beim Herauszoomen die passende verkleinerte Stufe des Bogens.
+function drawTierCell(c, kind, col, row, flip) {
+  const T = TIER[kind], spr = T && ART[`tier_${kind}`] ? figSprite(`tier_${kind}`, '#808080') : null;
+  if (!spr) return false;
+  const [cw, ch, ax, ay] = T, K = TIER_K[kind] || 0.2, t = c.getTransform(), on = Math.hypot(t.a, t.b) * K;
+  const lv = Math.max(0, Math.min(spr.mips.length - 1, Math.floor(Math.log2(1 / Math.max(on, 1e-3)))));
+  const im = spr.mips[lv], f = im.width / spr.w;
+  c.save(); if (flip) c.scale(-1, 1);
+  c.drawImage(im, col * cw * f, row * ch * f, cw * f, ch * f, -ax * K, -ay * K, cw * K, ch * K);
+  c.restore();
+  return true;
+}
+// Blickrichtung: Zeile 0 schaut nach links unten, Zeile 1 nach rechts oben; facing > 0 heißt nach rechts
+function tierView(a) { const row = a.away ? 1 : 0; return { row, flip: row === 0 ? (a.facing || 1) > 0 : (a.facing || 1) < 0 }; }
 function drawAnimal(c, a, x, y) {
   const winter = seasonIndex() === 3;
   c.save();
   c.translate(x, y);
   c.scale(FIG, FIG);
   if (a.kind !== 'ente') { c.fillStyle = 'rgba(20,30,10,0.22)'; c.beginPath(); c.ellipse(2, 0, a.kind === 'huhn' ? 3.5 : 8, a.kind === 'huhn' ? 1.5 : 2.8, 0, 0, Math.PI * 2); c.fill(); }
+  if (TIER[a.kind] && ART[`tier_${a.kind}`]) {
+    const { row, flip } = tierView(a);
+    const graze = !a.moving && Math.sin(G.time * (a.kind === 'huhn' ? 5 : 0.8) + a.v * 12) > (a.kind === 'huhn' ? 0.5 : 0.2);
+    const run = a.moving && a.flee > 0 && (a.kind === 'hirsch' || a.kind === 'reh' || a.kind === 'pferd');
+    const col = run ? 4 : a.moving ? 1 + (Math.floor(a.anim * (a.flee > 0 ? 9 : 4.5)) % 2) : graze ? 3 : 0;
+    const bob = a.kind === 'ente' ? Math.sin(G.time * 2 + a.v * 10) * 0.5 : 0;
+    if (a.kind === 'ente') { c.strokeStyle = 'rgba(255,255,255,0.4)'; c.lineWidth = 0.8; c.beginPath(); c.ellipse(0, 0.5, 5.5, 1.8, 0, 0, Math.PI * 2); c.stroke(); }
+    c.translate(0, bob);
+    drawTierCell(c, a.kind, col, row, flip);
+    if (a.flash > 0) { c.globalAlpha = Math.min(1, a.flash * 5); c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(0, -6, 7, 5, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; }
+    c.restore();
+    return;
+  }
   c.scale(a.facing, 1);
   const step = a.moving ? Math.sin(a.anim * 10) * 1.6 : 0;
   const graze = !a.moving && Math.sin(G.time * 0.8 + a.v * 12) > 0.2;
@@ -3986,6 +4020,14 @@ function drawAnimal(c, a, x, y) {
 
 // Erlegtes Tier, liegt eine Weile im Gras
 function drawCarcass(c, f, x, y) {
+  // Gemalt: das erlegte Tier aus der letzten Spalte des Bogens
+  if (TIER[f.animal] && ART[`tier_${f.animal}`]) {
+    const v = tierView(f);
+    c.save(); c.globalAlpha = Math.min(1, (f.dur - f.t) / 4); c.translate(x, y); c.scale(FIG, FIG);
+    drawTierCell(c, f.animal, 5, v.row, v.flip);
+    c.restore();
+    return;
+  }
   const col = { hirsch: '#8a5a34', schaf: '#efe9dc', kuh: '#9a6a42', huhn: '#f2eee6', ente: '#8a6a45' }[f.animal] || '#8a5a34';
   const big = (f.animal === 'hirsch' || f.animal === 'kuh' ? 1 : f.animal === 'schaf' ? 0.8 : 0.45) * FIG;
   c.globalAlpha = Math.min(1, (f.dur - f.t) / 4);

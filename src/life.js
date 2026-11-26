@@ -524,7 +524,7 @@ function campNight(v, dt) {
 function huntShot(v, t) {
   let deer = null, bd = 10;
   for (const a of G.animals || []) {
-    if (a.kind !== 'hirsch' || a.dead) continue;
+    if ((a.kind !== 'hirsch' && a.kind !== 'reh') || a.dead) continue;
     const d = Math.hypot(a.x - v.x, a.y - v.y);
     if (d < bd) { bd = d; deer = a; }
   }
