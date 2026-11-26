@@ -30,7 +30,7 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 
 ## Was schon drin ist
 
-- **Startmenü:** Animiertes Titelbild bei Sonnenuntergang. Du wählst deinen Namen, den Namen deiner Burg, Ritter oder Ritterin und eine von sechs Wappenfarben, mit Vorschau. Farbe und Name erscheinen im ganzen Spiel: Gefolge, Banner, Meldungen, Karte.
+- **Startmenü:** Animiertes Titelbild bei Sonnenuntergang, daneben ein Blatt Pergament mit gerissenem, angesengtem Rand. Darauf wählst du deinen Namen, den Namen deiner Burg, Ritter oder Ritterin und stellst dein Wappen zusammen: eine von sechs Farben, Gold oder Silber und ein Wappenbild, entweder ein Tier (Löwe, Adler, Hirsch, Eber, Rabe) oder ein Zeichen (Kreuz, Lilie, Stern, Turm, Mond, Schwerter, Rose). Die Vorschau ist gemalt wie eine Miniatur in einer Liederhandschrift um 1300: Rahmen in Blau, Gold und Rot, darüber in roter Tinte „Her Aldric von Ashcombe“ (als Ritterin „Frouwe …“). Der Ritter galoppiert nach links, Pferdedecke und Banner an der Lanze sind mit deinem Wappenbild bestreut, das Wappenbild steht als Helmzier auf dem Topfhelm, vor der Brust hängt der Wappenschild, im Grund rankt eine Rose. Farbe, Wappen und Name erscheinen im ganzen Spiel: Gefolge, Banner (mit dem Wappenbild), Burgfenster, Meldungen, Karte.
 - **Musik:** Wird live im Browser erzeugt, mit Laute, Flöte, Hörnern, Bordun und Trommeln. Es gibt ein episches Titelthema, Reisemusik im Dreiertakt, ruhigere Nachtmusik und Trommeln im Kampf. Taste L schaltet sie an und aus.
 
 - **Karte von England und Frankreich:** 1024 × 1024 Felder, ein Feld sind gut 800 m (die Welt misst rund 820 × 820 km). Die Orte liegen an ihren echten Stellen, die Wege dazwischen sind lang genug für Feldschlachten, Überfälle und Reisen über mehrere Tage; Lager, Höfe, Hügel und umherziehende Gruppen wachsen mit der Fläche mit, die Gruppen etwas weniger, damit mehr Platz bleibt. Die Küsten von England, Wales, Nordfrankreich, Flandern und der Ostrand Irlands, dazu Wight, Man und die Kanalinseln. Echte Flüsse (Themse, Severn, Trent, Ouse, Seine, Marne, Oise, Somme, Schelde und andere), Bergland an den richtigen Stellen (Pennines, Lake District, Snowdonia, Dartmoor, Ardennen) und die alten Wälder (Sherwood, Barnsdale, New Forest, Weald, Fontainebleau).
@@ -141,6 +141,7 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 | `src/sim.js` | Uhrzeit, Jahreszeiten, Tageswechsel |
 | `src/render.js` | Isometrischer Canvas-Renderer mit Höhenrelief (Licht an den Kachelecken, weich über die Hänge verlaufend), Schatten, Retro-Modus (Palette, Dithering), Minikarte |
 | `src/animals.js` | Tiere und Jagd |
+| `src/heraldry.js` | Wappen: Wappenbilder als Pfade (SVG für das Menü, Canvas für Banner), Wappenschild, die Miniatur des Ritters im Startmenü |
 | `src/titleart.js` | Titelbild: das gemalte Bild aus `assets/titel`, sonst im Code gemalt |
 | `src/assets.js` | Lädt handgemalte Grafiken aus `assets/`, fehlt eine, zeichnet das Spiel selbst |
 | `src/audio.js` | Musik mit Web Audio (Instrumente, Noten, Stimmungen) |
@@ -157,6 +158,7 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 | `tools/meshy_figuren.py` | Erzeugt die Figuren bei Meshy (Text zu 3D, Bemalung mit cyanfarbener Hauptkleidung, Rüstungs-Neubemalungen, Skelett, Bewegungen aus der Bewegungsbibliothek); der Schlüssel kommt über den Netzwerk-Proxy |
 | `tools/figuren_rendern.py` | Rendert alle Figuren und Rüstungen mit `tools/sprites.py` (`--bereich` für Endhaltungen wie Sitzen und Knien, `--stelle` für Bewegungen auf der Stelle) |
 | `tools/friedhof.py` | Schneidet Gräber, Friedhofskreuz, Zaun und Tor (Sommer und Winter) und die Gefallenen aus den Rasterbögen, schreibt `assets/friedhof/` (nutzt die Flutfüllung aus `tools/bauten.py`) |
+| `tools/pergament.py` | Erzeugt das Pergamentblatt des Startmenüs (`assets/ui/pergament.webp`): fleckige Haut, Wasserränder, Knicke, gerissener und angesengter Rand |
 | `tools/palisade.py` | Schneidet einzelne Pfähle und das Palisadentor aus dem gemalten Palisadenbogen (Sommer und Winter), schreibt `assets/palisade/` |
 | `tools/bauten.py` | Schneidet gemalte Gebäude und den Galgen aus Rasterbögen (Sommer und Winter), Fußpunkt aus der Grundrissraute, schreibt `assets/bauten/` (`python3 -I tools/bauten.py <bogen-ordner> assets/bauten`) |
 | `tools/gegenstaende.py` | Schneidet Waffen, Schilde und Werkzeuge aus den gemalten Rasterbögen, legt lange Dinge waagerecht mit Griffpunkt ab und schreibt `assets/gegenstaende/` (`python3 -I tools/gegenstaende.py <bogen-ordner> assets/gegenstaende`) |

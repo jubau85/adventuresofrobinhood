@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
+const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'heraldry', 'render', 'titleart', 'audio', 'ui', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
 function topLevelNames(src) {
@@ -63,7 +63,14 @@ function page(extern = []) {
     artBytes += buf.length;
     return `'data:${MIME[p.slice(p.lastIndexOf('.'))]};base64,${buf.toString('base64')}'`;
   });
-  const css = readFileSync(join(ROOT, 'style.css'), 'utf8');
+  // Bilder aus dem Stylesheet (Pergament des Startmenüs) immer einbetten: sie sind klein und gleich beim Start zu sehen
+  const css = readFileSync(join(ROOT, 'style.css'), 'utf8').replace(/url\((assets\/[^)]+\.(?:jpg|jpeg|png|webp))\)/g, (m, p) => {
+    const file = join(ROOT, p);
+    if (!existsSync(file)) return m;
+    const buf = readFileSync(file);
+    artBytes += buf.length;
+    return `url(data:${MIME[p.slice(p.lastIndexOf('.'))]};base64,${buf.toString('base64')})`;
+  });
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   html = html.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}</style>`);
   html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\n(function () {\n'use strict';\n${code}\n})();\n</script>`);

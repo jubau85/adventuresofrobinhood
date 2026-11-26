@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>A Knight's Tale</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,600;0,700;1,400&family=Alegreya+Sans:wght@400;500;700&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,600;0,700;1,400&family=Alegreya+Sans:wght@400;500;700&family=IM+Fell+English+SC&family=UnifrakturMaguntia&family=Uncial+Antiqua&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -78,18 +78,32 @@
           <label for="castle-input">Name deiner Burg</label>
           <input id="castle-input" maxlength="20" value="Ashcombe" spellcheck="false">
         </div>
-        <fieldset class="field">
+        <div class="pair">
+          <fieldset class="field">
           <legend>Figur</legend>
           <div class="seg">
             <label><input type="radio" name="figur" value="m" checked><span>Ritter</span></label>
             <label><input type="radio" name="figur" value="w"><span>Ritterin</span></label>
           </div>
-        </fieldset>
+          </fieldset>
+          <fieldset class="field">
+          <legend>Metall</legend>
+          <div class="seg" id="metal-pick">
+            <label><input type="radio" name="metall" value="gold" checked><span>Gold</span></label>
+            <label><input type="radio" name="metall" value="silber"><span>Silber</span></label>
+          </div>
+          </fieldset>
+        </div>
         <fieldset class="field">
           <legend>Wappenfarbe <span id="color-name" class="muted"></span></legend>
           <div class="swatches" id="color-swatches"></div>
         </fieldset>
-        <div class="preview"><canvas id="hero-preview" width="300" height="150" aria-label="Vorschau deiner Figur"></canvas></div>
+        <fieldset class="field">
+          <legend>Wappenbild <span id="charge-name" class="muted"></span></legend>
+          <div class="charges" id="charge-pick"></div>
+        </fieldset>
+
+        <div class="preview"><canvas id="hero-preview" width="300" height="212" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>

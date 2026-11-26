@@ -2,6 +2,7 @@
 
 import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY, CASTLE_PLOT } from './data.js';
+import { CHARGES, CHARGE_IDS, chargeSVG, PLATE_W, PLATE_H } from './heraldry.js';
 import { drawTitleArt } from './titleart.js';
 import { loadArt } from './assets.js';
 import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, sfxEnabled, setSfxEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
@@ -35,7 +36,7 @@ let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
 function newGame(opts) {
-  const { name, castleName, color, female } = opts;
+  const { name, castleName, color, female, arms } = opts;
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed);
   G.nextId = 1;
@@ -46,7 +47,7 @@ function newGame(opts) {
     x: site.x + 0.3, y: site.y + 2.6,
   });
   G.s = {
-    seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
+    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
@@ -103,6 +104,21 @@ function startWorld() {
 // Startmenü: Wappenfarben, Figur und Vorschau
 let titleColor = HERALDRY[0].color;
 let titleFemale = false;
+let titleCharge = 'loewe', titleMetal = 'gold';
+const titleArms = () => ({ field: titleColor, metal: titleMetal, charge: titleCharge });
+// Überschrift der Miniatur in roter Tinte, wie in den Liederhandschriften: „Her Aldric von Ashcombe“
+function titleInscription() {
+  const n = byId('name-input'), b = byId('castle-input');
+  const name = (n && n.value.trim()) || (titleFemale ? 'Aelfgifu' : 'Aldric'), burg = b && b.value.trim();
+  return `${titleFemale ? 'Frouwe' : 'Her'} ${name}${burg ? ` von ${burg}` : ''}`;
+}
+// Wappenbilder neu zeichnen (Farben folgen der Wahl)
+function renderChargePick() {
+  const box = byId('charge-pick');
+  const sel = titleCharge;
+  box.innerHTML = CHARGE_IDS.map((id) => `<label title="${CHARGES[id].name}"><input type="radio" name="wappenbild" value="${id}"${id === sel ? ' checked' : ''}><span>${chargeSVG(id, titleArms(), 30)}</span></label>`).join('');
+  byId('charge-name').textContent = CHARGES[sel].name;
+}
 
 function buildSetupForm() {
   const box = byId('color-swatches');
@@ -114,6 +130,20 @@ function buildSetupForm() {
     if (!inp) return;
     titleColor = inp.value;
     byId('color-name').textContent = inp.dataset.name;
+    renderChargePick();
+  });
+  renderChargePick();
+  byId('charge-pick').addEventListener('change', (e) => {
+    const inp = e.target.closest('input');
+    if (!inp) return;
+    titleCharge = inp.value;
+    byId('charge-name').textContent = CHARGES[titleCharge].name;
+  });
+  byId('metal-pick').addEventListener('change', (e) => {
+    const inp = e.target.closest('input');
+    if (!inp) return;
+    titleMetal = inp.value;
+    renderChargePick();
   });
   for (const r of document.querySelectorAll('input[name="figur"]')) {
     r.addEventListener('change', () => {
@@ -128,7 +158,7 @@ function buildSetupForm() {
     startAudio();
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
-    newGame({ name, castleName, color: titleColor, female: titleFemale });
+    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms() });
   });
 }
 
@@ -765,8 +795,8 @@ function drawTitleScreen() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const pv = byId('hero-preview');
   const pw = Math.round(pv.clientWidth * dpr) || 300;
-  if (pv.width !== pw) { pv.width = pw; pv.height = Math.round(pw / 2); }
-  drawHeroPreview(pv, titleColor, titleFemale, G.time);
+  if (pv.width !== pw) { pv.width = pw; pv.height = Math.round(pw * PLATE_H / PLATE_W); }
+  drawHeroPreview(pv, titleArms(), titleFemale, G.time, titleInscription());
   if (fault) throw fault;
 }
 
@@ -820,4 +850,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, step: (dt) => { G.time += dt; step(dt); } };

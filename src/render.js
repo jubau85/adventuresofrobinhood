@@ -20,6 +20,7 @@ import { gallowsFor } from './justice.js';
 import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weather.js';
 import { abandonedId } from './dynamics.js';
 import { homeGateClosed, homeSite } from './siege.js';
+import { drawCharge, drawKnightPlate } from './heraldry.js';
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -250,6 +251,8 @@ function banner(c, x, y, z, col) {
   c.closePath();
   c.fillStyle = col; c.fill();
   c.strokeStyle = OUTLINE; c.lineWidth = 0.7; c.stroke();
+  // Dein Banner trägt dein Wappenbild
+  if (G.s && G.s.arms && col === playerColor()) drawCharge(c, G.s.arms, bx + 7, by - 17.6 + w * 0.6, 6.4);
 }
 
 // ---------------------------------------------------------------- Gebäude
@@ -4432,30 +4435,12 @@ function drawCarcass(c, f, x, y) {
 }
 
 // Vorschau der Spielfigur im Startmenü: Reiter mit Banner in der gewählten Farbe
-export function drawHeroPreview(cv, color, female, t) {
+// Vorschau im Startmenü: der Ritter wie in einer Handschrift, mit Wappenschild und Pferd in Livree
+export function drawHeroPreview(cv, arms, female, t, title = '') {
   const c = cv.getContext('2d');
-  const w = cv.width, h = cv.height, k = h / 150;
   c.setTransform(1, 0, 0, 1, 0, 0);
-  c.clearRect(0, 0, w, h);
-  const g = c.createRadialGradient(w / 2, h * 0.78, 4, w / 2, h * 0.78, w * 0.5);
-  g.addColorStop(0, 'rgba(110,140,70,0.55)'); g.addColorStop(1, 'rgba(110,140,70,0)');
-  c.fillStyle = g; c.fillRect(0, 0, w, h);
-  c.setTransform(k * 2.6, 0, 0, k * 2.6, w * 0.52, h * 0.86);
-  // Standarte
-  c.strokeStyle = '#4a3322'; c.lineWidth = 1.2;
-  c.beginPath(); c.moveTo(-22, 0); c.lineTo(-22, -42); c.stroke();
-  c.beginPath(); c.moveTo(-22, -42);
-  for (let q = 0; q <= 8; q++) { const u = q / 8; c.lineTo(-22 + u * 16, -42 + Math.sin(t * 3 + u * 5) * 1.5 * u); }
-  for (let q = 8; q >= 0; q--) { const u = q / 8; c.lineTo(-22 + u * 16, -32 - u * 1 + Math.sin(t * 3 + u * 5) * 1.5 * u); }
-  c.closePath(); c.fillStyle = color; c.fill(); c.strokeStyle = OUTLINE; c.lineWidth = 0.6; c.stroke();
-  c.fillStyle = '#d8b54a'; c.fillRect(-15.5, -40, 1.2, 7); c.fillRect(-18, -37.2, 6.4, 1.2);
-  const u = {
-    kind: 'preview', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'zelter' },
-    st: { armorDef: 6, horse: ITEMS.zelter, maxHp: 1 }, hp: 1, mounted: true, facing: 1, anim: t * 0.6, moving: true,
-    female, hair: female ? '#7a3a1e' : '#3b2a1e', lookObj: heraldLook(color, false), swing: 0, flash: 0, combatT: 0,
-  };
-  drawFigure(c, u, 6, 0);
-  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, cv.width, cv.height);
+  drawKnightPlate(c, cv.width, cv.height, arms, t, { female, title });
 }
 
 // Tier unter dem Mauszeiger (für die Jagd)

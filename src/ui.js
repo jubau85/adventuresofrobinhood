@@ -30,6 +30,7 @@ import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, 
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
 import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, hireInTown } from './camps.js';
+import { armsSVG } from './heraldry.js';
 
 export function byId(id) { return document.getElementById(id); }
 
@@ -500,7 +501,7 @@ function castlePanel() {
     default: body = castleBuild();
   }
   const cb = CASTLE_BONUS[G.s.castle.level];
-  return { title: `Burg ${homeName()}`, sub: `${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
+  return { title: `Burg ${homeName()}`, sub: `${G.s.arms ? `<span class="arms-mini">${armsSVG(G.s.arms, 22, 'Dein Wappen')}</span>` : ''}${esc(levelName())} · Verteidigung ${castleDefense()} · In den Mauern +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr · Ruhm ${fmt(G.s.renown)}`, tabs, body };
 }
 
 // Ein einzelnes Burggebäude (Klick auf Gebäude oder Bauplatz in der Burg)
