@@ -147,6 +147,8 @@ export const NPC_TYPES = {
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
   freisasse: { cls: 'soldat', name: 'Freisasse', eq: { waffe: 'streitaxt', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 3], look: 'sachsen' },
   sachs_bogen: { cls: 'soldat', name: 'Sächsischer Bogner', eq: { waffe: 'kurzbogen', ruestung: 'lederwams' }, lv: [1, 2], look: 'sachsen' },
+  ritter_n: { cls: 'ritter', name: 'Normannischer Ritter', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'drachenschild', pferd: 'klepper' }, lv: [2, 3], look: 'soldat' },
+  thane: { cls: 'ritter', name: 'Sächsischer Than', eq: { waffe: 'streitaxt', ruestung: 'kettenhemd', schild: 'rundschild', pferd: 'klepper' }, lv: [2, 3], look: 'sachsen' },
   sergent: { cls: 'soldat', name: 'Sergent', eq: { waffe: 'speer', ruestung: 'kettenhemd', schild: 'drachenschild' }, lv: [1, 3], look: 'franken' },
   arbaletrier: { cls: 'soldat', name: 'Arbalétrier', eq: { waffe: 'armbrust', ruestung: 'gambeson' }, lv: [1, 3], look: 'franken' },
   chevalier: { cls: 'ritter', name: 'Chevalier', eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'wappenschild', pferd: 'zelter' }, lv: [2, 4], look: 'franken' },
@@ -186,6 +188,36 @@ export const GROUP_TYPES = {
     name: 'Sächsische Freisassen', nom: 'Sächsische Freisassen', acc: 'die sächsischen Freisassen', pl: true, faction: 'sachsen', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
     gold: [20, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.24, realms: ['en', 'wa'], siteFaction: 'sachsen',
     kill: { sachsen: -14, normannen: 5 },
+  },
+  // Heere für Schlacht-Ereignisse (je 50 Mann, bei wenig Leistung kleiner)
+  heer_john: {
+    name: 'Prinz Johns Heer', nom: 'Prinz Johns Heer', acc: 'Prinz Johns Heer', pl: false, faction: 'normannen', army: true,
+    members: [['ritter_n', 6, 6], ['soldat', 20, 20], ['armbrust', 12, 12], ['soeldner', 12, 12]],
+    gold: [320, 560], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['en', 'wa'],
+    kill: { normannen: -14, sachsen: 12 },
+  },
+  heer_richard: {
+    name: 'Das Heer der Getreuen König Richards', nom: 'Das Heer der Getreuen', acc: 'das Heer der Getreuen', pl: false, faction: 'sachsen', army: true,
+    members: [['thane', 6, 6], ['freisasse', 22, 22], ['sachs_bogen', 14, 14], ['bandit', 8, 8]],
+    gold: [260, 480], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['en', 'wa'],
+    kill: { sachsen: -14, normannen: 12 },
+  },
+  heer_philipp: {
+    name: 'König Philipps Heer', nom: 'König Philipps Heer', acc: 'König Philipps Heer', pl: false, faction: 'franken', army: true,
+    members: [['chevalier', 6, 6], ['sergent', 22, 22], ['arbaletrier', 14, 14], ['soeldner', 8, 8]],
+    gold: [320, 560], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['fr', 'fl', 'nd'],
+    kill: { franken: -14, normannen: 12 },
+  },
+  heer_normandie: {
+    name: 'Das normannische Aufgebot', nom: 'Das normannische Aufgebot', acc: 'das normannische Aufgebot', pl: false, faction: 'normannen', army: true,
+    members: [['ritter_n', 6, 6], ['soldat', 20, 20], ['armbrust', 12, 12], ['soeldner', 12, 12]],
+    gold: [300, 520], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['fr', 'fl', 'nd'],
+    kill: { normannen: -14, franken: 12 },
+  },
+  // Besatzung einer belagerten Burg oder Stadt (Fraktion wird beim Aufstellen gesetzt)
+  verteidiger: {
+    name: 'Besatzung', nom: 'Die Besatzung', acc: 'die Besatzung', pl: false, faction: null, defender: true,
+    members: [['wache', 6, 6]], gold: [40, 90], itemChance: 0.5, renown: 3, count: 0, spawn: 'none', speed: 1.1,
   },
   franzosen: {
     name: 'Französische Streife', nom: 'Eine französische Streife', acc: 'die französische Streife', pl: false, faction: 'franken', members: [['sergent', 2, 3], ['arbaletrier', 1, 1], ['chevalier', 0, 1]],

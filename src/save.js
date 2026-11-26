@@ -26,7 +26,7 @@ export function serialize() {
       companions: s.companions.map(unitData),
       castle: { ...s.castle, recruits: s.castle.recruits.map(unitData) },
     },
-    groups: G.groups.map((g) => ({ id: g.id, type: g.type, x: g.x, y: g.y, home: g.home, provoked: g.provoked, questId: g.questId, members: g.members.map(unitData) })),
+    groups: G.groups.filter((g) => !g.army && !g.defender).map((g) => ({ id: g.id, type: g.type, x: g.x, y: g.y, home: g.home, provoked: g.provoked, questId: g.questId, members: g.members.map(unitData) })),
   };
   return JSON.stringify(data);
 }

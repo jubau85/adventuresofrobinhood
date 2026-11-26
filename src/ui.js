@@ -17,7 +17,8 @@ import {
   castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses, foodNeed, foodStock,
 } from './castle.js';
 import { partyMembers, equip, unequip, previewEquip, xpNeeded, setPlayerPath, ferryRoutes, ferryCost, sail } from './units.js';
-import { seasonIndex, yearOf, clockText, passHours } from './sim.js';
+import { seasonIndex, yearOf, clockText, passHours, hourOf } from './sim.js';
+import { buffActive } from './life.js';
 import { drawMap, miniToWorld } from './render.js';
 import { landAt } from './world.js';
 
@@ -39,7 +40,7 @@ export function updateHUD() {
   set('hud-party', `${partyMembers().length}/${partyCap()}`);
   set('hud-cargo', `${cargoUsed()}/${cargoCap()}`);
   set('hud-hp', `${Math.ceil(s.player.hp)}/${s.player.st.maxHp}`);
-  set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}`);
+  set('hud-date', `Tag ${s.day} · ${SEASONS[seasonIndex()]} ${yearOf()}${buffActive() ? ' · ausgeruht' : ''}`);
   set('hud-clock', clockText());
   const mode = byId('hud-mode');
   const label = G.fast ? 'Zeitraffer' : '';
@@ -219,9 +220,34 @@ function townInfo(site) {
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${tavernAction(site)}
       ${harbourActions(site)}
     </div>
   </div>`;
+}
+
+// Gasthaus: Übernachten mit Gefolge
+function innCost() { return 4 + partyMembers().length * 3; }
+function tavernAction(site) {
+  if (!site.tavern) return '';
+  const cost = innCost();
+  return `<h3>${esc(site.tavern.name)}</h3>
+    <div class="action"><div><b>Übernachten</b><p>Warmes Essen, Bier und Betten für dich und dein Gefolge. Ihr schlaft bis zum Morgen und seid danach ganz geheilt. Bis zum nächsten Abend seid ihr ausgeruht: +10 % Angriff und Abwehr, +15 % Erfahrung. Und der Wirt weiß immer etwas Neues.</p></div><button class="btn" data-act="inn" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+}
+
+// Gerüchte des Wirts: echte Hinweise aus der Spielwelt
+function rumor(site) {
+  const opts = [];
+  const bandit = G.groups.filter((g) => g.type === 'banditen' && g.members.length).sort((a, b) => Math.hypot(a.x - site.x, a.y - site.y) - Math.hypot(b.x - site.x, b.y - site.y))[0];
+  if (bandit) opts.push(`Eine Bande Wegelagerer treibt sich ${dirText(site, bandit)} herum.`);
+  const towns = G.world.sites.filter((t) => t.demands && t.demands.length && t.land === site.land && t !== site);
+  if (towns.length) { const t = towns[Math.floor(Math.random() * towns.length)]; const g = t.demands[Math.floor(Math.random() * t.demands.length)]; opts.push(`In ${t.name} zahlen sie gerade gut für ${GOODS[g].name}.`); }
+  const army = G.groups.find((g) => g.army && g.members.length);
+  if (army) opts.push(`Man sagt, ein großes Heer zieht ${dirText(site, army)}.`);
+  if (G.siege) opts.push(`${G.siege.site.type === 'spieler' ? homeName() : G.siege.site.name} wird belagert, heißt es.`);
+  const rich = G.groups.find((g) => g.type === 'steuer' && g.members.length);
+  if (rich) opts.push(`Ein Steuereintreiber ist mit voller Kasse ${dirText(site, rich)} unterwegs.`);
+  return opts.length ? opts[Math.floor(Math.random() * opts.length)] : 'Es ist ruhig in letzter Zeit. Zu ruhig, wenn Ihr mich fragt.';
 }
 
 // Hafen: Überfahrten mit Preis und Dauer. Der Hafen liegt vor den Mauern und ist immer offen.
@@ -621,6 +647,8 @@ function helpPanel() {
         <li>Die Fraktionen <b>bekämpfen einander</b>: Banden überfallen Händler, Sachsen und Normannen gehen aufeinander los. Trupps einer Fraktion, die dich mag, kommen dir im Kampf zu Hilfe, verfeindete schließen sich deinen Angreifern an.</li>
         <li>Nach <b>Frankreich und Flandern</b> geht es nur per Schiff: von Dover nach Calais, von Portsmouth nach Barfleur oder von London nach Brügge. Drüben warten Paris, Rouen, die Messe von Troyes und die Krone Frankreichs.</li>
         <li>Der <b>Kompass</b> unten rechts zeigt, wo Norden liegt. In der Schrägansicht ist das rechts oben.</li>
+        <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> beschießt ein Heer eine Burg oder Stadt und stürmt das Tor. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben.</li>
+        <li>Im <b>Gasthaus</b> übernachtest du mit deinem Gefolge: voll geheilt, bis zum Abend ausgeruht (+10 % Angriff und Abwehr, +15 % Erfahrung), und der Wirt erzählt Gerüchte.</li>
       </ol></div>
     </div>`,
   };
@@ -648,6 +676,19 @@ const ACTIONS = {
     if (d.d === 'home') { mapState.cx = G.s.player.x; mapState.cy = G.s.player.y; mapState.zoom = Math.max(mapState.zoom, 2); }
     else mapState.zoom = Math.max(1, Math.min(5, mapState.zoom * (d.d === '1' ? 1.5 : 1 / 1.5)));
     if (G.ui.redrawMap) G.ui.redrawMap();
+  },
+  inn: () => {
+    const site = G.ui.arg, cost = innCost();
+    if (G.s.gold < cost) return;
+    G.s.gold -= cost;
+    const h = hourOf();
+    passHours(((7 - h + 24) % 24) || 24);
+    const p = G.s.player;
+    p.hp = p.st.maxHp;
+    for (const c of partyMembers()) c.hp = c.st.maxHp;
+    G.s.buff = { day: G.s.day };
+    log(`Ihr übernachtet im ${site.tavern.name} und seid ausgeruht bis zum Abend. Der Wirt raunt: „${rumor(site)}“`, 'good');
+    closePanel();
   },
   rest: () => {
     passHours(4);

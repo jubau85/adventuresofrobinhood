@@ -32,6 +32,10 @@ node tools/build.mjs
 - **Wahrzeichen:** der Tower von London und St Paul's, die Kathedralen von Canterbury, York, Lincoln, Durham, Ely, Winchester, Hereford, Reims, Laon, Rouen und Chartres (frisch abgebrannt), Notre-Dame und der neue Louvre im Bau, Mont-Saint-Michel auf seinem Felsen, der Gravensteen in Gent, die Tuchhallen von Brügge, Ypern, Troyes und Provins, der Burghügel von York und Glastonbury Tor.
 - **Sehenswürdigkeiten:** Stonehenge und der Hadrianswall. Wer sie zum ersten Mal besucht, gewinnt Ruhm.
 - **Einzelhöfe:** Über das Land verstreut liegen Gehöfte mit Äckern, Vieh und Bauern.
+- **Schlachten:** Ab und zu ziehen zwei Heere zu je 50 Mann heran, etwa Prinz Johns Heer gegen die Getreuen König Richards oder König Philipps Heer gegen das normannische Aufgebot. Du kannst zusehen oder auf einer Seite eingreifen. Bei knapper Bildrate werden die Heere automatisch kleiner.
+- **Belagerungen:** Ein Heer schlägt vor einer Burg oder Stadt der Gegenseite sein Lager auf, beschießt die Häuser mit dem Trebuchet und stürmt das Tor. Getroffene Häuser brennen und tragen Schäden davon, danach bauen die Bewohner sie unter Gerüsten wieder auf. Ist dir eine Fraktion feindlich, kann es auch deine eigene Burg treffen.
+- **Friedhöfe und Begräbnisse:** Die Toten bringen Priester und Mönche im Trauerzug zum Friedhof, mit Kreuz, Bahre und einer kleinen Messe. Die Gräber bleiben.
+- **Gasthäuser:** Die Bewohner treffen sich mittags und abends vor dem Gasthaus. Du kannst mit deinem Gefolge übernachten: voll geheilt, bis zum nächsten Abend ausgeruht (+10 % Angriff und Abwehr, +15 % Erfahrung), dazu ein Gerücht vom Wirt.
 - **Lebendige Orte:** Bauern hacken und ernten je nach Jahreszeit, Mägde holen Wasser am Brunnen und kaufen auf dem Markt ein, Schmiede hämmern am Amboss, Händler stehen hinter ihren Ständen und rufen ihre Waren aus, Mönche beten und jäten, Kinder spielen Fangen, Wachen stehen am Tor. Mittags trifft man sich zum Schwatz, abends geht es nach Hause. Wer in der Nähe ist, hört Sprüche, Grüße und Gerüchte.
 - **Schiffe übers Meer:** Fähren von Dover nach Calais, von Portsmouth nach Barfleur und ein Wollschiff von London nach Brügge. Die Überfahrt kostet Fährlohn je Kopf und Pferd und dauert einige Stunden. Wer auf der Karte ein Ziel jenseits des Meeres anklickt, reitet automatisch zum passenden Hafen.
 - **Kompass und eingenordete Karte:** In der Schrägansicht liegt Norden rechts oben, der Kompass in der Ecke zeigt es an. Die Minikarte zeigt die Umgebung, die große Karte (M) England und Frankreich mit Fährlinien und Landschaftsnamen. Sie lässt sich mit Mausrad oder + und − zoomen und durch Ziehen verschieben.
@@ -84,7 +88,8 @@ node tools/build.mjs
 | `src/geo.js` | Küsten, Flüsse, Bergland und Wälder als Längen- und Breitengrade |
 | `src/world.js` | Weltgenerator (Küsten rastern, Flüsse, Orte, Straßen je Landmasse, Häfen), A*-Wegfindung |
 | `src/units.js` | Einheiten, Werte, Kampf, Gefolge, KI-Gruppen, Fehden, Fähren |
-| `src/life.js` | Alltag der Bewohner: Rollen, Tagesablauf, Arbeitsplätze, Sprüche |
+| `src/life.js` | Alltag der Bewohner: Rollen, Tagesablauf, Arbeitsplätze, Sprüche, Gasthaus, Begräbnisse |
+| `src/siege.js` | Belagerungen, Gebäudeschäden und Wiederaufbau |
 | `src/economy.js` | Märkte, Preise, Ladung, Ausrüstungshandel |
 | `src/politics.js` | Ansehen, Ruhm, Aufträge |
 | `src/castle.js` | Burgausbau, Produktion, Anwerben, Überfälle |

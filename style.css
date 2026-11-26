@@ -354,3 +354,5 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 @media (prefers-reduced-motion: reduce) {
   .msg { transition: none; }
 }
+
+.buff { color: #9fd67a; font-weight: 600; }

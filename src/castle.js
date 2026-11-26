@@ -9,6 +9,7 @@ import { cargoUsed } from './economy.js';
 import { setPlayerWalls } from './world.js';
 import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
+import { startSiege } from './siege.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
@@ -284,11 +285,13 @@ export function dailyCastle() {
 function checkRaid() {
   if (G.s.day < 5) return;
   const threats = [];
-  if (isHostileFaction('normannen')) threats.push({ by: 'Normannische Truppen', str: 40 + G.s.day * 3, chance: 0.2 });
+  if (isHostileFaction('normannen')) threats.push({ by: 'Normannische Truppen', str: 40 + G.s.day * 3, chance: 0.2, army: 'heer_john' });
   if (isHostileFaction('waldleute')) threats.push({ by: 'Waldleute', str: 25 + G.s.day * 2, chance: 0.15 });
   threats.push({ by: 'Raubgesindel', str: 12 + G.s.day * 1.6, chance: 0.07 });
   for (const t of threats) {
     if (Math.random() >= t.chance) continue;
+    const home = castleSite(), p = G.s.player;
+    if (t.army && !G.siege && Math.hypot(home.x - p.x, home.y - p.y) < 100 && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) break;
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {

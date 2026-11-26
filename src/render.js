@@ -9,6 +9,7 @@ import { groundZ, tileAt } from './world.js';
 import { conProgress } from './castle.js';
 import { castlePasture } from './animals.js';
 import { ART, onArt } from './assets.js';
+import { graveSlot, graveCount, funeralProps } from './life.js';
 import { seasonIndex, darkness, warmth } from './sim.js';
 import { unitLook, heraldLook } from './units.js';
 import { questTarget } from './politics.js';
@@ -295,6 +296,118 @@ function drawHouse(c, b) {
     drawBox(c, b.x + b.wx * 0.2, b.y - b.wy * 0.15, 0.16, 0.16, b.rh * 0.8 + 6, '#857b6e', b.h, 'stone');
     b.smoke = P(b.x + b.wx * 0.2, b.y - b.wy * 0.15, b.h + b.rh * 0.8 + 6);
   }
+  if (b.tavern) drawTavernFront(c, b);
+  if (b.dmg > 0) drawDamage(c, b);
+}
+
+// Wirtshaus: Ausleger mit Schild, Bänke und Tisch vor der Tür
+function drawTavernFront(c, b) {
+  const [ax, ay] = P(b.x + b.wx / 2, b.y + b.wy / 2, b.h * 0.85);
+  c.strokeStyle = '#4a3322'; c.lineWidth = 1.6;
+  c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax + 11, ay + 5); c.stroke();
+  const sw = Math.sin(G.time * 1.6 + b.x) * 0.12;
+  c.save(); c.translate(ax + 9, ay + 5); c.rotate(sw);
+  c.fillStyle = '#d1ae6e'; c.fillRect(-5, 2, 10, 9); c.strokeStyle = '#4a3322'; c.lineWidth = 1; c.strokeRect(-5, 2, 10, 9);
+  c.beginPath(); c.moveTo(-3, 0); c.lineTo(-3, 2); c.moveTo(3, 0); c.lineTo(3, 2); c.stroke();
+  c.fillStyle = '#5a3a22';
+  if (b.sign === 'krug') { c.fillRect(-2, 4, 4, 5); c.strokeStyle = '#5a3a22'; c.beginPath(); c.arc(2.6, 6.5, 1.5, -1.4, 1.4); c.stroke(); }
+  else if (b.sign === 'krone') { c.beginPath(); c.moveTo(-3.5, 9); c.lineTo(-3.5, 5); c.lineTo(-1.5, 7); c.lineTo(0, 4); c.lineTo(1.5, 7); c.lineTo(3.5, 5); c.lineTo(3.5, 9); c.closePath(); c.fill(); }
+  else { c.beginPath(); c.ellipse(0, 6.5, 3.5, 2.2, 0, 0, Math.PI * 2); c.fill(); }
+  c.restore();
+  // Bank und Tisch
+  drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.55, 0.9, 0.16, 4, '#7a5636', 0, 'plank');
+  drawBox(c, b.x + 0.1, b.y + b.wy / 2 + 0.85, 0.7, 0.3, 7, '#8a6440', 0, 'plank');
+  const mug = P(b.x + 0.2, b.y + b.wy / 2 + 0.85, 7); c.fillStyle = '#c9b48a'; c.fillRect(mug[0] - 1, mug[1] - 3, 2, 3);
+  if (darkness() > 0.15) addLight(b.x, b.y + b.wy / 2, 10, 44, 1.1);
+}
+
+// Brand- und Belagerungsschäden: Ruß, Löcher im Dach, eingestürzte Sparren, danach ein Gerüst
+function drawDamage(c, b) {
+  const d = b.dmg, burning = b.fire > G.time;
+  const x0 = b.x - b.wx / 2, x1 = b.x + b.wx / 2, y0 = b.y - b.wy / 2, y1 = b.y + b.wy / 2;
+  c.save();
+  c.globalAlpha = Math.min(0.8, 0.25 + d * 0.6);
+  poly(c, [P(x0, y1, 0), P(x1, y1, 0), P(x1, y1, b.h * (0.4 + d * 0.5)), P(x0, y1, b.h * 0.3)], '#2a2220');
+  poly(c, [P(x1, y1, 0), P(x1, y0, 0), P(x1, y0, b.h * 0.3), P(x1, y1, b.h * (0.3 + d * 0.5))], '#1f1a18');
+  c.restore();
+  if (d >= 0.35) {
+    // Löcher im Dach mit verkohlten Sparren
+    const r = mulberry32(b.idx || 1);
+    for (let k = 0; k < (d >= 0.7 ? 4 : 2); k++) {
+      const u = 0.2 + r() * 0.6, v = 0.2 + r() * 0.6;
+      const p = P(x0 + u * b.wx, y0 + v * b.wy, b.h + b.rh * 0.5);
+      c.fillStyle = '#1e1816'; c.beginPath(); c.ellipse(p[0], p[1], 6 + d * 6, 3 + d * 3, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#3a2a20'; c.lineWidth = 1.4;
+      for (let j = -1; j <= 1; j++) { c.beginPath(); c.moveTo(p[0] + j * 4 - 3, p[1] - 4); c.lineTo(p[0] + j * 4 + 3, p[1] + 4); c.stroke(); }
+    }
+  }
+  if (burning) {
+    const top = P(b.x, b.y, b.h + b.rh * 0.6);
+    for (let k = 0; k < 5; k++) {
+      const fx = top[0] + (k - 2) * 6, fl = 1 + Math.sin(G.time * 11 + k * 1.7) * 0.25;
+      c.fillStyle = '#e8762a'; c.beginPath(); c.moveTo(fx - 4, top[1]); c.quadraticCurveTo(fx, top[1] - 16 * fl, fx + 4, top[1]); c.fill();
+      c.fillStyle = '#ffd25a'; c.beginPath(); c.moveTo(fx - 2, top[1]); c.quadraticCurveTo(fx, top[1] - 9 * fl, fx + 2, top[1]); c.fill();
+    }
+    if (Math.random() < 0.35) smokeEmit(top[0], top[1] - 10, 1);
+    addLight(b.x, b.y, b.h + 10, 50, 1.2);
+  } else drawScaffold(c, b.x, b.y, b.wx + 0.25, b.wy + 0.25, b.h + 6);
+}
+
+// Friedhof: hintere Hälfte mit Gräbern, vordere Zaunhälfte getrennt
+function drawCemetery(c, s, front) {
+  const cm = s.cemetery;
+  if (front) { drawFenceHalf(c, cm.x, cm.y, cm.wx, cm.wy, true); return; }
+  drawFenceHalf(c, cm.x, cm.y, cm.wx, cm.wy, false);
+  const n = graveCount(s);
+  const slots = [];
+  for (let k = 0; k < Math.min(n, 15); k++) slots.push({ ...graveSlot(s, k), fresh: k >= cm.old, k });
+  slots.sort((a, b) => a.x + a.y - (b.x + b.y));
+  for (const g of slots) {
+    const [px, py] = P(g.x, g.y);
+    if (g.fresh) {
+      c.fillStyle = '#6b4a2e'; c.beginPath(); c.ellipse(px + 4, py + 2, 7, 3, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#5a4030'; c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(px, py + 1); c.lineTo(px, py - 10); c.moveTo(px - 3, py - 7); c.lineTo(px + 3, py - 7); c.stroke();
+    } else {
+      c.fillStyle = '#8f897c'; c.fillRect(px - 1.2, py - 9, 2.4, 9); c.fillRect(px - 3.5, py - 7, 7, 1.8);
+    }
+  }
+  // Großes Steinkreuz
+  const cx = cm.x - cm.wx / 2 + 0.3, cy = cm.y + cm.wy / 2 - 0.3;
+  drawBox(c, cx, cy, 0.3, 0.3, 4, '#9a958a', 0, 'stone');
+  const [qx, qy] = P(cx, cy, 4);
+  c.fillStyle = '#a8a296'; c.fillRect(qx - 1.5, qy - 18, 3, 18); c.fillRect(qx - 5, qy - 14, 10, 3);
+}
+
+// Trebuchet der Belagerer: Gestell, Schwenkarm, Gegengewicht
+function drawTrebuchet(c, tr) {
+  const [bx, by] = P(tr.x, tr.y);
+  c.strokeStyle = '#5a3e26'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(bx - 14, by); c.lineTo(bx - 2, by - 36); c.lineTo(bx + 10, by); c.moveTo(bx - 6, by + 4); c.lineTo(bx - 2, by - 36); c.lineTo(bx + 4, by + 4); c.stroke();
+  c.lineWidth = 2.5; c.beginPath(); c.moveTo(bx - 18, by + 2); c.lineTo(bx + 16, by - 2); c.stroke();
+  const since = G.time - tr.fired;
+  const ang = since < 0.5 ? -0.9 + (since / 0.5) * 2.6 : since < 3 ? 1.7 - ((since - 0.5) / 2.5) * 2.6 : -0.9;
+  const pv = [bx - 2, by - 36];
+  const L1 = 30, L2 = 10;
+  const tip = [pv[0] + Math.cos(-Math.PI / 2 + ang) * L1, pv[1] + Math.sin(-Math.PI / 2 + ang) * L1];
+  const cw = [pv[0] - Math.cos(-Math.PI / 2 + ang) * L2, pv[1] - Math.sin(-Math.PI / 2 + ang) * L2];
+  c.strokeStyle = '#6b4a2a'; c.lineWidth = 3; c.beginPath(); c.moveTo(cw[0], cw[1]); c.lineTo(tip[0], tip[1]); c.stroke();
+  c.fillStyle = '#4a3a2a'; c.fillRect(cw[0] - 5, cw[1], 10, 9);
+  c.strokeStyle = '#c9b48a'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(tip[0], tip[1]); c.lineTo(tip[0] + 3, tip[1] + 8); c.stroke();
+}
+
+function drawSiegeShot(c, sh) {
+  if (sh.t < 0) return;
+  const k = Math.min(1, sh.t / sh.dur);
+  const x = sh.x0 + (sh.x1 - sh.x0) * k, y = sh.y0 + (sh.y1 - sh.y0) * k;
+  const p = P(x, y, 30 + Math.sin(k * Math.PI) * 140);
+  c.fillStyle = '#5a5248'; c.beginPath(); c.arc(p[0], p[1], 3.2, 0, Math.PI * 2); c.fill();
+}
+
+function drawOpenGrave(c, g) {
+  poly(c, [P(g.x - 0.18, g.y - 0.1), P(g.x + 0.18, g.y - 0.1), P(g.x + 0.18, g.y + 0.3), P(g.x - 0.18, g.y + 0.3)], '#2a1e14');
+  const [px, py] = P(g.x + 0.35, g.y + 0.1);
+  c.fillStyle = '#6b4a2e'; c.beginPath(); c.ellipse(px, py, 6, 3.5, 0, Math.PI, Math.PI * 2); c.fill();
 }
 
 function drawChurch(c, b) {
@@ -932,11 +1045,17 @@ function buildStaticParts() {
       well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
       landmark: drawLandmark, stonehenge: drawStonehenge,
     }[b.kind];
+    if (b.kind === 'friedhof') continue;
     if (f) parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b });
   }
   for (const s of W.sites) {
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
+    if (s.cemetery) {
+      const cm = s.cemetery;
+      parts.push({ x: cm.x, y: cm.y, d: cm.x + cm.y - (cm.wx + cm.wy) / 2, z: groundZ(W, cm.x, cm.y), f: (c) => drawCemetery(c, s, false) });
+      parts.push({ x: cm.x, y: cm.y, d: cm.x + cm.y + (cm.wx + cm.wy) / 2, z: groundZ(W, cm.x, cm.y), f: (c) => drawCemetery(c, s, true) });
+    }
   }
   return parts;
 }
@@ -1579,6 +1698,7 @@ function villageSpots(s) {
     spots.push(b);
   }
   s.villageSpots = spots;
+  spots.forEach((b, k) => { b.idx = `v${k}`; const d = G.s && G.s.damage && G.s.damage[b.idx]; if (d) b.dmg = d; });
   return spots;
 }
 
@@ -2249,6 +2369,22 @@ function drawVillagerGear(c, u, yb) {
     c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(6.8, yb - 17.5 - wave, 1.3, 0, Math.PI * 2); c.fill();
   }
   if (u.act === 'kaufen') { c.fillStyle = '#e8c35a'; c.beginPath(); c.arc(5.5, yb - 11, 1.2, 0, Math.PI * 2); c.fill(); }
+  if (u.act === 'kreuz') {
+    c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(4.2, yb - 3); c.lineTo(4.2, yb - 32); c.stroke();
+    c.fillStyle = '#d6ad4c'; c.fillRect(3.4, yb - 38, 1.6, 9); c.fillRect(1.6, yb - 35, 5.2, 1.6);
+  }
+  if (u.act === 'segnen') {
+    const a = Math.sin(G.time * 2.4) * 0.7;
+    const hx = 3, hy = yb - 13, ex = hx + Math.sin(a) * 9, ey = hy + Math.cos(a) * 9;
+    c.strokeStyle = '#c9b48a'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(hx, hy); c.lineTo(ex, ey); c.stroke();
+    c.fillStyle = '#d6ad4c'; c.beginPath(); c.arc(ex, ey, 1.8, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(230,230,230,0.5)'; c.beginPath(); c.arc(ex + 1, ey - 4 - (G.time * 6 % 6), 1.8, 0, Math.PI * 2); c.fill();
+  }
+  if (u.act === 'trinken') {
+    const up = Math.max(0, Math.sin(G.time * 1.2 + u.id)) > 0.85;
+    c.fillStyle = '#9a7a4a'; c.fillRect(up ? 1.5 : 4, up ? yb - 20 : yb - 12, 3, 4);
+    c.fillStyle = '#f0e6c8'; c.fillRect(up ? 1.5 : 4, up ? yb - 20 : yb - 12, 3, 1);
+  }
   if (u.act === 'beten') { c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(1.5, yb - 13.5, 1.3, 0, Math.PI * 2); c.fill(); }
   if (u.act === 'angeln') {
     const bob = Math.sin(G.time * 2 + u.id) * 1.5;
@@ -2273,6 +2409,10 @@ function drawVillagerGear(c, u, yb) {
     case 'holz': c.strokeStyle = '#7a5636'; c.lineWidth = 2.2; for (let k = 0; k < 3; k++) { c.beginPath(); c.moveTo(-5, yb - 18.5 + k * 1.6); c.lineTo(5, yb - 20 + k * 1.6); c.stroke(); } break;
     case 'heu': c.fillStyle = '#d8b452'; c.beginPath(); c.ellipse(0, yb - 24.5, 5.5, 2.8, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'fisch': c.fillStyle = '#b9c4c8'; c.beginPath(); c.ellipse(5.5, yb - 6, 3, 1.2, 0.4, 0, Math.PI * 2); c.fill(); break;
+    case 'bahre':
+      c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(6, yb - 14); c.lineTo(-22, yb - 14); c.stroke();
+      c.fillStyle = '#ece6d8'; c.beginPath(); c.ellipse(-8, yb - 16, 10, 2.8, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(80,70,60,0.6)'; c.lineWidth = 0.8; c.stroke();
+      break;
     default: break;
   }
 }
@@ -2634,6 +2774,7 @@ export function render() {
   ensureSprites();
   if (cacheSeason !== seasonIndex()) { chunkCache.clear(); cacheSeason = seasonIndex(); }
   if (G.castleDirty) { castleParts = buildPlayerCastle(); G.castleDirty = false; }
+  if (G.staticDirty) { staticParts = buildStaticParts(); G.staticDirty = false; }
   lights = [];
 
   // Welt zeichnen (im Pixel- und Retro-Modus in halber Auflösung)
@@ -2694,6 +2835,16 @@ export function render() {
     }
   }
   for (const part of staticParts) if (inView(part.x, part.y)) objs.push(part);
+  if (G.siege) {
+    const sg = G.siege;
+    if (sg.stage !== 'anmarsch') {
+      for (const t of sg.tents) if (inView(t.x, t.y)) objs.push({ d: t.x + t.y, z: zAt(t.x, t.y), f: (c) => drawTent(c, { x: t.x, y: t.y, wx: 0.9, wy: 0.9, color: FACTIONS[sg.army.faction].color }) });
+      if (inView(sg.tre.x, sg.tre.y)) objs.push({ d: sg.tre.x + sg.tre.y, z: zAt(sg.tre.x, sg.tre.y), f: (c) => drawTrebuchet(c, sg.tre) });
+    }
+    for (const sh of sg.shots) objs.push({ d: 1e6, z: 0, f: (c) => drawSiegeShot(c, sh) });
+  }
+  for (const g of funeralProps()) if (inView(g.x, g.y)) objs.push({ d: g.x + g.y - 0.4, z: zAt(g.x, g.y), f: (c) => drawOpenGrave(c, g) });
+  for (const f of G.fx) if (f.kind === 'staub' && inView(f.x, f.y)) objs.push({ d: f.x + f.y + 1, z: zAt(f.x, f.y), f: (c) => { const k = f.t / f.dur, [px, py] = P(f.x, f.y, 10); c.globalAlpha = Math.max(0, 0.7 * (1 - k)); c.fillStyle = '#8a7a66'; c.beginPath(); c.arc(px, py - k * 14, 8 + k * 22, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; } });
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
@@ -2899,7 +3050,20 @@ export function drawMap(c, w, h, opts = {}) {
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
   if (big) drawMapDecor(c, v);
+  for (const mk of [G.battle, G.siege && G.siege.site].filter(Boolean)) {
+    const q = miniPos(mk.x, mk.y, v), sz = big ? 9 : 7;
+    c.strokeStyle = '#1d140c'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(q.x - sz, q.y - sz); c.lineTo(q.x + sz, q.y + sz); c.moveTo(q.x + sz, q.y - sz); c.lineTo(q.x - sz, q.y + sz); c.stroke();
+    c.strokeStyle = '#ff6a4a'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(q.x - sz, q.y - sz); c.lineTo(q.x + sz, q.y + sz); c.moveTo(q.x + sz, q.y - sz); c.lineTo(q.x - sz, q.y + sz); c.stroke();
+  }
   for (const g of G.groups) {
+    if (g.army) {
+      const q = miniPos(g.x, g.y, v);
+      c.fillStyle = FACTIONS[g.faction].color; c.strokeStyle = '#1d140c'; c.lineWidth = 1.5;
+      c.beginPath(); c.arc(q.x, q.y, big ? 6 : 4.5, 0, Math.PI * 2); c.fill(); c.stroke();
+      continue;
+    }
     if (Math.hypot(g.x - p.x, g.y - p.y) > (big ? 30 : 24)) continue;
     const q = miniPos(g.x, g.y, v);
     c.fillStyle = g.engaged || g.provoked ? '#ff4a3a' : g.faction ? FACTIONS[g.faction].color : '#3a2a1a';

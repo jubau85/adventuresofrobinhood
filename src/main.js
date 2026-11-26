@@ -9,11 +9,12 @@ import { generateWorld, groundZ, setPlayerWalls } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
-  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers,
+  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus,
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
 import { castleSite, castleBonusAt, dailyBalance } from './castle.js';
+import { applyDamage, startSiege, siegeStatus } from './siege.js';
 import { updateTime, passHours } from './sim.js';
 import { initRender, resetRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview } from './render.js';
 import {
@@ -41,6 +42,7 @@ function newGame(opts) {
   G.s = {
     seed, castleName, color, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
+    damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null,
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     towns: {}, quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
@@ -66,6 +68,7 @@ function startWorld() {
   const home = G.world.sites.find((s) => s.type === 'spieler');
   home.name = homeName();
   setPlayerWalls(G.world, G.s.castle.level >= 1);
+  applyDamage();
   resetRender();
   const p = G.s.player;
   G.cam.x = isoX(p.x, p.y); G.cam.y = isoY(p.x, p.y) - groundZ(G.world, p.x, p.y);
@@ -216,11 +219,24 @@ function checkNearSite() {
   if (s && G.pendingSite === s && !inCombat()) { enterSite(s); return; }
   if (s && !inCombat()) {
     const blocked = s.faction && isHostileFaction(s.faction);
-    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}`);
+    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
   } else if (inCombat()) {
     const cb = castleBonusAt(G.s.player.x, G.s.player.y);
-    showPrompt(`<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>${cb ? ` · Mauerschutz +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr` : ''}`);
-  } else showPrompt(null);
+    showPrompt(`<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>${cb ? ` · Mauerschutz +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr` : ''}${battleText(' · ')}`);
+  } else if (battleText('')) showPrompt(battleText(''));
+  else showPrompt(null);
+}
+
+// Stand einer Schlacht in der Nähe
+function battleText(prefix) {
+  const sg = siegeStatus();
+  if (sg && Math.hypot(sg.x - G.s.player.x, sg.y - G.s.player.y) < 50) {
+    const st = { anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage];
+    return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>`;
+  }
+  const b = battleStatus();
+  if (!b || Math.hypot(b.x - G.s.player.x, b.y - G.s.player.y) > 45) return '';
+  return `${prefix}<span class="warn">Schlacht:</span> ${esc(b.a)} <b>${b.na}</b> gegen ${esc(b.b)} <b>${b.nb}</b>`;
 }
 
 function attackNearest() {
@@ -487,6 +503,8 @@ let last = performance.now(), hudT = 0, miniT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  // Mittlere Bildrate: bestimmt, wie groß Schlachten werden dürfen
+  if (dt > 0) G.fpsAvg = G.fpsAvg ? G.fpsAvg * 0.98 + (1 / dt) * 0.02 : 60;
   G.time += dt;
   if (G.started) {
     readInput();
@@ -570,4 +588,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => setPlayerWalls(G.world, G.s.castle.level >= 1);
-window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance };
+window.__ritterDebug = { passHours, refreshCastleHerd, dailyBalance, startBattle, startSiege };

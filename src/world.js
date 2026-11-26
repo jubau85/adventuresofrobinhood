@@ -276,6 +276,9 @@ export function generateWorld(seed) {
   for (const s of W.sites) genBuildings(W, s, rng);
   for (const f of W.farms) genFarm(W, f, rng);
   placePois(W, rng);
+  for (const s of W.sites) placeCemetery(W, s);
+  // Feste Nummer je Gebäude: Schäden werden darüber gespeichert
+  W.buildings.forEach((b, i) => { b.idx = i; });
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
@@ -819,6 +822,27 @@ function footprintFree(W, x, y, wx, wy, margin = 0.4) {
   return true;
 }
 
+const TAVERN_SIGNS = ['krug', 'krone', 'hirsch', 'eber', 'schwan'];
+const TAVERN_NAMES = ['Zum Goldenen Krug', 'Zur Krone', 'Zum Weißen Hirsch', 'Zum Blauen Eber', 'Zum Schwan', 'Zum Roten Löwen', 'Zur Glocke', 'Zum Pilger'];
+
+// Friedhof neben der Kirche (oder am Ortsrand), umzäunt, mit Steinkreuz
+function placeCemetery(W, s) {
+  if (s.type === 'lager' || s.type === 'spieler') return;
+  const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
+  const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
+  const wx = 2.6, wy = 2.0;
+  for (let r = 0; r <= 6; r += 0.5) {
+    const n = Math.max(1, Math.round(r * 8));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2, x = pref.x + Math.cos(a) * r, y = pref.y + Math.sin(a) * r;
+      if (!footprintFree(W, x, y, wx, wy, 0.3)) continue;
+      s.cemetery = { x, y, wx, wy, old: 2 + Math.floor(hash2(Math.round(x), Math.round(y), 5) * 6) };
+      W.buildings.push({ kind: 'friedhof', x, y, wx, wy, site: s.id, noCost: true, label: `Friedhof von ${s.name}` });
+      return;
+    }
+  }
+}
+
 const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [2.4, 2.2], motte: [3.2, 3.2], rundturm: [2.4, 2.4], tuchhalle: [3.4, 1.6], tor: [5.5, 5.5] };
 
 // Wahrzeichen zuerst setzen, die Häuser ordnen sich darum herum
@@ -898,6 +922,21 @@ function genBuildings(W, s, rng) {
       return;
     }
   };
+  // Wirtshaus mit Schild, Bänken und Fässern
+  const tavern = () => {
+    if (!['stadt', 'markt', 'dorf', 'halle', 'burg'].includes(s.type)) return;
+    for (let k = 0; k < 60; k++) {
+      const a = rng() * Math.PI * 2, r = (s.type === 'burg' ? 6.4 : 2.4) + rng() * 2.4;
+      const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
+      if (!freeSpot(W, x, y, 2.1) || Math.hypot(x - s.x, y - s.y) < 2) continue;
+      if (s.type === 'burg' && Math.hypot(x - s.x, y - s.y) < 5.8) continue;
+      add({ kind: 'house', x, y, wx: 1.5, wy: 1.1, h: 17, rh: 12, wall: 'timber', roof: 'thatch', chimney: true, lit: true, tavern: true, sign: rpick(rng, TAVERN_SIGNS) });
+      W.buildings.push({ kind: 'prop', prop: 'fass', x: x + 0.95, y: y - 0.2, v: rng(), site: s.id });
+      s.tavern = { x, y: y + 0.85, name: `Gasthaus ${rpick(rng, TAVERN_NAMES)}` };
+      return;
+    }
+  };
+  tavern();
   switch (s.type) {
     case 'stadt':
       if (!hasCathedral) add({ kind: 'church', x: s.x - 2.5, y: s.y - 2.5, wx: 2.6, wy: 1.2, h: 30, big: true });

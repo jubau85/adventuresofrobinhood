@@ -5,7 +5,9 @@ import { DAY_LEN, DAYS_PER_SEASON, SEASONS } from './data.js';
 import { dailyEconomy } from './economy.js';
 import { dailyCastle } from './castle.js';
 import { dailyQuests, alliesCount } from './politics.js';
-import { maintainGroups } from './units.js';
+import { maintainGroups, maybeBattle } from './units.js';
+import { maybeSiege, dailyRepairs } from './siege.js';
+import { dailyBurials } from './life.js';
 import { replenishAnimals } from './animals.js';
 
 export function hourOf() { return (6 + (G.s.time / DAY_LEN) * 24) % 24; }
@@ -58,6 +60,10 @@ function newDay() {
   dailyQuests();
   maintainGroups();
   replenishAnimals();
+  maybeBattle();
+  maybeSiege();
+  dailyRepairs();
+  dailyBurials();
   const now = seasonIndex();
   if (now !== before) {
     log(`Der ${SEASONS[now]} ${now === 0 ? `des Jahres ${yearOf()}` : ''} beginnt.`, 'gold');

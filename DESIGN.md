@@ -41,6 +41,7 @@ Schwellen: ab **+50** verbündet, ab **−30** feindlich (Tore zu, Patrouillen g
 - 63 Orte, Wahrzeichen (Kathedralen, Tower, Louvre, Tuchhallen), Stonehenge und Hadrianswall, Einzelhöfe
 - Bewohner mit Rollen und Tagesablauf
 - Hospiz, Schafzucht, Felder, Verpflegung; Fehden zwischen Fraktionen; Kampfbonus in der Burg
+- Schlachten zweier Heere (bis 50 gegen 50), Belagerungen mit Trebuchet, Gebäudeschäden und Wiederaufbau, Friedhöfe mit Begräbnissen, Gasthäuser mit Übernachtung
 - Tag und Nacht mit Lichtern, vier Jahreszeiten (Schnee, Herbstlaub)
 - Spieler und Gefolge mit Reiten, Ausrüstung, Stufen, Befehlen
 - Sechs Gruppentypen mit eigener Route und eigenem Verhalten

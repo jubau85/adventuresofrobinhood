@@ -13,7 +13,8 @@ import { cargoFree, addCargo, siteById } from './economy.js';
 import { castleSite, bLevel, castleBonusAt } from './castle.js';
 import { hourOf, passHours } from './sim.js';
 import { hitAnimal } from './animals.js';
-import { spawnVillagers, updateVillager, updateSayings } from './life.js';
+import { spawnVillagers, updateVillager, updateSayings, buffActive } from './life.js';
+import { countDead, updateSiege } from './siege.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -245,7 +246,7 @@ function isEnemy(a, b) {
 
 function nearestEnemy(u, radius, from = u) {
   let best = null, bd = radius;
-  for (const o of G.units) {
+  for (const o of G.combatants || G.units) {
     if (o === u || !isEnemy(u, o)) continue;
     const d = Math.hypot(o.x - from.x, o.y - from.y);
     if (d < bd) { bd = d; best = o; }
@@ -262,8 +263,8 @@ function calcDamage(a, t) {
   let atk = a.st.atk, def = t.st.def;
   if (a.mounted && a.st.horse) atk += a.st.horse.atk;
   if (t.mounted && t.st.horse) def += t.st.horse.def;
-  if (a.team === 'player') { const b = castleBonusAt(a.x, a.y); if (b) atk *= 1 + b.atk; }
-  if (t.team === 'player') { const b = castleBonusAt(t.x, t.y); if (b) def = def * (1 + b.def) + G.s.castle.level; }
+  if (a.team === 'player') { const b = castleBonusAt(a.x, a.y); if (b) atk *= 1 + b.atk; if (buffActive()) atk *= 1.1; }
+  if (t.team === 'player') { const b = castleBonusAt(t.x, t.y); if (b) def = def * (1 + b.def) + G.s.castle.level; if (buffActive()) def *= 1.1; }
   let dmg = (atk * atk) / (atk + def * 1.5) * rand(0.8, 1.2);
   let crit = false;
   if (Math.random() < 0.08) { dmg *= 1.6; crit = true; }
@@ -329,7 +330,7 @@ export function updateProjectiles(dt) {
 
 export function grantXp(u, amount) {
   if (!u || u.dead || (u.kind !== 'player' && u.kind !== 'companion')) return;
-  u.xp += amount;
+  u.xp += Math.round(amount * (buffActive() ? 1.15 : 1));
   while (u.xp >= xpNeeded(u.level) && u.level < 12) {
     u.xp -= xpNeeded(u.level);
     u.level++;
@@ -355,6 +356,7 @@ function unitDown(t, killer) {
   }
   G.fx.push({ kind: 'corpse', x: t.x, y: t.y, look: unitLook(t), t: 0, dur: 25 });
   const g = t.group;
+  countDead(t);
   // Erfahrung nur für Kämpfe, an denen du beteiligt bist
   if ((killer && killer.team === 'player') || (g && g.engaged)) {
     const xp = 6 + t.level * 6;
@@ -437,6 +439,8 @@ function formationSlot(k) {
 // ---------------------------------------------------------------- Aktualisierung
 export function updateUnits(dt) {
   const p = G.s.player;
+  // Alle, die gerade kämpfen können: nur sie kommen als Gegner in Frage
+  G.combatants = G.units.filter((o) => !o.dead && (o.team === 'player' || (o.group && (o.group.engaged || o.group.feud))));
   for (const u of G.units) {
     u.moving = false;
     if (u.cd > 0) u.cd -= dt;
@@ -460,7 +464,7 @@ export function updateUnits(dt) {
       const m = g.members[k];
       if (near || g.engaged || g.feud) updateGroupMember(m, g, k, dt);
       else {
-        const o = memberOffset(k);
+        const o = g.army ? armyOffset(g, k) : memberOffset(k);
         if (isWalkable(G.world, g.x + o.x, g.y + o.y)) { m.x = g.x + o.x; m.y = g.y + o.y; } else { m.x = g.x; m.y = g.y; }
       }
     }
@@ -555,6 +559,13 @@ function updateCompanion(u, k, dt) {
   if (d > 0.45) chaseTo(u, slot.x, slot.y, dt, 0.3, d > 3 ? 1.4 : 1.05);
 }
 
+// Heere ziehen in Blöcken: acht Mann nebeneinander, Reihe hinter Reihe
+function armyOffset(g, k) {
+  const fx = g.dirX || 1, fy = g.dirY || 0;
+  const col = (k % 8) - 3.5, row = Math.floor(k / 8);
+  return { x: -fy * col * 0.85 - fx * row * 0.85, y: fx * col * 0.85 - fy * row * 0.85 };
+}
+
 function memberOffset(k) {
   const a = k * 2.4, r = k === 0 ? 0 : 0.9 + (k % 2) * 0.4;
   return { x: Math.cos(a) * r, y: Math.sin(a) * r };
@@ -565,7 +576,7 @@ function updateGroupMember(m, g, k, dt) {
     const e = nearestEnemy(m, 22);
     if (e) { engage(m, e, dt); return; }
   }
-  const o = memberOffset(k);
+  const o = g.army ? armyOffset(g, k) : memberOffset(k);
   const tx = g.x + o.x, ty = g.y + o.y;
   const d = Math.hypot(tx - m.x, ty - m.y);
   if (d > 30) { m.x = tx; m.y = ty; return; }
@@ -574,14 +585,12 @@ function updateGroupMember(m, g, k, dt) {
 
 
 function separate() {
-  const list = G.units;
   const p = G.s.player;
+  const list = G.units.filter((o) => !o.dead && !o.hidden && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) <= 31);
   for (let i = 0; i < list.length; i++) {
     const a = list[i];
-    if (a.dead || a.hidden || Math.abs(a.x - p.x) + Math.abs(a.y - p.y) > 30) continue;
     for (let j = i + 1; j < list.length; j++) {
       const b = list[j];
-      if (b.dead || b.hidden) continue;
       const dx = b.x - a.x, dy = b.y - a.y;
       if (Math.abs(dx) > 0.6 || Math.abs(dy) > 0.6) continue;
       const d = Math.hypot(dx, dy) || 0.01;
@@ -693,10 +702,12 @@ export function spawnGroup(type, opts = {}) {
   const g = {
     id: uid(), type, faction: gt.faction, x: pos.x, y: pos.y, home: { x: pos.x, y: pos.y },
     members: [], fallen: [], engaged: false, provoked: false, path: null, pathI: 0, wait: rand(0, 4),
-    questId: opts.questId || null, aggro: gt.hostile ? 7 : 6,
+    questId: opts.questId || null, aggro: gt.hostile ? 7 : gt.army ? 12 : 6, army: !!gt.army,
   };
   const bonus = Math.floor((G.s.day - 1) / 8);
-  if (opts.members) {
+  if (opts.membersUnits) {
+    for (const m of opts.membersUnits) { m.team = 'group'; m.group = g; g.members.push(m); }
+  } else if (opts.members) {
     for (const md of opts.members) {
       const m = makeUnit(md);
       m.team = 'group'; m.group = g; m.mounted = !!m.st.horse;
@@ -704,7 +715,7 @@ export function spawnGroup(type, opts = {}) {
     }
   } else {
     for (const [nt, min, max] of gt.members) {
-      const n = randInt(min, max);
+      const n = Math.max(1, Math.round(randInt(min, max) * (opts.scale || 1)));
       for (let k = 0; k < n; k++) {
         const m = makeNpc(nt, pos.x + rand(-1, 1), pos.y + rand(-1, 1), bonus);
         m.team = 'group';
@@ -723,6 +734,15 @@ function chooseDest(g) {
   const gt = GROUP_TYPES[g.type];
   const W = G.world;
   let dest = null;
+  if (g.defender) { g.wait = 99999; return; }
+  if (g.army && g.siege && !g.siegeDone && G.siege && G.siege.army === g) {
+    dest = G.siege.stage === 'anmarsch' ? G.siege.camp : null;
+    if (!dest) { g.wait = 99999; return; }
+  } else if (g.army) {
+    // Nach der Schlacht zieht das Heer heim und löst sich auf, sobald es außer Sicht ist
+    dest = g.home;
+    if (Math.hypot(g.x - dest.x, g.y - dest.y) < 3) { if (!nearPlayer(g, 60)) removeGroup(g); else g.wait = 5; return; }
+  }
   if (gt.spawn === 'wild' || gt.spawn === 'forest' || g.questId) {
     for (let k = 0; k < 30 && !dest; k++) {
       const x = g.home.x + rand(-14, 14), y = g.home.y + rand(-14, 14);
@@ -750,6 +770,7 @@ export function updateGroups(dt) {
     if (!g.members.length) continue;
     const gt = GROUP_TYPES[g.type];
     const lead = g.members[0];
+    if (g.army) updateArmy(g, p);
     if (g.feud) {
       const f = g.feud;
       g.x = lead.x; g.y = lead.y;
@@ -760,7 +781,7 @@ export function updateGroups(dt) {
     if (g.engaged) {
       let minD = Infinity;
       for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
-      if (minD > 17 || p.dead) {
+      if (minD > (g.army ? 40 : 17) || p.dead) {
         g.engaged = false;
         g.path = null; g.wait = 2;
         g.x = lead.x; g.y = lead.y;
@@ -783,6 +804,7 @@ export function updateGroups(dt) {
       continue;
     }
     const target = g.path[g.pathI];
+    if (g.army) { const dd = Math.hypot(target.x - g.x, target.y - g.y) || 1; g.dirX = (target.x - g.x) / dd; g.dirY = (target.y - g.y) / dd; }
     const t = tileAt(G.world, g.x, g.y);
     const sp = gt.speed * TERRAIN_SPEED[t] * dt;
     const dx = target.x - g.x, dy = target.y - g.y, d = Math.hypot(dx, dy);
@@ -793,6 +815,7 @@ export function updateGroups(dt) {
       g.x += (dx / d) * sp; g.y += (dy / d) * sp;
     }
   }
+  updateSiege(dt);
 }
 
 export function maintainGroups(initial = false) {
@@ -853,7 +876,7 @@ const OUTLAWS = { banditen: 1, raubritter: 1 };
 const PREY = { haendler: 1, steuer: 1, patrouille: 1, franzosen: 1, sachsen: 1 };
 
 function groupsFeud(a, b) {
-  if (a === b || a.questId || b.questId) return false;
+  if (a === b || a.questId || b.questId || a.army || b.army || a.defender || b.defender) return false;
   if (OUTLAWS[a.type] || OUTLAWS[b.type]) {
     if (OUTLAWS[a.type] && OUTLAWS[b.type]) return false;
     return !!PREY[(OUTLAWS[a.type] ? b : a).type];
@@ -901,7 +924,7 @@ function checkFeuds() {
   // Helfer: Freunde in der Nähe greifen deine Angreifer an, Feinde schließen sich ihnen an
   if (!inCombat() || p.dead) return;
   for (const h of gs) {
-    if (!h.members.length || h.engaged || h.feud || h.questId) continue;
+    if (!h.members.length || h.engaged || h.feud || h.questId || h.army || h.defender) continue;
     const d = Math.hypot(h.x - p.x, h.y - p.y);
     if (d > 28) continue;
     const ht = GROUP_TYPES[h.type];
@@ -986,4 +1009,84 @@ function updateTowers(dt) {
     G.projectiles.push({ x: tx, y: ty, tx: best.x, ty: best.y, target: best, att: archer, t: 0, dur: Math.max(0.25, bd / 14), bolt: L >= 3, z0: 46 });
     G.towerCd[k] = 2.8 - L * 0.45;
   }
+}
+
+// ---------------------------------------------------------------- Schlachten
+// Ab und zu ziehen zwei Heere heran und schlagen sich, je 50 Mann (bei knapper Leistung weniger).
+// Du kannst zuschauen oder eingreifen. Nur ein Heer, dessen Fraktion dir feindlich ist, greift auch dich an.
+function battleSize() {
+  const f = G.fpsAvg || 60;
+  return f >= 40 ? 50 : f >= 30 ? 40 : 30;
+}
+
+export function maybeBattle() {
+  if (G.s.day < 4 || G.battle || inCombat()) return;
+  if (Math.random() < 0.35) startBattle();
+}
+
+export function startBattle() {
+  const W = G.world, p = G.s.player;
+  if (G.battle) return false;
+  const land = landAt(W, p.x, p.y);
+  const site = W.sites.reduce((a, s) => (s.land === land && (!a || Math.hypot(s.x - p.x, s.y - p.y) < Math.hypot(a.x - p.x, a.y - p.y)) ? s : a), null);
+  const french = site && (site.realm === 'fr' || site.realm === 'fl' || site.realm === 'nd');
+  const [ta, tb] = french ? ['heer_normandie', 'heer_philipp'] : ['heer_john', 'heer_richard'];
+  // Schlachtfeld: offenes Land 16 bis 26 Felder vom Spieler, nicht in einem Ort
+  for (let k = 0; k < 160; k++) {
+    const a = Math.random() * Math.PI * 2, r = rand(16, 26);
+    const bx = p.x + Math.cos(a) * r, by = p.y + Math.sin(a) * r;
+    const t = tileAt(W, bx, by);
+    if ((t !== T.GRASS && t !== T.FIELD) || landAt(W, bx, by) !== land) continue;
+    if (W.sites.some((s) => Math.hypot(s.x - bx, s.y - by) < s.clear + 6)) continue;
+    // Die Heere kommen von gegenüberliegenden Seiten
+    const d = Math.random() * Math.PI * 2;
+    const spawnAt = (ang) => {
+      for (let j = 0; j < 30; j++) {
+        const rr = 26 + j * 0.6, x = bx + Math.cos(ang) * rr, y = by + Math.sin(ang) * rr;
+        if (isWalkable(W, x, y) && landAt(W, x, y) === land) return { x, y };
+      }
+      return null;
+    };
+    const pa = spawnAt(d), pb = spawnAt(d + Math.PI);
+    if (!pa || !pb) continue;
+    const patha = findPath(W, pa.x, pa.y, bx, by, 60000), pathb = findPath(W, pb.x, pb.y, bx, by, 60000);
+    if (!patha || !pathb) continue;
+    const scale = battleSize() / 50;
+    const A = spawnGroup(ta, { pos: pa, scale }), B = spawnGroup(tb, { pos: pb, scale });
+    if (!A || !B) return false;
+    for (const [g, path] of [[A, patha], [B, pathb]]) { g.path = path; g.pathI = 0; g.wait = 0; g.foe = g === A ? B : A; g.peace = 0; }
+    G.battle = { x: bx, y: by, a: A, b: B };
+    rebuildUnits();
+    const na = GROUP_TYPES[ta], nb = GROUP_TYPES[tb];
+    const dx = bx - p.x, dy = by - p.y, ang = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    const dir = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'][Math.round(((ang + 360) % 360) / 45) % 8];
+    log(`Zwei Heere ziehen heran! ${na.nom} und ${nb.acc}, je ${A.members.length} Mann, treffen im ${dir} von dir aufeinander. Halte dich heraus oder greif ein.`, 'bad');
+    return true;
+  }
+  return false;
+}
+
+function updateArmy(g, p) {
+  if (g.siege) return;
+  const f = g.foe;
+  if (f && f.members.length && G.groups.includes(f)) {
+    // Treffen die Heere aufeinander, beginnt die Schlacht
+    if (!g.feud && Math.hypot(f.x - g.x, f.y - g.y) < 16) {
+      g.feud = f; f.feud = g; g.path = null; f.path = null;
+      if (nearPlayer(g, 60)) log('Die Heere prallen aufeinander!', 'bad');
+    }
+  } else if (G.battle && (G.battle.a === g || G.battle.b === g)) {
+    // Der Gegner ist geschlagen oder fort: Sieg melden, dann heimziehen
+    if (nearPlayer(g, 60)) log(`${GROUP_TYPES[g.type].nom} ${GROUP_TYPES[g.type].pl ? 'haben' : 'hat'} die Schlacht gewonnen.`, 'gold');
+    G.battle = null;
+    g.foe = null;
+  }
+  if (G.battle && !G.groups.includes(G.battle.a) && !G.groups.includes(G.battle.b)) G.battle = null;
+}
+
+// Stärke beider Heere für die Anzeige
+export function battleStatus() {
+  const b = G.battle;
+  if (!b) return null;
+  return { a: GROUP_TYPES[b.a.type].name, na: b.a.members.length, b: GROUP_TYPES[b.b.type].name, nb: b.b.members.length, x: b.x, y: b.y };
 }
