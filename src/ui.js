@@ -154,6 +154,8 @@ function repPill(f) {
   const st = repStatus(v);
   return `<span class="pill ${st.cls}">${st.label} · ${v > 0 ? '+' : ''}${v}</span>`;
 }
+// „bei den Sachsen“, aber „bei der Kirche“, „bei der Gilde“
+function beiFaction(f) { const n = FACTIONS[f].short; return n === 'Kirche' || n === 'Gilde' ? `bei der ${n}` : `bei den ${n}`; }
 function swatch(f) { return f ? `<span class="swatch" style="--c:${FACTIONS[f].color}"></span>` : ''; }
 
 function itemStats(id) {
@@ -193,7 +195,7 @@ function townPanel() {
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${siegeAt(site) ? siegeActions() : ''}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${letterActions(site, 'den Herrn der Stadt; die Torwache reicht ihn weiter, auch wenn sie dich nicht einlässt')}${siegeAt(site) ? siegeActions() : ''}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -220,9 +222,10 @@ function townInfo(site) {
       </dl>
     </div>
     <div class="actions">
+      ${letterActions(site)}
       ${siegeAt(site) ? siegeActions() : ''}
       <h3>Am Hof</h3>
-      <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen bei den ${esc(FACTIONS[f].short)} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
+      <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen ${esc(beiFaction(f))} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
       ${mineAction(site)}
       ${tourneyAction(site)}
@@ -234,13 +237,23 @@ function townInfo(site) {
   </div>`;
 }
 
+// Briefe für diesen Ort: überall abzugeben, wo man ankommt, auch beim Einsiedler, in der Grube,
+// in einem verlassenen Ort, am Tor einer feindlichen oder in einer belagerten Stadt
+const LETTER_TO = { einsiedelei: 'den Einsiedler', mine: 'den Steiger der Grube', lager: 'den Anführer der Waldleute' };
+function letterActions(site, who = null) {
+  const qs = G.s.quests.filter((q) => q.type === 'bote' && q.target === site.id);
+  if (!qs.length) return '';
+  const to = who || LETTER_TO[site.type] || `den Herrn von ${site.name}`;
+  return `<h3>Botschaft</h3>${qs.map((q) => `<div class="action"><div><b>${esc(q.title)}</b><p>Der versiegelte Brief aus ${esc(siteById(q.from).name)} ist bestimmt für ${esc(to)}. Belohnung ${fmt(q.reward.gold)} Gold und Ansehen ${esc(beiFaction(q.faction))}.</p></div><button class="btn primary" data-act="letter" data-q="${q.id}">Brief übergeben</button></div>`).join('')}`;
+}
+
 // Ein geplünderter Ort: leer, kein Markt, kein Gasthaus. Mit Sühne kehren die Leute früher zurück.
 function abandonedPanel(site) {
   const back = G.s.abandoned[site.id];
   return {
     title: site.name, sub: `${esc(TYPE_NAME[site.type])} · verlassen`, tabs: [],
     body: `<div class="notice bad"><p>Die Türen stehen offen, die Herdstellen sind kalt. Seit deinem Überfall wohnt in ${esc(site.name)} niemand mehr. Markt, Gasthaus und Werkstätten sind verlassen.</p><p>Erst um Tag ${back} wagen sich die ersten Leute zurück.</p></div>
-      <div class="actions">${blightActions(site)}${site.port ? harbourActions(site) : ''}</div>`,
+      <div class="actions">${letterActions(site, 'die wenigen, die geblieben sind')}${blightActions(site)}${site.port ? harbourActions(site) : ''}</div>`,
   };
 }
 
@@ -276,6 +289,7 @@ function hermitPanel(site) {
     body: `<div class="cols">
       <div><p class="lede">${esc(site.desc)}</p><p>${esc(FEATURE_TEXT[site.feature] || '')} Glühwürmchen tanzen hier in der Dämmerung, und es ist seltsam still.</p></div>
       <div class="actions">
+        ${letterActions(site)}
         <h3>Beim Einsiedler</h3>
         <div class="action"><div><b>Um Rat fragen</b><p>Der Einsiedler sieht mehr, als man glaubt: ein Spruch und ein echter Hinweis. Einmal am Tag.</p></div><button class="btn" data-act="hrat" ${st.adviceDay === G.s.day ? 'disabled' : ''}>Fragen</button></div>
         <div class="action"><div><b>Segen erbitten</b><p>Heilkräuter und ein Segen: Du und dein Gefolge seid ganz geheilt, bis morgen Abend +10 % Angriff und Abwehr, +15 % Erfahrung. Alle drei Tage.</p></div><button class="btn primary" data-act="hsegen" ${bless ? '' : 'disabled'}>Segnen lassen</button></div>
@@ -310,7 +324,7 @@ function siegePanel() {
           <dt>Verteidiger</dt><dd>${swatch(off.fs)}${sg.def ? `Besatzung: <b>${st.def}</b> Mann` : 'Die Besatzung hinter den Mauern'} · ${repPill(off.fs)}</dd>
         </dl>
       </div>
-      <div class="actions">${siegeActions()}</div>
+      <div class="actions">${inside ? letterActions(s) : ''}${siegeActions()}</div>
     </div>`,
   };
 }
@@ -353,7 +367,7 @@ function blightActions(site) {
   if (isBlighted(site)) {
     const cost = atoneCost(site), slain = G.s.slain[site.id] || 0;
     return `<h3>Nach dem Überfall</h3><div class="notice bad"><p>${esc(site.name)} liegt darnieder${slain ? `, ${slain} ${slain === 1 ? 'Bewohner ist' : 'Bewohner sind'} tot` : ''}. Bis Tag ${G.s.blight[site.id]} wird hier nichts gebaut und nichts repariert.</p></div>
-      <div class="action"><div><b>Sühne leisten</b><p>Gold für die Hinterbliebenen und Messen für die Toten. Danach wird wieder gebaut. Ansehen bei den ${esc(FACTIONS[site.faction].short)} +10, Kirche +4.</p></div><button class="btn" data-act="atone" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
+      <div class="action"><div><b>Sühne leisten</b><p>Gold für die Hinterbliebenen und Messen für die Toten. Danach wird wieder gebaut. Ansehen ${esc(beiFaction(site.faction))} +10, Kirche +4.</p></div><button class="btn" data-act="atone" ${G.s.gold < cost ? 'disabled' : ''}>${fmt(cost)} Gold</button></div>`;
   }
   if (!canDonate(site)) return '';
   const cost = donateCost(site);

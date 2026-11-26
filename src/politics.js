@@ -96,8 +96,10 @@ function makeQuest(site) {
       q.days = overSea ? 7 : 5;
       const d = Math.hypot(tgt.x - site.x, tgt.y - site.y);
       q.reward = { gold: Math.round(30 + d * 0.6 + (overSea ? 60 : 0)), rep: randInt(4, 7) + (overSea ? 2 : 0), renown: overSea ? 2 : 1 };
-      q.title = `Botschaft nach ${tgt.name}`;
-      q.desc = overSea ? `Bring einen versiegelten Brief nach ${tgt.name}. Dafür musst du übers Meer: Schiffe fahren in Dover, Portsmouth und London.` : `Bring einen versiegelten Brief nach ${tgt.name}.`;
+      // Einsiedler und Gruben liegen abseits: Der Brief geht an eine Person, nicht an einen Ort
+      const to = tgt.type === 'einsiedelei' ? `zum Einsiedler (${tgt.name})` : tgt.type === 'mine' ? `zum Steiger der ${tgt.name}` : `nach ${tgt.name}`;
+      q.title = tgt.type === 'einsiedelei' ? 'Botschaft an den Einsiedler' : tgt.type === 'mine' ? `Botschaft an die ${tgt.name}` : `Botschaft nach ${tgt.name}`;
+      q.desc = `Bring einen versiegelten Brief ${to}.${overSea ? ' Dafür musst du übers Meer: Schiffe fahren in Dover, Portsmouth und London.' : ''} Abgeben kannst du ihn dort im Fenster des Ortes (E).`;
       break;
     }
     default: break;
