@@ -495,7 +495,7 @@ const SAVE_KEY = 'a-knights-tale-v4';
 const SAVE_VERSION = 5;   // 5: Karte mit 1024 Kacheln
 
 // Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
-// Eine Kachel entspricht etwa 1,6 km. Längengrade sind mit cos(51,5°) gestaucht.
+// Eine Kachel entspricht gut 800 m (bei MAP 1024). Längengrade sind mit cos(51,5°) gestaucht.
 const LAT_N = 55.3, LAT_S = 47.9;
 const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
 const KM_PER_TILE = GEO.dLat * 111.2;
@@ -17160,6 +17160,8 @@ function onKey(e) {
   if (panelKeys[k]) { if (k === 'h') togglePanel('help'); else tool(panelKeys[k]); e.preventDefault(); return; }
   if (panelOpen()) return;
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); return; }
+  // Umschalttaste halten: der Held läuft (zu Pferd: Galopp), mit Tasten wie auf einem Weg per Mausklick
+  if (k === 'shift') { keys.add('shift'); return; }
   switch (k) {
     case 'e': interactHere(); break;
     case 'r': toggleRide(); break;
@@ -17196,7 +17198,9 @@ function readInput() {
 
 function bindInput() {
   window.addEventListener('keydown', onKey);
-  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  window.addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); if (!e.shiftKey) keys.delete('shift'); });
+  // Fenster verliert den Fokus: keine Taste bleibt „hängen“
+  window.addEventListener('blur', () => keys.clear());
   window.addEventListener('blur', () => keys.clear());
   let down = null, lastClick = null;
   viewCanvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
