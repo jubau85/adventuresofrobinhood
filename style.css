@@ -278,7 +278,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 #title-art { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .title-wrap {
   position: relative; min-height: 100%;
-  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 470px); align-items: center; gap: 24px 40px;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 640px); align-items: center; gap: 24px 40px;
   padding-block: 32px;
   padding-left: max(28px, env(safe-area-inset-left, 0px));
   padding-right: max(28px, env(safe-area-inset-right, 0px));
@@ -339,8 +339,25 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .charges span svg { width: 82%; height: auto; }
 .charges input:checked + span { background: radial-gradient(ellipse at 40% 30%, #f6d98e, var(--ocker) 75%); border-color: #4a3018; box-shadow: 0 0 0 2px #6a4a1a; }
 .charges input:focus-visible + span { outline: 2px solid var(--tinte); outline-offset: 2px; }
-.preview { margin: 2px -6px 0; }
-#hero-preview { display: block; width: 100%; height: auto; aspect-ratio: 300 / 212; max-width: 100%; }
+.title-card { container-type: inline-size; }
+/* Wappenwahl links, die Miniatur rechts daneben; im schmalen Blatt untereinander */
+.wappen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 16px 20px; align-items: start; }
+@media (max-width: 1200px) {
+  .title-wrap { grid-template-columns: minmax(0, 1fr) minmax(320px, 600px); }
+  .title-head h1 { font-size: clamp(48px, 7vw, 90px); }
+}
+@media (max-width: 1000px) { .title-wrap { grid-template-columns: minmax(0, 1fr) minmax(320px, 500px); } }
+.wappen-wahl { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.wappen .charges { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.wappen .swatches { flex-wrap: wrap; gap: 7px; }
+.wappen .swatches span { width: 33px; height: 33px; }
+.preview { margin: 0; }
+#hero-preview { display: block; width: 100%; height: auto; aspect-ratio: 240 / 340; max-width: 100%; }
+@container (max-width: 470px) {
+  .wappen { grid-template-columns: 1fr; }
+  .wappen .charges { grid-template-columns: repeat(6, minmax(0, 56px)); }
+  .preview { max-width: 340px; margin: 0 auto; width: 100%; }
+}
 .title-card .btn { padding: 6px 18px; font-size: 16px; }
 .title-card .btn.primary {
   font-family: var(--font-title); font-size: 30px; font-weight: 400; padding: 4px 24px 6px; color: #24140a;

@@ -286,7 +286,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 #title-art { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .title-wrap {
   position: relative; min-height: 100%;
-  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 470px); align-items: center; gap: 24px 40px;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 640px); align-items: center; gap: 24px 40px;
   padding-block: 32px;
   padding-left: max(28px, env(safe-area-inset-left, 0px));
   padding-right: max(28px, env(safe-area-inset-right, 0px));
@@ -347,8 +347,25 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .charges span svg { width: 82%; height: auto; }
 .charges input:checked + span { background: radial-gradient(ellipse at 40% 30%, #f6d98e, var(--ocker) 75%); border-color: #4a3018; box-shadow: 0 0 0 2px #6a4a1a; }
 .charges input:focus-visible + span { outline: 2px solid var(--tinte); outline-offset: 2px; }
-.preview { margin: 2px -6px 0; }
-#hero-preview { display: block; width: 100%; height: auto; aspect-ratio: 300 / 212; max-width: 100%; }
+.title-card { container-type: inline-size; }
+/* Wappenwahl links, die Miniatur rechts daneben; im schmalen Blatt untereinander */
+.wappen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 16px 20px; align-items: start; }
+@media (max-width: 1200px) {
+  .title-wrap { grid-template-columns: minmax(0, 1fr) minmax(320px, 600px); }
+  .title-head h1 { font-size: clamp(48px, 7vw, 90px); }
+}
+@media (max-width: 1000px) { .title-wrap { grid-template-columns: minmax(0, 1fr) minmax(320px, 500px); } }
+.wappen-wahl { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.wappen .charges { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.wappen .swatches { flex-wrap: wrap; gap: 7px; }
+.wappen .swatches span { width: 33px; height: 33px; }
+.preview { margin: 0; }
+#hero-preview { display: block; width: 100%; height: auto; aspect-ratio: 240 / 340; max-width: 100%; }
+@container (max-width: 470px) {
+  .wappen { grid-template-columns: 1fr; }
+  .wappen .charges { grid-template-columns: repeat(6, minmax(0, 56px)); }
+  .preview { max-width: 340px; margin: 0 auto; width: 100%; }
+}
 .title-card .btn { padding: 6px 18px; font-size: 16px; }
 .title-card .btn.primary {
   font-family: var(--font-title); font-size: 30px; font-weight: 400; padding: 4px 24px 6px; color: #24140a;
@@ -485,32 +502,35 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
           <label for="castle-input">Name deiner Burg</label>
           <input id="castle-input" maxlength="20" value="Ashcombe" spellcheck="false">
         </div>
-        <div class="pair">
-          <fieldset class="field">
-          <legend>Figur</legend>
-          <div class="seg">
-            <label><input type="radio" name="figur" value="m" checked><span>Ritter</span></label>
-            <label><input type="radio" name="figur" value="w"><span>Ritterin</span></label>
+        <div class="wappen">
+          <div class="wappen-wahl">
+            <div class="pair">
+              <fieldset class="field">
+              <legend>Figur</legend>
+              <div class="seg">
+                <label><input type="radio" name="figur" value="m" checked><span>Ritter</span></label>
+                <label><input type="radio" name="figur" value="w"><span>Ritterin</span></label>
+              </div>
+              </fieldset>
+              <fieldset class="field">
+              <legend>Metall</legend>
+              <div class="seg" id="metal-pick">
+                <label><input type="radio" name="metall" value="gold" checked><span>Gold</span></label>
+                <label><input type="radio" name="metall" value="silber"><span>Silber</span></label>
+              </div>
+              </fieldset>
+            </div>
+            <fieldset class="field">
+              <legend>Wappenfarbe <span id="color-name" class="muted"></span></legend>
+              <div class="swatches" id="color-swatches"></div>
+            </fieldset>
+            <fieldset class="field">
+              <legend>Wappenbild <span id="charge-name" class="muted"></span></legend>
+              <div class="charges" id="charge-pick"></div>
+            </fieldset>
           </div>
-          </fieldset>
-          <fieldset class="field">
-          <legend>Metall</legend>
-          <div class="seg" id="metal-pick">
-            <label><input type="radio" name="metall" value="gold" checked><span>Gold</span></label>
-            <label><input type="radio" name="metall" value="silber"><span>Silber</span></label>
-          </div>
-          </fieldset>
+          <div class="preview"><canvas id="hero-preview" width="240" height="340" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         </div>
-        <fieldset class="field">
-          <legend>Wappenfarbe <span id="color-name" class="muted"></span></legend>
-          <div class="swatches" id="color-swatches"></div>
-        </fieldset>
-        <fieldset class="field">
-          <legend>Wappenbild <span id="charge-name" class="muted"></span></legend>
-          <div class="charges" id="charge-pick"></div>
-        </fieldset>
-
-        <div class="preview"><canvas id="hero-preview" width="300" height="212" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
@@ -9540,11 +9560,12 @@ function drawArms(c, arms, x, y, w) {
 
 
 // ---------------------------------------------------------------- Ritter als Buchmalerei (Startmenü)
-// Gemalt wie eine Miniatur in einer Liederhandschrift um 1300: Rahmen in Blau, Gold und Rot, darüber der Name in
-// roter Tinte. Der Ritter galoppiert nach links, Pferdedecke und Banner sind mit dem Wappenbild bestreut, das
-// Wappenbild steht als Helmzier auf dem Topfhelm, im Grund rankt eine Rose. Flache Farben mit Tintenrand.
-// Gezeichnet in einem Feld von 300 × 212, eingepasst in w × h.
-const PLATE_W = 300, PLATE_H = 212;
+// Eine Seite wie aus einer Liederhandschrift um 1300, im Hochformat: oben in roter Tinte Name und Blattzahl, Rahmen
+// in Blau, Gold und Rot, im Grund scheint die Schrift der Rückseite durch. Der Ritter springt nach links, Pferdedecke
+// und Banner sind mit dem Wappenbild bestreut, das Wappenbild steht groß als Helmzier auf dem Topfhelm, vor der Brust
+// hängt der Wappenschild, rechts und oben rankt eine Rose. Flache Farben mit Tintenrand, Falten mit Schatten und
+// weißen Lichtern. Gezeichnet in einem Feld von 240 × 340, eingepasst in w × h.
+const PLATE_W = 240, PLATE_H = 340;
 const MS = { blau: '#2c5d9c', gold: '#d8a83a', rot: '#b8321f', ranke: '#3f7d37', blatt: '#2c6630', rose: '#c8402a', kette: '#a3a9ae', helm: '#b9bec2' };
 function msShade(hex, f) {
   const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -9617,62 +9638,117 @@ function msStem(c, draw, w = 2.2) {
   c.beginPath(); draw(); c.strokeStyle = INK; c.lineWidth = w + 1.1; c.stroke();
   c.beginPath(); draw(); c.strokeStyle = MS.ranke; c.lineWidth = w; c.stroke();
 }
-function msVine(c) {
-  msStem(c, () => { c.moveTo(268, 196); c.bezierCurveTo(284, 172, 254, 156, 264, 132); c.bezierCurveTo(274, 110, 250, 100, 256, 80); c.bezierCurveTo(262, 60, 240, 54, 226, 46); }, 2.4);
-  // Seitenzweige, je mit einer Rose im Rankenkreis
-  const twigs = [[264, 150, 271, 168], [262, 116, 244, 120], [258, 90, 272, 86], [250, 66, 236, 76], [236, 50, 210, 60], [258, 74, 266, 52]];
-  for (const [sx, sy, rx, ry] of twigs) {
-    const a0 = Math.atan2(sy - ry, sx - rx), R = 9.5;
-    msStem(c, () => { c.moveTo(sx, sy); c.quadraticCurveTo((sx + rx) / 2 + (ry - sy) * 0.25, (sy + ry) / 2 - (rx - sx) * 0.25, rx + Math.cos(a0) * R, ry + Math.sin(a0) * R); c.arc(rx, ry, R, a0, a0 + Math.PI * 1.55); }, 1.3);
-    // kleine Dornen am Kreis
-    c.strokeStyle = MS.ranke; c.lineWidth = 0.9;
-    for (let k = 1; k < 5; k++) { const a = a0 + k * 0.36; c.beginPath(); c.moveTo(rx + Math.cos(a) * R, ry + Math.sin(a) * R); c.lineTo(rx + Math.cos(a + 0.12) * (R + 2.6), ry + Math.sin(a + 0.12) * (R + 2.6)); c.stroke(); }
-    msRose(c, rx, ry, 5.6);
+// Gemalte Falten: dunkle, weiche Striche in den Tiefen, feine weiße Lichter auf den Graten (wie in der Buchmalerei)
+function msFolds(c, col, lines) {
+  for (const [x0, y0, x1, y1, bend] of lines) {
+    const mx = (x0 + x1) / 2 + bend, my = (y0 + y1) / 2;
+    for (const [w, a] of [[6, 0.1], [3.6, 0.14], [1.8, 0.2]]) { c.strokeStyle = col; c.globalAlpha = a * 2.2; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(mx, my, x1, y1); c.stroke(); }
+    c.globalAlpha = 0.55; c.strokeStyle = '#fff'; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(x0 + 3, y0 + 2); c.quadraticCurveTo(mx + 3.2, my, x1 + 3, y1 - 4); c.stroke();
   }
-  msLeaf(c, 268, 140, -0.4, 0.9); msLeaf(c, 254, 104, 2.7, 0.9); msLeaf(c, 262, 60, -1.2, 0.8); msLeaf(c, 270, 186, -0.9, 0.9);
-  // freie Ranke ohne Blüte
-  msStem(c, () => { c.moveTo(226, 46); c.bezierCurveTo(214, 40, 204, 46, 206, 52); c.arc(210, 51, 4, Math.PI, Math.PI * 2.6); }, 1.1);
+  c.globalAlpha = 1;
+}
+// Rose mit gemalter Tiefe
+function msRoseBig(c, x, y, r) {
+  msRose(c, x, y, r);
+  c.strokeStyle = 'rgba(110,20,10,0.45)'; c.lineWidth = r * 0.12;
+  for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k * 2 * Math.PI) / 5; c.beginPath(); c.arc(x + Math.cos(a) * r * 0.52, y + Math.sin(a) * r * 0.52, r * 0.36, a - 1.1, a + 1.1); c.stroke(); }
+  c.fillStyle = 'rgba(255,255,255,0.55)';
+  for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k * 2 * Math.PI) / 5 - 0.5; c.beginPath(); c.arc(x + Math.cos(a) * r * 0.78, y + Math.sin(a) * r * 0.78, r * 0.07, 0, Math.PI * 2); c.fill(); }
+}
+// Efeublatt (dreilappig)
+function msIvy(c, x, y, a, s) {
+  c.save(); c.translate(x, y); c.rotate(a); c.scale(s, s);
+  c.beginPath(); c.moveTo(0, 0);
+  c.bezierCurveTo(-2, -4, -9, -4, -10, -9); c.bezierCurveTo(-6, -10, -4, -13, 0, -16); c.bezierCurveTo(4, -13, 6, -10, 10, -9); c.bezierCurveTo(9, -4, 2, -4, 0, 0);
+  c.closePath(); msInk(c, MS.blatt, 0.7 / s);
+  c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 0.6 / s; c.beginPath(); c.moveTo(0, -2); c.lineTo(0, -12); c.stroke();
+  c.restore();
 }
 
-function msFrame(c) {
-  const x0 = 8, y0 = 28, x1 = 292, y1 = 206;
-  const band = (i, col) => { c.beginPath(); c.rect(x0 + i[0], y0 + i[0], x1 - x0 - 2 * i[0], y1 - y0 - 2 * i[0]); c.rect(x0 + i[1], y0 + i[1], x1 - x0 - 2 * i[1], y1 - y0 - 2 * i[1]); c.fillStyle = col; c.fill('evenodd'); };
-  c.fillStyle = 'rgba(252,247,233,0.62)'; c.fillRect(x0 + 11, y0 + 11, x1 - x0 - 22, y1 - y0 - 22);
-  band([0, 6.5], MS.blau); band([6.5, 9.4], MS.gold); band([9.4, 11.4], MS.rot);
-  c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 0.7; c.strokeRect(x0 + 3.2, y0 + 3.2, x1 - x0 - 6.4, y1 - y0 - 6.4);
-  c.strokeStyle = 'rgba(20,30,60,0.75)'; c.lineWidth = 0.6; c.strokeRect(x0, y0, x1 - x0, y1 - y0);
-  c.strokeStyle = 'rgba(90,50,10,0.5)'; c.strokeRect(x0 + 6.5, y0 + 6.5, x1 - x0 - 13, y1 - y0 - 13);
-  return [x0 + 11.4, y0 + 11.4, x1 - 11.4, y1 - 11.4];
+// Rosenranke: vom unteren Rand hinter dem Pferd hinauf und oben über das Bild, jede Rose in einem Rankenkreis
+function msVine(c) {
+  const stem = () => { c.moveTo(186, 323); c.bezierCurveTo(176, 300, 198, 286, 190, 262); c.bezierCurveTo(182, 240, 204, 226, 194, 204); c.bezierCurveTo(186, 184, 206, 170, 196, 148); c.bezierCurveTo(186, 126, 206, 112, 194, 90); c.bezierCurveTo(186, 74, 166, 70, 150, 74); c.bezierCurveTo(134, 78, 118, 72, 108, 58); };
+  msStem(c, stem, 2.6);
+  // [Abzweig am Stiel x, y, Rose x, y, Drehsinn]
+  const twigs = [[192, 244, 207, 228, 1], [194, 206, 172, 196, -1], [196, 170, 208, 152, 1], [195, 132, 172, 124, -1], [196, 100, 206, 66, 1], [160, 72, 168, 46, -1], [124, 72, 128, 48, 1], [110, 60, 88, 44, -1]];
+  for (const [sx, sy, rx, ry, dir] of twigs) {
+    const R = 14, a0 = Math.atan2(sy - ry, sx - rx);
+    msStem(c, () => { c.moveTo(sx, sy); c.quadraticCurveTo((sx + rx) / 2 + (ry - sy) * 0.3 * dir, (sy + ry) / 2 - (rx - sx) * 0.3 * dir, rx + Math.cos(a0) * R, ry + Math.sin(a0) * R); c.arc(rx, ry, R, a0, a0 + dir * Math.PI * 1.6, dir < 0); }, 1.5);
+    // Ranke läuft in eine kleine Schnecke aus
+    const ae = a0 + dir * Math.PI * 1.6, ex = rx + Math.cos(ae) * R, ey = ry + Math.sin(ae) * R;
+    msStem(c, () => { c.moveTo(ex, ey); c.arc(ex + Math.cos(ae) * -3, ey + Math.sin(ae) * -3, 3, ae, ae + dir * Math.PI * 1.5, dir < 0); }, 1);
+    // kleine Blättchen außen am Kreis
+    c.fillStyle = MS.ranke;
+    for (let k = 1; k < 7; k++) { const a = a0 + dir * k * 0.42; const px = rx + Math.cos(a) * R, py = ry + Math.sin(a) * R; c.beginPath(); c.ellipse(px + Math.cos(a) * 2.2, py + Math.sin(a) * 2.2, 2.2, 1, a, 0, Math.PI * 2); c.fill(); }
+    msRoseBig(c, rx, ry, 9);
+  }
+  msIvy(c, 206, 312, 0.5, 0.95); msIvy(c, 182, 280, -0.6, 0.85); msIvy(c, 210, 108, 0.8, 0.8);
 }
 
+// Rahmen: Blau mit weißer Haarlinie, Gold, Rot; innen das Pergament (mit Schrift von der Rückseite, die durchscheint)
+const MS_VERSE = ['ich saz ûf eime steine und dahte bein mit beine', 'dar ûf satzt ich den ellenbogen ich hete in mîne hant gesmogen', 'daz kinne und ein mîn wange dô dâhte ich mir vil ange', 'wie man zer welte solte leben deheinen rât kond ich gegeben', 'wie man driu dinc erwurbe der deheinez niht verdurbe'];
+function msFrame(c, bleed) {
+  const x0 = 8, y0 = 26, x1 = PLATE_W - 8, y1 = PLATE_H - 6, ins = 11;
+  const band = (a, b, col) => { c.beginPath(); c.rect(x0 + a, y0 + a, x1 - x0 - 2 * a, y1 - y0 - 2 * a); c.rect(x0 + b, y0 + b, x1 - x0 - 2 * b, y1 - y0 - 2 * b); c.fillStyle = col; c.fill('evenodd'); };
+  c.fillStyle = 'rgba(253,249,236,0.5)'; c.fillRect(x0 + ins, y0 + ins, x1 - x0 - 2 * ins, y1 - y0 - 2 * ins);
+  if (bleed) {
+    // gespiegelt und ganz blass: die Verse der Rückseite
+    c.save(); c.beginPath(); c.rect(x0 + ins, y0 + ins, x1 - x0 - 2 * ins, y1 - y0 - 2 * ins); c.clip();
+    c.translate(PLATE_W, 0); c.scale(-1, 1);
+    c.fillStyle = 'rgba(80,50,25,0.045)'; c.font = `8.5px 'UnifrakturMaguntia', serif`;
+    for (let i = 0, y = y0 + 22; y < y1 - 6; i++, y += 10.5) c.fillText(MS_VERSE[i % MS_VERSE.length], x0 + 16 + (i % 3) * 2, y);
+    c.restore();
+  }
+  band(0, 6, MS.blau);
+  const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, '#e9c25a'); g.addColorStop(0.45, MS.gold); g.addColorStop(0.55, '#f0d27a'); g.addColorStop(1, '#b98a2a');
+  band(6, 9, g); band(9, ins, MS.rot);
+  c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 0.7; c.strokeRect(x0 + 3, y0 + 3, x1 - x0 - 6, y1 - y0 - 6);
+  c.strokeStyle = 'rgba(20,30,60,0.7)'; c.lineWidth = 0.6; c.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  c.strokeStyle = 'rgba(90,50,10,0.45)'; c.strokeRect(x0 + 6, y0 + 6, x1 - x0 - 12, y1 - y0 - 12);
+  return [x0 + ins, y0 + ins, x1 - ins, y1 - ins];
+}
+
+// Blattzahl in römischen Ziffern wie in den Handschriften („.lvij.“)
+function msRoman(n) {
+  let s = '';
+  for (const [v, r] of [[100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]) while (n >= v) { s += r; n -= v; }
+  return s.replace(/i$/, 'j');
+}
 function msTitle(c, text) {
   if (!text) return;
-  let fs = 17;
-  c.font = `${fs}px 'UnifrakturMaguntia', 'Old English Text MT', serif`;
+  let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const folio = `.${msRoman(12 + (h % 128))}.`;
+  const font = (fs) => `${fs}px 'UnifrakturMaguntia', 'Old English Text MT', serif`;
+  let fs = 15; c.font = font(fs);
   const tw = c.measureText(text).width;
-  if (tw > 250) { fs = Math.max(9, fs * 250 / tw); c.font = `${fs}px 'UnifrakturMaguntia', 'Old English Text MT', serif`; }
-  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
-  c.fillStyle = MS.rot; c.fillText(text, 150, 21);
+  if (tw > 160) { fs = Math.max(8, fs * 160 / tw); c.font = font(fs); }
+  c.textBaseline = 'alphabetic'; c.fillStyle = MS.rot;
+  c.textAlign = 'center'; c.fillText(text, 108, 18);
+  c.font = font(12); c.textAlign = 'right'; c.fillText(folio, PLATE_W - 14, 18);
   c.textAlign = 'left';
+  // Punktierte Linierung wie auf der Seite
+  c.fillStyle = 'rgba(120,90,60,0.35)';
+  for (let x = 12; x < PLATE_W - 12; x += 7) c.fillRect(x, 23, 0.8, 0.8);
 }
 
-// Pferdedecke mit Kopfhaube (Pferd nach links, Kopf geneigt)
+// Pferdedecke mit Kopfhaube; das Pferd springt nach links, der Vorderleib hoch, der Kopf geneigt
 function msCap(c) {
   c.beginPath();
-  c.moveTo(130, 96);
-  c.bezierCurveTo(160, 97, 196, 97, 214, 104);
-  c.bezierCurveTo(228, 109, 233, 121, 231, 134);
-  c.bezierCurveTo(236, 148, 244, 160, 252, 170);
-  c.quadraticCurveTo(244, 174, 236, 167); c.quadraticCurveTo(228, 175, 218, 168); c.quadraticCurveTo(208, 174, 198, 166);
-  c.quadraticCurveTo(190, 172, 184, 162); c.quadraticCurveTo(168, 157, 152, 158); c.quadraticCurveTo(136, 158, 124, 165);
-  c.quadraticCurveTo(116, 174, 106, 168); c.quadraticCurveTo(98, 176, 88, 168); c.quadraticCurveTo(82, 172, 78, 163);
-  c.bezierCurveTo(72, 150, 74, 136, 84, 128);   // Brust
-  c.bezierCurveTo(90, 122, 94, 114, 96, 106);   // Hals unten bis zur Kehle
-  c.bezierCurveTo(92, 114, 84, 122, 74, 124);   // Unterkiefer
-  c.lineTo(60, 112);                            // Saum der Kopfhaube über der Nase
-  c.bezierCurveTo(64, 100, 74, 88, 84, 80);     // Stirn
-  c.lineTo(91, 76);                             // Genick
-  c.bezierCurveTo(108, 70, 124, 80, 130, 96);   // Mähnenkamm
+  c.moveTo(104, 206);
+  c.bezierCurveTo(128, 212, 158, 222, 180, 232);                 // Rücken
+  c.bezierCurveTo(196, 238, 206, 254, 202, 270);                 // Kruppe
+  c.bezierCurveTo(206, 280, 210, 290, 214, 300);                 // Schoß hinten, weht
+  c.quadraticCurveTo(207, 305, 200, 299); c.quadraticCurveTo(193, 306, 185, 299); c.quadraticCurveTo(178, 305, 170, 298); c.quadraticCurveTo(163, 303, 156, 296);
+  c.quadraticCurveTo(146, 289, 136, 294);                        // unter dem Bauch höher
+  c.quadraticCurveTo(130, 312, 122, 304); c.quadraticCurveTo(114, 314, 106, 304); c.quadraticCurveTo(98, 312, 90, 302); c.quadraticCurveTo(82, 310, 76, 300);
+  c.bezierCurveTo(68, 284, 66, 266, 72, 252);                    // Brust
+  c.bezierCurveTo(76, 240, 76, 228, 72, 220);                    // Hals unten bis zur Kehle
+  c.bezierCurveTo(64, 226, 54, 232, 46, 234);                    // Unterkiefer
+  c.lineTo(36, 222);                                             // Saum der Haube über der Nase
+  c.bezierCurveTo(40, 208, 50, 194, 60, 186);                    // Stirn
+  c.lineTo(66, 182);                                             // Genick
+  c.bezierCurveTo(84, 176, 100, 188, 104, 206);                  // Mähnenkamm
   c.closePath();
 }
 
@@ -9681,151 +9757,146 @@ function drawKnightPlate(c, w, h, arms, t = 0, opt = {}) {
   c.save();
   c.translate((w - PLATE_W * k) / 2, (h - PLATE_H * k) / 2); c.scale(k, k);
   c.lineJoin = 'round'; c.lineCap = 'round';
-  const field = arms.field, metal = (METALS[arms.metal] || METALS.gold).color;
-  const coat = msReddish(field) ? '#ebe5d6' : '#b65c52', coatFar = msReddish(field) ? '#c7bfae' : '#91463f';
-  const lanceCol = msReddish(field) ? metal : MS.rot;
+  const field = arms.field, metal = (METALS[arms.metal] || METALS.gold).color, deep = msShade(field, 0.55);
+  const white = msReddish(field);
+  const coat = white ? '#ece6d8' : '#b45a54', coatFar = white ? '#c8c0ae' : '#8e4540';
+  const lanceCol = white ? metal : MS.rot;
   msTitle(c, opt.title);
-  const [ix0, iy0, ix1, iy1] = msFrame(c);
+  const [ix0, iy0, ix1, iy1] = msFrame(c, true);
   c.save(); c.beginPath(); c.rect(ix0, iy0, ix1 - ix0, iy1 - iy0); c.clip();
   msVine(c);
   c.restore();
 
-  // Reiter und Pferd: im eigenen Maß gezeichnet, verkleinert in den Rahmen gesetzt (Hufe dürfen auf dem Rahmen stehen)
-  const S = 0.92, KS = 1.15, K = (p) => [165 + (p[0] - 165) * KS, 100 + (p[1] - 100) * KS];
-  c.save(); c.translate(150 + 2, 41); c.scale(S, S); c.translate(-150, -14);
-
-  // Lanze mit Banner (hinter allem)
-  const tip = [38, 26], hand = K([136, 79]), ux = (hand[0] - tip[0]), uy = (hand[1] - tip[1]), ul = Math.hypot(ux, uy), u = [ux / ul, uy / ul];
+  // Lanze von links oben zur Faust, Banner längs des Schafts, das nach rechts weht
+  const tip = [26, 44], hand = [86, 178], ul = Math.hypot(hand[0] - tip[0], hand[1] - tip[1]), u = [(hand[0] - tip[0]) / ul, (hand[1] - tip[1]) / ul];
   const at = (d) => [tip[0] + u[0] * d, tip[1] + u[1] * d];
   {
-    // Banner längs des Schafts angeschlagen, das freie Ende weht nach hinten unten und läuft in drei Zungen aus
-    const H = 34, L = 25, f = [0.42, 0.91], N = 10;
-    const pos = (h, s) => { const b = at(4 + h * H), wv = Math.sin(s * 4 - t * 3.4 + h * 2) * 2.6 * s; return [b[0] + f[0] * L * s + u[0] * wv, b[1] + f[1] * L * s + u[1] * wv]; };
-    c.beginPath();
-    let p = pos(0, 0); c.moveTo(p[0], p[1]);
-    for (let i = 1; i <= N; i++) { p = pos(0, i / N); c.lineTo(p[0], p[1]); }
-    for (let j = 1; j <= 6; j++) { const h = j / 6; p = pos(h, j % 2 ? 0.8 : 1.12); c.lineTo(p[0], p[1]); }
-    for (let i = N; i >= 0; i--) { p = pos(1, i / N); c.lineTo(p[0], p[1]); }
-    c.closePath();
-    c.fillStyle = field; c.fill();
-    c.save(); c.clip();
-    for (const h of [0.27, 0.73]) { const q = pos(h, 0.46); drawCharge(c, arms, q[0], q[1], 14); }
-    c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 2;
-    for (const h of [0.5]) { const a0 = pos(h, 0.05), a1 = pos(h, 0.95); c.beginPath(); c.moveTo(a0[0], a0[1]); c.lineTo(a1[0], a1[1]); c.stroke(); }
+    const H0 = 10, H1 = 66, L = 54, N = 12;
+    const pos = (hh, s) => { const b = at(H0 + hh * (H1 - H0)), wv = Math.sin(s * 5 - t * 3 + hh * 1.5) * 3.4 * s; return [b[0] + L * s, b[1] + wv + s * 6]; };
+    const outline = () => {
+      c.beginPath(); let p = pos(0, 0); c.moveTo(p[0], p[1]);
+      for (let i = 1; i <= N; i++) { p = pos(0, i / N); c.lineTo(p[0], p[1]); }
+      for (let j = 1; j <= 8; j++) { p = pos(j / 8, 1 + Math.sin(j * 1.3) * 0.02); c.lineTo(p[0], p[1]); }
+      for (let i = N; i >= 0; i--) { p = pos(1, i / N); c.lineTo(p[0], p[1]); }
+      c.closePath();
+    };
+    outline(); c.fillStyle = field; c.fill();
+    c.save(); outline(); c.clip();
+    for (const hh of [0.17, 0.5, 0.83]) { const q = pos(hh, 0.5); drawCharge(c, arms, q[0], q[1], 17); }
+    const f1 = pos(0, 0.3), f2 = pos(1, 0.32), f3 = pos(0, 0.72), f4 = pos(1, 0.7);
+    msFolds(c, deep, [[f1[0], f1[1], f2[0], f2[1], 4], [f3[0], f3[1], f4[0], f4[1], -4]]);
     c.restore();
-    c.strokeStyle = INK; c.lineWidth = 1; c.stroke();
+    outline(); c.strokeStyle = INK; c.lineWidth = 1; c.stroke();
   }
-  const butt = at(ul + 40);
-  c.beginPath(); c.moveTo(tip[0], tip[1]); c.lineTo(butt[0], butt[1]); c.strokeStyle = INK; c.lineWidth = 3.6; c.stroke();
-  c.beginPath(); c.moveTo(tip[0], tip[1]); c.lineTo(butt[0], butt[1]); c.strokeStyle = lanceCol; c.lineWidth = 2.2; c.stroke();
-  // Spitze
+  const butt = at(ul + 44);
+  c.beginPath(); c.moveTo(tip[0], tip[1]); c.lineTo(butt[0], butt[1]); c.strokeStyle = INK; c.lineWidth = 4.2; c.stroke();
+  c.beginPath(); c.moveTo(tip[0], tip[1]); c.lineTo(butt[0], butt[1]); c.strokeStyle = lanceCol; c.lineWidth = 2.7; c.stroke();
   c.save(); c.translate(tip[0], tip[1]); c.rotate(Math.atan2(u[1], u[0]));
-  c.beginPath(); c.moveTo(-9, 0); c.lineTo(-1, -2.4); c.lineTo(1.5, 0); c.lineTo(-1, 2.4); c.closePath(); msInk(c, MS.helm, 0.8);
+  c.beginPath(); c.moveTo(-11, 0); c.lineTo(-1, -3); c.lineTo(2, 0); c.lineTo(-1, 3); c.closePath(); msInk(c, MS.helm, 0.8);
   c.restore();
 
-  // Ferne Beine, Schweif, nahe Beine
-  msLeg(c, [[124, 150], [110, 166], [98, 176], [86, 182], [78, 186]], [13, 8, 5.4, 4.6, 5], coatFar);
-  msLeg(c, [[204, 142], [208, 162], [222, 178], [236, 186], [244, 190]], [16, 10, 6, 4.6, 5], coatFar);
-  c.beginPath(); c.moveTo(236, 146); c.bezierCurveTo(252, 146, 264, 152, 274, 162); c.lineTo(267, 162); c.lineTo(276, 168); c.bezierCurveTo(262, 168, 250, 164, 240, 160); c.closePath();
-  msInk(c, msShade(coat, 0.82), 0.9);
-  c.strokeStyle = 'rgba(40,20,10,0.45)'; c.lineWidth = 0.6;
-  for (const d of [0, 3, 6]) { c.beginPath(); c.moveTo(242, 150 + d); c.bezierCurveTo(254, 152 + d, 262, 156 + d, 270, 163 + d * 0.5); c.stroke(); }
-  msLeg(c, [[112, 148], [98, 162], [84, 170], [70, 174], [60, 177]], [14, 8.5, 5.6, 4.8, 5.2], coat);
-  msLeg(c, [[214, 140], [220, 158], [236, 172], [252, 180], [262, 184]], [17, 11, 6.4, 4.8, 5.2], coat);
+  // Beine und Schweif
+  msLeg(c, [[88, 258], [70, 268], [54, 278], [54, 294], [58, 306]], [14, 9, 6.6, 5.6, 6], coatFar);
+  msLeg(c, [[168, 272], [166, 292], [178, 306], [170, 318], [176, 328]], [18, 11, 7, 5.6, 6], coatFar);
+  c.beginPath(); c.moveTo(202, 274); c.bezierCurveTo(214, 280, 222, 288, 230, 300); c.lineTo(223, 298); c.lineTo(228, 307); c.bezierCurveTo(217, 302, 208, 296, 200, 288); c.closePath();
+  msInk(c, msShade(coat, 0.85), 0.9);
+  c.strokeStyle = 'rgba(60,20,10,0.4)'; c.lineWidth = 0.6;
+  for (const d of [0, 3, 6]) { c.beginPath(); c.moveTo(204, 279 + d); c.bezierCurveTo(212, 284 + d, 218, 290 + d, 225, 300 + d * 0.4); c.stroke(); }
+  msLeg(c, [[80, 250], [60, 252], [42, 256], [38, 272], [40, 286]], [15, 9.5, 6.6, 5.6, 6], coat);
+  msLeg(c, [[184, 268], [190, 290], [204, 304], [196, 318], [204, 328]], [20, 12, 7, 5.6, 6], coat);
+  // Schattenlinien an den Beinen
+  c.strokeStyle = msShade(coat, 0.7); c.lineWidth = 1.2; c.globalAlpha = 0.6;
+  for (const pts of [[[60, 254], [44, 258], [41, 272]], [[190, 292], [202, 305]]]) { c.beginPath(); c.moveTo(pts[0][0], pts[0][1] + 2); for (const p of pts.slice(1)) c.lineTo(p[0] + 1.5, p[1] + 1); c.stroke(); }
+  c.globalAlpha = 1;
 
-  // Decke: Feld, Wappenbilder gestreut, Falten, Futter in Metall an den Säumen, Tintenrand
+  // Decke: Feld, gestreute Wappenbilder, gemalte Falten, Futter in Metall, Tintenrand
   msCap(c); c.fillStyle = field; c.fill();
   c.save(); msCap(c); c.clip();
-  const wash = c.createLinearGradient(0, 80, 0, 176);
-  wash.addColorStop(0, 'rgba(255,255,255,0.14)'); wash.addColorStop(0.5, 'rgba(255,255,255,0)'); wash.addColorStop(1, 'rgba(0,0,0,0.16)');
-  c.fillStyle = wash; c.fillRect(50, 60, 220, 120);
-  for (let r = 0; r < 4; r++) for (let q = 0; q < 9; q++) {
-    const x = 74 + q * 24 + (r % 2) * 12, y = 88 + r * 22;
-    if (x < 88 && y < 100) continue;      // Augenpartie frei
-    drawCharge(c, arms, x, y, 15);
+  const wash = c.createLinearGradient(0, 180, 0, 312);
+  wash.addColorStop(0, 'rgba(255,255,255,0.16)'); wash.addColorStop(0.55, 'rgba(255,255,255,0)'); wash.addColorStop(1, 'rgba(0,0,0,0.2)');
+  c.fillStyle = wash; c.fillRect(20, 170, 200, 150);
+  for (let r = 0; r < 5; r++) for (let q = 0; q < 8; q++) {
+    const x = 36 + q * 26 + (r % 2) * 13, y = 190 + r * 26;
+    if (x < 70 && y < 220) continue;     // Augenpartie frei
+    drawCharge(c, arms, x, y, 17);
   }
-  c.strokeStyle = msShade(field, 0.62); c.lineWidth = 1.6; c.globalAlpha = 0.55;
-  for (const [x0, y0, x1, y1] of [[94, 138, 98, 170], [84, 144, 86, 166], [220, 136, 228, 170], [208, 140, 210, 168], [238, 146, 246, 168]]) { c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x0 - 3, (y0 + y1) / 2, x1, y1); c.stroke(); }
-  c.globalAlpha = 1;
-  c.strokeStyle = metal; c.lineWidth = 3.4;
-  c.beginPath(); c.moveTo(231, 134); c.bezierCurveTo(236, 148, 244, 160, 252, 170); c.stroke();
-  c.beginPath(); c.moveTo(78, 163); c.bezierCurveTo(72, 150, 74, 136, 84, 128); c.stroke();
+  msFolds(c, deep, [[92, 262, 90, 306, -3], [108, 262, 106, 308, 3], [124, 268, 122, 304, -2], [172, 258, 168, 298, -4], [188, 256, 186, 298, 3], [201, 272, 208, 298, 2]]);
+  c.strokeStyle = metal; c.lineWidth = 4;
+  c.beginPath(); c.moveTo(202, 270); c.bezierCurveTo(206, 280, 210, 290, 214, 300); c.stroke();
+  c.beginPath(); c.moveTo(76, 300); c.bezierCurveTo(68, 284, 66, 266, 72, 252); c.stroke();
   c.restore();
-  msCap(c); c.strokeStyle = INK; c.lineWidth = 1.3; c.stroke();
+  msCap(c); c.strokeStyle = INK; c.lineWidth = 1.4; c.stroke();
   // Ohren in Stoff
-  c.beginPath(); c.moveTo(82, 81); c.quadraticCurveTo(76, 70, 79, 63); c.quadraticCurveTo(87, 70, 89, 78); c.closePath(); msInk(c, field, 1);
-  c.beginPath(); c.moveTo(89, 78); c.quadraticCurveTo(88, 68, 93, 62); c.quadraticCurveTo(98, 70, 96, 79); c.closePath(); msInk(c, msShade(field, 0.8), 1);
+  c.beginPath(); c.moveTo(58, 187); c.quadraticCurveTo(50, 176, 52, 166); c.quadraticCurveTo(62, 174, 65, 183); c.closePath(); msInk(c, field, 1);
+  c.beginPath(); c.moveTo(64, 183); c.quadraticCurveTo(63, 172, 68, 164); c.quadraticCurveTo(74, 174, 71, 184); c.closePath(); msInk(c, msShade(field, 0.8), 1);
   // Augenloch mit Auge
-  c.save(); c.translate(80, 95); c.rotate(-0.9);
-  c.beginPath(); c.ellipse(0, 0, 4.6, 3.6, 0, 0, Math.PI * 2); msInk(c, '#f1d6cc', 0.9);
-  c.beginPath(); c.arc(0.4, 0, 1.7, 0, Math.PI * 2); c.fillStyle = INK; c.fill();
+  c.save(); c.translate(54, 204); c.rotate(-0.9);
+  c.beginPath(); c.ellipse(0, 0, 5.4, 4.2, 0, 0, Math.PI * 2); msInk(c, '#efd2c8', 0.9);
+  c.beginPath(); c.arc(0.4, 0, 2, 0, Math.PI * 2); c.fillStyle = INK; c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(-0.4, -0.8, 0.6, 0, Math.PI * 2); c.fill();
   c.restore();
-  // Maul frei, Zaumzeug rot mit goldenem Buckel
-  c.beginPath(); c.moveTo(60, 112); c.bezierCurveTo(52, 116, 50, 126, 54, 130); c.bezierCurveTo(58, 134, 68, 132, 74, 124); c.closePath(); msInk(c, coat, 1);
-  c.beginPath(); c.arc(55.5, 124, 1.2, 0, Math.PI * 2); c.fillStyle = INK; c.fill();
-  c.beginPath(); c.moveTo(57, 131); c.quadraticCurveTo(61, 129, 65, 130); c.strokeStyle = INK; c.lineWidth = 0.8; c.stroke();
-  c.strokeStyle = MS.rot; c.lineWidth = 1.8;
-  c.beginPath(); c.moveTo(58, 114); c.lineTo(73, 127); c.moveTo(66, 120); c.lineTo(88, 82); c.moveTo(78, 101); c.lineTo(95, 108); c.stroke();
-  c.beginPath(); c.arc(77, 102, 2.2, 0, Math.PI * 2); msInk(c, MS.gold, 0.6);
+  // Maul, Zaumzeug rot mit goldenem Buckel
+  c.beginPath(); c.moveTo(36, 222); c.bezierCurveTo(28, 226, 26, 236, 30, 240); c.bezierCurveTo(34, 244, 42, 242, 46, 234); c.closePath(); msInk(c, coat, 1);
+  c.beginPath(); c.arc(31, 233, 1.3, 0, Math.PI * 2); c.fillStyle = INK; c.fill();
+  c.beginPath(); c.moveTo(32, 240.5); c.quadraticCurveTo(37, 239, 41, 240); c.strokeStyle = INK; c.lineWidth = 0.8; c.stroke();
+  c.strokeStyle = MS.rot; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(34, 224); c.lineTo(47, 236); c.moveTo(41, 230); c.lineTo(61, 190); c.moveTo(52, 212); c.lineTo(72, 220); c.stroke();
+  c.beginPath(); c.arc(52, 212, 2.6, 0, Math.PI * 2); msInk(c, MS.gold, 0.6);
 
-  // Reiter etwas größer als das Pferd, wie in der Buchmalerei
-  c.save(); c.translate(165, 100); c.scale(KS, KS); c.translate(-165, -100);
-  // Sattel: hoher Hinterzwiesel
-  c.beginPath(); c.moveTo(178, 101); c.quadraticCurveTo(180, 90, 186, 80); c.lineTo(191, 82); c.quadraticCurveTo(186, 92, 186, 102); c.closePath(); msInk(c, MS.gold, 1);
-  c.beginPath(); c.moveTo(144, 100); c.quadraticCurveTo(142, 94, 145, 88); c.lineTo(150, 89); c.lineTo(150, 100); c.closePath(); msInk(c, MS.gold, 1);
-
-  // Bein in Kettenhose mit Steigbügel und Sporn
-  c.strokeStyle = '#5a3a22'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(160, 102); c.lineTo(148, 151); c.stroke();
-  const legPath = () => msLimb(c, [[155, 118], [153, 132], [151, 147]], [10, 8.4, 7.4]);
+  // Sattel: hoher Hinterzwiesel, Vorderzwiesel
+  c.beginPath(); c.moveTo(144, 220); c.quadraticCurveTo(146, 206, 152, 194); c.lineTo(158, 196); c.quadraticCurveTo(152, 208, 152, 222); c.closePath(); msInk(c, MS.gold, 1);
+  c.beginPath(); c.moveTo(106, 214); c.quadraticCurveTo(104, 206, 108, 198); c.lineTo(114, 199); c.lineTo(114, 214); c.closePath(); msInk(c, MS.gold, 1);
+  // Bein in Kettenhose, Steigbügel, Sporn
+  c.strokeStyle = '#5a3a22'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(128, 216); c.lineTo(114, 274); c.stroke();
+  const legPath = () => msLimb(c, [[121, 238], [119, 254], [118, 268]], [13, 11, 9.5]);
   legPath(); c.fillStyle = MS.kette; c.fill();
-  c.save(); c.clip(); msMail(c, 144, 116, 162, 152); c.restore();
+  c.save(); c.clip(); msMail(c, 110, 232, 130, 272); c.restore();
   legPath(); c.strokeStyle = INK; c.lineWidth = 1; c.stroke();
-  c.beginPath(); c.moveTo(155, 145); c.quadraticCurveTo(150, 152, 137, 157); c.lineTo(147, 151); c.quadraticCurveTo(149, 147, 148, 145); c.closePath(); msInk(c, MS.kette, 0.9);
-  c.beginPath(); c.moveTo(142, 156); c.lineTo(145, 150.5); c.lineTo(152, 150); c.lineTo(150, 156); c.strokeStyle = INK; c.lineWidth = 1.5; c.stroke();
-  c.beginPath(); c.moveTo(155, 149); c.lineTo(161, 151); c.strokeStyle = MS.gold; c.lineWidth = 1.4; c.stroke();
-
-  // Waffenrock: Schoß über dem Oberschenkel, nach hinten wehend
-  c.beginPath(); c.moveTo(151, 97); c.lineTo(178, 97); c.bezierCurveTo(190, 104, 202, 116, 210, 132);
-  c.lineTo(200, 134); c.lineTo(193, 128); c.lineTo(184, 136); c.lineTo(174, 129); c.lineTo(162, 134); c.lineTo(152, 128);
-  c.bezierCurveTo(148, 118, 148, 106, 151, 97); c.closePath();
-  c.fillStyle = field; c.fill();
-  c.save(); c.clip(); drawCharge(c, arms, 182, 114, 15); c.strokeStyle = msShade(field, 0.6); c.lineWidth = 1.4; c.globalAlpha = 0.5;
-  c.beginPath(); c.moveTo(166, 102); c.quadraticCurveTo(170, 116, 168, 130); c.moveTo(190, 108); c.quadraticCurveTo(194, 118, 196, 130); c.stroke(); c.restore();
-  c.strokeStyle = INK; c.lineWidth = 1.2; c.stroke();
+  c.beginPath(); c.moveTo(123, 264); c.quadraticCurveTo(118, 274, 101, 280); c.lineTo(113, 271); c.quadraticCurveTo(114, 266, 113, 264); c.closePath(); msInk(c, MS.kette, 0.9);
+  c.beginPath(); c.moveTo(106, 281); c.lineTo(109, 274); c.lineTo(119, 273); c.lineTo(117, 281); c.strokeStyle = INK; c.lineWidth = 1.7; c.stroke();
+  c.beginPath(); c.moveTo(123, 268); c.lineTo(131, 271); c.strokeStyle = MS.gold; c.lineWidth = 1.6; c.stroke();
+  // Waffenrock: Schoß über dem Oberschenkel, nach hinten wehend, mit weißem Futter am Saum
+  const skirt = () => { c.beginPath(); c.moveTo(110, 204); c.lineTo(146, 204); c.bezierCurveTo(156, 214, 164, 230, 168, 248); c.lineTo(158, 250); c.lineTo(151, 243); c.lineTo(143, 251); c.lineTo(134, 244); c.lineTo(125, 251); c.lineTo(115, 243); c.bezierCurveTo(108, 230, 106, 216, 110, 204); c.closePath(); };
+  skirt(); c.fillStyle = field; c.fill();
+  c.save(); skirt(); c.clip();
+  drawCharge(c, arms, 141, 226, 17);
+  msFolds(c, deep, [[126, 210, 122, 248, -3], [150, 212, 158, 246, 3]]);
+  c.strokeStyle = metal; c.lineWidth = 3; c.beginPath(); c.moveTo(168, 248); c.lineTo(158, 250); c.lineTo(151, 243); c.lineTo(143, 251); c.lineTo(134, 244); c.lineTo(125, 251); c.lineTo(115, 243); c.stroke();
+  c.restore();
+  skirt(); c.strokeStyle = INK; c.lineWidth = 1.2; c.stroke();
   // Leib im Waffenrock
-  c.beginPath(); c.moveTo(153, 100); c.lineTo(179, 100); c.lineTo(178, 76); c.quadraticCurveTo(166, 70, 154, 76); c.closePath(); msInk(c, field, 1.2);
+  c.beginPath(); c.moveTo(108, 208); c.lineTo(146, 208); c.lineTo(144, 168); c.quadraticCurveTo(126, 160, 110, 168); c.closePath(); msInk(c, field, 1.2);
   // Ritterin: Zopf unter dem Helm
   if (opt.female) {
-    msLimb(c, [[176, 70], [182, 78], [185, 88], [189, 99]], [5, 4.6, 4, 2.6]); msInk(c, '#b07a3a', 0.8);
-    c.strokeStyle = 'rgba(60,30,10,0.6)'; c.lineWidth = 0.6;
-    for (const [x, y] of [[179, 76], [183, 84], [185, 92]]) { c.beginPath(); c.moveTo(x - 2, y - 1); c.lineTo(x + 2, y + 1.5); c.stroke(); }
+    msLimb(c, [[138, 160], [146, 172], [149, 184], [154, 198]], [7, 6.4, 5.4, 3.4]); msInk(c, '#b07a3a', 0.8);
+    c.strokeStyle = 'rgba(60,30,10,0.6)'; c.lineWidth = 0.7;
+    for (const [x, y] of [[142, 166], [147, 176], [150, 187]]) { c.beginPath(); c.moveTo(x - 3, y - 1); c.lineTo(x + 3, y + 2); c.stroke(); }
   }
-  // Topfhelm mit Sehschlitz, Luftlöchern und goldenem Kreuzband
-  c.beginPath(); c.moveTo(153, 78); c.lineTo(152, 56); c.quadraticCurveTo(152, 49, 165, 49); c.quadraticCurveTo(178, 49, 178, 56); c.lineTo(178, 78); c.quadraticCurveTo(166, 81, 153, 78); c.closePath();
-  const hg = c.createLinearGradient(152, 0, 178, 0); hg.addColorStop(0, '#dfe2e4'); hg.addColorStop(0.55, MS.helm); hg.addColorStop(1, '#868c92');
-  msInk(c, hg, 1.3);
-  c.fillStyle = MS.gold; c.fillRect(155.5, 50, 3, 28); c.fillRect(152.5, 60.5, 13, 2.6);
-  c.strokeStyle = INK; c.lineWidth = 0.6; c.strokeRect(155.5, 50, 3, 28);
-  c.fillStyle = INK; c.fillRect(152, 58, 16, 1.9);
-  for (const [x, y] of [[160, 67], [163, 67], [160, 70], [163, 70], [161.5, 73]]) { c.beginPath(); c.arc(x, y, 0.6, 0, Math.PI * 2); c.fill(); }
-  // Helmwulst in Feld und Metall, darauf das Wappenbild als Helmzier
-  for (let i = 0; i < 5; i++) { c.beginPath(); c.ellipse(155.5 + i * 4.8, 48.5, 2.8, 2.4, 0.5, 0, Math.PI * 2); msInk(c, i % 2 ? metal : field, 0.7); }
-  drawCharge(c, arms, 165, 36, 23);
-  // Arm in Kettenhemd zur Lanze, Faust um den Schaft
-  const armPath = () => msLimb(c, [[170, 80], [156, 86], [140, 80]], [9, 8, 7]);
+  // Topfhelm: Sehschlitz, Luftlöcher, goldenes Kreuzband, Licht auf der Wölbung
+  c.beginPath(); c.moveTo(111, 166); c.lineTo(110, 140); c.quadraticCurveTo(110, 131, 125, 131); c.quadraticCurveTo(140, 131, 140, 140); c.lineTo(140, 166); c.quadraticCurveTo(126, 170, 111, 166); c.closePath();
+  const hg = c.createLinearGradient(110, 0, 140, 0); hg.addColorStop(0, '#e6e8ea'); hg.addColorStop(0.5, MS.helm); hg.addColorStop(1, '#7d838a');
+  msInk(c, hg, 1.4);
+  c.fillStyle = MS.gold; c.fillRect(113.5, 132, 3.6, 34); c.fillRect(110.5, 147.5, 16, 3);
+  c.strokeStyle = INK; c.lineWidth = 0.6; c.strokeRect(113.5, 132, 3.6, 34); c.strokeRect(110.5, 147.5, 16, 3);
+  c.fillStyle = INK; c.fillRect(110, 144.5, 19, 2.4);
+  for (const [x, y] of [[121, 155], [124.5, 155], [121, 159], [124.5, 159], [122.7, 163]]) { c.beginPath(); c.arc(x, y, 0.75, 0, Math.PI * 2); c.fill(); }
+  c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(119, 134); c.quadraticCurveTo(129, 133, 134, 137); c.stroke();
+  // Das Wappenbild als große Helmzier, darunter der Helmwulst in Feld und Metall
+  drawCharge(c, arms, 125, 108, 52);
+  for (let i = 0; i < 6; i++) { c.beginPath(); c.ellipse(112.5 + i * 5.1, 131, 3, 2.6, 0.5, 0, Math.PI * 2); msInk(c, i % 2 ? metal : field, 0.7); }
+  // Arm in Kettenhemd, Faust um den Schaft
+  const armPath = () => msLimb(c, [[138, 172], [112, 186], [90, 180]], [11, 10, 9]);
   armPath(); c.fillStyle = MS.kette; c.fill();
-  c.save(); c.clip(); msMail(c, 134, 72, 176, 92); c.restore();
+  c.save(); c.clip(); msMail(c, 82, 166, 146, 196); c.restore();
   armPath(); c.strokeStyle = INK; c.lineWidth = 1; c.stroke();
-  c.beginPath(); c.ellipse(136, 79, 4.4, 3.6, -0.4, 0, Math.PI * 2); msInk(c, MS.kette, 1);
-  c.beginPath(); c.moveTo(136 - u[0] * 4.5, 79 - u[1] * 4.5); c.lineTo(136 - u[0] * 8, 79 - u[1] * 8); c.strokeStyle = INK; c.lineWidth = 3.6 / KS; c.stroke(); c.strokeStyle = lanceCol; c.lineWidth = 2.2 / KS; c.stroke();
-  // Wappenschild vor der Brust
-  c.save(); c.translate(152, 82); c.rotate(-0.1);
-  drawArms(c, arms, 0, 0, 35);
-  c.restore();
+  c.beginPath(); c.ellipse(hand[0], hand[1], 6, 5, -0.5, 0, Math.PI * 2); msInk(c, MS.kette, 1);
+  c.beginPath(); c.moveTo(hand[0] - u[0] * 6, hand[1] - u[1] * 6); c.lineTo(hand[0] - u[0] * 11, hand[1] - u[1] * 11); c.strokeStyle = INK; c.lineWidth = 4.2; c.stroke(); c.strokeStyle = lanceCol; c.lineWidth = 2.7; c.stroke();
+  // Großer Wappenschild vor der Brust
+  c.save(); c.translate(112, 170); c.rotate(-0.08);
+  drawArms(c, arms, 0, 0, 48);
   c.restore();
   // Zügel von der Schildhand zum Gebiss
-  { const r0 = K([139, 110]); c.beginPath(); c.moveTo(r0[0], r0[1]); c.quadraticCurveTo(96, 138, 62, 126); } c.strokeStyle = MS.rot; c.lineWidth = 1.4; c.stroke();
-  c.restore();
+  c.beginPath(); c.moveTo(92, 218); c.quadraticCurveTo(64, 246, 38, 236); c.strokeStyle = MS.rot; c.lineWidth = 1.6; c.stroke();
   c.restore();
 }
 

@@ -78,32 +78,35 @@
           <label for="castle-input">Name deiner Burg</label>
           <input id="castle-input" maxlength="20" value="Ashcombe" spellcheck="false">
         </div>
-        <div class="pair">
-          <fieldset class="field">
-          <legend>Figur</legend>
-          <div class="seg">
-            <label><input type="radio" name="figur" value="m" checked><span>Ritter</span></label>
-            <label><input type="radio" name="figur" value="w"><span>Ritterin</span></label>
+        <div class="wappen">
+          <div class="wappen-wahl">
+            <div class="pair">
+              <fieldset class="field">
+              <legend>Figur</legend>
+              <div class="seg">
+                <label><input type="radio" name="figur" value="m" checked><span>Ritter</span></label>
+                <label><input type="radio" name="figur" value="w"><span>Ritterin</span></label>
+              </div>
+              </fieldset>
+              <fieldset class="field">
+              <legend>Metall</legend>
+              <div class="seg" id="metal-pick">
+                <label><input type="radio" name="metall" value="gold" checked><span>Gold</span></label>
+                <label><input type="radio" name="metall" value="silber"><span>Silber</span></label>
+              </div>
+              </fieldset>
+            </div>
+            <fieldset class="field">
+              <legend>Wappenfarbe <span id="color-name" class="muted"></span></legend>
+              <div class="swatches" id="color-swatches"></div>
+            </fieldset>
+            <fieldset class="field">
+              <legend>Wappenbild <span id="charge-name" class="muted"></span></legend>
+              <div class="charges" id="charge-pick"></div>
+            </fieldset>
           </div>
-          </fieldset>
-          <fieldset class="field">
-          <legend>Metall</legend>
-          <div class="seg" id="metal-pick">
-            <label><input type="radio" name="metall" value="gold" checked><span>Gold</span></label>
-            <label><input type="radio" name="metall" value="silber"><span>Silber</span></label>
-          </div>
-          </fieldset>
+          <div class="preview"><canvas id="hero-preview" width="240" height="340" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         </div>
-        <fieldset class="field">
-          <legend>Wappenfarbe <span id="color-name" class="muted"></span></legend>
-          <div class="swatches" id="color-swatches"></div>
-        </fieldset>
-        <fieldset class="field">
-          <legend>Wappenbild <span id="charge-name" class="muted"></span></legend>
-          <div class="charges" id="charge-pick"></div>
-        </fieldset>
-
-        <div class="preview"><canvas id="hero-preview" width="300" height="212" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
