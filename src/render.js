@@ -662,15 +662,33 @@ function drawTribune(c, x, y, col, crowd) {
   if (!crowd) return true;
   const t = G.tour, cheer = t && t.cheer > 0;
   const cols = ['#9a3b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#e8e0cc', '#6f5a8a', '#8a5a4a', '#4a6a5a'];
+  // Zuschauer als 3D-Figuren: Bauern, Bürger, Frauen und Kinder sitzen auf den Bänken und schauen zur Schranke
+  // (links unten); beim Tjost springen viele auf und jubeln. Hinterste Reihe zuerst.
+  const KEYS = ['buerger', 'frau', 'bauer', 'buerger', 'frau', 'kind', 'bauer', 'frau'];
   for (const [ty, h] of [[y - 0.32, 17], [y, 12], [y + 0.32, 7]]) {
     for (let k = 0; k < 8; k++) {
       const px = x - 1.45 + k * 0.4 + (ty - y) * 0.3;
       const [sx, sy] = P(px, ty, h);
+      const n = k * 3 + Math.round(ty * 7), seed = (n * 7919) >>> 0;
+      const key = KEYS[(n + 64) % KEYS.length], color = cols[(n + 64) % cols.length];
+      const up = cheer && (seed % 3) !== 0;
+      const anim = up ? 'jubeln' : key === 'kind' ? 'stehen' : 'sitzen';
+      if (modelReady(key) && modelHas(key, anim)) {
+        const M = FIG3D[key], mv = M.bewegungen[anim];
+        const frame = up ? Math.floor(G.time * mv.bilder / mv.dauer + seed) % mv.bilder : Math.floor(G.time * 0.6 + seed) % mv.bilder;
+        const cell = modelCell(key, anim, 0, frame, color);
+        if (cell) {
+          const kk = heroK(M) * 0.92, CW = M.breite || M.zelle, CH = M.hoehe || M.zelle;
+          // Sitzende sitzen auf der Bank, Stehende stehen davor auf der Stufe
+          const fy = sy - (anim === 'sitzen' ? 1 : 3);
+          c.drawImage(lodOf(cell, c, kk), sx - M.fusspunkt[0] * kk, fy - M.fusspunkt[1] * kk, CW * kk, CH * kk);
+          continue;
+        }
+      }
       const bob = cheer ? Math.abs(Math.sin(G.time * 8 + k * 1.3 + ty * 3)) * 2.5 : 0;
-      c.fillStyle = cols[(k * 3 + Math.round(ty * 7)) % cols.length];
+      c.fillStyle = color;
       c.fillRect(sx - 2.4, sy - 8 - bob, 4.8, 6);
       c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(sx, sy - 10.5 - bob, 2, 0, Math.PI * 2); c.fill();
-      if (cheer && k % 3 === 0) { c.strokeStyle = '#e4ba94'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(sx - 2, sy - 8 - bob); c.lineTo(sx - 4, sy - 14 - bob); c.moveTo(sx + 2, sy - 8 - bob); c.lineTo(sx + 4, sy - 14 - bob); c.stroke(); }
     }
   }
   return true;
