@@ -26,6 +26,8 @@ MOD = {
 KEYS = {k: (k, None, False) for k in MOD}
 # Fußsoldat im Gambeson: Neubemalung mit großem Waffenrock (die erste Bemalung hatte kaum Farbe zum Einfärben)
 KEYS['soldat'] = ('soldat', 'gambeson', False)
+# Ritterin ohne Rüstung: das Wams cyan (tools/wams.py), damit es die Wappenfarbe trägt
+KEYS['ritterin'] = ('ritterin', 'wams', False)
 for v in ['leder', 'kette', 'schuppe']: KEYS[f'soldat_{v}'] = ('soldat', v, False)
 for v in ['gambeson', 'leder', 'kette', 'schuppe', 'ritter']: KEYS[f'ritterin_{v}'] = ('ritterin', v, v == 'ritter')
 HELD = ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']
@@ -45,7 +47,8 @@ def fresh(out):
 for key in [k for k in want if k.startswith('held_')]:
     v = key[5:]; out = os.path.join(E, f'sp_{v}'); t0 = time.time(); fresh(out)
     X = ['--meter', '1.8', '--zelle', '224', '--figur', '120', '--punkt', 'RightHand,LeftHand,Hips'] + QUALI
-    if v != 'edel': X += ['--textur', os.path.join(E, f'{v}_farbe.png')]
+    # ohne Rüstung das Wams cyan (tools/wams.py), damit es die Wappenfarbe trägt
+    X += ['--textur', os.path.join(E, f'{"wams" if v == "edel" else v}_farbe.png')]
     if v == 'ritter': X += ['--helm', os.path.join(E, 'teile', 'topfhelm.glb')]
     print(key, flush=True)
     run([os.path.join(E, 'edel_walking.glb'), out] + X + ['--bilder', 'walking_man=8'])

@@ -37,7 +37,8 @@ def tables():
 if not only_fig:
     for f in glob.glob(os.path.join(R, 'assets/held/*.webp')): os.remove(f)
     for v in ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']:
-        x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if v == 'ritter' else ['--ohne-maske', '1']
+        # Ritter: Waffenrock, Edelmann: Wams in der Wappenfarbe; die übrigen Rüstungen ohne Farbe
+        x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if v == 'ritter' else ['--farbton', '188', '--breite', '34'] if v == 'edel' else ['--ohne-maske', '1']
         hero[v] = entry(pack(os.path.join(E, f'sp_{v}'), os.path.join(R, 'assets/held'), f'held_{v}', ['--zelle', '224', '--qualitaet', '84'] + x))
     # nur der Held: die Figuren bleiben, wie sie sind
     if only_hero: fig.update(tables()['FIG3D'])
@@ -50,7 +51,7 @@ for sp in [] if only_hero else sorted(glob.glob(os.path.join(D, 'sp_*'))):
     key = os.path.basename(sp)[3:]
     if keys and key not in keys: continue
     if not os.path.exists(os.path.join(sp, 'sprites.json')): continue
-    x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if key == 'ritterin_ritter' else ['--farbton', '188', '--breite', '34'] if key.startswith('soldat') else []
+    x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if key == 'ritterin_ritter' else ['--farbton', '188', '--breite', '34'] if key.startswith('soldat') or key == 'ritterin' else []
     fig[key] = entry(pack(sp, os.path.join(R, 'assets/figuren3d'), key, ['--zelle', '168', '--qualitaet', '76', '--maske-qualitaet', '60', '--alpha', '50'] + x))
 js = lambda o: json.dumps(o, separators=(',', ':')).replace('"', "'")
 lines = ['// 3D-Figuren aus Meshy, gerendert mit tools/sprites.py, gepackt mit tools/sprite_pack.py (Rand abgeschnitten).',

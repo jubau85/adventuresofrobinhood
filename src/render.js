@@ -4223,7 +4223,7 @@ function horse3dFor(u, L) {
 }
 
 // ---------------------------------------------------------------- 3D-Figur malen (Held, Gefolge, Volk, Gegner)
-// Der Held: ohne Rüstung ein Edelmann in schwarzem Wams; jede Rüstung ist dieselbe Figur in anderer Bemalung, die
+// Der Held: ohne Rüstung ein Edelmann im Wams in der Wappenfarbe; jede Rüstung ist dieselbe Figur in anderer Bemalung, die
 // Kettenrüstung dazu mit Topfhelm und einem Waffenrock in der Wappenfarbe. Waffe, Schild und Werkzeug malt das Spiel
 // an die gerenderten Handpunkte, zu Pferd sitzt die Hüfte auf dem Sattelpunkt.
 const heroK = (M) => FIG3D_H / (M.figur_px || 60);
