@@ -61,9 +61,10 @@ for v, txt in {
     'ritter': f'a crusader knight: knee-length grey chainmail hauberk with long mail sleeves and mail mittens, a mail coif covering the head and hair, mail chausses on the legs, over the mail a sleeveless knee-length surcoat in {CYAN} without any pattern, brown leather sword belt, dark leather shoes',
 }.items():
     JOBS[f'edel_{v}'] = (EDEL, f'{STIL}, {txt}, warm skin' + ('' if v in ('kette', 'ritter') else f', {HELD}'))
-    JOBS[f'ritterin_{v}'] = (R['ritterin'], f'{STIL}, {txt}, warm skin' + ('' if v in ('kette', 'ritter') else ', long dark brown braided hair'))
+    # Meshy malte der Ritterin sonst einen Bart oder blondes Haar
+    JOBS[f'ritterin_{v}'] = (R['ritterin'], f"{STIL}, {txt}, a young woman's smooth face without any beard or stubble, warm skin" + ('' if v == 'ritter' else ', long dark brown hair tied back in a single braid'))
 SOLDAT = f'{STIL}, grey iron conical helmet with nose guard and a painted shine, the sleeveless knee-length tunic over the armour is {CYAN}, brown trousers, brown leather boots and belt, warm skin, short dark beard'
-JOBS['soldat_leder'] = (R['soldat'], SOLDAT + ', the long sleeves and the skirt below the tunic are brown boiled leather with visible stitching and iron rivets')
+JOBS['soldat_leder'] = (R['soldat'], SOLDAT + ', both arms are fully covered down to the wrists by long sleeves of brown boiled leather with visible stitching and iron rivets, no bare skin on the arms, the skirt below the tunic is brown boiled leather')
 JOBS['soldat_kette'] = (R['soldat'], SOLDAT + ', a grey chainmail coif under the helmet, the long sleeves and the skirt below the tunic are grey steel chainmail drawn as a fine ring pattern with bright highlights')
 JOBS['soldat_schuppe'] = (R['soldat'], SOLDAT + ', the long sleeves and the skirt below the tunic are overlapping polished steel scales riveted on leather with bright highlights')
 only = sys.argv[2:] or list(JOBS)

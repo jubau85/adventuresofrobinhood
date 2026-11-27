@@ -53,7 +53,7 @@ for sp in [] if only_hero else sorted(glob.glob(os.path.join(D, 'sp_*'))):
     key = os.path.basename(sp)[3:]
     if keys and key not in keys: continue
     if not os.path.exists(os.path.join(sp, 'sprites.json')): continue
-    x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if key == 'ritterin_ritter' else ['--farbton', '188', '--breite', '34'] if key.startswith('soldat') or key == 'ritterin' else []
+    x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if key == 'ritterin_ritter' else ['--farbton', '188', '--breite', '34'] if key.startswith('soldat') or key == 'ritterin' else ['--ohne-maske', '1'] if key.startswith('ritterin_') else []
     fig[key] = entry(pack(sp, os.path.join(R, 'assets/figuren3d'), key, ['--zelle', '168', '--qualitaet', '76', '--maske-qualitaet', '60', '--alpha', '50'] + x + FARBE))
 js = lambda o: json.dumps(o, separators=(',', ':')).replace('"', "'")
 lines = ['// 3D-Figuren aus Meshy, gerendert mit tools/sprites.py, gepackt mit tools/sprite_pack.py (Rand abgeschnitten).',
