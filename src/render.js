@@ -634,6 +634,7 @@ function tourneyParts() {
   const host = L.host && L.host.faction ? FACTIONS[L.host.faction].color : '#a33b32';
   const z = groundZ(W, lx, ly);
   const add = (x, y, f, dd = 0) => parts.push({ x, y, d: x + y + dd, z, f });
+  if (tourneyPartsPainted(L, add, host)) return parts;
   for (let i = -6; i < 6; i++) {
     const x0 = lx + i, x1 = x0 + 1;
     add(x0 + 0.5, ly, (c) => drawTiltPiece(c, x0, x1, ly, i % 2 ? host : '#e8dcc0', i === -6, i === 5));
@@ -645,6 +646,49 @@ function tourneyParts() {
     add(x, y, (c) => drawPavilion(c, x, y, k.col));
   });
   return parts;
+}
+
+// ---------------------------------------------------------------- Paket Turnierplatz und Hafen (tools/turnier_hafen.py)
+// Ritterzelte, Tribüne, Schranke (ein Feld je Stück), Fahne und Kleinkram des Turniers; Koggen, Boote, Steg (ein Feld)
+// und Kai-Kleinkram. Magenta wird zur Farbe des Ritters oder Gastgebers. Fußpunkt in der Mitte der Grundfläche (Schiffe:
+// Mitte der Wasserlinie), bei Schranke und Steg in der Feldmitte. (P5 entsteht weiter unten, darum erst beim Wählen eingetragen)
+const TH_P5 = {"th_schranke_y":[34.0,33.4,0.3333],"th_schranke_y_winter":[34.0,33.4,0.3333],"th_tribuene_x":[89.5,83.12,0.3333],"th_tribuene_x_winter":[89.38,83.06,0.3333],"th_tribuene_y":[90.0,83.12,0.3333],"th_tribuene_y_winter":[90.0,83.0,0.3333],"th_zelt_eckig":[39.75,72.0,0.3333],"th_zelt_eckig_winter":[39.62,72.31,0.3333],"th_zelt_koenig":[48.25,79.75,0.3333],"th_zelt_koenig_winter":[48.12,79.44,0.3333],"th_zelt_lang":[52.25,49.38,0.3333],"th_zelt_lang_winter":[52.25,49.5,0.3333],"th_zelt_rund":[40.0,78.5,0.3333],"th_zelt_rund_winter":[39.88,78.94,0.3333],"th_aufsteigeblock":[14.12,20.44,0.3333],"th_aufsteigeblock_winter":[14.0,20.12,0.3333],"th_faesser":[21.38,23.81,0.3333],"th_faesser_winter":[21.5,23.5,0.3333],"th_fahne":[34.25,87.0,0.3333],"th_fahne_winter":[33.38,87.31,0.3333],"th_herold":[30.88,36.19,0.3333],"th_herold_winter":[30.75,36.25,0.3333],"th_lanzenbock":[23.25,24.5,0.3333],"th_lanzenbock_winter":[23.5,24.5,0.3333],"th_lanzenstaender":[21.0,49.75,0.3333],"th_lanzenstaender_winter":[20.88,49.31,0.3333],"th_preistisch":[17.0,19.25,0.3333],"th_preistisch_winter":[16.88,18.94,0.3333],"th_ruestungsstaender":[8.88,36.31,0.3333],"th_ruestungsstaender_winter":[8.88,36.69,0.3333],"th_schildbaum":[21.5,44.5,0.3333],"th_schildbaum_winter":[21.5,44.5,0.3333],"th_schranke_x":[34.0,33.4,0.3333],"th_schranke_x_winter":[34.0,33.4,0.3333],"th_anker":[16.5,28.38,0.3333],"th_anker_winter":[16.5,28.38,0.3333],"th_boot_x":[34.62,45.06,0.3333],"th_boot_x_winter":[34.25,45.0,0.3333],"th_boot_y":[33.75,55.62,0.3333],"th_boot_y_winter":[33.88,55.56,0.3333],"th_kogge_x":[76.88,133.69,0.3333],"th_kogge_x_2":[84.62,143.56,0.3333],"th_kogge_x_2_winter":[84.62,143.19,0.3333],"th_kogge_x_winter":[83.38,130.44,0.3333],"th_kogge_y":[88.75,139.62,0.3333],"th_kogge_y_2":[83.75,153.12,0.3333],"th_kogge_y_2_winter":[83.75,153.12,0.3333],"th_kogge_y_winter":[84.38,144.44,0.3333],"th_kran":[64.88,77.19,0.3333],"th_kran_winter":[64.88,77.19,0.3333],"th_ladung":[21.25,30.88,0.3333],"th_ladung_winter":[21.25,30.88,0.3333],"th_poller":[12.25,21.75,0.3333],"th_poller_winter":[12.12,21.69,0.3333],"th_ruderboot":[31.38,36.81,0.3333],"th_ruderboot_winter":[31.5,36.88,0.3333],"th_steg_x":[34.0,48.6,0.3333],"th_steg_x_winter":[34.0,48.6,0.3333],"th_steg_y":[34.0,48.6,0.3333],"th_steg_y_winter":[34.0,48.6,0.3333]};
+function thPick(n) { const w = `th_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `th_${n}`; if (!P5[id] && TH_P5[id]) P5[id] = TH_P5[id]; return wantArt(id) ? id : null; }
+// Tribüne: das Bild längs x, Zuschauer auf drei Bankreihen
+function drawTribune(c, x, y, col, crowd) {
+  const id = thPick('tribuene_x');
+  if (!id || !p5(c, id, x, y, 1, false, col)) return false;
+  if (!crowd) return true;
+  const t = G.tour, cheer = t && t.cheer > 0;
+  const cols = ['#9a3b32', '#3d6fa3', '#d6ad4c', '#5b8a3c', '#e8e0cc', '#6f5a8a', '#8a5a4a', '#4a6a5a'];
+  for (const [ty, h] of [[y - 0.32, 17], [y, 12], [y + 0.32, 7]]) {
+    for (let k = 0; k < 8; k++) {
+      const px = x - 1.45 + k * 0.4 + (ty - y) * 0.3;
+      const [sx, sy] = P(px, ty, h);
+      const bob = cheer ? Math.abs(Math.sin(G.time * 8 + k * 1.3 + ty * 3)) * 2.5 : 0;
+      c.fillStyle = cols[(k * 3 + Math.round(ty * 7)) % cols.length];
+      c.fillRect(sx - 2.4, sy - 8 - bob, 4.8, 6);
+      c.fillStyle = '#e4ba94'; c.beginPath(); c.arc(sx, sy - 10.5 - bob, 2, 0, Math.PI * 2); c.fill();
+      if (cheer && k % 3 === 0) { c.strokeStyle = '#e4ba94'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(sx - 2, sy - 8 - bob); c.lineTo(sx - 4, sy - 14 - bob); c.moveTo(sx + 2, sy - 8 - bob); c.lineTo(sx + 4, sy - 14 - bob); c.stroke(); }
+    }
+  }
+  return true;
+}
+// Gemalter Turnierplatz: Schranke, zwei Tribünen, Fahnen an den Enden, Ritterzelte und Kleinkram
+const ZELTE = ['zelt_rund', 'zelt_eckig', 'zelt_lang'];
+const TOURNEY_DEKO = [['herold', 0, -1.7], ['preistisch', -1.3, -1.7], ['aufsteigeblock', -6.9, -1.4], ['aufsteigeblock', 6.9, -1.4],
+  ['lanzenstaender', -7.6, -2.5], ['lanzenstaender', 7.6, -2.5], ['schildbaum', -7.6, -3.5], ['schildbaum', 7.6, -3.5],
+  ['lanzenbock', -7.5, 2.6], ['lanzenbock', 7.5, 2.6], ['ruestungsstaender', -7.0, 2.1], ['ruestungsstaender', 7.0, 2.1],
+  ['faesser', -4.4, -3.7], ['faesser', 4.4, -3.7]];
+function tourneyPartsPainted(L, add, host) {
+  if (!thPick('schranke_x') || !thPick('tribuene_x') || !thPick('zelt_rund')) return false;
+  const { lx, ly } = L;
+  for (let i = -6; i < 6; i++) { const x = lx + i + 0.5; add(x, ly, (c) => p5(c, thPick('schranke_x') || 'th_schranke_x', x, ly, 1, false, host)); }
+  for (const dx of [-1.9, 1.9]) add(lx + dx, ly - 3, (c) => drawTribune(c, lx + dx, ly - 3, host, !L.building));
+  for (const side of [-1, 1]) add(lx + side * 6.4, ly - 0.2, (c) => p5(c, thPick('fahne') || 'th_fahne', lx + side * 6.4, ly - 0.2, 0.7, side > 0, host));
+  L.knights.forEach((k, i) => { const { x, y } = pavilionSpot(lx, ly, i), n = ZELTE[i % ZELTE.length]; add(x, y, (c) => p5(c, thPick(n) || `th_${n}`, x, y, 0.85, i % 2 === 1, k.col)); });
+  for (const [n, dx, dy] of TOURNEY_DEKO) add(lx + dx, ly + dy, (c) => p5(c, thPick(n) || `th_${n}`, lx + dx, ly + dy, 1, dx > 0, host));
+  return true;
 }
 
 function drawTiltPiece(c, x0, x1, y, col, first, last) {
@@ -1395,6 +1439,14 @@ function drawShip(c, b) {
   const th = (b.dir || 0) + Math.PI / 2;
   const ux = Math.cos(th), uy = Math.sin(th), vx = -uy, vy = ux;
   const bob = Math.sin(G.time * 1.3 + b.x) * 1.2;
+  // Gemalte Kogge, je nach Richtung des Bugs (längs x nach rechts unten oder links oben, längs y nach links unten oder
+  // rechts oben); Wellen an der Wasserlinie
+  const kn = Math.abs(ux) >= Math.abs(uy) ? (ux > 0 ? 'kogge_x' : 'kogge_x_2') : (uy > 0 ? 'kogge_y' : 'kogge_y_2'), kid = thPick(kn);
+  if (kid) {
+    const [wx, wy] = P(b.x, b.y, 0);
+    c.fillStyle = 'rgba(235,245,250,0.3)'; c.beginPath(); c.ellipse(wx, wy + 2, 34, 9, 0, 0, Math.PI * 2); c.fill();
+    if (p5(c, kid, b.x, b.y, 0.62, false, '#a8382c', bob)) return;
+  }
   const at = (a, w, z) => P(b.x + ux * a + vx * w, b.y + uy * a + vy * w, z + bob);
   // Wellen am Rumpf
   c.fillStyle = 'rgba(235,245,250,0.35)';
@@ -2227,6 +2279,20 @@ function buildStaticParts() {
     const big = b.wx >= 0.5 && BOXED_KINDS[b.kind];
     const r = 0.2, box = big ? [b.x - b.wx / 2, b.x + b.wx / 2, b.y - b.wy / 2, b.y + b.wy / 2] : [b.x - r, b.x + r, b.y - r, b.y + r];
     parts.push({ x: b.x, y: b.y, d: b.x + b.y, z: groundZ(W, b.x, b.y), f: (c) => f(c, b), b, box, big });
+  }
+  // Häfen: Ladung, Poller und Anker am Kai, Fischer- und Ruderboote neben dem Liegeplatz, an Städten ein Tretkran
+  for (const s of W.sites) {
+    if (!s.quay || !s.dock) continue;
+    const N = W.N, qx = s.quay.x, qy = s.quay.y, ddx = Math.sign(Math.round(s.dock.x - qx)), ddy = Math.sign(Math.round(s.dock.y - qy));
+    const px = -ddy, py = ddx, land = (x, y) => { const t = W.tiles[Math.floor(y) * N + Math.floor(x)]; return t !== T.WATER && t !== T.BRIDGE && t !== T.ROAD; }, wet = (x, y) => W.tiles[Math.floor(y) * N + Math.floor(x)] === T.WATER;
+    const items = [['ladung', qx + px * 0.75, qy + py * 0.75, land], ['poller', qx - px * 0.45 + ddx * 0.3, qy - py * 0.45 + ddy * 0.3, land], ['anker', qx - px * 0.9, qy - py * 0.9, land],
+      [Math.abs(px) > 0.5 ? 'boot_x' : 'boot_y', s.dock.x + px * 2.6, s.dock.y + py * 2.6, wet], ['ruderboot', s.dock.x - px * 2.2 - ddx * 0.6, s.dock.y - py * 2.2 - ddy * 0.6, wet]];
+    if (s.type === 'stadt' && !s.gracht) items.push(['kran', qx + px * 1.6 - ddx * 0.6, qy + py * 1.6 - ddy * 0.6, land]);
+    for (const [n, x, y, ok] of items) {
+      if (!ok(x, y)) continue;
+      const wave = n.startsWith('boot') || n === 'ruderboot';
+      parts.push({ x, y, d: x + y, z: groundZ(W, x, y), f: (c) => { const id = thPick(n); if (!id) return; if (wave) { const [wx, wy] = P(x, y, 0); c.fillStyle = 'rgba(235,245,250,0.25)'; c.beginPath(); c.ellipse(wx, wy + 1, 16, 4.5, 0, 0, Math.PI * 2); c.fill(); } p5(c, id, x, y, n === 'kran' ? 0.85 : 0.8, false, '#a8382c', wave ? Math.sin(G.time * 1.4 + x) * 0.8 : 0); } });
+    }
   }
   for (const s of W.sites) {
     if (s.cityWall) {
@@ -3726,6 +3792,19 @@ function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
 }
 
 // Ein Brückenstück: Anschlüsse nach Himmelsrichtung im Bild (NW = −x, NO = −y, SO = +x, SW = +y)
+// Stege der Häfen: das Brückenfeld zwischen Kai und Liegeplatz; 'x' oder 'y' nach seiner Richtung
+let pierMap = null;
+function pierAt(W, i, j) {
+  if (!pierMap || pierMap.W !== W) {
+    pierMap = { W, m: new Map() };
+    for (const s of W.sites) {
+      if (!s.quay || !s.dock) continue;
+      const qx = Math.floor(s.quay.x), qy = Math.floor(s.quay.y);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.tiles[(qy + dy) * W.N + qx + dx] === T.BRIDGE) pierMap.m.set((qy + dy) * W.N + qx + dx, dx ? 'x' : 'y');
+    }
+  }
+  return pierMap.m.get(j * W.N + i) || null;
+}
 function drawBridgeSprite(c, W, g) {
   const { i, j } = g, N = W.N;
   const road = (a, b2) => isRoadish(W, a, b2);
@@ -3742,6 +3821,9 @@ function drawBridgeSprite(c, W, g) {
     const wet = (a, b2) => W.tiles[b2 * N + a] === T.WATER;
     name = wet(i, j - 1) || wet(i, j + 1) ? 'bruecke_x' : 'bruecke_y';
   }
+  // Steg vom Kai zum Liegeplatz der Schiffe (gemalt, längs x oder y)
+  const pier = pierAt(W, i, j);
+  if (pier) { const sid = thPick(`steg_${pier}`), a = sid && P5[sid], im = sid && ART[sid]; if (a && im) { const [x, y] = g.ctr; c.drawImage(im, x - a[0], y - a[1] + 4, im.width * a[2], im.height * a[2]); return true; } }
   // In Flandern Steinbrücken mit Bögen
   const fl = ART.fl_steinbruecke_x && inFlandersXY(i + 0.5, j + 0.5);
   const id = fl ? flId(`stein${name}`) : yorkId(name), a = P5[id], im = ART[id];
@@ -5101,6 +5183,7 @@ onArt((id) => {
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
   if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_')) { partCache.clear(); G.staticDirty = true; }
   if (id.startsWith('york_bruecke') || id.startsWith('fl_steinbruecke') || id.startsWith('fl_kaimauer')) chunkCache.clear();
+  if (id.startsWith('th_')) { G.staticDirty = true; if (id.startsWith('th_steg')) chunkCache.clear(); }
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }

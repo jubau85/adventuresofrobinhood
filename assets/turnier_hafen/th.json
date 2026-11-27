@@ -1,0 +1,902 @@
+{
+ "schranke_y": {
+  "fuss": [
+   34.0,
+   33.4
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   996,
+   390,
+   204,
+   156
+  ]
+ },
+ "schranke_y_winter": {
+  "fuss": [
+   34.0,
+   33.4
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   996,
+   390,
+   204,
+   156
+  ]
+ },
+ "tribuene_x": {
+  "fuss": [
+   89.5,
+   83.12
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   0,
+   0,
+   537,
+   390
+  ]
+ },
+ "tribuene_x_winter": {
+  "fuss": [
+   89.38,
+   83.06
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   0,
+   0,
+   537,
+   390
+  ]
+ },
+ "tribuene_y": {
+  "fuss": [
+   90.0,
+   83.12
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   537,
+   0,
+   540,
+   390
+  ]
+ },
+ "tribuene_y_winter": {
+  "fuss": [
+   90.0,
+   83.0
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   537,
+   0,
+   540,
+   390
+  ]
+ },
+ "zelt_eckig": {
+  "fuss": [
+   39.75,
+   72.0
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   0,
+   390,
+   240,
+   285
+  ]
+ },
+ "zelt_eckig_winter": {
+  "fuss": [
+   39.62,
+   72.31
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   0,
+   390,
+   240,
+   285
+  ]
+ },
+ "zelt_koenig": {
+  "fuss": [
+   48.25,
+   79.75
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1281,
+   0,
+   291,
+   321
+  ]
+ },
+ "zelt_koenig_winter": {
+  "fuss": [
+   48.12,
+   79.44
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1281,
+   0,
+   291,
+   321
+  ]
+ },
+ "zelt_lang": {
+  "fuss": [
+   52.25,
+   49.38
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   240,
+   390,
+   315,
+   231
+  ]
+ },
+ "zelt_lang_winter": {
+  "fuss": [
+   52.25,
+   49.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   240,
+   390,
+   315,
+   231
+  ]
+ },
+ "zelt_rund": {
+  "fuss": [
+   40.0,
+   78.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1572,
+   0,
+   240,
+   306
+  ]
+ },
+ "zelt_rund_winter": {
+  "fuss": [
+   39.88,
+   78.94
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1572,
+   0,
+   240,
+   306
+  ]
+ },
+ "aufsteigeblock": {
+  "fuss": [
+   14.12,
+   20.44
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1728,
+   390,
+   84,
+   84
+  ]
+ },
+ "aufsteigeblock_winter": {
+  "fuss": [
+   14.0,
+   20.12
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1728,
+   390,
+   84,
+   84
+  ]
+ },
+ "faesser": {
+  "fuss": [
+   21.38,
+   23.81
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1599,
+   390,
+   129,
+   105
+  ]
+ },
+ "faesser_winter": {
+  "fuss": [
+   21.5,
+   23.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1599,
+   390,
+   129,
+   105
+  ]
+ },
+ "fahne": {
+  "fuss": [
+   34.25,
+   87.0
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1077,
+   0,
+   204,
+   324
+  ]
+ },
+ "fahne_winter": {
+  "fuss": [
+   33.38,
+   87.31
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1077,
+   0,
+   204,
+   324
+  ]
+ },
+ "herold": {
+  "fuss": [
+   30.88,
+   36.19
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   810,
+   390,
+   186,
+   159
+  ]
+ },
+ "herold_winter": {
+  "fuss": [
+   30.75,
+   36.25
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   810,
+   390,
+   186,
+   159
+  ]
+ },
+ "lanzenbock": {
+  "fuss": [
+   23.25,
+   24.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1458,
+   390,
+   141,
+   111
+  ]
+ },
+ "lanzenbock_winter": {
+  "fuss": [
+   23.5,
+   24.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1458,
+   390,
+   141,
+   111
+  ]
+ },
+ "lanzenstaender": {
+  "fuss": [
+   21.0,
+   49.75
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   555,
+   390,
+   126,
+   186
+  ]
+ },
+ "lanzenstaender_winter": {
+  "fuss": [
+   20.88,
+   49.31
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   555,
+   390,
+   126,
+   186
+  ]
+ },
+ "preistisch": {
+  "fuss": [
+   17.0,
+   19.25
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1812,
+   390,
+   102,
+   84
+  ]
+ },
+ "preistisch_winter": {
+  "fuss": [
+   16.88,
+   18.94
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1812,
+   390,
+   102,
+   84
+  ]
+ },
+ "ruestungsstaender": {
+  "fuss": [
+   8.88,
+   36.31
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1404,
+   390,
+   54,
+   129
+  ]
+ },
+ "ruestungsstaender_winter": {
+  "fuss": [
+   8.88,
+   36.69
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1404,
+   390,
+   54,
+   129
+  ]
+ },
+ "schildbaum": {
+  "fuss": [
+   21.5,
+   44.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   681,
+   390,
+   129,
+   171
+  ]
+ },
+ "schildbaum_winter": {
+  "fuss": [
+   21.5,
+   44.5
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   681,
+   390,
+   129,
+   171
+  ]
+ },
+ "schranke_x": {
+  "fuss": [
+   34.0,
+   33.4
+  ],
+  "k": 0.3333,
+  "bogen": "turnier",
+  "zelle": [
+   "turnier",
+   1200,
+   390,
+   204,
+   156
+  ]
+ },
+ "schranke_x_winter": {
+  "fuss": [
+   34.0,
+   33.4
+  ],
+  "k": 0.3333,
+  "bogen": "turnier_winter",
+  "zelle": [
+   "turnier_winter",
+   1200,
+   390,
+   204,
+   156
+  ]
+ },
+ "anker": {
+  "fuss": [
+   16.5,
+   28.38
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1527,
+   603,
+   99,
+   114
+  ]
+ },
+ "anker_winter": {
+  "fuss": [
+   16.5,
+   28.38
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1527,
+   603,
+   99,
+   114
+  ]
+ },
+ "boot_x": {
+  "fuss": [
+   34.62,
+   45.06
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1002,
+   603,
+   207,
+   192
+  ]
+ },
+ "boot_x_winter": {
+  "fuss": [
+   34.25,
+   45.0
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1002,
+   603,
+   207,
+   192
+  ]
+ },
+ "boot_y": {
+  "fuss": [
+   33.75,
+   55.62
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   390,
+   603,
+   204,
+   225
+  ]
+ },
+ "boot_y_winter": {
+  "fuss": [
+   33.88,
+   55.56
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   390,
+   603,
+   204,
+   225
+  ]
+ },
+ "kogge_x": {
+  "fuss": [
+   76.88,
+   133.69
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1524,
+   0,
+   504,
+   537
+  ]
+ },
+ "kogge_x_2": {
+  "fuss": [
+   84.62,
+   143.56
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1014,
+   0,
+   510,
+   573
+  ]
+ },
+ "kogge_x_2_winter": {
+  "fuss": [
+   84.62,
+   143.19
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1014,
+   0,
+   510,
+   573
+  ]
+ },
+ "kogge_x_winter": {
+  "fuss": [
+   83.38,
+   130.44
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1524,
+   0,
+   504,
+   537
+  ]
+ },
+ "kogge_y": {
+  "fuss": [
+   88.75,
+   139.62
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   507,
+   0,
+   507,
+   579
+  ]
+ },
+ "kogge_y_2": {
+  "fuss": [
+   83.75,
+   153.12
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   0,
+   0,
+   507,
+   603
+  ]
+ },
+ "kogge_y_2_winter": {
+  "fuss": [
+   83.75,
+   153.12
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   0,
+   0,
+   507,
+   603
+  ]
+ },
+ "kogge_y_winter": {
+  "fuss": [
+   84.38,
+   144.44
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   507,
+   0,
+   507,
+   579
+  ]
+ },
+ "kran": {
+  "fuss": [
+   64.88,
+   77.19
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   0,
+   603,
+   390,
+   336
+  ]
+ },
+ "kran_winter": {
+  "fuss": [
+   64.88,
+   77.19
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   0,
+   603,
+   390,
+   336
+  ]
+ },
+ "ladung": {
+  "fuss": [
+   21.25,
+   30.88
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1398,
+   603,
+   129,
+   129
+  ]
+ },
+ "ladung_winter": {
+  "fuss": [
+   21.25,
+   30.88
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1398,
+   603,
+   129,
+   129
+  ]
+ },
+ "poller": {
+  "fuss": [
+   12.25,
+   21.75
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1626,
+   603,
+   75,
+   87
+  ]
+ },
+ "poller_winter": {
+  "fuss": [
+   12.12,
+   21.69
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1626,
+   603,
+   75,
+   87
+  ]
+ },
+ "ruderboot": {
+  "fuss": [
+   31.38,
+   36.81
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   1209,
+   603,
+   189,
+   162
+  ]
+ },
+ "ruderboot_winter": {
+  "fuss": [
+   31.5,
+   36.88
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   1209,
+   603,
+   189,
+   162
+  ]
+ },
+ "steg_x": {
+  "fuss": [
+   34.0,
+   48.6
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   594,
+   603,
+   204,
+   204
+  ]
+ },
+ "steg_x_winter": {
+  "fuss": [
+   34.0,
+   48.6
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   594,
+   603,
+   204,
+   204
+  ]
+ },
+ "steg_y": {
+  "fuss": [
+   34.0,
+   48.6
+  ],
+  "k": 0.3333,
+  "bogen": "hafen",
+  "zelle": [
+   "hafen",
+   798,
+   603,
+   204,
+   204
+  ]
+ },
+ "steg_y_winter": {
+  "fuss": [
+   34.0,
+   48.6
+  ],
+  "k": 0.3333,
+  "bogen": "hafen_winter",
+  "zelle": [
+   "hafen_winter",
+   798,
+   603,
+   204,
+   204
+  ]
+ }
+}
