@@ -23,12 +23,17 @@ Speicherordner), etwa um den Mehrspieler auf einem Rechner zu testen.
 ## Paket bauen
 
 ```
+npm run dist:setup    # Windows-Installer „A Knight's Tale Setup <version>.exe“ (auch unter Linux, ohne Wine)
 npm run dist:win      # Windows: Installer (NSIS) und ZIP in desktop/release/
 npm run dist:linux    # Linux: AppImage und tar.gz
 npm run dist:mac      # Mac: ZIP (nur auf einem Mac)
 ```
 
-Den Windows-Installer am besten unter Windows bauen; das ZIP geht auch unter Linux. Ein Code-Signatur-Zertifikat ist
+`dist:setup` baut mit electron-builder den Programmordner und packt ihn mit NSIS (`installer/setup.nsi`) zum
+Installer; dafür muss `makensis` da sein (Linux: `apt install nsis`, Windows: NSIS von nsis.sourceforge.io). Er
+installiert ohne Administratorrechte nach `%LOCALAPPDATA%\Programs\A Knight's Tale`, legt Verknüpfungen im Startmenü
+und auf dem Desktop an und erscheint unter „Apps“ zum Deinstallieren; Spielstände bleiben dabei erhalten.
+`dist:win` (electron-builders eigener Installer) braucht unter Linux Wine und geht darum am besten unter Windows. Ein Code-Signatur-Zertifikat ist
 nicht eingerichtet (Windows warnt dann beim ersten Start; für Steam ist das nicht nötig, Steam startet die App selbst).
 Das Programmsymbol (`build/icon.png`) erzeugt `python3 -I ../tools/symbol.py build/icon.png`.
 

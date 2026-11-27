@@ -11,7 +11,8 @@
     "start:zweite": "electron . --zweite",
     "dist:win": "npm run spiel && electron-builder --win nsis zip",
     "dist:linux": "npm run spiel && electron-builder --linux AppImage tar.gz",
-    "dist:mac": "npm run spiel && electron-builder --mac zip"
+    "dist:mac": "npm run spiel && electron-builder --mac zip",
+    "dist:setup": "node build-setup.mjs"
   },
   "devDependencies": {
     "electron": "45.3.4",
