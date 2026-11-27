@@ -8,8 +8,9 @@ import { G } from './state.js';
 import { byId, esc } from './ui.js';
 import { CHARGES, CHARGE_IDS, armsSVG, chargeSVG } from './heraldry.js';
 import { mpLobbyHost, mpLobbyJoin, mpLobbyChoose, mpLobbyStart, mpLobbyLeave, mpChat, lobbyView } from './mp.js';
+import { drawLobbyMap, lobbyMapPick, lobbyMapSeatPos } from './shiremap.js';
 
-let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null;
+let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null, lbHover = null, lbMapReq = 0;
 const LOBBY_DIFF = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']];
 const isDesktop = () => !!(window.ritterDesktop && window.ritterDesktop.relay);
 
@@ -21,6 +22,9 @@ export function initLobby(h) {
   box.addEventListener('change', onLobbyChange);
   box.addEventListener('keydown', onLobbyKey);
   box.addEventListener('input', onLobbyInput);
+  box.addEventListener('pointermove', onMapMove);
+  box.addEventListener('pointerleave', () => { if (lbHover) { lbHover = null; mapSoon(); } }, true);
+  window.addEventListener('resize', () => { if (!byId('lobby').hidden) mapSoon(); });
 }
 
 export function openLobby() {
@@ -101,6 +105,8 @@ function renderLobby() {
       </section>
       <section class="lb-col" aria-label="Deine Grafschaft">
         <h3>Deine Grafschaft</h3>
+        <div class="lb-map"><canvas id="lb-map" role="img" aria-label="Karte der Grafschaften: Klick wählt eine freie Grafschaft"></canvas></div>
+        <p class="lb-maptip" id="lb-maptip">Klick auf die Karte wählt eine freie Grafschaft.</p>
         <label class="lb-field">Hier beginnst du als Herr<select id="lb-seat"></select></label>
         <div class="lb-seatinfo" id="lb-seatinfo"></div>
         <div id="lb-diff"></div>
@@ -154,6 +160,7 @@ function renderLobbyParts() {
     const realms = [...new Set(v.seats.map((x) => x.realm))];
     sel.innerHTML = realms.map((r) => `<optgroup label="${esc(r)}">${v.seats.filter((x) => x.realm === r).map((x) => `<option value="${esc(x.id)}"${x.id === me.seat ? ' selected' : ''}${x.by ? ' disabled' : ''}>${esc(x.name)} · Burg ${esc(x.castle)}${x.by ? ` (${esc(x.by)})` : ''}</option>`).join('')}</optgroup>`).join('');
   }
+  drawLobbyMapNow(v);
   const seat = v.seats.find((x) => x.id === me.seat);
   set('lb-seatinfo', seat ? `<p><b>${esc(seat.name)}</b>, Sitz auf der Burg ${esc(seat.castle)} (${esc(seat.realm)}).</p><p>${esc(seat.text)}</p><p class="lb-sub">Bisher halten ${esc(seat.lord)} die Burg. Du beginnst als ihr Herr mit Besatzung, Rittersaal und Lager; die Abgaben der Grafschaft gehören dir.</p>` : '');
   const diffName = (LOBBY_DIFF.find((d) => d[0] === v.difficulty) || LOBBY_DIFF[0])[1];
@@ -179,7 +186,34 @@ function renderLobbyParts() {
        <button type="button" class="btn" data-lb="leave">Verlassen</button>`);
 }
 
+// Karte: vergebene Grafschaften mit Farbe und Wappen ihres Spielers, deine golden, die unter dem Zeiger hell
+function drawLobbyMapNow(v) {
+  const cv = byId('lb-map');
+  if (!cv || !v || v.waiting) return;
+  const seats = v.players.filter((p) => p.seat).map((p) => ({ id: p.seat, by: p.id === v.me.id ? null : p.name, color: p.color, arms: p.arms }));
+  drawLobbyMap(cv, { seats, mine: v.me.seat, hover: lbHover });
+  const tip = byId('lb-maptip'), h = lbHover && v.seats.find((x) => x.id === lbHover);
+  if (tip) tip.textContent = h ? `${h.name} · Burg ${h.castle} (${h.realm})${h.id === v.me.seat ? ' · deine Wahl' : h.by ? ` · gewählt von ${h.by}` : ' · frei, Klick wählt'}` : 'Klick auf die Karte wählt eine freie Grafschaft.';
+}
+function mapSoon() {
+  if (lbMapReq) return;
+  lbMapReq = requestAnimationFrame(() => { lbMapReq = 0; if (lbStep === 'lobby' && !byId('lobby').hidden) drawLobbyMapNow(lobbyView()); });
+}
+window.__lobbyMapPos = (id) => { const cv = byId('lb-map'); return cv ? lobbyMapSeatPos(cv, id) : null; };
+function mapPoint(e) { const cv = byId('lb-map'), r = cv.getBoundingClientRect(); return lobbyMapPick(cv, e.clientX - r.left, e.clientY - r.top); }
+function onMapMove(e) {
+  if (e.target.id !== 'lb-map') { if (lbHover) { lbHover = null; mapSoon(); } return; }
+  const id = mapPoint(e);
+  e.target.style.cursor = id ? 'pointer' : 'default';
+  if (id !== lbHover) { lbHover = id; mapSoon(); }
+}
+
 function onLobbyClick(e) {
+  if (e.target.id === 'lb-map') {
+    const id = mapPoint(e), v = lobbyView(), s = id && v && v.seats.find((x) => x.id === id);
+    if (s && (s.free || id === v.me.seat)) mpLobbyChoose({ seat: id });
+    return;
+  }
   const b = e.target.closest('[data-lb]');
   if (!b) return;
   const act = b.dataset.lb;

@@ -40,6 +40,19 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await A.click('[data-lb="host"]');
   await A.waitForSelector('#lb-players tr');
   ok(true, 'A hat die Lobby eröffnet');
+  // Karte: Zeiger über Kent zeigt den Namen, ein Klick wählt Kent, dann zurück nach Nottingham über die Liste
+  const kent = await A.evaluate(() => window.__lobbyMapPos('dover'));
+  const box = await A.locator('#lb-map').boundingBox();
+  await A.mouse.move(box.x + kent.x, box.y + kent.y + 3);
+  await A.waitForTimeout(200);
+  const tip = await A.evaluate(() => document.getElementById('lb-maptip').textContent);
+  ok(/Kent/.test(tip), `Karte nennt die Grafschaft unter dem Zeiger (${tip})`);
+  await A.mouse.click(box.x + kent.x, box.y + kent.y + 3);
+  await A.waitForTimeout(300);
+  ok(await A.evaluate(() => window.__ritter.mp.seat === 'dover'), 'Klick auf die Karte wählt Kent');
+  await A.screenshot({ path: `${OUT}/lobby_karte.png` });
+  await A.selectOption('#lb-seat', 'nottingham');
+  await A.waitForTimeout(300);
   await B.fill('#name-input', 'Brida');
   await B.click('#btn-mp');
   await B.fill('#lb-room-join', 'test1');
