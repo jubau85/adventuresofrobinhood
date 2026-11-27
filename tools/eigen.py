@@ -15,6 +15,22 @@ SRC_K, OUT_K = 4.0, 3.0
 LOSE = ('bauholz', 'steinquader', 'materialhaufen', 'bauplatz_schild')
 
 
+def ohne_fahnen(im):
+    """Die Wimpel (Magenta) an den Pflöcken von Absteckung und Baustelle entfernen; Pflöcke und Schnur bleiben."""
+    a = np.asarray(im).astype(np.float32) / 255
+    rgb = a[..., :3]; mx, mn = rgb.max(-1), rgb.min(-1); d = np.maximum(mx - mn, 1e-6)
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    hue = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60
+    sat = (mx - mn) / np.maximum(mx, 1e-6)
+    m = (hue > 280) & (hue < 352) & (sat > 0.28) & (mx > 0.12)
+    # Saum: Nachbarn eines Wimpelpunkts, die selbst rötlich-violett sind
+    grow = m.copy()
+    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)): grow |= np.roll(np.roll(m, dy, 0), dx, 1)
+    m |= grow & (hue > 260) & (sat > 0.15)
+    a[m, 3] = 0
+    return Image.fromarray((a * 255 + 0.5).astype(np.uint8), 'RGBA')
+
+
 def main(src, assets):
     out = os.path.join(assets, 'eigen'); os.makedirs(out, exist_ok=True)
     files = sorted(glob.glob(os.path.join(src, '**', 'eigen', '*.png'), recursive=True))
@@ -28,6 +44,7 @@ def main(src, assets):
         if name in seen: continue
         seen.add(name)
         im = Image.open(p).convert('RGBA')
+        if name.startswith(('absteckung', 'baustelle')): im = ohne_fahnen(im)
         w, h = im.size
         if name.startswith(LOSE):
             a = np.array(im.getchannel('A')) > 150
