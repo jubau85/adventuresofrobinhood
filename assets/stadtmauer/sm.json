@@ -1,0 +1,902 @@
+{
+ "stadtmauer_ecke_nw_no": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   948,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_no_schaden_1": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_no_schaden_1_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_no_schaden_2": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1026,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_no_schaden_2_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1026,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_no_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   948,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_sw": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1119,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_sw_schaden_1": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   171,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_sw_schaden_1_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   171,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_sw_schaden_2": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1197,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_sw_schaden_2_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1197,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_nw_sw_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1119,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_no": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1290,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_no_schaden_1": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   342,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_no_schaden_1_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   342,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_no_schaden_2": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1368,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_no_schaden_2_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1368,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_no_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1290,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_sw": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1461,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_sw_schaden_1": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   513,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_sw_schaden_1_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   513,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_sw_schaden_2": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1539,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_sw_schaden_2_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1539,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_ecke_so_sw_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1461,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_x": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1632,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_x_schaden_1": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   684,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_x_schaden_1_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   684,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_x_schaden_2": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1710,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_x_schaden_2_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1710,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_x_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1632,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_y": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1803,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_y_schaden_1": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   855,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_y_schaden_1_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   855,
+   378,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_y_schaden_2": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   573,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_y_schaden_2_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   573,
+   171,
+   195
+  ]
+ },
+ "stadtmauer_y_winter": {
+  "anker": [
+   28.5,
+   44.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1803,
+   0,
+   171,
+   195
+  ]
+ },
+ "stadttor_x": {
+  "anker": [
+   44.0,
+   94.5,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   474,
+   0,
+   264,
+   351
+  ]
+ },
+ "stadttor_x_schaden_1": {
+  "anker": [
+   44.0,
+   94.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   948,
+   0,
+   264,
+   351
+  ]
+ },
+ "stadttor_x_schaden_1_winter": {
+  "anker": [
+   44.0,
+   94.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   948,
+   0,
+   264,
+   351
+  ]
+ },
+ "stadttor_x_schaden_2": {
+  "anker": [
+   44.0,
+   94.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1212,
+   0,
+   264,
+   351
+  ]
+ },
+ "stadttor_x_schaden_2_winter": {
+  "anker": [
+   44.0,
+   94.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1212,
+   0,
+   264,
+   351
+  ]
+ },
+ "stadttor_x_winter": {
+  "anker": [
+   44.0,
+   94.5,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   474,
+   0,
+   264,
+   351
+  ]
+ },
+ "stadttor_y": {
+  "anker": [
+   43.5,
+   98.75,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   213,
+   0,
+   261,
+   372
+  ]
+ },
+ "stadttor_y_schaden_1": {
+  "anker": [
+   43.5,
+   98.75,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   426,
+   0,
+   261,
+   372
+  ]
+ },
+ "stadttor_y_schaden_1_winter": {
+  "anker": [
+   43.5,
+   98.75,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   426,
+   0,
+   261,
+   372
+  ]
+ },
+ "stadttor_y_schaden_2": {
+  "anker": [
+   43.5,
+   98.75,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   687,
+   0,
+   261,
+   372
+  ]
+ },
+ "stadttor_y_schaden_2_winter": {
+  "anker": [
+   43.5,
+   98.75,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   687,
+   0,
+   261,
+   372
+  ]
+ },
+ "stadttor_y_winter": {
+  "anker": [
+   43.5,
+   98.75,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   213,
+   0,
+   261,
+   372
+  ]
+ },
+ "stadtturm": {
+  "anker": [
+   35.0,
+   84.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   738,
+   0,
+   210,
+   321
+  ]
+ },
+ "stadtturm_dach": {
+  "anker": [
+   35.5,
+   103.5,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   0,
+   0,
+   213,
+   378
+  ]
+ },
+ "stadtturm_dach_schaden_1": {
+  "anker": [
+   35.5,
+   103.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   0,
+   213,
+   378
+  ]
+ },
+ "stadtturm_dach_schaden_1_winter": {
+  "anker": [
+   35.5,
+   103.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   0,
+   213,
+   378
+  ]
+ },
+ "stadtturm_dach_schaden_2": {
+  "anker": [
+   35.5,
+   103.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   213,
+   0,
+   213,
+   378
+  ]
+ },
+ "stadtturm_dach_schaden_2_winter": {
+  "anker": [
+   35.5,
+   103.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   213,
+   0,
+   213,
+   378
+  ]
+ },
+ "stadtturm_dach_winter": {
+  "anker": [
+   35.5,
+   103.5,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   0,
+   0,
+   213,
+   378
+  ]
+ },
+ "stadtturm_schaden_1": {
+  "anker": [
+   35.0,
+   84.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1476,
+   0,
+   210,
+   321
+  ]
+ },
+ "stadtturm_schaden_1_winter": {
+  "anker": [
+   35.0,
+   84.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1476,
+   0,
+   210,
+   321
+  ]
+ },
+ "stadtturm_schaden_2": {
+  "anker": [
+   35.0,
+   84.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1686,
+   0,
+   210,
+   321
+  ]
+ },
+ "stadtturm_schaden_2_winter": {
+  "anker": [
+   35.0,
+   84.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1686,
+   0,
+   210,
+   321
+  ]
+ },
+ "stadtturm_winter": {
+  "anker": [
+   35.0,
+   84.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   738,
+   0,
+   210,
+   321
+  ]
+ }
+}

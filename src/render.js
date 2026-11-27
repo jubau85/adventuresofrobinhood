@@ -429,6 +429,76 @@ function churchSprite(b) {
   return { id: yorkId(name), base: `york_${name}`, flip: f.flip, sc: f.sc };
 }
 
+// Stadtmauer aus dem Baukasten (tools/stadtmauer.py): je Feld des 4-verbundenen Rings ein Teil nach seinen Nachbarn
+// im Ring (gerade längs x oder y, Ecke mit Pfeiler), auf Wegfeldern ein Torturm mit Durchfahrt quer zur Mauer, in
+// Abständen runde Mauertürme (mit Zinnen oder Kegeldach). Wimpel in der Farbe des Herrn; Schäden der Belagerung in zwei
+// Stufen, danach ein Gerüst. Fehlen die Bilder, die gezeichnete Mauer wie bisher.
+const SM_PIECE = { 'nw+so': 'stadtmauer_x', 'no+sw': 'stadtmauer_y', 'nw+no': 'stadtmauer_ecke_nw_no', 'so+sw': 'stadtmauer_ecke_so_sw', 'nw+sw': 'stadtmauer_ecke_nw_sw', 'so+no': 'stadtmauer_ecke_so_no' };
+function cityWallParts(s) {
+  const W = G.world, N = W.N, ring = s.cityWall, set = new Set(ring.map(([x, y]) => y * N + x));
+  const tileAt = (x, y) => W.tiles[y * N + x];
+  const isRoad = (x, y) => tileAt(x, y) === T.ROAD, isOpen = (x, y) => { const t = tileAt(x, y); return t === T.ROAD || t === T.BRIDGE || t === T.WATER; };
+  const parts = [], gateK = new Set();
+  ring.forEach(([x, y], k) => { if (isRoad(x, y)) gateK.add(k); });
+  ring.forEach(([x, y], k) => {
+    if (tileAt(x, y) === T.BRIDGE) return;
+    const has = (dx, dy) => set.has((y + dy) * N + x + dx);
+    const nb = [has(-1, 0) && 'nw', has(1, 0) && 'so', has(0, -1) && 'no', has(0, 1) && 'sw'].filter(Boolean);
+    let piece = SM_PIECE[nb.join('+')] || SM_PIECE[[nb[1], nb[0]].join('+')];
+    // Mauerende am Wasser: gerade in Richtung des einen Nachbarn
+    if (!piece) piece = nb[0] === 'no' || nb[0] === 'sw' ? 'stadtmauer_y' : 'stadtmauer_x';
+    const road = isRoad(x, y);
+    let gate = null;
+    if (road) {
+      // Torturm: auf x-Mauer Durchfahrt längs j, auf y-Mauer längs i; auf einer Ecke nach dem Weg
+      if (piece === 'stadtmauer_x' || piece === 'stadtmauer_y') gate = piece === 'stadtmauer_x' ? 'x' : 'y';
+      else gate = isRoad(x, y - 1) || isRoad(x, y + 1) ? 'x' : 'y';
+    }
+    const nearGate = gateK.has((k + 1) % ring.length) || gateK.has((k - 1 + ring.length) % ring.length);
+    const tower = !road && !nearGate && k % 8 === 4;
+    const roof = tower && hash2(x, y, 913) < 0.45;
+    const name = gate ? `stadttor_${gate}` : tower ? (roof ? 'stadtturm_dach' : 'stadtturm') : piece;
+    const o = { x: x + 0.5, y: y + 0.5, tower: tower || !!gate, gate: !!gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
+    const hw = gate ? 0.6 : tower ? 0.56 : 0.5;
+    parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => {
+      const hit = wallHit(s, o.x, o.y);
+      const stage = !hit ? 0 : hit.gone || hit.dmg >= 0.55 ? 2 : hit.dmg >= 0.12 ? 1 : 0;
+      const id = (stage && smPick(`${name}_schaden_${stage}`)) || smPick(name);
+      if (id) {
+        p5(c, id, o.x, o.y, 1, false, siteColor(s));
+        if (gate && cityGateClosed(s, x, y)) drawCityGateDoors(c, x, y, gate);
+        if (hit && hit.repair && stage) drawScaffold(c, o.x, o.y, 1.05, 1.05, gate || tower ? 46 : 32);
+        return;
+      }
+      if (artPending(`sm_${name}`)) return;
+      if (road) return;
+      if (hit && !o.tower) drawWallRuined(c, o.x, o.y, 1.0, 1.0, 38, '#b9b1a1', hit);
+      else cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o));
+    }, box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
+  });
+  return parts;
+}
+function cityGateClosed(s, x, y) {
+  const sg = G.siege;
+  return !!(sg && sg.site === s && sg.gatesClosed && sg.walls && sg.walls.gates.some(([gx, gy]) => gx === x && gy === y));
+}
+// Geschlossene Torflügel im Bogen des gemalten Torturms (x: Bogen auf der Südwestseite, y: auf der Südostseite)
+function drawCityGateDoors(c, x, y, gate) {
+  const pt = gate === 'x' ? (u, z) => P(x + u, y + 1.02, z) : (u, z) => P(x + 1.02, y + 1 - u, z);
+  const [u0, u1] = gate === 'x' ? [0.24, 0.86] : [0.3, 0.84], um = (u0 + u1) / 2, zs = 17, zt = 27;
+  c.fillStyle = '#6b4b2e'; c.beginPath();
+  const a = pt(u0, 0); c.moveTo(a[0], a[1]);
+  for (const [u, z] of [[u0, zs], [u0 + (um - u0) * 0.35, zt - 3], [um, zt], [u1 - (u1 - um) * 0.35, zt - 3], [u1, zs], [u1, 0]]) { const q = pt(u, z); c.lineTo(q[0], q[1]); }
+  c.closePath(); c.fill();
+  c.strokeStyle = '#3a2818'; c.lineWidth = 1;
+  c.beginPath();
+  for (let k = 1; k < 6; k++) { const u = u0 + (u1 - u0) * (k / 6), q0 = pt(u, 0), q1 = pt(u, k === 3 ? zt : zs + 4); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); }
+  c.stroke();
+  c.strokeStyle = '#2c2622'; c.lineWidth = 1.6; c.beginPath();
+  for (const z of [5, 13]) { const q0 = pt(u0, z), q1 = pt(u1, z); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); }
+  const m0 = pt(um, 0), m1 = pt(um, zt); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]);
+  c.stroke();
+}
 // Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
 function drawCityWallPiece(c, o) {
   const col = '#b9b1a1';
@@ -533,6 +603,8 @@ function siegeGatePartsFor(sg) {
     return out;
   }
   const h = s.cityWall ? 30 : 18;
+  // Gemalte Stadttore schließen ihre Flügel selbst (cityWallParts)
+  if (s.cityWall && SM_P5.sm_stadttor_x && (ART.sm_stadttor_x || ART.sm_stadttor_x_winter || artPending('sm_stadttor_x'))) return out;
   for (const [tx, ty] of sg.walls.gates) {
     const x = tx + 0.5, y = ty + 0.5;
     // Torflügel quer zur Straße: liegt das Tor im Osten oder Westen, verläuft die Mauer von Nord nach Süd
@@ -657,6 +729,9 @@ const TH_P5 = {"th_schranke_y":[34.0,33.4,0.3333],"th_schranke_y_winter":[34.0,3
 // Paket Orte (tools/orte.py): Anker in Weltpixeln, Mitte der Grundfläche
 const ORTE_P5 = {"ort_baumstumpf_axt":[17.39,31.8,0.3333],"ort_baumstumpf_axt_winter":[17.39,31.8,0.3333],"ort_erzhaufen":[25.27,46.55,0.3333],"ort_erzhaufen_winter":[25.27,46.55,0.3333],"ort_feuerstelle":[25.99,32.3,0.3333],"ort_feuerstelle_winter":[25.99,32.3,0.3333],"ort_steinkreuz":[11.85,34.48,0.3333],"ort_steinkreuz_winter":[11.85,34.48,0.3333],"ort_votivbaum":[47.08,76.35,0.3333],"ort_votivbaum_winter":[47.08,76.35,0.3333],"ort_wegschrein":[10.99,36.2,0.3333],"ort_wegschrein_winter":[10.99,36.2,0.3333]};
 function ortPick(n) { const w = `ort_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `ort_${n}`; if (!P5[id] && ORTE_P5[id]) P5[id] = ORTE_P5[id]; return ORTE_P5[id] && wantArt(id) ? id : null; }
+// Stadtmauer-Baukasten (tools/stadtmauer.py): Anker auf der Feldmitte, Weltpixel
+const SM_P5 = {"sm_stadtmauer_ecke_nw_no":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_winter":[28.5,44.25,0.3333],"sm_stadtmauer_x":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_x_winter":[28.5,44.25,0.3333],"sm_stadtmauer_y":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_y_winter":[28.5,44.25,0.3333],"sm_stadttor_x":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_1":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_1_winter":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_2":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_2_winter":[44.0,94.5,0.3333],"sm_stadttor_x_winter":[44.0,94.5,0.3333],"sm_stadttor_y":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_1":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_1_winter":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_2":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_2_winter":[43.5,98.75,0.3333],"sm_stadttor_y_winter":[43.5,98.75,0.3333],"sm_stadtturm":[35.0,84.0,0.3333],"sm_stadtturm_dach":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_1":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_1_winter":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_2":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_2_winter":[35.5,103.5,0.3333],"sm_stadtturm_dach_winter":[35.5,103.5,0.3333],"sm_stadtturm_schaden_1":[35.0,84.0,0.3333],"sm_stadtturm_schaden_1_winter":[35.0,84.0,0.3333],"sm_stadtturm_schaden_2":[35.0,84.0,0.3333],"sm_stadtturm_schaden_2_winter":[35.0,84.0,0.3333],"sm_stadtturm_winter":[35.0,84.0,0.3333]};
+function smPick(n) { const w = `sm_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `sm_${n}`; if (!P5[id] && SM_P5[id]) P5[id] = SM_P5[id]; return SM_P5[id] && wantArt(id) ? id : null; }
 function thPick(n) { const w = `th_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `th_${n}`; if (!P5[id] && TH_P5[id]) P5[id] = TH_P5[id]; return wantArt(id) ? id : null; }
 // Tribüne: das Bild längs x, Zuschauer auf drei Bankreihen
 function drawTribune(c, x, y, col, crowd) {
@@ -1748,7 +1823,10 @@ function drawProp(c, b) {
 
 function drawScaffold(c, x, y, wx, wy, h) {
   drawScaffoldPoles(c, x, y, wx, wy, h);
-  drawStones(c, x - wx / 2 - 0.4, y + 0.2, 4);
+  // gemalte Steinquader aus Paket 6, sonst gezeichnete Blöcke
+  const st = eigenLoose(hash2(Math.round(x * 4), Math.round(y * 4), 5) < 0.5 ? 'steinquader_1' : 'steinquader_2');
+  if (st) p5(c, st, x - wx / 2 - 0.35, y + 0.25, 0.85);
+  else drawStones(c, x - wx / 2 - 0.4, y + 0.2, 4);
 }
 function drawScaffoldPoles(c, x, y, wx, wy, h) {
   c.strokeStyle = '#8a6a40'; c.lineWidth = 1.4;
@@ -2445,23 +2523,7 @@ function buildStaticParts() {
     }
   }
   for (const s of W.sites) {
-    if (s.cityWall) {
-      const N = W.N, isOpen = (x, y) => { const t = W.tiles[y * N + x]; return t === T.ROAD || t === T.BRIDGE || t === T.WATER; };
-      const ring = s.cityWall;
-      ring.forEach(([x, y], k) => {
-        if (isOpen(x, y)) return;
-        const prev = ring[(k - 1 + ring.length) % ring.length], next = ring[(k + 1) % ring.length];
-        const gate = isOpen(prev[0], prev[1]) || isOpen(next[0], next[1]);
-        const o = { x: x + 0.5, y: y + 0.5, tower: gate || k % 7 === 0, gate, color: s.faction ? FACTIONS[s.faction].color : '#a33b32' };
-        const hw = o.tower ? 0.62 : 0.5;
-        const site = s;
-        parts.push({ x: o.x, y: o.y, d: o.x + o.y, z: groundZ(W, o.x, o.y), f: (c) => {
-          const hit = !o.tower && wallHit(site, o.x, o.y);
-          if (hit) drawWallRuined(c, o.x, o.y, 1.0, 1.0, 38, '#b9b1a1', hit);
-          else cachedDraw(c, o, [-44, 64, o.gate ? -116 : -82, 26], (g) => drawCityWallPiece(g, o));
-        }, box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
-      });
-    }
+    if (s.cityWall) parts.push(...cityWallParts(s));
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, siteColor(s)));
     if (s.baron) parts.push(...baronCastleParts(s));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
@@ -4199,39 +4261,41 @@ function drawBridgeSprite(c, W, g) {
 // Wiese, Heide, Sand und Fels in Bögen ineinander über, und Ufer verlaufen geschwungen statt in Rautentreppen.
 const LAYER_ORDER = [/^wiese/, /^acker|^feld/, /^heide/, /^waldboden/, /^schlamm/, /^kies/, /^sand/, /^fels/, /^klippe/, /^schnee/];
 const layerRank = (id) => { const k = LAYER_ORDER.findIndex((r) => r.test(id)); return k < 0 ? LAYER_ORDER.length : k; };
-let groundNoise = null, maskCv = null, layerCv = null;
+let groundNoise = null;
 function softGround(c, cvs, W, x0, y0, ox, oy, cs, look) {
-  if (typeof c.filter !== 'string') return false;
   const N = W.N, M = W.M, vh = W.vh, R = 2;
   groundNoise = groundNoise || makeNoise(7717);
   // Gemalter Boden der Kacheln im Chunk und im Rand (Wasser zählt nicht)
-  const tex = new Map(), ids = new Map();
+  const tex = new Map(), ids = new Set();
   for (let j = y0 - R; j < y0 + CHUNK + R; j++) for (let i = x0 - R; i < x0 + CHUNK + R; i++) {
     if (i < 0 || j < 0 || i >= N || j >= N) continue;
     const t = W.tiles[j * N + i];
     if (t === T.WATER || t === T.BRIDGE) continue;
     const id = groundTex(W, t, look, i, j);
     if (!id || !ART[id]) continue;
-    tex.set(j * N + i, id);
-    if (!ids.has(id)) ids.set(id, []);
-    ids.get(id).push(i, j);
+    tex.set(j * N + i, id); ids.add(id);
   }
   if (!ids.size) return true;
-  const w = cvs.width, h = cvs.height;
-  if (!maskCv || maskCv.width !== w || maskCv.height !== h) { maskCv = makeCanvas(w, h); layerCv = makeCanvas(w, h); }
-  const mc = maskCv.getContext('2d'), lc = layerCv.getContext('2d');
-  // Gezeichnet wird nur auf den Kacheln dieses Chunks (Land und Wasser)
-  c.save();
-  c.beginPath();
-  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) {
-    const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy, e = 0.6;
-    c.moveTo(sx, sy - vh[j * M + i] - e); c.lineTo(sx + HW + e, sy + HH - vh[j * M + i + 1]); c.lineTo(sx, sy + TH - vh[(j + 1) * M + i + 1] + e); c.lineTo(sx - HW - e, sy + HH - vh[(j + 1) * M + i]); c.closePath();
-  }
-  c.clip();
-  const order = [...ids.keys()].sort((a, b) => layerRank(a) - layerRank(b) || (a < b ? -1 : 1));
-  // Unter Land am Wasser liegt auch Wasser: Zieht sich das Ufer zurück, sieht man dort Wasser statt der Grundfarbe
+  const inChunk = (i, j) => i >= x0 && j >= y0 && i < x0 + CHUNK && j < y0 + CHUNK;
+  const tileQuad = (g, i, j, e = 0) => {
+    const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
+    g.moveTo(sx, sy - vh[j * M + i] - e); g.lineTo(sx + HW + e, sy + HH - vh[j * M + i + 1]); g.lineTo(sx, sy + TH - vh[(j + 1) * M + i + 1] + e); g.lineTo(sx - HW - e, sy + HH - vh[(j + 1) * M + i]); g.closePath();
+  };
+  // Umriss aller Kacheln des Chunks (ein Hauch größer gegen Haarlinien an den Chunkgrenzen): Schablone für den Saum
+  const vx = (i, j) => isoX(i, j) + ox, vy = (i, j) => isoY(i, j) + oy - vh[j * M + i], E = 0.6;
+  const outline = (g) => {
+    g.beginPath();
+    g.moveTo(vx(x0, y0), vy(x0, y0) - E);
+    for (let i = x0 + 1; i <= x0 + CHUNK; i++) g.lineTo(vx(i, y0) + E * 0.9, vy(i, y0) - E * 0.45);
+    for (let j = y0 + 1; j <= y0 + CHUNK; j++) g.lineTo(vx(x0 + CHUNK, j) + E * 0.9, vy(x0 + CHUNK, j) + E * 0.45);
+    for (let i = x0 + CHUNK - 1; i >= x0; i--) g.lineTo(vx(i, y0 + CHUNK) - E * 0.9, vy(i, y0 + CHUNK) + E * 0.45);
+    for (let j = y0 + CHUNK - 1; j >= y0; j--) g.lineTo(vx(x0, j) - E * 0.9, vy(x0, j) - E * 0.45);
+    g.closePath();
+  };
+  const order = [...ids].sort((a, b) => layerRank(a) - layerRank(b) || (a < b ? -1 : 1));
+  // Unter Land am Wasser liegt auch Wasser: Zieht sich das Ufer zurück, sieht man dort Wasser statt der Grundfarbe.
+  // Wasser- und Uferkacheln in einem Pfad je Wasserart, so bleiben zwischen ihnen keine Haarlinien.
   const wet = (i, j) => { const t = i >= 0 && j >= 0 && i < N && j < N ? W.tiles[j * N + i] : T.WATER; return t === T.WATER || t === T.BRIDGE; };
-  // Wasserkacheln und Uferkacheln in einem Pfad je Wasserart: so bleiben zwischen ihnen keine Haarlinien
   const wgroups = new Map();
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) {
     let wi = -1;
@@ -4247,55 +4311,69 @@ function softGround(c, cvs, W, x0, y0, ox, oy, cs, look) {
     const wpat = texPattern(c, wid, ox, oy);
     if (!wpat) continue;
     c.beginPath();
-    for (let k = 0; k < list.length; k += 2) {
-      const i = list[k], j = list[k + 1], sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
-      c.moveTo(sx, sy - vh[j * M + i]); c.lineTo(sx + HW, sy + HH - vh[j * M + i + 1]); c.lineTo(sx, sy + TH - vh[(j + 1) * M + i + 1]); c.lineTo(sx - HW, sy + HH - vh[(j + 1) * M + i]); c.closePath();
-    }
+    for (let k = 0; k < list.length; k += 2) tileQuad(c, list[k], list[k + 1], 0.5);
     c.fillStyle = wpat; c.fill();
   }
   // Zugehörigkeit einer Kachel zur Ebene: Land dieser oder einer höheren Bodenart (die höhere liegt ohnehin darüber)
   const rankAt = new Map();
   for (const [k, id] of tex) rankAt.set(k, layerRank(id));
   const member = (i, j, rank) => { const r = rankAt.get(j * N + i); return r !== undefined && r >= rank ? 1 : 0; };
+  // Je Bodenart: Die Form folgt einem Feld, das an jeder Kachelecke den Anteil der vier Kacheln dort angibt, bilinear
+  // in Teilfelder verteilt und mit Rauschen in Weltkoordinaten gewellt (darum ohne Nähte an den Chunkgrenzen). Volle
+  // Kacheln und die Teilfelder darüber werden direkt mit dem Muster gefüllt; zwei halb durchsichtige Konturstriche um die
+  // Teilfelder geben den weichen Saum nach außen (innen deckt das gleiche Muster sie zu).
+  const S = 7;
   for (const id of order) {
     const rank = layerRank(id), field = /^acker|^feld/.test(id), amp = field ? 0.12 : 0.5;
-    mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, w, h); mc.setTransform(cs, 0, 0, cs, 0, 0);
-    mc.fillStyle = '#fff'; mc.beginPath();
+    const pat = texPattern(c, id, ox, oy);
+    if (!pat) continue;
+    const fill = new Path2D(), edge = new Path2D();
+    let edges = 0;
+    // Wert des Feldes an einem Teilfeld (in Teilfeld-Koordinaten der ganzen Welt), zwischengespeichert: gehört es zur Ebene?
+    const cornerMemo = new Map(), inMemo = new Map();
+    const corner = (vi, vj) => { const k = vj * (N + 1) + vi; let v = cornerMemo.get(k); if (v === undefined) { v = (member(vi - 1, vj - 1, rank) + member(vi, vj - 1, rank) + member(vi - 1, vj, rank) + member(vi, vj, rank)) / 4; cornerMemo.set(k, v); } return v; };
+    const inside = (gx, gy) => {
+      const k = gy * 1e6 + gx; let v = inMemo.get(k);
+      if (v !== undefined) return v;
+      const i = Math.floor(gx / S), j = Math.floor(gy / S), u = (gx - i * S + 0.5) / S, w = (gy - j * S + 0.5) / S;
+      const f = corner(i, j) * (1 - u) * (1 - w) + corner(i + 1, j) * u * (1 - w) + corner(i + 1, j + 1) * u * w + corner(i, j + 1) * (1 - u) * w;
+      v = f + (fbm(groundNoise, (i + u) * 0.9, (j + w) * 0.9, 2) - 0.5) * amp > 0.5;
+      inMemo.set(k, v); return v;
+    };
     for (let j = y0 - 1; j < y0 + CHUNK + 1; j++) for (let i = x0 - 1; i < x0 + CHUNK + 1; i++) {
       if (i < 0 || j < 0 || i >= N || j >= N) continue;
-      // Werte an den vier Ecken: Anteil der vier Kacheln an dieser Ecke, die zur Ebene gehören
+      const own = inChunk(i, j);
       const m = (a, b) => member(i + a, j + b, rank);
       const cT = (m(-1, -1) + m(0, -1) + m(-1, 0) + m(0, 0)) / 4, cR = (m(0, -1) + m(1, -1) + m(0, 0) + m(1, 0)) / 4;
       const cB = (m(0, 0) + m(1, 0) + m(0, 1) + m(1, 1)) / 4, cL = (m(-1, 0) + m(0, 0) + m(-1, 1) + m(0, 1)) / 4;
       const lo = Math.min(cT, cR, cB, cL), hi = Math.max(cT, cR, cB, cL);
       if (hi + amp / 2 <= 0.5) continue;
+      if (lo - amp / 2 > 0.5) { if (own) tileQuad(fill, i, j, 0.5); continue; }
       const hT = vh[j * M + i], hR = vh[j * M + i + 1], hB = vh[(j + 1) * M + i + 1], hL = vh[(j + 1) * M + i];
       const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
       const tp = (u, v) => [sx + (u - v) * HW, sy + (u + v) * HH - (hT + (hR - hT) * u + (hL - hT) * v + (hT - hR - hL + hB) * u * v)];
-      const quad = (u0, v0, u1, v1) => { const a = tp(u0, v0), b = tp(u1, v0), d = tp(u1, v1), e = tp(u0, v1); mc.moveTo(a[0], a[1]); mc.lineTo(b[0], b[1]); mc.lineTo(d[0], d[1]); mc.lineTo(e[0], e[1]); mc.closePath(); };
-      if (lo - amp / 2 > 0.5) { quad(-0.01, -0.01, 1.01, 1.01); continue; }
-      // Grenzkachel: in 6 × 6 Teilfelder, Wert bilinear aus den Ecken plus Rauschen; über der Hälfte gehört es dazu
-      const S = 6, e = 0.012;
+      const quad = (g, u0, v0, u1, v1) => { const a = tp(u0, v0), b = tp(u1, v0), d = tp(u1, v1), e = tp(u0, v1); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(d[0], d[1]); g.lineTo(e[0], e[1]); g.closePath(); };
+      const e = 0.02;
       for (let b = 0; b < S; b++) for (let a = 0; a < S; a++) {
-        const u = (a + 0.5) / S, v = (b + 0.5) / S;
-        const f = cT * (1 - u) * (1 - v) + cR * u * (1 - v) + cB * u * v + cL * (1 - u) * v;
-        const n = (fbm(groundNoise, (i + u) * 0.9, (j + v) * 0.9, 2) - 0.5) * amp;
-        if (f + n > 0.5) quad(a / S - e, b / S - e, (a + 1) / S + e, (b + 1) / S + e);
+        const gx = i * S + a, gy = j * S + b;
+        if (!inside(gx, gy)) continue;
+        if (own) quad(fill, a / S - e, b / S - e, (a + 1) / S + e, (b + 1) / S + e);
+        // Saum nur an Teilfeldern am Rand der Form
+        if (inside(gx - 1, gy) && inside(gx + 1, gy) && inside(gx, gy - 1) && inside(gx, gy + 1)) continue;
+        quad(edge, a / S, b / S, (a + 1) / S, (b + 1) / S);
+        edges++;
       }
     }
-    mc.fill();
-    // Ebene: Muster füllen, mit der weichgezeichneten Maske ausstanzen
-    lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalCompositeOperation = 'source-over'; lc.clearRect(0, 0, w, h);
-    lc.setTransform(cs, 0, 0, cs, 0, 0);
-    lc.fillStyle = texPattern(lc, id, ox, oy); lc.fillRect(-10, -10, w / cs + 20, h / cs + 20);
-    lc.setTransform(1, 0, 0, 1, 0, 0);
-    lc.globalCompositeOperation = 'destination-in';
-    lc.filter = `blur(${(field ? 0.9 : 2.2) * cs}px)`;
-    lc.drawImage(maskCv, 0, 0);
-    lc.filter = 'none'; lc.globalCompositeOperation = 'source-over';
-    c.drawImage(layerCv, 0, 0, w / cs, h / cs);
+    c.fillStyle = pat; c.fill(fill);
+    if (!edges) continue;
+    // Saum: durch den Umriss des Chunks, damit er an den Chunkgrenzen nahtlos in den des Nachbarn übergeht
+    c.save(); outline(c); c.clip();
+    c.strokeStyle = pat; c.lineJoin = 'round';
+    const soft = field ? 0.5 : 1;
+    c.globalAlpha = 0.32; c.lineWidth = 9 * soft; c.stroke(edge);
+    c.globalAlpha = 0.42; c.lineWidth = 4.5 * soft; c.stroke(edge);
+    c.restore();
   }
-  c.restore();
   return true;
 }
 
@@ -5674,6 +5752,7 @@ onArt((id) => {
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
   if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_') || id.startsWith('ort_')) { partCache.clear(); G.staticDirty = true; }
   if (id.startsWith('york_bruecke') || id.startsWith('fl_steinbruecke') || id.startsWith('fl_kaimauer')) chunkCache.clear();
+  if (id.startsWith('sm_')) G.staticDirty = true;
   if (id.startsWith('th_')) { G.staticDirty = true; if (id.startsWith('th_steg')) chunkCache.clear(); }
 });
 

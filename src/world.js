@@ -1364,14 +1364,37 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
   }
   // Stadtmauer: Ring knapp außerhalb, Straßen bleiben als Tore offen
   if (walled) {
-    s.cityWall = [];
-    const seen = new Set();
-    for (let a = 0; a < Math.PI * 2; a += 0.3 / R) {
+    // Der Ring ist 4-verbunden (jedes Mauerfeld hat zwei Mauernachbarn über die Kanten), damit die gemalten Teile
+    // (gerade, Ecke, Turm, Tor) lückenlos aneinanderstoßen: Wo der Kreis über Eck springt, kommt das Feld dazwischen
+    // hinzu (das innere, außer dort liegt schon ein Weg); 2 × 2-Klumpen werden ausgedünnt. Wasser bleibt offen.
+    const ring = [];
+    for (let a = 0; a < Math.PI * 2; a += 0.12 / R) {
       const x = Math.floor(cx + Math.cos(a) * R), y = Math.floor(cy + Math.sin(a) * R);
+      const L = ring[ring.length - 1];
+      if (L && L[0] === x && L[1] === y) continue;
+      if (L && L[0] !== x && L[1] !== y) {
+        const c1 = [x, L[1]], c2 = [L[0], y];
+        const d1 = Math.hypot(c1[0] + 0.5 - cx, c1[1] + 0.5 - cy), d2 = Math.hypot(c2[0] + 0.5 - cx, c2[1] + 0.5 - cy);
+        const inner = d1 < d2 ? c1 : c2, outer = d1 < d2 ? c2 : c1;
+        ring.push(W.tiles[inner[1] * N + inner[0]] === T.ROAD ? outer : inner);
+      }
+      ring.push([x, y]);
+    }
+    while (ring.length > 1 && ring[ring.length - 1][0] === ring[0][0] && ring[ring.length - 1][1] === ring[0][1]) ring.pop();
+    const F = ring[0], Lr = ring[ring.length - 1];
+    if (Lr[0] !== F[0] && Lr[1] !== F[1]) ring.push([F[0], Lr[1]]);
+    const key = (q) => q[1] * N + q[0];
+    let set = new Set(ring.map(key)), list = ring.filter((q, k) => ring.findIndex((r) => key(r) === key(q)) === k);
+    for (let pass = 0; pass < 40; pass++) {
+      const nb = (q) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => set.has(key([q[0] + dx, q[1] + dy]))).length;
+      const drop = list.find((q) => nb(q) >= 3);
+      if (!drop) break;
+      list = list.filter((q) => q !== drop); set = new Set(list.map(key));
+    }
+    s.cityWall = [];
+    for (const [x, y] of list) {
       const i = y * N + x;
-      if (seen.has(i) || x < 1 || y < 1 || x >= N - 1 || y >= N - 1) continue;
-      seen.add(i);
-      if (W.tiles[i] === T.WATER) continue;
+      if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1 || W.tiles[i] === T.WATER) continue;
       s.cityWall.push([x, y]);
       W.solid[i] = 1;
     }
