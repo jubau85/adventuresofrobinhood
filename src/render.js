@@ -421,6 +421,7 @@ function drawChurchFast(c, b) {
 }
 // Kirche als gemaltes Bild: Dorf- und Stadtkirchen mit Westturm, Abteien als Kloster mit Kreuzgang
 function churchSprite(b) {
+  if (!b.abbey && ART.fl_kirche && flemish(b)) { const f = flFit('kirche', b.wx, b.wy, 1.1, 0.42); return { id: flId('kirche'), base: 'fl_kirche', flip: f.flip, sc: f.sc }; }
   const name = b.abbey ? 'kloster' : 'kirche_dorf';
   if (!ART[`york_${name}`]) return null;
   const f = yorkFit(name, b.wx, b.wy, 1.6, 0.6);
@@ -1289,10 +1290,10 @@ function drawTor(c, b) {
 function drawLandmark(c, b) {
   switch (b.lm) {
     case 'kathedrale': return drawCathedral(c, b);
-    case 'tower': return drawGreatKeep(c, b);
+    case 'tower': if (b.grey && flemish(b) && drawGravensteen(c, b)) return null; return drawGreatKeep(c, b);
     case 'motte': return drawMotte(c, b);
     case 'rundturm': return drawRoundKeep(c, b);
-    case 'tuchhalle': return drawClothHall(c, b);
+    case 'tuchhalle': if (flemish(b) && drawFlemishClothHall(c, b)) return null; return drawClothHall(c, b);
     case 'tor': return drawTor(c, b);
     default: return null;
   }
@@ -1439,6 +1440,11 @@ function drawShip(c, b) {
 }
 
 function drawStall(c, b) {
+  // Flandern: Tuchstand mit Ballen und Bahnen, das Sonnendach in der Farbe des Stands
+  if (ART.fl_tuchstand && flemish(b)) {
+    const f = flFit('tuchstand', b.wx || 0.8, b.wy || 0.6, 1.1, 0.8);
+    if (p5(c, flId('tuchstand'), b.x, b.y, f.sc, hash2(Math.round(b.x * 10), Math.round(b.y * 10), 13) < 0.5, b.color)) return;
+  }
   // Gemalter Marktstand (Obst und Brot oder Tuch und Töpfe), das Sonnendach in der Farbe des Stands
   const sn = hash2(Math.round(b.x * 10), Math.round(b.y * 10), 11) < 0.5 ? 'marktstand_1' : 'marktstand_2';
   if (ART[`york_${sn}`]) {
@@ -1516,6 +1522,12 @@ function drawStones(c, x, y, n) {
 // Kleinkram aus York: Fässer, Heuhaufen, Karren, Kisten, Sitzstamm, Kohlenmeiler; gespiegelt nach Zufall des Ortes
 const PROP_YORK = { fass: ['fass', 1], heu: ['heu', 1], karren: ['karren', 1], kisten: ['kisten', 1], sitzstamm: ['sitzstamm', 1], meiler: ['kohlenmeiler', 1] };
 function drawProp(c, b) {
+  const fp = ART.fl_wollballen && flProp(b);
+  if (fp) {
+    const [px, pyy] = P(b.x, b.y, 0);
+    c.fillStyle = 'rgba(25,35,15,0.18)'; c.beginPath(); c.ellipse(px + 2, pyy, 11, 4.2, 0, 0, Math.PI * 2); c.fill();
+    if (p5(c, flId(fp[0]), b.x, b.y, fp[1], (b.v || 0) > 0.5)) return;
+  }
   const py = PROP_YORK[b.prop];
   if (py && ART[`york_${py[0]}`]) {
     const [px, pyy] = P(b.x, b.y, 0);
@@ -1674,8 +1686,9 @@ function yorkId(name) { const w = `york_${name}_winter`; return lookSeason() ===
 // Ein gemalter Bau auf der Grundfläche wx × wy: gespiegelt, damit die Tür vorn links liegt, oder wenn sonst die lange
 // Seite quer stünde. Maßstab nach der Fläche, ohne weit über die Grundfläche hinauszuragen; die Bilder haben Türen in
 // Menschengröße, darum höchstens maxSc größer
-function yorkFit(name, wx, wy, maxSc = 1.3, minSc = 0.8) {
-  const [fw0, fh0, door] = YORK[name];
+function yorkFit(name, wx, wy, maxSc = 1.3, minSc = 0.8) { return fitTo(YORK, name, wx, wy, maxSc, minSc); }
+function fitTo(tab, name, wx, wy, maxSc = 1.3, minSc = 0.8) {
+  const [fw0, fh0, door] = tab[name];
   let flip = door === 'R', fw = flip ? fh0 : fw0, fh = flip ? fw0 : fh0;
   const along = (a, b) => (a / b >= 1.2 ? 1 : b / a >= 1.2 ? -1 : 0);
   const ho = along(wx, wy), so = along(fw, fh);
@@ -1713,6 +1726,7 @@ function houseSprite(b) {
     const [fw, fh] = BAU_FLAECHE.taverne;
     return { id: bauId('taverne'), base: 'bau_taverne', flip: b.wy > b.wx, sc: Math.sqrt((b.wx * b.wy) / (fw * fh)) };
   }
+  if (ART.fl_giebel_1 && flemish(b)) { const fs = flHouse(b); if (fs) return fs; }
   const list = HAUS_BILDER[`${b.roof || 'thatch'}|${b.wall || 'plaster'}`];
   if (!list) return null;
   const A = Math.max(b.wx, b.wy) / Math.min(b.wx, b.wy), big = Math.max(b.wx, b.wy);
@@ -1740,9 +1754,127 @@ function drawHouseSprite(c, b, hs) {
   const empty = abandonedId(b.site), lit = b.lit && !empty;
   if (lit && darkness() > 0.2) { addLight(b.x, b.y + b.wy / 2, b.h * 0.5, 22, 0.8); addLight(b.x + b.wx / 2, b.y, b.h * 0.5, 22, 0.7); }
   // Rauch aus dem gemalten Schornstein
-  const r = hs.name && YORK_RAUCH[hs.name], a = P5[hs.base];
+  const r = hs.name && (hs.fl ? FL_RAUCH : YORK_RAUCH)[hs.name], a = P5[hs.base];
   if (r && a && !empty) { const [px, py] = P(b.x, b.y, 0); b.smoke = [px + (r[0] - a[0]) * hs.sc * (hs.flip ? -1 : 1), py + (r[1] - a[1]) * hs.sc]; }
   return true;
+}
+
+// ---------------------------------------------------------------- Paket Flandern (tools/flandern.py)
+// Backsteinhäuser mit Treppengiebeln, Höfe und Katen mit Strohdach, Kirche, Belfried, Tuchhalle, Gravensteen,
+// Windmühle, Tretkran, Lastkahn, Marktstand und Kleinkram, Kaimauern und Steinbrücken, je mit Winterbild. Sie gelten in
+// den Orten Flanderns (realm 'fl') und auf dem Land ringsum. FLAND: Grundfläche beim Maßstab 1 und Türseite wie YORK.
+Object.assign(P5, {"fl_backhaus":[49.38,86.75,0.3333],"fl_backhaus_winter":[49.38,86.75,0.3333],"fl_fachwerk":[45.12,103.12,0.3333],"fl_fachwerk_winter":[45.12,103.12,0.3333],"fl_giebel_1":[39.62,115.12,0.3333],"fl_giebel_1_winter":[39.62,115.12,0.3333],"fl_giebel_2":[40.25,118.62,0.3333],"fl_giebel_2_winter":[40.25,118.62,0.3333],"fl_giebel_3":[38.0,110.5,0.3333],"fl_giebel_3_winter":[38.0,110.5,0.3333],"fl_gildehaus":[61.0,106.25,0.3333],"fl_gildehaus_winter":[61.0,106.25,0.3333],"fl_godshuis":[78.5,84.5,0.3333],"fl_godshuis_winter":[78.5,84.5,0.3333],"fl_hof":[72.5,80.38,0.3333],"fl_hof_winter":[72.5,80.38,0.3333],"fl_kate":[42.38,74.25,0.3333],"fl_kate_winter":[42.38,74.25,0.3333],"fl_scheune":[62.0,89.75,0.3333],"fl_scheune_winter":[62.0,89.75,0.3333],"fl_speicher":[40.62,128.88,0.3333],"fl_speicher_winter":[40.62,128.88,0.3333],"fl_weberhaus":[48.38,69.25,0.3333],"fl_weberhaus_winter":[48.38,69.25,0.3333],"fl_belfried":[24.62,211.12,0.3333],"fl_belfried_winter":[24.62,211.12,0.3333],"fl_tuchhalle":[106.0,142.25,0.3333],"fl_tuchhalle_winter":[106.0,142.25,0.3333],"fl_kirche":[105.62,215.75,0.3333],"fl_kirche_winter":[105.62,215.75,0.3333],"fl_tretkran":[40.0,93.0,0.3333],"fl_tretkran_winter":[40.0,93.0,0.3333],"fl_gravensteen":[111.5,183.19,0.3333],"fl_gravensteen_winter":[111.5,183.19,0.3333],"fl_windmuehle":[67.5,139.12,0.3333],"fl_windmuehle_winter":[67.5,139.12,0.3333],"fl_tuchstand":[29.38,36.06,0.3333],"fl_tuchstand_winter":[29.5,36.12,0.3333],"fl_tuchrahmen":[50.25,41.62,0.3333],"fl_tuchrahmen_winter":[50.38,41.69,0.3333],"fl_bierfaesser":[20.5,26.12,0.3333],"fl_bierfaesser_winter":[20.38,26.19,0.3333],"fl_faerbebottiche":[24.88,23.81,0.3333],"fl_faerbebottiche_winter":[24.88,23.81,0.3333],"fl_flachs":[18.5,25.0,0.3333],"fl_flachs_winter":[18.38,24.94,0.3333],"fl_netzgestell":[29.5,28.62,0.3333],"fl_netzgestell_winter":[29.62,28.56,0.3333],"fl_wollballen":[22.5,26.88,0.3333],"fl_wollballen_winter":[22.5,26.88,0.3333],"fl_lastkahn":[50.38,28.44,0.3333],"fl_lastkahn_winter":[50.5,28.5,0.3333],"fl_kaimauer_x":[44.0,37.0,0.3333],"fl_kaimauer_x_winter":[44.0,37.0,0.3333],"fl_kaimauer_y":[44.0,37.0,0.3333],"fl_kaimauer_y_winter":[44.0,37.0,0.3333],"fl_kaimauer_ecke":[44.0,37.0,0.3333],"fl_kaimauer_ecke_winter":[44.0,37.0,0.3333],"fl_kaimauer_x_rand":[44.0,37.0,0.3333],"fl_kaimauer_x_rand_winter":[44.0,37.0,0.3333],"fl_kaimauer_y_rand":[44.0,37.0,0.3333],"fl_kaimauer_y_rand_winter":[44.0,37.0,0.3333],"fl_steinbruecke_x":[44.0,37.0,0.3333],"fl_steinbruecke_x_winter":[44.0,37.0,0.3333],"fl_steinbruecke_y":[44.0,37.0,0.3333],"fl_steinbruecke_y_winter":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_nw_no":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_nw_no_winter":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_nw_sw":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_nw_sw_winter":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_so_no":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_so_no_winter":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_so_sw":[44.0,37.0,0.3333],"fl_steinbruecke_ecke_so_sw_winter":[44.0,37.0,0.3333]});
+const FLAND = {"backhaus":[1.3,1.38,"L"],"fachwerk":[1.21,0.62,"R"],"giebel_1":[1.3,0.83,"L"],"giebel_2":[1.44,0.73,"L"],"giebel_3":[1.27,0.74,"L"],"gildehaus":[2.62,0.74,"L"],"godshuis":[3.44,0.84,"L"],"hof":[3.02,0.85,"L"],"kate":[1.38,0.75,"L"],"scheune":[2.07,1.15,"L"],"speicher":[1.53,0.63,"L"],"weberhaus":[1.67,0.76,"L"],"belfried":[0.66,0.66,"L"],"tuchhalle":[4.7,1.17,"L"],"kirche":[1.26,4.64,"L"],"tretkran":[0.9,0.96,"L"],"gravensteen":[4.4,4.4,"L"],"windmuehle":[0.83,0.83,"L"],"tuchstand":[0.81,0.81,"L"],"tuchrahmen":[1.4,1.4,"L"],"bierfaesser":[0.55,0.55,"L"],"faerbebottiche":[0.68,0.68,"L"],"flachs":[0.48,0.48,"L"],"netzgestell":[0.8,0.8,"L"],"wollballen":[0.62,0.62,"L"],"lastkahn":[1.39,1.39,"L"],"kaimauer_x":[1.0,1.0,"L"],"kaimauer_y":[1.0,1.0,"L"],"kaimauer_ecke":[1.0,1.0,"L"],"kaimauer_x_rand":[1.0,1.0,"L"],"kaimauer_y_rand":[1.0,1.0,"L"],"steinbruecke_x":[1.0,1.0,"L"],"steinbruecke_y":[1.0,1.0,"L"],"steinbruecke_ecke_nw_no":[1.0,1.0,"L"],"steinbruecke_ecke_nw_sw":[1.0,1.0,"L"],"steinbruecke_ecke_so_no":[1.0,1.0,"L"],"steinbruecke_ecke_so_sw":[1.0,1.0,"L"]};
+function flId(name) { const w = `fl_${name}_winter`; return lookSeason() === 3 && ART[w] ? w : `fl_${name}`; }
+const flFit = (name, wx, wy, maxSc, minSc) => fitTo(FLAND, name, wx, wy, maxSc, minSc);
+// Schornsteine im Bild (Weltpixel)
+const FL_RAUCH = { backhaus: [58, 8], fachwerk: [58.25, 8], giebel_1: [28, 10], giebel_2: [32.5, 13], giebel_3: [50, 10.5], gildehaus: [52.5, 8.75], godshuis: [56.75, 18], hof: [55, 10.5], kate: [53.75, 6.75], weberhaus: [61.75, 6.25], speicher: [34.5, 13] };
+// Liegt ein Punkt in Flandern? Im Umkreis eines flämischen Ortes und auf dem Land ringsum (bis 30 Felder)
+let flSites = null;
+function flSiteList() {
+  const W = G.world;
+  if (!flSites || flSites.W !== W) flSites = { W, list: W.sites.filter((s) => s.realm === 'fl') };
+  return flSites.list;
+}
+function inFlandersXY(x, y) { return flSiteList().some((s) => Math.abs(s.x - x) < s.clear + 30 && Math.abs(s.y - y) < s.clear + 30 && Math.hypot(s.x - x, s.y - y) < s.clear + 30); }
+// In einer flämischen Stadt oder einem Markt (für Kaimauern)
+function inFlemishTown(x, y) { return flSiteList().some((s) => (s.type === 'stadt' || s.type === 'markt') && Math.hypot(s.x - x, s.y - y) < s.clear); }
+function flemish(b) { if (b._fl === undefined) b._fl = inFlandersXY(b.x, b.y); return b._fl; }
+function siteOf(b) { if (b._site === undefined) b._site = (b.site && G.world.sites.find((s) => s.id === b.site)) || null; return b._site; }
+// Häuser: in Städten und Märkten Backstein mit Treppengiebel, Speicher und Fachwerk; auf dem Land Höfe, Katen und
+// Weberhäuser mit Strohdach; Schuppen als Scheune, die Schmiede als Backhaus mit Ofen. Unter den passenden das, dessen Grundriss der Form am nächsten kommt.
+const FL_STADT = ['giebel_1', 'giebel_2', 'giebel_3', 'gildehaus', 'speicher', 'fachwerk', 'weberhaus'];
+const FL_LAND = ['kate', 'hof', 'weberhaus', 'kate'];
+function flHouse(b) {
+  const s = siteOf(b), town = s && (s.type === 'stadt' || s.type === 'markt');
+  const list = b.wall === 'wood' && !b.lit ? ['scheune'] : b.smithy ? ['backhaus', 'scheune'] : town ? FL_STADT : FL_LAND;
+  const A = Math.max(b.wx, b.wy) / Math.min(b.wx, b.wy);
+  const misfit = (n) => { const [fw, fh] = FLAND[n], a = Math.max(fw, fh) / Math.min(fw, fh); return Math.max(a / A, A / a); };
+  const have = list.filter((n) => ART[`fl_${n}`]);
+  let ok = have.filter((n) => misfit(n) <= (town ? 1.8 : 1.9));
+  if (!ok.length && have.length) ok = [have.reduce((a, n) => (misfit(n) < misfit(a) ? n : a))];
+  if (!ok.length) return null;
+  const name = ok[Math.min(ok.length - 1, Math.floor(hash2(Math.round(b.x * 10), Math.round(b.y * 10), 7) * ok.length))];
+  const f = flFit(name, b.wx, b.wy, 1.15, 0.6);
+  return { id: flId(name), base: `fl_${name}`, name, fl: true, flip: f.flip, sc: f.sc };
+}
+// Gravensteen in Gent: die Fahne in der Farbe des Herrn
+function drawGravensteen(c, b) {
+  if (!ART.fl_gravensteen) return false;
+  const sc = Math.min(b.wx, b.wy) / FLAND.gravensteen[0] * 1.08, s = siteOf(b);
+  drawShadow(c, b.x, b.y, b.wx * 0.9, b.wy * 0.9, 60, 0.18);
+  return p5(c, flId('gravensteen'), b.x, b.y, sc, false, s ? siteColor(s) : '#c8a030');
+}
+// Tuchhalle mit Arkaden; in Brügge steht der Belfried vor der Mitte der Halle
+function drawFlemishClothHall(c, b) {
+  if (!ART.fl_tuchhalle) return false;
+  const f = flFit('tuchhalle', b.wx, b.wy * (b.belfry ? 0.62 : 1), 1.0, 0.5), back = b.belfry ? -0.32 : 0;
+  drawShadow(c, b.x, b.y + back, f.fw * f.sc, f.fh * f.sc, 40);
+  if (!p5(c, flId('tuchhalle'), b.x, b.y + back, f.sc, f.flip)) return false;
+  if (b.belfry && ART.fl_belfried) {
+    const by = b.y + back + (f.fh * f.sc) / 2 + 0.36;
+    drawShadow(c, b.x, by, 0.7, 0.7, 120, 0.16);
+    p5(c, flId('belfried'), b.x, by, 0.92);
+  }
+  return true;
+}
+// Windmühle, Tretkran, Lastkahn (World: kind 'deko'); ohne Bild die gezeichnete Bockwindmühle
+const DEKO_SC = { windmuehle: 0.85, tretkran: 0.8, lastkahn: 0.62 };
+function drawDeko(c, b) {
+  const sc = DEKO_SC[b.name] || 1;
+  if (ART[`fl_${b.name}`]) {
+    if (b.name !== 'lastkahn') drawShadow(c, b.x, b.y, (b.wx || 0.8) * 0.9, (b.wy || 0.8) * 0.9, b.name === 'windmuehle' ? 60 : 40, 0.16);
+    if (p5(c, flId(b.name), b.x, b.y, sc, !!b.flip)) return;
+  }
+  if (b.name === 'windmuehle') drawWindmill(c, b.x, b.y);
+}
+// Kleinkram in Flandern: Bierfässer, Wollballen, Flachsgarben, Färbebottiche; Netze an den Häfen
+const PROP_FL = { fass: ['bierfaesser', 0.8], kisten: ['wollballen', 0.72], heu: ['flachs', 0.85], karren: ['faerbebottiche', 0.75] };
+function flProp(b) {
+  if (!flemish(b)) return null;
+  const s = siteOf(b);
+  if (b.prop === 'holzstapel' && s && s.port) return ['netzgestell', 0.8];
+  const m = PROP_FL[b.prop];
+  if (!m || (b.prop === 'karren' && (b.v || 0) < 0.5)) return null;
+  return m;
+}
+// Kaimauern an Grachten und Flüssen in Flanderns Städten: An einem Landfeld mit Wasser vorn links oder vorn rechts hängt
+// die Mauer über das Wasser hinab, mit Wasser hinten liegt nur die Deckplatte auf der Kante. Gezeichnet werden auch die
+// Felder im Kranz um den Chunk, beschnitten auf die eigenen Felder (wie bei den Wegen).
+function drawQuays(c, W, x0, y0, ox, oy) {
+  if (!ART.fl_kaimauer_x) return;
+  const towns = flSiteList().filter((s) => (s.type === 'stadt' || s.type === 'markt') && s.x + s.clear > x0 - 1 && s.x - s.clear < x0 + CHUNK + 1 && s.y + s.clear > y0 - 1 && s.y - s.clear < y0 + CHUNK + 1);
+  if (!towns.length) return;
+  const N = W.N, M = W.M, vh = W.vh;
+  const wet = (i, j) => i >= 0 && j >= 0 && i < N && j < N && W.tiles[j * N + i] === T.WATER && !W.sea[j * N + i];
+  const dry = (i, j) => { const t = W.tiles[j * N + i]; return t !== T.WATER && t !== T.BRIDGE; };
+  const list = [];
+  for (let j = Math.max(1, y0 - 1); j <= Math.min(N - 2, y0 + CHUNK); j++) for (let i = Math.max(1, x0 - 1); i <= Math.min(N - 2, x0 + CHUNK); i++) {
+    if (!dry(i, j) || !towns.some((s) => Math.hypot(s.x - i - 0.5, s.y - j - 0.5) < s.clear)) continue;
+    const sw = wet(i, j + 1), so = wet(i + 1, j), no = wet(i, j - 1), nw = wet(i - 1, j);
+    if (sw || so || no || nw) list.push({ i, j, sw, so, no, nw });
+  }
+  if (!list.length) return;
+  c.save();
+  c.beginPath();
+  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) {
+    const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy, h = vh[j * M + i];
+    c.moveTo(sx, sy - h - 0.6); c.lineTo(sx + HW + 0.6, sy + HH - vh[j * M + i + 1]); c.lineTo(sx, sy + 2 * HH - vh[(j + 1) * M + i + 1] + 0.6); c.lineTo(sx - HW - 0.6, sy + HH - vh[(j + 1) * M + i]); c.closePath();
+  }
+  c.clip();
+  const put = (name, q) => {
+    const id = flId(name), a = P5[id], im = ART[id];
+    if (!a || !im) return;
+    const sx = isoX(q.i + 0.5, q.j + 0.5) + ox, sy = isoY(q.i + 0.5, q.j + 0.5) + oy - (vh[q.j * M + q.i] + vh[(q.j + 1) * M + q.i + 1]) / 2;
+    c.drawImage(im, sx - a[0], sy - a[1], im.width * a[2], im.height * a[2]);
+  };
+  for (const q of list) { if (q.no) put('kaimauer_x_rand', q); if (q.nw) put('kaimauer_y_rand', q); }
+  for (const q of list) {
+    if (q.sw && q.so) put('kaimauer_ecke', q);
+    else if (q.sw) put('kaimauer_x', q);
+    else if (q.so) put('kaimauer_y', q);
+  }
+  c.restore();
 }
 
 // Schadensstufe eines Mauerstücks: 1–3 nach dem Schaden, 4 wenn die Bresche offen ist
@@ -2027,7 +2159,7 @@ function palisadeRing(site, r) {
   return parts;
 }
 
-const BOXED_KINDS = { house: 1, church: 1, longhall: 1, landmark: 1, klause: 1, stollen: 1, halde: 1, mystic: 1, tent: 1, stall: 1, well: 1 };
+const BOXED_KINDS = { house: 1, church: 1, longhall: 1, landmark: 1, klause: 1, stollen: 1, halde: 1, mystic: 1, tent: 1, stall: 1, well: 1, deko: 1 };
 
 // Tiefensortierung: erst grob nach x + y, dann für Gebäude genau. Was vollständig hinter einem
 // Gebäude steht (westlich oder nördlich davon), wird vorher gezeichnet, was davor steht, danach.
@@ -2087,7 +2219,7 @@ function buildStaticParts() {
       house: drawHouseFast, church: drawChurchFast, longhall: drawLonghall, tent: drawTent, stall: drawStall,
       well: drawWell, fire: drawFire, fence: drawFence, prop: drawProp, ship: drawShip,
       landmark: drawLandmark, stonehenge: drawStonehenge,
-      stollen: drawStollen, halde: drawHalde, klause: drawKlause, mystic: drawMystic,
+      stollen: drawStollen, halde: drawHalde, klause: drawKlause, mystic: drawMystic, deko: drawDeko,
     }[b.kind];
     if (b.kind === 'friedhof') continue;
     if (!f) continue;
@@ -3509,7 +3641,9 @@ function drawBridgeSprite(c, W, g) {
     const wet = (a, b2) => W.tiles[b2 * N + a] === T.WATER;
     name = wet(i, j - 1) || wet(i, j + 1) ? 'bruecke_x' : 'bruecke_y';
   }
-  const id = yorkId(name), a = P5[id], im = ART[id];
+  // In Flandern Steinbrücken mit Bögen
+  const fl = ART.fl_steinbruecke_x && inFlandersXY(i + 0.5, j + 0.5);
+  const id = fl ? flId(`stein${name}`) : yorkId(name), a = P5[id], im = ART[id];
   if (!a || !im) return false;
   const [x, y] = g.ctr;
   c.drawImage(im, x - a[0], y - a[1] + 2, im.width * a[2], im.height * a[2]);
@@ -3537,6 +3671,7 @@ function renderChunk(cx, cy, cs = 1) {
   texBatch = null;
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise, 2);
   drawRoads(c, W, x0, y0, ox, oy, pal, season);
+  drawQuays(c, W, x0, y0, ox, oy);
   return { cvs, x: -ox, y: -oy, s: cs, w: cvs.width / cs, h: cvs.height / cs };
 }
 
@@ -4863,8 +4998,8 @@ onArt((id) => {
   if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
   if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
-  if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_')) { partCache.clear(); G.staticDirty = true; }
-  if (id.startsWith('york_bruecke')) chunkCache.clear();
+  if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_')) { partCache.clear(); G.staticDirty = true; }
+  if (id.startsWith('york_bruecke') || id.startsWith('fl_steinbruecke') || id.startsWith('fl_kaimauer')) chunkCache.clear();
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }

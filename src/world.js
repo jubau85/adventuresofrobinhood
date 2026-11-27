@@ -174,9 +174,10 @@ function markWalls(W, arr) {
 // jedes Feld, dessen Mitte darin liegt; dünne Zäune sperren jedes Feld, das sie berühren.
 // Straßen und Brücken sperrt ein Ortsgebäude nie, das Feld vor der Tür bleibt frei.
 export const REACH = 0.1;
-const SOLID_KINDS = { house: 1, church: 1, longhall: 1, klause: 1, stollen: 1, halde: 1, landmark: 1, stall: 1, well: 1, tent: 1, fence: 1 };
+const SOLID_KINDS = { house: 1, church: 1, longhall: 1, klause: 1, stollen: 1, halde: 1, landmark: 1, stall: 1, well: 1, tent: 1, fence: 1, deko: 1 };
 function solidRects(b) {
   if (!SOLID_KINDS[b.kind] || !b.wx) return null;
+  if (b.kind === 'deko' && !b.solid) return null;
   if (b.kind === 'landmark') {
     if (b.lm === 'tor') return null;
     // Kathedrale: Langhaus und Querschiff statt des ganzen Rechtecks
@@ -509,7 +510,8 @@ export function generateWorld(seed) {
   placeDocks(W);
   for (const s of W.sites) addFields(W, s, rng);
   addFarms(W, rng);
-  for (const s of W.sites) genBuildings(W, s, rng);
+  // Orte in Flandern bekommen ihren eigenen Zufall: Änderungen dort verschieben nicht den Rest der Welt
+  for (const s of W.sites) genBuildings(W, s, s.realm === 'fl' ? mulberry32((seed ^ strHash(s.id)) >>> 0) : rng);
   for (const f of W.farms) genFarm(W, f, rng);
   placePois(W, rng);
   for (const s of W.sites) placeCemetery(W, s);
@@ -1490,6 +1492,7 @@ function genBuildings(W, s, rng) {
     const R = s.clear - 1;
     for (let a = 0; a < Math.PI * 2; a += 0.3 / R) { const x = Math.floor(s.x + Math.cos(a) * R), y = Math.floor(s.y + Math.sin(a) * R); if (x > 0 && y > 0 && x < W.N && y < W.N) W.solid[y * W.N + x] = 1; }
   }
+  if (s.realm === 'fl' && s.type === 'stadt') carveGrachten(W, s, rng);
   const lms = s.landmarks || [];
   const hasCathedral = lms.some((l) => l.kind === 'kathedrale');
   for (const lm of lms) placeLandmark(W, s, lm);
@@ -1601,6 +1604,71 @@ function genBuildings(W, s, rng) {
       break;
     default:
       break;
+  }
+  if (s.realm === 'fl') flemishExtras(W, s, rng, add);
+}
+
+// Kurzer Hash eines Namens (für den eigenen Zufall eines Ortes)
+function strHash(str) {
+  let h = 2166136261;
+  for (let k = 0; k < str.length; k++) h = Math.imul(h ^ str.charCodeAt(k), 16777619);
+  return h >>> 0;
+}
+
+// Grachten in Brügge: ein Ring zwischen den Ringgassen und ein Arm hinaus durch die Stadtmauer. Wo schon ein Weg liegt,
+// wird er zur Brücke; die Hauptstraßen queren den Ring später auf Brücken (genCity), die Ringgassen enden am Wasser.
+function carveGrachten(W, s, rng) {
+  const N = W.N, R = s.clear - 1, rr = R * 0.56;
+  const wet = (x, y) => {
+    if (x < 2 || y < 2 || x >= N - 2 || y >= N - 2) return;
+    const i = y * N + x, t = W.tiles[i];
+    if (t === T.WATER || t === T.BRIDGE) return;
+    W.tiles[i] = t === T.ROAD ? T.BRIDGE : T.WATER;
+  };
+  for (let y = Math.floor(s.y - rr - 2); y <= s.y + rr + 2; y++) for (let x = Math.floor(s.x - rr - 2); x <= s.x + rr + 2; x++) {
+    if (Math.abs(Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y) - rr) < 0.62) wet(x, y);
+  }
+  const a = rng() * Math.PI * 2;
+  for (let r = rr; r < R + 2.5; r += 0.3) wet(Math.floor(s.x + Math.cos(a) * r), Math.floor(s.y + Math.sin(a) * r));
+  s.gracht = { r: rr, arm: a };
+}
+
+// Flandern: Windmühlen vor dem Ort; in Brügge Lastkähne auf der Gracht und ein Tretkran am Kai
+function flemishExtras(W, s, rng, add) {
+  const N = W.N;
+  const mills = s.type === 'stadt' ? 3 : s.type === 'markt' ? 2 : 1;
+  for (let k = 0, placed = 0; k < 120 && placed < mills; k++) {
+    const a = rng() * Math.PI * 2, r = s.clear + 0.8 + rng() * 3.5;
+    const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
+    if (x < 3 || y < 3 || x >= N - 3 || y >= N - 3) continue;
+    const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
+    if (t !== T.GRASS && t !== T.FIELD) continue;
+    if (!freeSpot(W, x, y, 2.4) || countAround(W, Math.floor(x), Math.floor(y), 2, T.WATER) || countAround(W, Math.floor(x), Math.floor(y), 1, T.ROAD)) continue;
+    add({ kind: 'deko', name: 'windmuehle', x, y, wx: 1.0, wy: 1.0, solid: true });
+    placed++;
+  }
+  if (!s.gracht) return;
+  const { r: rr } = s.gracht;
+  const isWet = (x, y) => W.tiles[Math.floor(y) * N + Math.floor(x)] === T.WATER;
+  // Lastkähne längs der Gracht, die Längsseite nach der Richtung des Rings
+  for (let k = 0, placed = 0; k < 40 && placed < 3; k++) {
+    const a = rng() * Math.PI * 2;
+    const x = Math.floor(s.x + Math.cos(a) * rr) + 0.5, y = Math.floor(s.y + Math.sin(a) * rr) + 0.5;
+    if (!isWet(x, y) || !isWet(x + Math.sin(a) * 0.9, y - Math.cos(a) * 0.9)) continue;
+    if (W.buildings.some((b) => b.name === 'lastkahn' && Math.hypot(b.x - x, b.y - y) < 4)) continue;
+    // Ringrichtung (−sin a, cos a): mehr entlang y als entlang x heißt, das Bild bleibt ungespiegelt
+    add({ kind: 'deko', name: 'lastkahn', x, y, flip: Math.abs(Math.sin(a)) > Math.abs(Math.cos(a)), noCost: true });
+    placed++;
+  }
+  // Tretkran auf einem Feld am Kai, nahe dem Markt
+  for (let k = 0; k < 80; k++) {
+    const a = rng() * Math.PI * 2, r = rr + (rng() < 0.5 ? -1 : 1);
+    const x = Math.floor(s.x + Math.cos(a) * r) + 0.5, y = Math.floor(s.y + Math.sin(a) * r) + 0.5;
+    const t = W.tiles[Math.floor(y) * N + Math.floor(x)];
+    if (t === T.WATER || t === T.ROAD || t === T.BRIDGE || !countAround(W, Math.floor(x), Math.floor(y), 1, T.WATER)) continue;
+    if (!freeSpot(W, x, y, 1.3)) continue;
+    add({ kind: 'deko', name: 'tretkran', x, y, wx: 0.9, wy: 0.9, solid: true });
+    break;
   }
 }
 

@@ -11,7 +11,7 @@ const ext = (b) => (DRAWN[b.kind] ? DRAWN[b.kind](b) : [b.wx || 0, b.wy || 0]);
 const stats = {}, examples = {};
 for (const seed of [12345, 777, 4242]) {
   const W = generateWorld(seed);
-  const solid = W.buildings.filter((b) => b.wx && ['house', 'church', 'longhall', 'landmark', 'tent', 'stall', 'well', 'klause', 'mystic', 'stollen', 'halde', 'stonehenge'].includes(b.kind));
+  const solid = W.buildings.filter((b) => b.wx && ['house', 'church', 'longhall', 'landmark', 'tent', 'stall', 'well', 'klause', 'mystic', 'stollen', 'halde', 'stonehenge', 'deko'].includes(b.kind));
   // Friedhöfe und Stadtmauern als Hindernisse
   const extra = [];
   for (const s of W.sites) {

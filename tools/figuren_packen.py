@@ -1,6 +1,6 @@
 # Packt den Held (<held-ordner>/sp_<stufe>) und alle übrigen Figuren (<arbeitsordner>/sp_*) und schreibt src/figuren.js
 # und die Bildeinträge in src/assets.js.
-# Aufruf: python3 tools/figuren_packen.py <arbeitsordner> <held-ordner> [nur-figuren] [schlüssel ...]
+# Aufruf: python3 tools/figuren_packen.py <arbeitsordner> <held-ordner> [nur-figuren | nur-held] [schlüssel ...]
 import json, glob, os, subprocess, sys
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = os.path.abspath(sys.argv[1]); E = os.path.abspath(sys.argv[2])
@@ -24,24 +24,29 @@ def pack(src, dst, name, extra):
     print(name, ' '.join(l.split()[1] + ':' + l.split()[-2] for l in p.stdout.splitlines() if l.startswith('gepackt')), flush=True)
     return json.loads(p.stdout.strip().splitlines()[-1])
 only_fig = 'nur-figuren' in sys.argv[3:]
+only_hero = 'nur-held' in sys.argv[3:]
 hero, fig = {}, {}
-if not only_fig:
-    for f in glob.glob(os.path.join(R, 'assets/held/*.webp')): os.remove(f)
-    for v in ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']:
-        x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if v == 'ritter' else ['--ohne-maske', '1']
-        hero[v] = entry(pack(os.path.join(E, f'sp_{v}'), os.path.join(R, 'assets/held'), f'held_{v}', ['--zelle', '224', '--qualitaet', '84'] + x))
-else:
+def tables():
     # vorhandene Tabellen aus src/figuren.js lesen (je Zeile „  name: {…},“)
     cur, tab = None, {'HERO3D': {}, 'FIG3D': {}}
     for line in open(os.path.join(R, 'src/figuren.js')).read().split('\n'):
         if line.startswith('export const '): cur = line.split()[2]; continue
         if cur and line.startswith('  ') and ': {' in line:
             k, v = line.strip().split(': ', 1); tab[cur][k] = json.loads(v.rstrip(',').replace("'", '"'))
-    hero = tab['HERO3D']; fig.update(tab['FIG3D'])
-keys = [a for a in sys.argv[3:] if a != 'nur-figuren']
-for f in glob.glob(os.path.join(R, 'assets/figuren3d/*.webp')):
+    return tab
+if not only_fig:
+    for f in glob.glob(os.path.join(R, 'assets/held/*.webp')): os.remove(f)
+    for v in ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']:
+        x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if v == 'ritter' else ['--ohne-maske', '1']
+        hero[v] = entry(pack(os.path.join(E, f'sp_{v}'), os.path.join(R, 'assets/held'), f'held_{v}', ['--zelle', '224', '--qualitaet', '84'] + x))
+    # nur der Held: die Figuren bleiben, wie sie sind
+    if only_hero: fig.update(tables()['FIG3D'])
+else:
+    tab = tables(); hero = tab['HERO3D']; fig.update(tab['FIG3D'])
+keys = [a for a in sys.argv[3:] if a not in ('nur-figuren', 'nur-held')]
+for f in [] if only_hero else glob.glob(os.path.join(R, 'assets/figuren3d/*.webp')):
     if not keys or any(os.path.basename(f).startswith(k + '_') and not os.path.basename(f)[len(k) + 1:].split('_')[0] in ('leder', 'kette', 'schuppe', 'gambeson', 'ritter') for k in keys): os.remove(f)
-for sp in sorted(glob.glob(os.path.join(D, 'sp_*'))):
+for sp in [] if only_hero else sorted(glob.glob(os.path.join(D, 'sp_*'))):
     key = os.path.basename(sp)[3:]
     if keys and key not in keys: continue
     if not os.path.exists(os.path.join(sp, 'sprites.json')): continue
