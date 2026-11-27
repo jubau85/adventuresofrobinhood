@@ -4107,8 +4107,10 @@ function drawLance(c, u, by) {
 const GEG = {knueppel:[13.5,10.8,0.8,128,142.6],langschwert:[12.3,14.6,0.95,128,-44.6],kriegshammer:[13.6,21.3,0.8,128,143.1],speer:[103.9,11.7,2.1,128,-43.4],streitaxt:[14.6,23.8,0.85,128,-40.7],kurzbogen:[78.3,5.1,1.2,128,-44.3],armbrust:[34.4,53.3,0.85,128,-30.4],axt:[12.7,17.7,0.75,128,-145.6],hammer:[27.8,36.8,0.4,256,138.0],hacke:[27.0,57.5,1.1,128,-131.6],sichel:[7.5,20.1,0.5,128,-131.9],heugabel:[83.9,21.5,1.6,128,138.9],besen:[77.6,25.6,1.3,128,135.6],angelrute:[23.6,26.9,3.0,128,-39.7],wanderstab:[133.5,27.5,1.7,128,-132.5],kruecke:[152.3,31.6,1.3,128,-52.8],holzschild:[32.3,38.4,0.6,128],holzschild_innen:[32.6,38.4,0.6,128],rundschild:[45.0,51.2,0.8,128],rundschild_innen:[45.5,51.2,0.8,128],langschild:[35.2,70.4,1.1,128],langschild_innen:[34.8,70.4,1.1,128],wappenschild:[34.9,51.2,0.8,128],wappenschild_innen:[34.9,51.2,0.8,128],bettelschale:[17.9,12.8,0.1,256],krug:[25.9,35.8,0.28,256],becher:[11.9,15.4,0.12,256]};
 const UPM = FIG3D_H / 1.8;   // Figureneinheiten je Meter
 // Gegenstand an der aktuellen Stelle zeichnen: um den Griff gedreht (ang), vergrößert (sc), Magenta umgefärbt (color)
-function drawGeg(c, name, ang = 0, sc = 1, color = null) {
-  const g = GEG[name], id = `geg_${name}`;
+function drawGeg(c, name, ang = 0, sc = 1, color = null, dir = null) {
+  // Gibt es das Ding als Meshy-Modell, den Blick passend zur Richtung der Figur nehmen
+  const n3 = geg3Name(name, dir);
+  const g = n3 && wantArt(`g3_${n3}`) ? GEG3[n3] : GEG[name], id = g === GEG3[n3] ? `g3_${n3}` : `geg_${name}`;
   if (!g || !ART[id]) return false;
   const spr = figSprite(id, color || '#808080');
   if (!spr) return false;
@@ -4128,6 +4130,22 @@ const WEAPON_GEG = {
 };
 const SHIELD_GEG = { holzschild: 'holzschild', rundschild: 'rundschild', drachenschild: 'langschild', wappenschild: 'wappenschild' };
 const TOOL_GEG = { hacke: 'hacke', sichel: 'sichel', axt: 'axt', hammer: 'hammer', gabel: 'heugabel', besen: 'besen' };
+// Handdinge aus Meshy-Modellen (tools/gegenstaende_render.py, _nach.py): je Ding mehrere Blicke, damit es sich mit der Figur
+// dreht. Schilde um die Hochachse (0° Schauseite … 180° Rückseite), lange Dinge um ihre Längsachse (0° flach … 80° hochkant).
+// GEG3: Blick -> [Griff x, Griff y, Länge oder Höhe in Metern, Bildpunkte je Meter]
+// GEG3-ANFANG (erzeugt aus assets/gegenstaende3d/gegenstaende.json)
+const GEG3 = {"axt_0":[13.8,5.0,0.9,128],"axt_45":[13.8,5.0,0.9,128],"axt_80":[13.8,5.0,0.9,128],"drachenschild_0":[30.0,71.0,1.1,128],"drachenschild_135":[22.0,71.0,1.1,128],"drachenschild_180":[30.0,71.0,1.1,128],"drachenschild_45":[22.5,71.0,1.1,128],"drachenschild_75":[13.0,71.0,1.1,128],"fackel_0":[20.0,5.0,0.6,128],"fackel_45":[20.0,5.0,0.6,128],"fackel_80":[20.0,4.0,0.6,128],"hacke_0":[16.6,20.5,1.3,128],"hacke_45":[16.6,13.0,1.3,128],"hacke_80":[16.6,4.5,1.3,128],"hammer_0":[15.3,19.0,0.4,256],"hammer_45":[15.3,16.0,0.4,256],"hammer_80":[15.3,7.5,0.4,256],"holzschild_0":[23.0,45.0,0.7,128],"holzschild_135":[17.5,45.0,0.7,128],"holzschild_180":[23.0,45.0,0.7,128],"holzschild_45":[17.5,45.0,0.7,128],"holzschild_75":[9.5,45.0,0.7,128],"rundschild_0":[52.0,51.5,0.8,128],"rundschild_135":[37.5,51.5,0.8,128],"rundschild_180":[52.0,51.5,0.8,128],"rundschild_45":[37.5,51.5,0.8,128],"rundschild_75":[15.5,51.5,0.8,128],"saege_0":[14.3,18.0,0.7,128],"saege_45":[14.3,14.5,0.7,128],"saege_80":[14.3,5.5,0.7,128],"schaufel_0":[12.3,17.0,1.2,128],"schaufel_45":[12.3,13.0,1.2,128],"schaufel_80":[12.3,5.0,1.2,128],"sense_0":[66.1,27.5,1.7,128],"sense_45":[66.1,19.5,1.7,128],"sense_80":[66.1,6.5,1.7,128],"sichel_0":[7.6,17.5,0.5,128],"sichel_45":[7.6,12.5,0.5,128],"sichel_80":[7.6,4.5,0.5,128],"spitzhacke_0":[13.8,31.5,0.9,128],"spitzhacke_45":[13.8,22.5,0.9,128],"spitzhacke_80":[13.8,5.0,0.9,128],"turnierlanze_0":[89.6,22.0,3.5,128],"turnierlanze_45":[89.6,22.5,3.5,128],"turnierlanze_80":[89.6,22.5,3.5,128],"wappenschild_0":[30.0,49.0,0.75,128],"wappenschild_135":[22.0,49.0,0.75,128],"wappenschild_180":[30.0,49.0,0.75,128],"wappenschild_45":[22.0,49.0,0.75,128],"wappenschild_75":[9.0,49.0,0.75,128],"zange_0":[7.6,4.5,0.5,128],"zange_45":[7.6,4.5,0.5,128],"zange_80":[7.6,2.5,0.5,128]};
+// GEG3-ENDE
+const GEG3_OF = { axt: 'axt', hammer: 'hammer', hacke: 'hacke', sichel: 'sichel', holzschild: 'holzschild', rundschild: 'rundschild', langschild: 'drachenschild', wappenschild: 'wappenschild', zange: 'zange', schaufel: 'schaufel', fackel: 'fackel', spitzhacke: 'spitzhacke', sense: 'sense', saege: 'saege' };
+// Blick je Richtung der Figur (dirIndex 0 … 7: 1 zum Betrachter, 3 und 7 zur Seite, 5 vom Betrachter weg)
+const SHIELD_VIEW = [45, 0, 45, 75, 135, 180, 135, 75];
+const LONG_VIEW = [45, 80, 45, 0, 45, 80, 45, 0];
+function geg3Name(name, dir) {
+  const base = GEG3_OF[name.replace(/_innen$/, '')];
+  if (!base || dir == null) return null;
+  const id = `${base}_${(/schild/.test(base) ? SHIELD_VIEW : LONG_VIEW)[dir]}`;
+  return GEG3[id] && artKnown(`g3_${id}`) ? id : null;
+}
 
 function drawWeapon(c, u, by) {
   if (u.lance) { drawLance(c, u, by); return; }
@@ -4567,11 +4585,11 @@ function drawModel3d(c, u, L, m, key) {
   const gear = () => {
     const sgn = (u.dirX ?? 0) - (u.dirY ?? 1) >= 0 ? 1 : -1;
     const rh = pt('RightHand'), lh = pt('LeftHand');
-    if (u.eq && u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x + 1.5 * sgn, oy + lh.y, sgn, back);
+    if (u.eq && u.eq.schild && lh) drawHeroShield(c, u, L, ox + lh.x + 1.5 * sgn, oy + lh.y, sgn, back, dir);
     if (rh && ((u.eq && u.eq.waffe) || u.lance)) {
       c.save(); c.translate(ox + rh.x, oy + rh.y); c.scale(sgn, 1); c.translate(-4, 12); drawWeapon(c, u, 0); c.restore();
     }
-    if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim);
+    if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim, dir);
   };
   if (back) gear();
   c.drawImage(lodOf(near || cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
@@ -4582,15 +4600,20 @@ function drawModel3d(c, u, L, m, key) {
   return (head ? oy + head.y : -10) - 2;
 }
 // Werkzeug in der rechten Hand, Bogen, Eimer, Korb oder Stab bei den Dorfleuten
-function drawHandGear(c, u, rh, lh, sgn, anim) {
+function drawHandGear(c, u, rh, lh, sgn, anim, dir = null) {
   let tool = TOOL3D[u.act];
   c.strokeStyle = OUTLINE; c.lineWidth = 0.9;
   if (tool === 'hammer' || tool === 'axt' || tool === 'hacke') emitWork(u.x, u.y, tool === 'hammer' && u.task && u.task.anvil ? 'amboss' : tool, ACT_SPEED[u.act] || 1, u.id % 7);
+  // Passendes Werkzeug zur Arbeit (Meshy-Handdinge): Spaten am Grab, Spitzhacke im Stollen, Sense bei der Ernte, Säge am Bau
+  if (tool === 'hacke' && u.grave) tool = 'schaufel';
+  else if (tool === 'hacke' && u.home && u.home.type === 'mine') tool = 'spitzhacke';
+  else if (tool === 'sichel' && !u.female && u.id % 2) tool = 'sense';
+  else if (tool === 'hammer' && u.task && u.task.repair && u.id % 3 === 0) tool = 'saege';
   if (tool && rh) {
     c.save(); c.translate(rh.x, rh.y); c.scale(sgn, 1);
     // Stiel von der Hand nach oben vorn; bei Schlagbewegungen folgt er der Hand
     c.rotate(anim === 'stehen' ? -1.2 : -1.9);
-    if (drawGeg(c, TOOL_GEG[tool])) { c.restore(); tool = null; }
+    if (drawGeg(c, TOOL_GEG[tool] || tool, 0, 1, null, dir)) { c.restore(); tool = null; }
   }
   if (tool && rh) {
     c.strokeStyle = '#6b4a2a'; c.lineWidth = 1.5;
@@ -4624,13 +4647,13 @@ function drawHandGear(c, u, rh, lh, sgn, anim) {
   if (u.act === 'saeen' && rh && Math.sin(G.time * 3.3 + u.id) > 0.5) { c.fillStyle = '#d8c48a'; for (let q = 0; q < 4; q++) c.fillRect(rh.x + 2 + q * 1.8, rh.y + 1 + q * 1.4 + ((G.time * 9 + q) % 3), 1, 1); }
   if (u.act === 'gefesselt' && rh) { c.strokeStyle = '#b8a070'; c.lineWidth = 1; c.beginPath(); c.moveTo(rh.x - 2, rh.y); c.lineTo(rh.x + 2, rh.y); c.stroke(); }
 }
-function drawHeroShield(c, u, L, x, y, sgn, inner = false) {
+function drawHeroShield(c, u, L, x, y, sgn, inner = false, dir = null) {
   const it = ITEMS[u.eq.schild];
   const col = u.tunic || playerColor(), trim = '#d8b54a';
   c.save(); c.translate(x, y); c.scale(sgn, 1);
   // Gemalter Schild: von vorn die Schauseite (Wappenschild in der Farbe des Trägers), von hinten Riemen und Griff
   const sg = SHIELD_GEG[u.eq.schild];
-  if (sg && drawGeg(c, inner ? `${sg}_innen` : sg, 0, 0.85, u.tunic || (L && L.tunic) || col)) { c.restore(); return; }
+  if (sg && drawGeg(c, inner ? `${sg}_innen` : sg, 0, 0.85, u.tunic || (L && L.tunic) || col, dir)) { c.restore(); return; }
   c.strokeStyle = OUTLINE; c.lineWidth = 0.8;
   c.fillStyle = it && it.def >= 4 ? shade(col, 1.05) : '#8a6440';
   if (it && (u.eq.schild === 'rundschild' || u.eq.schild === 'holzschild')) {

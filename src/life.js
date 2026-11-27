@@ -734,10 +734,10 @@ export function updateFunerals(dt) {
     } else if (f.stage === 'grab') {
       const digger = f.bearers[1];
       chaseTo(digger, f.grave.x + 0.45, f.grave.y + 0.1, dt, 0.1, 0.6);
-      digger.act = 'hacke';
+      digger.act = 'hacke'; digger.grave = true;
       f.bearers[0].carry = null;
       all.forEach((v, k) => { if (v !== digger && v !== f.priest) { const a = (k / all.length) * Math.PI * 2; chaseTo(v, f.grave.x + Math.cos(a) * 0.9, f.grave.y + Math.sin(a) * 0.7, dt, 0.1, 0.6); v.act = 'beten'; } });
-      if (f.t > 7) { f.stage = 'messe'; f.t = 0; digger.act = 'beten'; }
+      if (f.t > 7) { f.stage = 'messe'; f.t = 0; digger.act = 'beten'; digger.grave = false; }
     } else if (f.stage === 'messe') {
       f.priest.act = 'segnen';
       const lines = [[0.5, f.priest, 'Requiem aeternam dona eis, Domine.'], [5, f.priest, 'Et lux perpetua luceat eis.'], [9.5, f.mourners[0] || f.bearers[0], 'Ruhe in Frieden.'], [13, f.priest, 'Requiescant in pace.'], [16.5, f.bearers[0], 'Amen.']];

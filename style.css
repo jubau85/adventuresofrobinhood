@@ -492,3 +492,5 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .loading-card p { margin: 0 0 12px; font-family: var(--font-head, serif); font-size: 20px; color: var(--ink, #3a2a1c); }
 .loading-bar { height: 10px; border-radius: 5px; background: rgba(90,67,48,0.2); overflow: hidden; }
 .loading-bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #a8791f, #e3b843); transition: width 0.15s; }
+/* Warenbilder in Markt und Lager */
+.ware-bild { display: inline-block; width: 22px; height: 22px; object-fit: contain; vertical-align: -6px; margin-right: 6px; }

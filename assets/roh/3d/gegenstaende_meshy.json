@@ -1,0 +1,20 @@
+{
+ "hinweis": "Meshy-Aufträge (Multi-Image-to-3D) der Handdinge; die Modelle lassen sich mit GET /openapi/v1/multi-image-to-3d/<id> erneut laden",
+ "auftraege": {
+  "axt": "01a21d01-e1b6-7475-80e7-2521905fb886",
+  "drachenschild": "01a21d13-51ba-77c3-a0d3-70fe167e7687",
+  "fackel": "01a21d13-8f3b-7493-ad2f-91799927313a",
+  "hacke": "01a21d13-87e8-7789-9186-04101c1c86a6",
+  "hammer": "01a21d13-701b-763a-b6af-5554d6ca4f38",
+  "holzschild": "01a21d13-6601-7592-9acf-15bcdf785312",
+  "rundschild": "01a21d13-5b2f-7535-b26b-017782fa2215",
+  "saege": "01a21d13-a806-7170-a631-53832e8ff112",
+  "schaufel": "01a21d13-8044-76aa-9533-22af8907ae8e",
+  "sense": "01a21d13-9fa8-7579-9c34-607e9a3dff85",
+  "sichel": "01a21d13-b167-704c-bd27-6334e62ed1db",
+  "spitzhacke": "01a21d13-96d0-7464-b793-9819a27c1d68",
+  "turnierlanze": "01a21d13-4ac5-75a6-be4a-94bb810c40b7",
+  "wappenschild": "01a21d01-d67f-74c6-879d-724527456d5d",
+  "zange": "01a21d13-78c4-744a-9ddd-f32e6427f264"
+ }
+}

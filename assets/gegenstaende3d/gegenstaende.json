@@ -1,0 +1,512 @@
+{
+ "turnierlanze_0": {
+  "art": "lang",
+  "griff": [
+   89.6,
+   22.0
+  ],
+  "meter": 3.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "turnierlanze_45": {
+  "art": "lang",
+  "griff": [
+   89.6,
+   22.5
+  ],
+  "meter": 3.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "turnierlanze_80": {
+  "art": "lang",
+  "griff": [
+   89.6,
+   22.5
+  ],
+  "meter": 3.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "drachenschild_0": {
+  "art": "aufrecht",
+  "griff": [
+   30.0,
+   71.0
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "drachenschild_45": {
+  "art": "aufrecht",
+  "griff": [
+   22.5,
+   71.0
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "drachenschild_75": {
+  "art": "aufrecht",
+  "griff": [
+   13.0,
+   71.0
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "drachenschild_135": {
+  "art": "aufrecht",
+  "griff": [
+   22.0,
+   71.0
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "drachenschild_180": {
+  "art": "aufrecht",
+  "griff": [
+   30.0,
+   71.0
+  ],
+  "meter": 1.1,
+  "ppm": 128
+ },
+ "rundschild_0": {
+  "art": "aufrecht",
+  "griff": [
+   52.0,
+   51.5
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "rundschild_45": {
+  "art": "aufrecht",
+  "griff": [
+   37.5,
+   51.5
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "rundschild_75": {
+  "art": "aufrecht",
+  "griff": [
+   15.5,
+   51.5
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "rundschild_135": {
+  "art": "aufrecht",
+  "griff": [
+   37.5,
+   51.5
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "rundschild_180": {
+  "art": "aufrecht",
+  "griff": [
+   52.0,
+   51.5
+  ],
+  "meter": 0.8,
+  "ppm": 128
+ },
+ "holzschild_0": {
+  "art": "aufrecht",
+  "griff": [
+   23.0,
+   45.0
+  ],
+  "meter": 0.7,
+  "ppm": 128
+ },
+ "holzschild_45": {
+  "art": "aufrecht",
+  "griff": [
+   17.5,
+   45.0
+  ],
+  "meter": 0.7,
+  "ppm": 128
+ },
+ "holzschild_75": {
+  "art": "aufrecht",
+  "griff": [
+   9.5,
+   45.0
+  ],
+  "meter": 0.7,
+  "ppm": 128
+ },
+ "holzschild_135": {
+  "art": "aufrecht",
+  "griff": [
+   17.5,
+   45.0
+  ],
+  "meter": 0.7,
+  "ppm": 128
+ },
+ "holzschild_180": {
+  "art": "aufrecht",
+  "griff": [
+   23.0,
+   45.0
+  ],
+  "meter": 0.7,
+  "ppm": 128
+ },
+ "wappenschild_0": {
+  "art": "aufrecht",
+  "griff": [
+   30.0,
+   49.0
+  ],
+  "meter": 0.75,
+  "ppm": 128
+ },
+ "wappenschild_45": {
+  "art": "aufrecht",
+  "griff": [
+   22.0,
+   49.0
+  ],
+  "meter": 0.75,
+  "ppm": 128
+ },
+ "wappenschild_75": {
+  "art": "aufrecht",
+  "griff": [
+   9.0,
+   49.0
+  ],
+  "meter": 0.75,
+  "ppm": 128
+ },
+ "wappenschild_135": {
+  "art": "aufrecht",
+  "griff": [
+   22.0,
+   49.0
+  ],
+  "meter": 0.75,
+  "ppm": 128
+ },
+ "wappenschild_180": {
+  "art": "aufrecht",
+  "griff": [
+   30.0,
+   49.0
+  ],
+  "meter": 0.75,
+  "ppm": 128
+ },
+ "axt_0": {
+  "art": "lang",
+  "griff": [
+   13.8,
+   5.0
+  ],
+  "meter": 0.9,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "axt_45": {
+  "art": "lang",
+  "griff": [
+   13.8,
+   5.0
+  ],
+  "meter": 0.9,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "axt_80": {
+  "art": "lang",
+  "griff": [
+   13.8,
+   5.0
+  ],
+  "meter": 0.9,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "hammer_0": {
+  "art": "lang",
+  "griff": [
+   15.3,
+   19.0
+  ],
+  "meter": 0.4,
+  "winkel": 0,
+  "ppm": 256
+ },
+ "hammer_45": {
+  "art": "lang",
+  "griff": [
+   15.3,
+   16.0
+  ],
+  "meter": 0.4,
+  "winkel": 0,
+  "ppm": 256
+ },
+ "hammer_80": {
+  "art": "lang",
+  "griff": [
+   15.3,
+   7.5
+  ],
+  "meter": 0.4,
+  "winkel": 0,
+  "ppm": 256
+ },
+ "zange_0": {
+  "art": "lang",
+  "griff": [
+   7.6,
+   4.5
+  ],
+  "meter": 0.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "zange_45": {
+  "art": "lang",
+  "griff": [
+   7.6,
+   4.5
+  ],
+  "meter": 0.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "zange_80": {
+  "art": "lang",
+  "griff": [
+   7.6,
+   2.5
+  ],
+  "meter": 0.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "schaufel_0": {
+  "art": "lang",
+  "griff": [
+   12.3,
+   17.0
+  ],
+  "meter": 1.2,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "schaufel_45": {
+  "art": "lang",
+  "griff": [
+   12.3,
+   13.0
+  ],
+  "meter": 1.2,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "schaufel_80": {
+  "art": "lang",
+  "griff": [
+   12.3,
+   5.0
+  ],
+  "meter": 1.2,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "hacke_0": {
+  "art": "lang",
+  "griff": [
+   16.6,
+   20.5
+  ],
+  "meter": 1.3,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "hacke_45": {
+  "art": "lang",
+  "griff": [
+   16.6,
+   13.0
+  ],
+  "meter": 1.3,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "hacke_80": {
+  "art": "lang",
+  "griff": [
+   16.6,
+   4.5
+  ],
+  "meter": 1.3,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "fackel_0": {
+  "art": "lang",
+  "griff": [
+   20.0,
+   5.0
+  ],
+  "meter": 0.6,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "fackel_45": {
+  "art": "lang",
+  "griff": [
+   20.0,
+   5.0
+  ],
+  "meter": 0.6,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "fackel_80": {
+  "art": "lang",
+  "griff": [
+   20.0,
+   4.0
+  ],
+  "meter": 0.6,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "spitzhacke_0": {
+  "art": "lang",
+  "griff": [
+   13.8,
+   31.5
+  ],
+  "meter": 0.9,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "spitzhacke_45": {
+  "art": "lang",
+  "griff": [
+   13.8,
+   22.5
+  ],
+  "meter": 0.9,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "spitzhacke_80": {
+  "art": "lang",
+  "griff": [
+   13.8,
+   5.0
+  ],
+  "meter": 0.9,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "sense_0": {
+  "art": "lang",
+  "griff": [
+   66.1,
+   27.5
+  ],
+  "meter": 1.7,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "sense_45": {
+  "art": "lang",
+  "griff": [
+   66.1,
+   19.5
+  ],
+  "meter": 1.7,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "sense_80": {
+  "art": "lang",
+  "griff": [
+   66.1,
+   6.5
+  ],
+  "meter": 1.7,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "saege_0": {
+  "art": "lang",
+  "griff": [
+   14.3,
+   18.0
+  ],
+  "meter": 0.7,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "saege_45": {
+  "art": "lang",
+  "griff": [
+   14.3,
+   14.5
+  ],
+  "meter": 0.7,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "saege_80": {
+  "art": "lang",
+  "griff": [
+   14.3,
+   5.5
+  ],
+  "meter": 0.7,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "sichel_0": {
+  "art": "lang",
+  "griff": [
+   7.6,
+   17.5
+  ],
+  "meter": 0.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "sichel_45": {
+  "art": "lang",
+  "griff": [
+   7.6,
+   12.5
+  ],
+  "meter": 0.5,
+  "winkel": 0,
+  "ppm": 128
+ },
+ "sichel_80": {
+  "art": "lang",
+  "griff": [
+   7.6,
+   4.5
+  ],
+  "meter": 0.5,
+  "winkel": 0,
+  "ppm": 128
+ }
+}

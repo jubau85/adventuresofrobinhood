@@ -558,7 +558,7 @@ function marketTable(site) {
     const tag = site.produces.includes(g) ? '<span class="tag cheap">billig</span>' : site.demands.includes(g) ? '<span class="tag dear">gefragt</span>' : '';
     const have = G.s.cargo[g] || 0, stored = G.s.castle.storage[g] || 0;
     return `<tr>
-      <th scope="row">${GOODS[g].name} ${tag}</th>
+      <th scope="row">${wareIcon(g)}${GOODS[g].name} ${tag}</th>
       <td class="num">${town.stock[g]}</td>
       <td class="num">${buyPrice(site, g)}</td>
       <td class="btns"><button class="btn sm" data-act="buy" data-good="${g}" data-n="1">+1</button><button class="btn sm" data-act="buy" data-good="${g}" data-n="5">+5</button></td>
@@ -819,7 +819,7 @@ function castleStore() {
   const c = G.s.castle;
   const rows = GOOD_IDS.map((g) => {
     const st = c.storage[g] || 0, cg = G.s.cargo[g] || 0;
-    return `<tr><th scope="row">${GOODS[g].name}</th><td class="num">${st}</td><td class="num">${cg}</td>
+    return `<tr><th scope="row">${wareIcon(g)}${GOODS[g].name}</th><td class="num">${st}</td><td class="num">${cg}</td>
       <td class="btns"><button class="btn sm" data-act="store" data-good="${g}" data-n="all" ${cg ? '' : 'disabled'}>einlagern</button><button class="btn sm" data-act="load" data-good="${g}" data-n="10" ${st ? '' : 'disabled'}>10 aufladen</button></td></tr>`;
   }).join('');
   return `<p class="meta">Ladung ${cargoUsed()}/${cargoCap()}</p>
@@ -1103,6 +1103,14 @@ function homeShireNote() {
   const seat = G.world.sites.find((s) => s.id === HOME_SHIRE);
   return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;
 }
+
+// ---------------------------------------------------------------- Warenbilder (assets/waren, aus den Gegenstands-Vorlagen)
+const WAREN_BILD = {
+  getreide: 'assets/waren/getreidesack.webp', holz: 'assets/waren/holz.webp', stein: 'assets/waren/steinblock.webp', eisen: 'assets/waren/eisenbarren.webp',
+  wolle: 'assets/waren/wollballen.webp', bier: 'assets/waren/bierfass.webp', salz: 'assets/waren/salzsack.webp', wein: 'assets/waren/weinfass.webp',
+  fleisch: 'assets/waren/fleisch.webp', felle: 'assets/waren/felle.webp', blei: 'assets/waren/bleibarren.webp',
+};
+function wareIcon(g) { return WAREN_BILD[g] ? `<img class="ware-bild" src="${WAREN_BILD[g]}" alt="" loading="lazy">` : '<span class="ware-bild"></span>'; }
 
 // ---------------------------------------------------------------- Barone (barons.js)
 // Rangliste aller sieben Herren (die Barone und du), dazu ihre Nachrichten
