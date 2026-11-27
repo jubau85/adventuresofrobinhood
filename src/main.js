@@ -31,7 +31,8 @@ import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog, castleFocusTab,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
-import { mpHost, mpJoin, mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, seatName } from './mp.js';
+import { mpHost, mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, seatName, mpLobbyBegin, mpLobbyUpdate } from './mp.js';
+import { initLobby } from './lobby.js';
 import { nearestWalkable } from './world.js';
 import { baronSite } from './barons.js';
 import { giveAlms } from './life.js';
@@ -115,7 +116,7 @@ function startGuest(d, who) {
   log(`Du bist der Partie „${G.mp.room}“ beigetreten. Dein Platz: ${seatName(d.seat)}.`, 'gold');
 }
 
-// Startmenü: Mehrspieler. Leeres Relais-Feld: Browser-Kanal (zweites Fenster auf diesem Rechner), sonst WebSocket.
+// Mehrspieler (Lobby in lobby.js): Leere Adresse heißt Browser-Kanal (zweites Fenster im selben Browser), sonst WebSocket.
 // In der Desktop-App startet, wer eröffnet, das Relais auf seinem Rechner (desktop/relay.js); Mitspieler tragen dann
 // ws://<seine Adresse>:8765 ein.
 function desktopRelay() {
@@ -127,13 +128,6 @@ function desktopRelay() {
   return `ws://127.0.0.1:${r.port}`;
 }
 function relayKind(url) { return url ? 'relais' : 'kanal'; }
-function mpOpts(forHost) {
-  const room = (byId('mp-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg';
-  let url = byId('mp-relay').value.trim();
-  if (url && !/^wss?:\/\//.test(url)) url = `ws://${url}${/:\d+$/.test(url) ? '' : ':8765'}`;
-  if (!url && forHost) url = desktopRelay() || '';
-  return { room, kind: relayKind(url), url };
-}
 function hostNote() {
   if (G.mpLan && G.mpLan.length) log(`Mitspieler im Heimnetz tragen als Relais ein: ${G.mpLan.join(' oder ')} (Partie „${G.mp.room}“).`, 'gold');
 }
@@ -241,21 +235,14 @@ function buildSetupForm() {
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
     return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' };
   };
-  byId('btn-host').addEventListener('click', () => {
-    startAudio();
-    const o = formOpts(), m = mpOpts(true);
-    showLoading('Die Welt wird erschaffen …');
-    setTimeout(() => { newGame(o); mpHost(m); hostNote(); }, 50);
-  });
-  byId('btn-join').addEventListener('click', () => {
-    startAudio();
-    const o = formOpts(), m = mpOpts(false);
-    showLoading(`Suche die Partie „${m.room}“ …`);
-    byId('mp-status').textContent = '';
-    mpJoin({ ...m, name: o.name, color: o.color, arms: o.arms, female: o.female }, (d, err) => {
-      if (!d) { byId('loading').hidden = true; byId('mp-status').textContent = err || 'Beitreten fehlgeschlagen.'; return; }
-      setTimeout(() => startGuest(d, o), 30);
-    }, (msg) => { byId('loading').hidden = true; byId('mp-status').textContent = msg; });
+  // Mehrspieler-Lobby: eröffnen, beitreten, Burg wählen, bereit, gemeinsam starten
+  initLobby({
+    profile: formOpts,
+    desktopRelay,
+    showLoading: (t) => { startAudio(); showLoading(t); },
+    hideLoading: () => { byId('loading').hidden = true; },
+    startHost: (o) => { startAudio(); showLoading('Die Welt wird erschaffen …'); setTimeout(() => { newGame(o); mpLobbyBegin(); hostNote(); }, 50); },
+    startGuest: (d, o) => { startAudio(); startGuest(d, o); },
   });
   byId('setup-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -894,6 +881,7 @@ function frameBody(now) {
     const season = seasonIndex();
     setScene('welt_sommer', !night && season <= 2 && precip() < 0.35 ? 'wiese_tag' : null);
   }
+  if (G.mp && !G.started) mpLobbyUpdate(dt);
   if (!byId('title').hidden) {
     setMood('titel');
     setScene('welt_sommer', null);

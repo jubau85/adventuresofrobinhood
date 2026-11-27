@@ -495,13 +495,34 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 /* Warenbilder in Markt und Lager */
 .ware-bild { display: inline-block; width: 22px; height: 22px; object-fit: contain; vertical-align: -6px; margin-right: 6px; }
 
-/* Mehrspieler */
-.mp-title { margin-top: 10px; }
-.mp-title summary { cursor: pointer; font-family: var(--font-head); color: var(--ink, #3a2a18); }
-.mp-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-.mp-row label { display: flex; flex-direction: column; font-size: 13px; gap: 3px; flex: 1 1 140px; }
-.mp-row input, .mp-in { padding: 5px 7px; border: 1px solid rgba(60,40,20,0.4); border-radius: 3px; background: rgba(255,250,235,0.85); font: inherit; color: #2a1c10; }
+/* Mehrspieler: Lobby über dem Startmenü (Pergament wie das Startmenü, Felder in gut lesbarer Schrift) */
+#lobby { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(12,8,4,0.55); }
+#lobby[hidden] { display: none; }
+.lobby-card { width: min(780px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.lobby-card h3 { margin: 0 0 6px; font-family: var(--uncial); font-weight: 400; font-size: 19px; color: #2e1d10; }
+.lb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 640px) { .lb-cols { grid-template-columns: 1fr; } }
+.lb-col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.lb-field { display: flex; flex-direction: column; gap: 4px; width: 100%; font-family: var(--font-body); font-size: 15px; color: #2e1d10; }
+.lobby-card input:not([type]), .lobby-card input[type="text"], .lobby-card select {
+  font-family: var(--font-body); font-size: 17px; padding: 6px 10px; width: 100%; box-sizing: border-box;
+  color: var(--tinte); background: rgba(255,247,226,0.55); border: 2px solid #2e1f12; border-radius: 2px;
+}
+.lobby-card input::placeholder { color: #6e5a44; font-style: italic; }
+.lb-note, .lb-hint { margin: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.45; color: #3a2614; }
+.lb-hint { font-size: 14px; color: #5a4128; }
+.lb-status { margin: 0; padding: 6px 10px; font-family: var(--font-body); background: rgba(150,40,30,0.12); border-left: 3px solid #8a2a1e; color: #5a1a10; }
+.lb-players { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 16px; color: var(--tinte); }
+.lb-players th { text-align: left; font-family: var(--uncial); font-weight: 400; font-size: 14px; padding: 4px 6px; border-bottom: 1.5px solid #4a3018; }
+.lb-players td { padding: 5px 6px; border-bottom: 1px solid rgba(74,48,24,0.25); }
+.lb-players tr.me td { background: rgba(214,157,60,0.18); }
+.lb-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 7px; border: 1px solid rgba(0,0,0,0.45); vertical-align: -1px; }
+.lb-tag { font-size: 12px; padding: 0 5px; margin-left: 4px; border: 1px solid #6a4a1a; border-radius: 2px; color: #5a3a14; }
+.lb-chat { display: flex; flex-direction: column; gap: 6px; }
+.lb-chatlog { height: 110px; overflow-y: auto; padding: 6px 8px; font-family: var(--font-body); font-size: 15px; color: var(--tinte); background: rgba(255,247,226,0.35); border: 1px solid rgba(46,31,18,0.5); }
+.lobby-card .seg .btn { border-radius: 0; }
 .mp-box { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid rgba(200,170,110,0.25); }
+.mp-in { padding: 5px 7px; border: 1px solid rgba(60,40,20,0.4); border-radius: 3px; background: rgba(255,250,235,0.85); font: inherit; color: #2a1c10; }
 .mp-roster { list-style: none; margin: 0; padding: 0; }
 .mp-roster li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .mp-roster .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.4); }

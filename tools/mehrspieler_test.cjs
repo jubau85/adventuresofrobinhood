@@ -31,22 +31,45 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   };
   const A = await open('A'), B = await open('B');
   const ev = (p, f, a) => p.evaluate(f, a);
-  // A eröffnet
+  // Lobby: A eröffnet, B tritt bei, wählt eine Burg, meldet sich bereit, beide schreiben; A startet
+  if (RELAY) for (const p of [A, B]) await p.evaluate(() => { window.ritterDesktop = { relay: { start: () => ({ port: 8765, addresses: ['127.0.0.1'] }) } }; });
   await A.fill('#name-input', 'Aldric');
-  await A.evaluate(() => { document.querySelector('.mp-title').open = true; document.getElementById('mp-room').value = 'test1'; }); await A.fill('#mp-relay', RELAY);
-  await A.click('#btn-host');
-  await A.waitForFunction(() => window.__ritter.started && window.__ritter.mp && !window.__ritter.loadingArt, null, { timeout: 90000 });
-  ok(true, 'A hat die Partie eröffnet');
-  // B tritt bei
+  await A.click('#btn-mp');
+  await A.screenshot({ path: `${OUT}/lobby_wahl.png` });
+  await A.fill('#lb-room-host', 'test1');
+  await A.click('[data-lb="host"]');
+  await A.waitForSelector('#lb-players tr');
+  ok(true, 'A hat die Lobby eröffnet');
   await B.fill('#name-input', 'Brida');
-  await B.evaluate(() => { document.querySelector('.mp-title').open = true; document.getElementById('mp-room').value = 'test1'; }); await B.fill('#mp-relay', RELAY);
-  await B.click('#btn-join');
-  await B.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.welcomed && !window.__ritter.loadingArt, null, { timeout: 90000 });
+  await B.click('#btn-mp');
+  await B.fill('#lb-room-join', 'test1');
+  if (RELAY) await B.fill('#lb-addr', '127.0.0.1');
+  await B.click('[data-lb="join"]');
+  await B.waitForFunction(() => document.querySelectorAll('#lb-players tr').length === 2, null, { timeout: 20000 });
+  await A.waitForFunction(() => document.querySelectorAll('#lb-players tr').length === 2, null, { timeout: 20000 });
+  ok(true, 'beide sehen sich in der Lobby');
+  ok(await A.evaluate(() => document.querySelector('[data-lb="start"]').disabled), 'Start gesperrt, solange B nicht bereit ist');
+  await B.selectOption('#lb-seat', 'malcolm');
+  await B.waitForTimeout(600);
+  await B.click('[data-lb="ready"]');
+  await B.fill('#lb-chat', 'Bin bereit!');
+  await B.press('#lb-chat', 'Enter');
+  await A.waitForFunction(() => !document.querySelector('[data-lb="start"]').disabled, null, { timeout: 10000 });
+  const lobbyA = await A.evaluate(() => ({ rows: [...document.querySelectorAll('#lb-players tr')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()), chat: document.getElementById('lb-chatlog').textContent }));
+  console.log('Lobby A', JSON.stringify(lobbyA));
+  ok(lobbyA.rows.some((r) => /Brida/.test(r) && /Glenarden/.test(r) && /✔/.test(r)), 'A sieht Brida auf Glenarden, bereit');
+  ok(/Brida: Bin bereit!/.test(lobbyA.chat), 'Chat in der Lobby kommt an');
+  await A.screenshot({ path: `${OUT}/lobby_A.png` });
+  await B.screenshot({ path: `${OUT}/lobby_B.png` });
+  await A.click('[data-lb="start"]');
+  await A.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.phase === 'game' && !window.__ritter.loadingArt, null, { timeout: 120000 });
+  await B.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.welcomed && !window.__ritter.loadingArt, null, { timeout: 120000 });
+  ok(true, 'A hat gestartet, beide sind im Spiel');
   const sB = await ev(B, () => { const G = window.__ritter; return { seat: G.mp.seat, seed: G.s.seed, day: G.s.day, role: G.mp.role, name: G.s.player.name, pos: [G.s.player.x, G.s.player.y] }; });
   const sA = await ev(A, () => { const G = window.__ritter; return { seed: G.s.seed, day: G.s.day, seats: G.mp.seats, human: Object.entries(G.s.barons).filter(([k, b]) => b.human).map(([k, b]) => [k, b.human.name]) }; });
   console.log('B', JSON.stringify(sB)); console.log('A', JSON.stringify(sA));
   ok(sB.seed === sA.seed, 'gleiche Welt (Startwert)');
-  ok(sB.seat && sB.seat !== 'heim' && sA.human.some(([k, n]) => k === sB.seat && n === 'Brida'), `B sitzt auf einer Baronsburg (${sB.seat}), die KI dort ruht`);
+  ok(sB.seat === 'malcolm' && sA.human.some(([k, n]) => k === 'malcolm' && n === 'Brida'), `B sitzt auf der gewählten Burg (${sB.seat}), die KI dort ruht`);
   // Helden: B geht ein Stück, A sieht ihn
   await B.waitForTimeout(1500);
   await ev(B, () => { const p = window.__ritter.s.player; p.x += 3; p.y += 1; });
@@ -88,7 +111,7 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   // Gast kann die Heimburg nicht verwalten
   // Gastgeber geht: B übernimmt
   await A.close();
-  await B.waitForTimeout(10000);
+  await B.waitForFunction(() => window.__ritter.mp && window.__ritter.mp.role === 'host', null, { timeout: 25000 }).catch(() => {});
   const mig = await ev(B, () => ({ role: window.__ritter.mp.role, peers: window.__ritter.mp.peers.size, msgs: window.__ritter.messages.slice(-3).map((m) => m.text) }));
   console.log('nach dem Gehen', JSON.stringify(mig));
   ok(mig.role === 'host', 'B ist jetzt Gastgeber');

@@ -503,13 +503,34 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 /* Warenbilder in Markt und Lager */
 .ware-bild { display: inline-block; width: 22px; height: 22px; object-fit: contain; vertical-align: -6px; margin-right: 6px; }
 
-/* Mehrspieler */
-.mp-title { margin-top: 10px; }
-.mp-title summary { cursor: pointer; font-family: var(--font-head); color: var(--ink, #3a2a18); }
-.mp-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-.mp-row label { display: flex; flex-direction: column; font-size: 13px; gap: 3px; flex: 1 1 140px; }
-.mp-row input, .mp-in { padding: 5px 7px; border: 1px solid rgba(60,40,20,0.4); border-radius: 3px; background: rgba(255,250,235,0.85); font: inherit; color: #2a1c10; }
+/* Mehrspieler: Lobby über dem Startmenü (Pergament wie das Startmenü, Felder in gut lesbarer Schrift) */
+#lobby { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(12,8,4,0.55); }
+#lobby[hidden] { display: none; }
+.lobby-card { width: min(780px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.lobby-card h3 { margin: 0 0 6px; font-family: var(--uncial); font-weight: 400; font-size: 19px; color: #2e1d10; }
+.lb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 640px) { .lb-cols { grid-template-columns: 1fr; } }
+.lb-col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.lb-field { display: flex; flex-direction: column; gap: 4px; width: 100%; font-family: var(--font-body); font-size: 15px; color: #2e1d10; }
+.lobby-card input:not([type]), .lobby-card input[type="text"], .lobby-card select {
+  font-family: var(--font-body); font-size: 17px; padding: 6px 10px; width: 100%; box-sizing: border-box;
+  color: var(--tinte); background: rgba(255,247,226,0.55); border: 2px solid #2e1f12; border-radius: 2px;
+}
+.lobby-card input::placeholder { color: #6e5a44; font-style: italic; }
+.lb-note, .lb-hint { margin: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.45; color: #3a2614; }
+.lb-hint { font-size: 14px; color: #5a4128; }
+.lb-status { margin: 0; padding: 6px 10px; font-family: var(--font-body); background: rgba(150,40,30,0.12); border-left: 3px solid #8a2a1e; color: #5a1a10; }
+.lb-players { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 16px; color: var(--tinte); }
+.lb-players th { text-align: left; font-family: var(--uncial); font-weight: 400; font-size: 14px; padding: 4px 6px; border-bottom: 1.5px solid #4a3018; }
+.lb-players td { padding: 5px 6px; border-bottom: 1px solid rgba(74,48,24,0.25); }
+.lb-players tr.me td { background: rgba(214,157,60,0.18); }
+.lb-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 7px; border: 1px solid rgba(0,0,0,0.45); vertical-align: -1px; }
+.lb-tag { font-size: 12px; padding: 0 5px; margin-left: 4px; border: 1px solid #6a4a1a; border-radius: 2px; color: #5a3a14; }
+.lb-chat { display: flex; flex-direction: column; gap: 6px; }
+.lb-chatlog { height: 110px; overflow-y: auto; padding: 6px 8px; font-family: var(--font-body); font-size: 15px; color: var(--tinte); background: rgba(255,247,226,0.35); border: 1px solid rgba(46,31,18,0.5); }
+.lobby-card .seg .btn { border-radius: 0; }
 .mp-box { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid rgba(200,170,110,0.25); }
+.mp-in { padding: 5px 7px; border: 1px solid rgba(60,40,20,0.4); border-radius: 3px; background: rgba(255,250,235,0.85); font: inherit; color: #2a1c10; }
 .mp-roster { list-style: none; margin: 0; padding: 0; }
 .mp-roster li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .mp-roster .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.4); }
@@ -629,22 +650,12 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
+          <button type="button" class="btn" id="btn-mp">Mehrspieler …</button>
         </div>
         <p class="hint" id="continue-info"></p>
-        <details class="mp-title">
-          <summary>Mehrspieler</summary>
-          <div class="mp-row">
-            <label>Partie <input id="mp-room" value="burg" maxlength="32" autocomplete="off"></label>
-            <label>Relais <input id="mp-relay" placeholder="leer: dieser Rechner" autocomplete="off"></label>
-          </div>
-          <div class="row">
-            <button type="button" class="btn" id="btn-host">Partie eröffnen</button>
-            <button type="button" class="btn" id="btn-join">Partie beitreten</button>
-          </div>
-          <p class="hint" id="mp-status"></p>
-        </details>
       </form>
     </div>
+    <section id="lobby" hidden role="dialog" aria-modal="true" aria-label="Mehrspieler"><div class="title-card lobby-card" id="lobby-card"></div></section>
     <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
   </section>
 </div>
@@ -12842,13 +12853,14 @@ function openTransport({ kind = 'kanal', room = 'burg', url = '', id = netId() }
 
 
 
+
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
   'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'castle', 'castleName', 'hostArms'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
-const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 7, HOST_TIMEOUT = 8, JOIN_GRACE = 120;
+const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
 
 function mpActive() { return !!G.mp; }
 function mpGuest() { return !!(G.mp && G.mp.role === 'guest'); }
@@ -12866,7 +12878,10 @@ function seatName(seat) {
   return s ? s.name : (BARONS[seat] ? BARONS[seat].short : seat);
 }
 
-function me() { return { name: G.s ? G.s.player.name : '?', color: G.s ? G.s.color : '#888', arms: G.s ? G.s.arms : null, female: G.s ? !!G.s.player.female : false }; }
+function me() {
+  if (!G.s && G.mp && G.mp.profile) { const f = G.mp.profile; return { name: f.name, color: f.color, arms: f.arms, female: !!f.female }; }
+  return { name: G.s ? G.s.player.name : '?', color: G.s ? G.s.color : '#888', arms: G.s ? G.s.arms : null, female: G.s ? !!G.s.player.female : false };
+}
 
 function newSession(role, opts) {
   const id = opts.id || netId();
@@ -12911,6 +12926,9 @@ function mpJoin(opts, onWelcome, onFail) {
   return mp;
 }
 
+// Fenster zu oder neu geladen: kurz Bescheid sagen, damit die anderen nicht erst auf die Zeitüberschreitung warten
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { const mp = G.mp; if (mp && mp.tr) try { mp.tr.broadcast('tschuess', {}); } catch (e) { /* schon zu */ } });
+
 function mpLeave() {
   const mp = G.mp;
   if (!mp) return;
@@ -12926,6 +12944,7 @@ function mpUpdate(dt) {
   const mp = G.mp;
   if (!mp || !G.started || (mp.role === 'guest' && !mp.welcomed)) return;
   const now = performance.now() / 1000;
+  stallCredit(mp, now);
   for (const k of Object.keys(mp.t)) mp.t[k] += dt;
   if (mp.t.hero >= HERO_EVERY) { mp.t.hero = 0; mp.tr.broadcast('held', heroState()); }
   if (mp.t.hello >= HELLO_EVERY) { mp.t.hello = 0; mp.tr.broadcast('da', { ...me(), seat: mp.seat, role: mp.role }); }
@@ -12969,19 +12988,21 @@ function peer(mp, id) {
 function onMessage(mp, env) {
   if (G.mp !== mp) return;
   const { f: from, y: type, d } = env;
+  if (mp.phase === 'lobby') return lobbyMessage(mp, from, type, d);
   if (mp.role === 'host' && type === 'hallo') return welcome(mp, from, d);
   if (type === 'willkommen') return mp.role === 'guest' && !mp.welcomed ? welcomed(mp, from, d) : null;
   if (mp.role === 'guest' && !mp.welcomed) return;
   const p = peer(mp, from);
   if (from === mp.hostId) mp.lastHost = performance.now() / 1000;
   switch (type) {
-    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; break;
+    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; if (mp.role === 'host') reseat(mp, from, p); break;
     case 'held': p.hero = d; p.name = d.name || p.name; p.color = d.col || p.color; break;
     case 'uhr': if (mp.role === 'guest' && from === mp.hostId) applyClock(d); break;
     case 'welt': if (mp.role === 'guest' && from === mp.hostId) applyWorld(d); break;
     case 'maerkte': if (mp.role === 'guest' && from === mp.hostId) Object.assign(G.s, d); break;
     case 'sitze': if (from === mp.hostId) { mp.seats = d.seats; if (d.seats) for (const [s, id] of Object.entries(d.seats)) if (id === mp.id) mp.seat = s; } break;
     case 'chat': log(`${String(d.name || p.name).slice(0, 24)}: ${String(d.text || '').slice(0, 200)}`, 'chat'); break;
+    case 'lobby': case 'wahl': case 'start': break;
     case 'befehl': if (mp.role === 'host') runCommand(mp, from, d); break;
     case 'antwort': { const cb = mp.pending.get(d.n); if (cb) { mp.pending.delete(d.n); cb(d); } break; }
     case 'gastgeber': mp.hostId = from; if (mp.role === 'host' && from !== mp.id) mp.role = 'guest'; log(`${p.name} ist jetzt Gastgeber der Partie.`, 'gold'); break;
@@ -13008,6 +13029,18 @@ function welcome(mp, from, d) {
   mp.tr.send(from, 'willkommen', { hostId: mp.id, host: me(), seat, seats: mp.seats, world: pickKeys(G.s, [...SHARED_KEYS, ...MARKET_KEYS]), seed: G.s.seed });
   mp.tr.broadcast('sitze', { seats: mp.seats });
   mp.hash.world = '';
+}
+
+// Gastgeber: ein Gast, der nach einem Aussetzer wieder da ist, bekommt seine Burg zurück, wenn sie noch frei ist
+function reseat(mp, from, p) {
+  const seat = p.seat;
+  if (!seat || seat === 'heim' || mp.seats[seat] === from) return;
+  const b = G.s.barons && G.s.barons[seat];
+  if (mp.seats[seat] || !b || b.gone || Object.values(mp.seats).includes(from)) return;
+  mp.seats[seat] = from;
+  b.human = { id: from, name: p.name, color: p.color };
+  log(`${p.name} ist wieder da und übernimmt ${seatName(seat)}.`, 'gold');
+  mp.tr.broadcast('sitze', { seats: mp.seats });
 }
 
 function welcomed(mp, from, d) {
@@ -13093,11 +13126,23 @@ function mpChat(text) {
   const mp = G.mp;
   const t = String(text || '').trim().slice(0, 200);
   if (!mp || !t) return;
-  mp.tr.broadcast('chat', { text: t, name: G.s.player.name });
-  log(`${G.s.player.name}: ${t}`, 'chat');
+  const name = G.s ? G.s.player.name : (mp.profile && mp.profile.name) || '?';
+  mp.tr.broadcast('chat', { text: t, name });
+  if (G.started) log(`${name}: ${t}`, 'chat');
+  else lobbyChat(mp, name, t);
 }
 
 // ---------------------------------------------------------------- Gastgeber-Wechsel und Abschied
+// Hing dieses Fenster selbst (Tageswechsel, Bilder nachladen, Fenster im Hintergrund), konnte es in der Zeit nichts
+// empfangen: die Pause zählt dann nicht gegen die anderen.
+function stallCredit(mp, now) {
+  const gap = mp.tick ? now - mp.tick : 0;
+  mp.tick = now;
+  if (gap <= 1) return;
+  for (const p of mp.peers.values()) if (p.last < now) p.last = Math.min(now, p.last + gap);
+  if (mp.lastHost && mp.lastHost < now) mp.lastHost = Math.min(now, mp.lastHost + gap);
+}
+
 function peerGone(mp, id, why) {
   const p = mp.peers.get(id);
   if (!p) return;
@@ -13180,6 +13225,185 @@ function mpHookGuest() {
   mp.lastHost = now;
   for (const p of mp.peers.values()) p.last = now;
   mp.t.hello = HELLO_EVERY;   // gleich beim nächsten Bild melden
+}
+
+// ---------------------------------------------------------------- Lobby (vor dem Spiel)
+// Der Gastgeber eröffnet, Gäste klopfen an und erscheinen in der Liste. Jeder wählt eine freie Baronsburg und meldet
+// sich bereit; der Gastgeber stellt die Schwierigkeit ein und startet. Dann erschafft er die Welt und schickt jedem
+// seinen Willkommensgruß mit dem Weltstand (wie beim späteren Beitreten). Was die Lobby anzeigt, liefert lobbyView().
+// ev: { onLobby(view), onStart(), onWelcome(d), onClosed(msg), onFail(msg) } – Rückmeldungen an die Oberfläche
+const LOBBY_EVERY = 1.5;
+
+function mpLobbyHost(opts, profile, ev = {}) {
+  const mp = newSession('host', opts);
+  mp.phase = 'lobby'; mp.profile = profile; mp.ev = ev; mp.seat = 'heim'; mp.seats.heim = mp.id;
+  mp.lobby = { difficulty: profile.difficulty || 'leicht', chat: [] };
+  mp.lan = opts.lan || null;
+  G.mp = mp;
+  lobbyChanged(mp);
+  return mp;
+}
+
+function mpLobbyJoin(opts, profile, ev = {}) {
+  const mp = newSession('guest', opts);
+  mp.phase = 'lobby'; mp.profile = profile; mp.ev = ev; mp.lobby = { chat: [] };
+  mp.join = { name: profile.name, color: profile.color, arms: profile.arms, female: !!profile.female, want: null };
+  mp.onWelcome = (d, err) => { if (ev.onWelcome) ev.onWelcome(d, err); };
+  G.mp = mp;
+  let tries = 0;
+  const knock = () => {
+    if (G.mp !== mp || mp.inLobby || mp.welcomed) return;
+    if (++tries > 12) { G.mp = null; mp.tr.close(); if (ev.onFail) ev.onFail('Keine Partie mit diesem Namen gefunden. Stimmen Name und Adresse?'); return; }
+    mp.tr.broadcast('hallo', mp.join);
+    setTimeout(knock, 700);
+  };
+  mp.tr.ready.then((ok) => { if (!ok) { G.mp = null; if (ev.onFail) ev.onFail('Keine Verbindung zum Gastgeber. Stimmt die Adresse, läuft seine Partie?'); return; } knock(); });
+  return mp;
+}
+
+// Gast: Burg wählen oder Bereit umschalten
+function mpLobbyChoose(patch) {
+  const mp = G.mp;
+  if (!mp || mp.phase !== 'lobby') return;
+  if (mp.role === 'guest') { mp.tr.send(mp.hostId, 'wahl', patch); return; }
+  if (patch.difficulty && ['leicht', 'mittel', 'schwer'].includes(patch.difficulty)) mp.lobby.difficulty = patch.difficulty;
+  lobbyChanged(mp);
+}
+
+// Gastgeber: alle laden die Welt; danach (main.js hat newGame gerufen) mpLobbyBegin
+function mpLobbyStart() {
+  const mp = G.mp;
+  if (!mp || mp.role !== 'host' || mp.phase !== 'lobby') return null;
+  mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty });
+  return { difficulty: mp.lobby.difficulty };
+}
+function mpLobbyBegin() {
+  const mp = G.mp;
+  if (!mp || !G.s) return;
+  mp.phase = 'game';
+  G.s.hostArms = { arms: G.s.arms, color: G.s.color, name: G.s.player.name };
+  hookGame();
+  const now = performance.now() / 1000;
+  for (const p of mp.peers.values()) {
+    p.last = now;
+    welcome(mp, p.id, { name: p.name, color: p.color, arms: p.arms, female: p.female, want: p.seat });
+  }
+  log(`Die Partie „${mp.room}“ beginnt.`, 'gold');
+}
+
+function mpLobbyLeave() {
+  const mp = G.mp;
+  if (!mp) return;
+  mp.tr.broadcast('tschuess', {});
+  mp.tr.close();
+  G.mp = null;
+}
+
+function lobbyChat(mp, name, text) {
+  if (!mp.lobby) return;
+  mp.lobby.chat.push({ name: String(name).slice(0, 24), text });
+  if (mp.lobby.chat.length > 60) mp.lobby.chat.shift();
+  if (mp.ev && mp.ev.onLobby) mp.ev.onLobby(lobbyView());
+}
+
+// Freie Baronsburgen für einen Gast (seine eigene zählt als frei)
+function freeSeats(mp, forId) {
+  const taken = new Set([...mp.peers.values()].filter((p) => p.id !== forId && p.seat).map((p) => p.seat));
+  return BARON_IDS.filter((b) => !taken.has(b));
+}
+
+function lobbyState(mp) {
+  const players = [{ id: mp.id, ...me(), seat: 'heim', ready: true, host: true }];
+  for (const p of mp.peers.values()) players.push({ id: p.id, name: p.name, color: p.color, arms: p.arms, female: p.female, seat: p.seat, ready: !!p.ready, host: false });
+  return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, players, lan: mp.lan || null };
+}
+
+function lobbyChanged(mp) {
+  if (mp.role === 'host') { mp.lobby.state = lobbyState(mp); mp.tr.broadcast('lobby', mp.lobby.state); }
+  if (mp.ev && mp.ev.onLobby) mp.ev.onLobby(lobbyView());
+}
+
+function lobbyMessage(mp, from, type, d) {
+  const now = performance.now() / 1000;
+  if (type === 'chat') { lobbyChat(mp, d.name || '?', String(d.text || '').slice(0, 200)); return; }
+  if (mp.role === 'host') {
+    if (type === 'hallo') {
+      const p = peer(mp, from);
+      Object.assign(p, { name: String(d.name || 'Gast').slice(0, 24), color: d.color, arms: d.arms, female: !!d.female });
+      if (!p.seat || !freeSeats(mp, from).includes(p.seat)) { const free = freeSeats(mp, from); p.seat = free[0] || null; }
+      if (!p.seat) { mp.tr.send(from, 'willkommen', { voll: true }); mp.peers.delete(from); return; }
+      lobbyChanged(mp);
+    } else if (type === 'wahl') {
+      const p = mp.peers.get(from);
+      if (!p) return;
+      p.last = now;
+      if (d.seat && BARONS[d.seat] && freeSeats(mp, from).includes(d.seat)) p.seat = d.seat;
+      if (typeof d.ready === 'boolean') p.ready = d.ready;
+      lobbyChanged(mp);
+    } else if (type === 'da') { const p = mp.peers.get(from); if (p) p.last = now; }
+    else if (type === 'tschuess') { if (mp.peers.delete(from)) lobbyChanged(mp); }
+    return;
+  }
+  // Gast
+  if (type === 'lobby') {
+    if (!d.players || !d.players.some((p) => p.id === mp.id)) return;
+    mp.inLobby = true; mp.hostId = from; mp.lastHost = now;
+    mp.lobby.state = d;
+    const meRow = d.players.find((p) => p.id === mp.id);
+    mp.seat = meRow.seat;
+    if (mp.ev.onLobby) mp.ev.onLobby(lobbyView());
+  } else if (type === 'start' && from === mp.hostId) {
+    mp.lastHost = now + 180;   // der Gastgeber erschafft jetzt die Welt und schweigt eine Weile
+    mp.phase = 'game';
+    if (mp.ev.onStart) mp.ev.onStart();
+  } else if (type === 'willkommen') {
+    mp.phase = 'game';
+    if (!mp.welcomed) welcomed(mp, from, d);
+  } else if (type === 'tschuess' && from === mp.hostId) {
+    mp.tr.close(); G.mp = null;
+    if (mp.ev.onClosed) mp.ev.onClosed('Der Gastgeber hat die Partie geschlossen.');
+  } else if (from === mp.hostId) mp.lastHost = now;
+}
+
+// Herzschlag in der Lobby (aus der Hauptschleife, solange das Startmenü offen ist)
+function mpLobbyUpdate(dt) {
+  const mp = G.mp;
+  if (!mp || mp.phase !== 'lobby') return;
+  const now = performance.now() / 1000;
+  stallCredit(mp, now);
+  mp.t.hello += dt;
+  if (mp.t.hello < LOBBY_EVERY) return;
+  mp.t.hello = 0;
+  if (mp.role === 'host') {
+    let gone = false;
+    for (const [id, p] of mp.peers) if (now - p.last > PEER_TIMEOUT) { mp.peers.delete(id); gone = true; }
+    if (gone) lobbyChanged(mp); else mp.tr.broadcast('lobby', lobbyState(mp));
+  } else if (mp.inLobby) {
+    mp.tr.send(mp.hostId, 'da', {});
+    if (now - mp.lastHost > HOST_TIMEOUT) { mp.tr.close(); G.mp = null; if (mp.ev.onClosed) mp.ev.onClosed('Der Gastgeber ist nicht mehr zu erreichen.'); }
+  }
+}
+
+// Für die Oberfläche: wer ist da, wer sitzt wo, wer ist bereit, was darf ich
+function lobbyView() {
+  const mp = G.mp;
+  if (!mp || !mp.lobby) return null;
+  const st = mp.role === 'host' ? (mp.lobby.state || lobbyState(mp)) : mp.lobby.state;
+  if (!st) return { role: mp.role, room: mp.room, waiting: true, chat: mp.lobby.chat };
+  const mine = st.players.find((p) => p.id === mp.id) || {};
+  const taken = new Set(st.players.filter((p) => p.id !== mp.id).map((p) => p.seat));
+  return {
+    role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, players: st.players, me: mine,
+    seats: BARON_IDS.map((id) => ({ id, free: !taken.has(id), label: lobbySeatLabel(id) })),
+    allReady: st.players.every((p) => p.ready), chat: mp.lobby.chat,
+  };
+}
+function lobbySeatLabel(seat) {
+  if (seat === 'heim') return 'Heimburg des Gastgebers';
+  const b = BARONS[seat];
+  if (!b) return seat;
+  const site = SETTLEMENTS.find((s) => s.id === b.seat);
+  return `${site ? site.name : b.seat} (${b.region}) – statt ${b.name}`;
 }
 
 // ===== camps.js =====
@@ -22971,6 +23195,177 @@ function initUI() {
 }
 
 
+// ===== lobby.js =====
+// Mehrspieler-Lobby im Startmenü: Partie eröffnen oder beitreten, dann alle in einer Liste mit Wappenfarbe, Burg und
+// „bereit“; der Gastgeber stellt die Schwierigkeit ein und startet, Gäste wählen ihre Burg und melden sich bereit.
+// Chat für alle. Die Regeln dahinter stehen in mp.js; hier nur die Oberfläche. main.js reicht über initLobby die Dinge
+// herein, die zum Spielstart gehören (Profil aus dem Startmenü, Welt erschaffen, als Gast einsteigen, Ladetafel).
+
+
+
+
+
+let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '';
+const LOBBY_DIFF = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']];
+const isDesktop = () => !!(window.ritterDesktop && window.ritterDesktop.relay);
+
+function initLobby(h) {
+  lbHooks = h;
+  byId('btn-mp').addEventListener('click', openLobby);
+  const box = byId('lobby');
+  box.addEventListener('click', onLobbyClick);
+  box.addEventListener('change', onLobbyChange);
+  box.addEventListener('keydown', onLobbyKey);
+}
+
+function openLobby() {
+  lbStep = G.mp && G.mp.phase === 'lobby' ? 'lobby' : 'wahl';
+  byId('lobby').hidden = false;
+  renderLobby();
+}
+function closeLobby() { byId('lobby').hidden = true; }
+
+// Adresse wie „192.168.1.20“ oder „192.168.1.20:8765“ oder „ws://…“ zu einer WebSocket-Adresse
+function normAddr(a) {
+  a = String(a || '').trim();
+  if (!a) return '';
+  if (!/^wss?:\/\//.test(a)) a = `ws://${a}`;
+  if (!/:\d+(\/|$)/.test(a.replace(/^wss?:\/\//, ''))) a += ':8765';
+  return a;
+}
+const roomName = (v) => (String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32)) || 'burg';
+
+const lobbyEvents = {
+  onLobby: () => { if (lbStep === 'lobby' && !byId('lobby').hidden) renderLobbyParts(); },
+  onStart: () => { closeLobby(); lbHooks.showLoading('Der Gastgeber erschafft die Welt …'); },
+  onWelcome: (d, err) => {
+    if (!d) { lbHooks.hideLoading(); lbStep = 'wahl'; lbStatus = err || 'Beitreten fehlgeschlagen.'; byId('lobby').hidden = false; renderLobby(); return; }
+    closeLobby();
+    lbHooks.showLoading('Die Welt wird erschaffen …');
+    setTimeout(() => lbHooks.startGuest(d, lbProfile), 30);
+  },
+  onClosed: (msg) => { lbHooks.hideLoading(); lbStep = 'wahl'; lbStatus = msg; byId('lobby').hidden = false; renderLobby(); },
+  onFail: (msg) => { lbStep = 'wahl'; lbStatus = msg; renderLobby(); },
+};
+
+function renderLobby() {
+  const card = byId('lobby-card');
+  lbSig = '';
+  if (lbStep === 'wahl') {
+    const hint = isDesktop()
+      ? 'Wer eröffnet, ist Gastgeber. Seine Mitspieler im Heimnetz tragen die Adresse ein, die ihm hier gleich angezeigt wird. Auf demselben PC (zweites Fenster) bleibt das Adressfeld leer.'
+      : 'In dieser Browser-Fassung spielen zwei Fenster im selben Browser miteinander; das Adressfeld bleibt dann leer. Mit Freunden im Netz spielt ihr über die Desktop-App.';
+    card.innerHTML = `
+      <h2>Mehrspieler</h2>
+      <p class="lb-note">Dein Held kommt aus dem Startmenü: Name, Figur und Wappen dort einstellen, dann hier eröffnen oder beitreten.</p>
+      <div class="lb-cols">
+        <div class="lb-col">
+          <h3>Partie eröffnen</h3>
+          <label class="lb-field">Name der Partie<input id="lb-room-host" value="burg" maxlength="32" autocomplete="off"></label>
+          <button type="button" class="btn primary" data-lb="host">Eröffnen</button>
+        </div>
+        <div class="lb-col">
+          <h3>Partie beitreten</h3>
+          <label class="lb-field">Name der Partie<input id="lb-room-join" value="burg" maxlength="32" autocomplete="off"></label>
+          <label class="lb-field">Adresse des Gastgebers<input id="lb-addr" placeholder="${isDesktop() ? 'z. B. 192.168.1.20 – leer: dieser PC' : 'leer lassen'}" autocomplete="off"></label>
+          <button type="button" class="btn primary" data-lb="join">Beitreten</button>
+        </div>
+      </div>
+      <p class="lb-hint">${esc(hint)}</p>
+      ${lbStatus ? `<p class="lb-status">${esc(lbStatus)}</p>` : ''}
+      <div class="row"><button type="button" class="btn" data-lb="back">Zurück</button></div>`;
+    return;
+  }
+  card.innerHTML = `
+    <h2 id="lb-title">Partie</h2>
+    <p class="lb-note" id="lb-info"></p>
+    <table class="lb-players"><thead><tr><th>Spieler</th><th>Burg</th><th>Bereit</th></tr></thead><tbody id="lb-players"></tbody></table>
+    <div id="lb-mine"></div>
+    <div id="lb-diff"></div>
+    <div class="lb-chat"><div class="lb-chatlog" id="lb-chatlog" aria-live="polite"></div>
+      <input id="lb-chat" maxlength="200" placeholder="Nachricht an alle … (Enter schickt)" autocomplete="off"></div>
+    <div class="row" id="lb-actions"></div>`;
+  renderLobbyParts();
+}
+
+function renderLobbyParts() {
+  const v = lobbyView();
+  if (!v || lbStep !== 'lobby') return;
+  const set = (id, html) => { const el = byId(id); if (el && el.innerHTML !== html) el.innerHTML = html; };
+  set('lb-title', `Partie „${esc(v.room)}“`);
+  if (v.waiting) {
+    set('lb-info', 'Verbinde mit dem Gastgeber …');
+    set('lb-actions', '<button type="button" class="btn" data-lb="leave">Abbrechen</button>');
+    return;
+  }
+  const info = v.role === 'host'
+    ? (v.lan && v.lan.length ? `Du bist Gastgeber. Mitspieler tragen ein: Partie <b>${esc(v.room)}</b>, Adresse <b>${esc(v.lan.map((a) => a.replace(/^ws:\/\//, '').replace(/:8765$/, '')).join(' oder '))}</b>.`
+      : `Du bist Gastgeber. Mitspieler treten der Partie <b>${esc(v.room)}</b> bei.`)
+    : 'Wähle deine Burg und melde dich bereit. Der Gastgeber startet das Spiel.';
+  set('lb-info', info);
+  set('lb-players', v.players.map((p) => `<tr${p.id === v.me.id ? ' class="me"' : ''}>
+      <td><span class="lb-dot" style="background:${esc(p.color || '#888')}"></span>${esc(p.name)}${p.host ? ' <span class="lb-tag">Gastgeber</span>' : ''}${p.id === v.me.id ? ' <span class="lb-tag">du</span>' : ''}</td>
+      <td>${esc(p.seat === 'heim' ? 'Heimburg' : (v.seats.find((s) => s.id === p.seat) || { label: '–' }).label)}</td>
+      <td>${p.ready ? '✔' : '…'}</td></tr>`).join(''));
+  // Burgwahl (Gäste): nur neu zeichnen, wenn sich die Auswahl ändert, sonst klappt das Menü beim Öffnen zu
+  if (v.role === 'guest') {
+    const s2 = JSON.stringify([v.me.seat, v.seats.map((s) => s.free)]);
+    if (s2 !== lbSig) {
+      lbSig = s2;
+      set('lb-mine', `<label class="lb-field">Deine Burg
+        <select id="lb-seat">${v.seats.map((s) => `<option value="${esc(s.id)}"${s.id === v.me.seat ? ' selected' : ''}${s.free || s.id === v.me.seat ? '' : ' disabled'}>${esc(s.label)}${s.free || s.id === v.me.seat ? '' : ' (vergeben)'}</option>`).join('')}</select></label>`);
+    }
+  } else set('lb-mine', '');
+  const diffName = (LOBBY_DIFF.find((d) => d[0] === v.difficulty) || LOBBY_DIFF[0])[1];
+  set('lb-diff', v.role === 'host'
+    ? `<div class="lb-field">Schwierigkeit der Barone <div class="seg">${LOBBY_DIFF.map(([k, n]) => `<button type="button" class="btn sm${v.difficulty === k ? ' primary' : ''}" data-lb="diff" data-v="${k}">${n}</button>`).join('')}</div></div>`
+    : `<p class="lb-note">Schwierigkeit der Barone: <b>${esc(diffName)}</b></p>`);
+  set('lb-chatlog', v.chat.map((c) => `<div><b>${esc(c.name)}:</b> ${esc(c.text)}</div>`).join('') || '<div class="muted">Noch keine Nachrichten.</div>');
+  const log = byId('lb-chatlog'); if (log) log.scrollTop = log.scrollHeight;
+  const guests = v.players.filter((p) => !p.host);
+  set('lb-actions', v.role === 'host'
+    ? `<button type="button" class="btn primary" data-lb="start"${v.allReady ? '' : ' disabled'}>Spiel starten</button>
+       <button type="button" class="btn" data-lb="leave">Partie schließen</button>
+       <span class="lb-hint">${guests.length ? (v.allReady ? 'Alle sind bereit.' : 'Warte, bis alle bereit sind.') : 'Du kannst auch allein starten; Mitspieler können später noch beitreten.'}</span>`
+    : `<button type="button" class="btn primary" data-lb="ready">${v.me.ready ? 'Doch nicht bereit' : 'Bereit'}</button>
+       <button type="button" class="btn" data-lb="leave">Verlassen</button>`);
+}
+
+function onLobbyClick(e) {
+  const b = e.target.closest('[data-lb]');
+  if (!b) return;
+  const act = b.dataset.lb;
+  if (act === 'host') {
+    lbProfile = lbHooks.profile();
+    const url = isDesktop() ? lbHooks.desktopRelay() : '';
+    mpLobbyHost({ room: roomName(byId('lb-room-host').value), kind: url ? 'relais' : 'kanal', url, lan: G.mpLan || null }, lbProfile, lobbyEvents);
+    lbStep = 'lobby'; lbStatus = ''; renderLobby();
+  } else if (act === 'join') {
+    lbProfile = lbHooks.profile();
+    let url = normAddr(byId('lb-addr').value);
+    if (!url && isDesktop()) url = 'ws://127.0.0.1:8765';
+    mpLobbyJoin({ room: roomName(byId('lb-room-join').value), kind: url ? 'relais' : 'kanal', url }, lbProfile, lobbyEvents);
+    lbStep = 'lobby'; lbStatus = ''; renderLobby();
+  } else if (act === 'ready') { const v = lobbyView(); mpLobbyChoose({ ready: !(v && v.me && v.me.ready) }); }
+  else if (act === 'diff') mpLobbyChoose({ difficulty: b.dataset.v });
+  else if (act === 'start') {
+    const r = mpLobbyStart();
+    if (!r) return;
+    closeLobby();
+    lbHooks.startHost({ ...lbProfile, difficulty: r.difficulty });
+  } else if (act === 'leave') { mpLobbyLeave(); lbStep = 'wahl'; lbStatus = ''; renderLobby(); }
+  else if (act === 'back') { if (G.mp && G.mp.phase === 'lobby') mpLobbyLeave(); closeLobby(); }
+}
+
+function onLobbyChange(e) {
+  if (e.target.id === 'lb-seat') mpLobbyChoose({ seat: e.target.value });
+}
+
+function onLobbyKey(e) {
+  if (e.target.id === 'lb-chat' && e.key === 'Enter') { e.preventDefault(); mpChat(e.target.value); e.target.value = ''; }
+  if (e.key === 'Escape') { e.stopPropagation(); }
+}
+
 // ===== save.js =====
 // Speichern und Laden: im Browser über localStorage, in der Desktop-App (desktop/) als Datei im Benutzerordner über die
 // Brücke window.ritterDesktop (dort später auch für die Steam Cloud). Die Welt wird aus dem Seed neu erzeugt.
@@ -23114,6 +23509,7 @@ function saveSummary(data = readSave()) {
 
 
 
+
 const keys = new Set();
 let viewCanvas, mini;
 
@@ -23190,7 +23586,7 @@ function startGuest(d, who) {
   log(`Du bist der Partie „${G.mp.room}“ beigetreten. Dein Platz: ${seatName(d.seat)}.`, 'gold');
 }
 
-// Startmenü: Mehrspieler. Leeres Relais-Feld: Browser-Kanal (zweites Fenster auf diesem Rechner), sonst WebSocket.
+// Mehrspieler (Lobby in lobby.js): Leere Adresse heißt Browser-Kanal (zweites Fenster im selben Browser), sonst WebSocket.
 // In der Desktop-App startet, wer eröffnet, das Relais auf seinem Rechner (desktop/relay.js); Mitspieler tragen dann
 // ws://<seine Adresse>:8765 ein.
 function desktopRelay() {
@@ -23202,13 +23598,6 @@ function desktopRelay() {
   return `ws://127.0.0.1:${r.port}`;
 }
 function relayKind(url) { return url ? 'relais' : 'kanal'; }
-function mpOpts(forHost) {
-  const room = (byId('mp-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg';
-  let url = byId('mp-relay').value.trim();
-  if (url && !/^wss?:\/\//.test(url)) url = `ws://${url}${/:\d+$/.test(url) ? '' : ':8765'}`;
-  if (!url && forHost) url = desktopRelay() || '';
-  return { room, kind: relayKind(url), url };
-}
 function hostNote() {
   if (G.mpLan && G.mpLan.length) log(`Mitspieler im Heimnetz tragen als Relais ein: ${G.mpLan.join(' oder ')} (Partie „${G.mp.room}“).`, 'gold');
 }
@@ -23316,21 +23705,14 @@ function buildSetupForm() {
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
     return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' };
   };
-  byId('btn-host').addEventListener('click', () => {
-    startAudio();
-    const o = formOpts(), m = mpOpts(true);
-    showLoading('Die Welt wird erschaffen …');
-    setTimeout(() => { newGame(o); mpHost(m); hostNote(); }, 50);
-  });
-  byId('btn-join').addEventListener('click', () => {
-    startAudio();
-    const o = formOpts(), m = mpOpts(false);
-    showLoading(`Suche die Partie „${m.room}“ …`);
-    byId('mp-status').textContent = '';
-    mpJoin({ ...m, name: o.name, color: o.color, arms: o.arms, female: o.female }, (d, err) => {
-      if (!d) { byId('loading').hidden = true; byId('mp-status').textContent = err || 'Beitreten fehlgeschlagen.'; return; }
-      setTimeout(() => startGuest(d, o), 30);
-    }, (msg) => { byId('loading').hidden = true; byId('mp-status').textContent = msg; });
+  // Mehrspieler-Lobby: eröffnen, beitreten, Burg wählen, bereit, gemeinsam starten
+  initLobby({
+    profile: formOpts,
+    desktopRelay,
+    showLoading: (t) => { startAudio(); showLoading(t); },
+    hideLoading: () => { byId('loading').hidden = true; },
+    startHost: (o) => { startAudio(); showLoading('Die Welt wird erschaffen …'); setTimeout(() => { newGame(o); mpLobbyBegin(); hostNote(); }, 50); },
+    startGuest: (d, o) => { startAudio(); startGuest(d, o); },
   });
   byId('setup-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -23969,6 +24351,7 @@ function frameBody(now) {
     const season = seasonIndex();
     setScene('welt_sommer', !night && season <= 2 && precip() < 0.35 ? 'wiese_tag' : null);
   }
+  if (G.mp && !G.started) mpLobbyUpdate(dt);
   if (!byId('title').hidden) {
     setMood('titel');
     setScene('welt_sommer', null);

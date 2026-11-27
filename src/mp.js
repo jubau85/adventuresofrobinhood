@@ -10,6 +10,7 @@ import { G, log } from './state.js';
 import { openTransport, netId } from './net.js';
 import { makeUnit } from './units.js';
 import { BARONS, BARON_IDS, applyBarons, baronSite } from './barons.js';
+import { SETTLEMENTS } from './data.js';
 import { applyDamage } from './siege.js';
 import { applyCons } from './dynamics.js';
 
@@ -19,7 +20,7 @@ export const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'sno
   'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'castle', 'castleName', 'hostArms'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
-const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 7, HOST_TIMEOUT = 8, JOIN_GRACE = 120;
+const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
 
 export function mpActive() { return !!G.mp; }
 export function mpGuest() { return !!(G.mp && G.mp.role === 'guest'); }
@@ -37,7 +38,10 @@ export function seatName(seat) {
   return s ? s.name : (BARONS[seat] ? BARONS[seat].short : seat);
 }
 
-function me() { return { name: G.s ? G.s.player.name : '?', color: G.s ? G.s.color : '#888', arms: G.s ? G.s.arms : null, female: G.s ? !!G.s.player.female : false }; }
+function me() {
+  if (!G.s && G.mp && G.mp.profile) { const f = G.mp.profile; return { name: f.name, color: f.color, arms: f.arms, female: !!f.female }; }
+  return { name: G.s ? G.s.player.name : '?', color: G.s ? G.s.color : '#888', arms: G.s ? G.s.arms : null, female: G.s ? !!G.s.player.female : false };
+}
 
 function newSession(role, opts) {
   const id = opts.id || netId();
@@ -82,6 +86,9 @@ export function mpJoin(opts, onWelcome, onFail) {
   return mp;
 }
 
+// Fenster zu oder neu geladen: kurz Bescheid sagen, damit die anderen nicht erst auf die Zeitüberschreitung warten
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { const mp = G.mp; if (mp && mp.tr) try { mp.tr.broadcast('tschuess', {}); } catch (e) { /* schon zu */ } });
+
 export function mpLeave() {
   const mp = G.mp;
   if (!mp) return;
@@ -97,6 +104,7 @@ export function mpUpdate(dt) {
   const mp = G.mp;
   if (!mp || !G.started || (mp.role === 'guest' && !mp.welcomed)) return;
   const now = performance.now() / 1000;
+  stallCredit(mp, now);
   for (const k of Object.keys(mp.t)) mp.t[k] += dt;
   if (mp.t.hero >= HERO_EVERY) { mp.t.hero = 0; mp.tr.broadcast('held', heroState()); }
   if (mp.t.hello >= HELLO_EVERY) { mp.t.hello = 0; mp.tr.broadcast('da', { ...me(), seat: mp.seat, role: mp.role }); }
@@ -140,19 +148,21 @@ function peer(mp, id) {
 function onMessage(mp, env) {
   if (G.mp !== mp) return;
   const { f: from, y: type, d } = env;
+  if (mp.phase === 'lobby') return lobbyMessage(mp, from, type, d);
   if (mp.role === 'host' && type === 'hallo') return welcome(mp, from, d);
   if (type === 'willkommen') return mp.role === 'guest' && !mp.welcomed ? welcomed(mp, from, d) : null;
   if (mp.role === 'guest' && !mp.welcomed) return;
   const p = peer(mp, from);
   if (from === mp.hostId) mp.lastHost = performance.now() / 1000;
   switch (type) {
-    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; break;
+    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; if (mp.role === 'host') reseat(mp, from, p); break;
     case 'held': p.hero = d; p.name = d.name || p.name; p.color = d.col || p.color; break;
     case 'uhr': if (mp.role === 'guest' && from === mp.hostId) applyClock(d); break;
     case 'welt': if (mp.role === 'guest' && from === mp.hostId) applyWorld(d); break;
     case 'maerkte': if (mp.role === 'guest' && from === mp.hostId) Object.assign(G.s, d); break;
     case 'sitze': if (from === mp.hostId) { mp.seats = d.seats; if (d.seats) for (const [s, id] of Object.entries(d.seats)) if (id === mp.id) mp.seat = s; } break;
     case 'chat': log(`${String(d.name || p.name).slice(0, 24)}: ${String(d.text || '').slice(0, 200)}`, 'chat'); break;
+    case 'lobby': case 'wahl': case 'start': break;
     case 'befehl': if (mp.role === 'host') runCommand(mp, from, d); break;
     case 'antwort': { const cb = mp.pending.get(d.n); if (cb) { mp.pending.delete(d.n); cb(d); } break; }
     case 'gastgeber': mp.hostId = from; if (mp.role === 'host' && from !== mp.id) mp.role = 'guest'; log(`${p.name} ist jetzt Gastgeber der Partie.`, 'gold'); break;
@@ -179,6 +189,18 @@ function welcome(mp, from, d) {
   mp.tr.send(from, 'willkommen', { hostId: mp.id, host: me(), seat, seats: mp.seats, world: pickKeys(G.s, [...SHARED_KEYS, ...MARKET_KEYS]), seed: G.s.seed });
   mp.tr.broadcast('sitze', { seats: mp.seats });
   mp.hash.world = '';
+}
+
+// Gastgeber: ein Gast, der nach einem Aussetzer wieder da ist, bekommt seine Burg zurück, wenn sie noch frei ist
+function reseat(mp, from, p) {
+  const seat = p.seat;
+  if (!seat || seat === 'heim' || mp.seats[seat] === from) return;
+  const b = G.s.barons && G.s.barons[seat];
+  if (mp.seats[seat] || !b || b.gone || Object.values(mp.seats).includes(from)) return;
+  mp.seats[seat] = from;
+  b.human = { id: from, name: p.name, color: p.color };
+  log(`${p.name} ist wieder da und übernimmt ${seatName(seat)}.`, 'gold');
+  mp.tr.broadcast('sitze', { seats: mp.seats });
 }
 
 function welcomed(mp, from, d) {
@@ -264,11 +286,23 @@ export function mpChat(text) {
   const mp = G.mp;
   const t = String(text || '').trim().slice(0, 200);
   if (!mp || !t) return;
-  mp.tr.broadcast('chat', { text: t, name: G.s.player.name });
-  log(`${G.s.player.name}: ${t}`, 'chat');
+  const name = G.s ? G.s.player.name : (mp.profile && mp.profile.name) || '?';
+  mp.tr.broadcast('chat', { text: t, name });
+  if (G.started) log(`${name}: ${t}`, 'chat');
+  else lobbyChat(mp, name, t);
 }
 
 // ---------------------------------------------------------------- Gastgeber-Wechsel und Abschied
+// Hing dieses Fenster selbst (Tageswechsel, Bilder nachladen, Fenster im Hintergrund), konnte es in der Zeit nichts
+// empfangen: die Pause zählt dann nicht gegen die anderen.
+function stallCredit(mp, now) {
+  const gap = mp.tick ? now - mp.tick : 0;
+  mp.tick = now;
+  if (gap <= 1) return;
+  for (const p of mp.peers.values()) if (p.last < now) p.last = Math.min(now, p.last + gap);
+  if (mp.lastHost && mp.lastHost < now) mp.lastHost = Math.min(now, mp.lastHost + gap);
+}
+
 function peerGone(mp, id, why) {
   const p = mp.peers.get(id);
   if (!p) return;
@@ -351,4 +385,183 @@ export function mpHookGuest() {
   mp.lastHost = now;
   for (const p of mp.peers.values()) p.last = now;
   mp.t.hello = HELLO_EVERY;   // gleich beim nächsten Bild melden
+}
+
+// ---------------------------------------------------------------- Lobby (vor dem Spiel)
+// Der Gastgeber eröffnet, Gäste klopfen an und erscheinen in der Liste. Jeder wählt eine freie Baronsburg und meldet
+// sich bereit; der Gastgeber stellt die Schwierigkeit ein und startet. Dann erschafft er die Welt und schickt jedem
+// seinen Willkommensgruß mit dem Weltstand (wie beim späteren Beitreten). Was die Lobby anzeigt, liefert lobbyView().
+// ev: { onLobby(view), onStart(), onWelcome(d), onClosed(msg), onFail(msg) } – Rückmeldungen an die Oberfläche
+const LOBBY_EVERY = 1.5;
+
+export function mpLobbyHost(opts, profile, ev = {}) {
+  const mp = newSession('host', opts);
+  mp.phase = 'lobby'; mp.profile = profile; mp.ev = ev; mp.seat = 'heim'; mp.seats.heim = mp.id;
+  mp.lobby = { difficulty: profile.difficulty || 'leicht', chat: [] };
+  mp.lan = opts.lan || null;
+  G.mp = mp;
+  lobbyChanged(mp);
+  return mp;
+}
+
+export function mpLobbyJoin(opts, profile, ev = {}) {
+  const mp = newSession('guest', opts);
+  mp.phase = 'lobby'; mp.profile = profile; mp.ev = ev; mp.lobby = { chat: [] };
+  mp.join = { name: profile.name, color: profile.color, arms: profile.arms, female: !!profile.female, want: null };
+  mp.onWelcome = (d, err) => { if (ev.onWelcome) ev.onWelcome(d, err); };
+  G.mp = mp;
+  let tries = 0;
+  const knock = () => {
+    if (G.mp !== mp || mp.inLobby || mp.welcomed) return;
+    if (++tries > 12) { G.mp = null; mp.tr.close(); if (ev.onFail) ev.onFail('Keine Partie mit diesem Namen gefunden. Stimmen Name und Adresse?'); return; }
+    mp.tr.broadcast('hallo', mp.join);
+    setTimeout(knock, 700);
+  };
+  mp.tr.ready.then((ok) => { if (!ok) { G.mp = null; if (ev.onFail) ev.onFail('Keine Verbindung zum Gastgeber. Stimmt die Adresse, läuft seine Partie?'); return; } knock(); });
+  return mp;
+}
+
+// Gast: Burg wählen oder Bereit umschalten
+export function mpLobbyChoose(patch) {
+  const mp = G.mp;
+  if (!mp || mp.phase !== 'lobby') return;
+  if (mp.role === 'guest') { mp.tr.send(mp.hostId, 'wahl', patch); return; }
+  if (patch.difficulty && ['leicht', 'mittel', 'schwer'].includes(patch.difficulty)) mp.lobby.difficulty = patch.difficulty;
+  lobbyChanged(mp);
+}
+
+// Gastgeber: alle laden die Welt; danach (main.js hat newGame gerufen) mpLobbyBegin
+export function mpLobbyStart() {
+  const mp = G.mp;
+  if (!mp || mp.role !== 'host' || mp.phase !== 'lobby') return null;
+  mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty });
+  return { difficulty: mp.lobby.difficulty };
+}
+export function mpLobbyBegin() {
+  const mp = G.mp;
+  if (!mp || !G.s) return;
+  mp.phase = 'game';
+  G.s.hostArms = { arms: G.s.arms, color: G.s.color, name: G.s.player.name };
+  hookGame();
+  const now = performance.now() / 1000;
+  for (const p of mp.peers.values()) {
+    p.last = now;
+    welcome(mp, p.id, { name: p.name, color: p.color, arms: p.arms, female: p.female, want: p.seat });
+  }
+  log(`Die Partie „${mp.room}“ beginnt.`, 'gold');
+}
+
+export function mpLobbyLeave() {
+  const mp = G.mp;
+  if (!mp) return;
+  mp.tr.broadcast('tschuess', {});
+  mp.tr.close();
+  G.mp = null;
+}
+
+function lobbyChat(mp, name, text) {
+  if (!mp.lobby) return;
+  mp.lobby.chat.push({ name: String(name).slice(0, 24), text });
+  if (mp.lobby.chat.length > 60) mp.lobby.chat.shift();
+  if (mp.ev && mp.ev.onLobby) mp.ev.onLobby(lobbyView());
+}
+
+// Freie Baronsburgen für einen Gast (seine eigene zählt als frei)
+function freeSeats(mp, forId) {
+  const taken = new Set([...mp.peers.values()].filter((p) => p.id !== forId && p.seat).map((p) => p.seat));
+  return BARON_IDS.filter((b) => !taken.has(b));
+}
+
+function lobbyState(mp) {
+  const players = [{ id: mp.id, ...me(), seat: 'heim', ready: true, host: true }];
+  for (const p of mp.peers.values()) players.push({ id: p.id, name: p.name, color: p.color, arms: p.arms, female: p.female, seat: p.seat, ready: !!p.ready, host: false });
+  return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, players, lan: mp.lan || null };
+}
+
+function lobbyChanged(mp) {
+  if (mp.role === 'host') { mp.lobby.state = lobbyState(mp); mp.tr.broadcast('lobby', mp.lobby.state); }
+  if (mp.ev && mp.ev.onLobby) mp.ev.onLobby(lobbyView());
+}
+
+function lobbyMessage(mp, from, type, d) {
+  const now = performance.now() / 1000;
+  if (type === 'chat') { lobbyChat(mp, d.name || '?', String(d.text || '').slice(0, 200)); return; }
+  if (mp.role === 'host') {
+    if (type === 'hallo') {
+      const p = peer(mp, from);
+      Object.assign(p, { name: String(d.name || 'Gast').slice(0, 24), color: d.color, arms: d.arms, female: !!d.female });
+      if (!p.seat || !freeSeats(mp, from).includes(p.seat)) { const free = freeSeats(mp, from); p.seat = free[0] || null; }
+      if (!p.seat) { mp.tr.send(from, 'willkommen', { voll: true }); mp.peers.delete(from); return; }
+      lobbyChanged(mp);
+    } else if (type === 'wahl') {
+      const p = mp.peers.get(from);
+      if (!p) return;
+      p.last = now;
+      if (d.seat && BARONS[d.seat] && freeSeats(mp, from).includes(d.seat)) p.seat = d.seat;
+      if (typeof d.ready === 'boolean') p.ready = d.ready;
+      lobbyChanged(mp);
+    } else if (type === 'da') { const p = mp.peers.get(from); if (p) p.last = now; }
+    else if (type === 'tschuess') { if (mp.peers.delete(from)) lobbyChanged(mp); }
+    return;
+  }
+  // Gast
+  if (type === 'lobby') {
+    if (!d.players || !d.players.some((p) => p.id === mp.id)) return;
+    mp.inLobby = true; mp.hostId = from; mp.lastHost = now;
+    mp.lobby.state = d;
+    const meRow = d.players.find((p) => p.id === mp.id);
+    mp.seat = meRow.seat;
+    if (mp.ev.onLobby) mp.ev.onLobby(lobbyView());
+  } else if (type === 'start' && from === mp.hostId) {
+    mp.lastHost = now + 180;   // der Gastgeber erschafft jetzt die Welt und schweigt eine Weile
+    mp.phase = 'game';
+    if (mp.ev.onStart) mp.ev.onStart();
+  } else if (type === 'willkommen') {
+    mp.phase = 'game';
+    if (!mp.welcomed) welcomed(mp, from, d);
+  } else if (type === 'tschuess' && from === mp.hostId) {
+    mp.tr.close(); G.mp = null;
+    if (mp.ev.onClosed) mp.ev.onClosed('Der Gastgeber hat die Partie geschlossen.');
+  } else if (from === mp.hostId) mp.lastHost = now;
+}
+
+// Herzschlag in der Lobby (aus der Hauptschleife, solange das Startmenü offen ist)
+export function mpLobbyUpdate(dt) {
+  const mp = G.mp;
+  if (!mp || mp.phase !== 'lobby') return;
+  const now = performance.now() / 1000;
+  stallCredit(mp, now);
+  mp.t.hello += dt;
+  if (mp.t.hello < LOBBY_EVERY) return;
+  mp.t.hello = 0;
+  if (mp.role === 'host') {
+    let gone = false;
+    for (const [id, p] of mp.peers) if (now - p.last > PEER_TIMEOUT) { mp.peers.delete(id); gone = true; }
+    if (gone) lobbyChanged(mp); else mp.tr.broadcast('lobby', lobbyState(mp));
+  } else if (mp.inLobby) {
+    mp.tr.send(mp.hostId, 'da', {});
+    if (now - mp.lastHost > HOST_TIMEOUT) { mp.tr.close(); G.mp = null; if (mp.ev.onClosed) mp.ev.onClosed('Der Gastgeber ist nicht mehr zu erreichen.'); }
+  }
+}
+
+// Für die Oberfläche: wer ist da, wer sitzt wo, wer ist bereit, was darf ich
+export function lobbyView() {
+  const mp = G.mp;
+  if (!mp || !mp.lobby) return null;
+  const st = mp.role === 'host' ? (mp.lobby.state || lobbyState(mp)) : mp.lobby.state;
+  if (!st) return { role: mp.role, room: mp.room, waiting: true, chat: mp.lobby.chat };
+  const mine = st.players.find((p) => p.id === mp.id) || {};
+  const taken = new Set(st.players.filter((p) => p.id !== mp.id).map((p) => p.seat));
+  return {
+    role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, players: st.players, me: mine,
+    seats: BARON_IDS.map((id) => ({ id, free: !taken.has(id), label: lobbySeatLabel(id) })),
+    allReady: st.players.every((p) => p.ready), chat: mp.lobby.chat,
+  };
+}
+export function lobbySeatLabel(seat) {
+  if (seat === 'heim') return 'Heimburg des Gastgebers';
+  const b = BARONS[seat];
+  if (!b) return seat;
+  const site = SETTLEMENTS.find((s) => s.id === b.seat);
+  return `${site ? site.name : b.seat} (${b.region}) – statt ${b.name}`;
 }

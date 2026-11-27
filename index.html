@@ -119,22 +119,12 @@
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
+          <button type="button" class="btn" id="btn-mp">Mehrspieler …</button>
         </div>
         <p class="hint" id="continue-info"></p>
-        <details class="mp-title">
-          <summary>Mehrspieler</summary>
-          <div class="mp-row">
-            <label>Partie <input id="mp-room" value="burg" maxlength="32" autocomplete="off"></label>
-            <label>Relais <input id="mp-relay" placeholder="leer: dieser Rechner" autocomplete="off"></label>
-          </div>
-          <div class="row">
-            <button type="button" class="btn" id="btn-host">Partie eröffnen</button>
-            <button type="button" class="btn" id="btn-join">Partie beitreten</button>
-          </div>
-          <p class="hint" id="mp-status"></p>
-        </details>
       </form>
     </div>
+    <section id="lobby" hidden role="dialog" aria-modal="true" aria-label="Mehrspieler"><div class="title-card lobby-card" id="lobby-card"></div></section>
     <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
   </section>
 </div>

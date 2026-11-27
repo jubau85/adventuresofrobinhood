@@ -166,9 +166,17 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Verhältnis −60 und Tag 30), Mittel (×0,9, ×1,15, 3 Gebäude, −45, Tag 18), Schwer (×1,25, ×0,85, Steinburg mit 4
   Gebäuden, −25, Tag 10). Dazu „klug“: wie oft ein Baron das Vernünftigste tut (35 %, 60 %, 85 %).
 
-### Phase 7: Mehrspieler (2 bis 6) – Kern umgesetzt (mp.js, net.js)
+### Phase 7: Mehrspieler (2 bis 6) – Kern und Lobby umgesetzt (mp.js, lobby.js, net.js)
 - Ziel: Jeder sitzt auf einer Burg, wächst, schließt Bündnisse, handelt und führt Feldschlachten; ausgeliefert über
   Steam (Desktop-App in `desktop/`, Lobbys und Verbindungen über Steam).
+- **Lobby (`lobby.js`, Lobby-Teil in `mp.js`):** Vor dem Spiel treffen sich alle in einer Lobby. Der Gastgeber
+  eröffnet sie unter einem Namen, Gäste klopfen mit `hallo` an (bis zu zwölfmal, falls das Relais oder der Gastgeber
+  noch nicht so weit ist). Der Gastgeber führt die Liste (`lobby`, alle 1,5 s und bei jeder Änderung): Name, Farbe,
+  gewählte Burg, bereit. Gäste schicken ihre Wahl (`wahl`: Burg, bereit), der Gastgeber vergibt jede Burg nur einmal
+  und stellt die Schwierigkeit ein. „Spiel starten“ geht, wenn alle Gäste bereit sind (allein auch sofort); dann
+  schickt er `start`, erschafft die Welt und begrüßt jeden Gast mit dem Weltstand und der gewählten Burg. Gäste
+  warten so lange mit Ladetafel und einer Schonfrist von drei Minuten. Wer nach dem Start dazukommt, steigt wie
+  bisher direkt ein.
 - **Gastgeber-Modell:** Ein Spieler ist Gastgeber und rechnet die gemeinsame Welt allein: Uhrzeit und Tage, Märkte,
   Barone, Krieg, Grafschaften, Schäden, Bauten, Wetter, Turniere, Hinrichtungen (`SHARED_KEYS` in `mp.js`). Er schickt
   den ganzen Stand (nicht nur Änderungen), alle 3 s, wenn sich etwas geändert hat, die Märkte alle 8 s, die Uhr zweimal
@@ -181,8 +189,10 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Kauf und Verkauf, Platzwechsel). Weitere folgen mit 7b.
 - **Helden der anderen:** jeder schickt 10-mal je Sekunde Position, Pferd, Ausrüstung und Farbe; die anderen zeigen ihn
   als 3D-Figur mit Namen und Ring in seiner Farbe, weich zwischen den Meldungen.
-- **Gastgeber-Wechsel:** Kommt vom Gastgeber 8 s nichts, übernimmt der Gast mit der kleinsten Kennung mit dem zuletzt
-  empfangenen Weltstand. Neu Beitretende haben eine Schonfrist, solange sie die Welt erzeugen.
+- **Gastgeber-Wechsel:** Kommt vom Gastgeber 15 s nichts (oder verabschiedet er sich beim Schließen des Fensters),
+  übernimmt der Gast mit der kleinsten Kennung mit dem zuletzt empfangenen Weltstand. Neu Beitretende haben eine
+  Schonfrist, solange sie die Welt erzeugen. Hing ein Fenster selbst (Tageswechsel, Bilder laden), zählt die Pause
+  nicht gegen die anderen; ein Gast, der nach einem Aussetzer wieder auftaucht, bekommt seine Burg zurück.
 - **Verbindung (`net.js`):** Browser-Kanal (zwei Fenster auf einem Rechner), WebSocket-Relais (`desktop/relay.js`,
   in der Desktop-App beim Eröffnen eingebaut, sonst `node tools/relay.mjs`), später Steam. Chrome verlangt für Seiten
   aus dem Netz eine Freigabe für Verbindungen ins Heimnetz; die Desktop-App ist davon nicht betroffen.
