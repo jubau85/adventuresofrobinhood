@@ -261,7 +261,8 @@ function ivStudio(I, dt) {
     c.globalCompositeOperation = 'source-over';
   }
   if (t > 1.4) {
-    const a = ivClamp((t - 1.4) / 1.2) * fadeOut, R = Math.max(W, H);
+    const beat = 60 / 110, ph = ((t - 4.8) % beat + beat) % beat, pulse = t > 4.8 && t < 7.8 ? 1 + 0.9 * Math.exp(-ph * 9) : 1 + 0.5 * Math.exp(-Math.max(0, t - 1.4) * 4);
+    const a = ivClamp((t - 1.4) / 1.2) * fadeOut * pulse, R = Math.max(W, H);
     c.save(); c.translate(W / 2, cy); c.rotate(t * 0.035); c.globalCompositeOperation = 'lighter';
     for (let k = 0; k < 16; k++) {
       c.rotate(Math.PI / 8);
@@ -407,7 +408,7 @@ const ivHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
 function ivStudioSound(A) {
   const { ac } = A, t0 = ac.currentTime + 0.05;
-  const bus = ac.createGain(); bus.gain.value = 0.85; bus.connect(A.dry);
+  const bus = ac.createGain(); bus.gain.value = 0.66; bus.connect(A.dry);
   const send = ac.createGain(); send.gain.value = 0.7; bus.connect(send); send.connect(A.wet);
   const nodes = [];
   const keep = (n) => { nodes.push(n); return n; };
@@ -430,7 +431,7 @@ function ivStudioSound(A) {
     for (const m of notes) for (const det of [-9, 0, 8]) {
       const o = keep(ac.createOscillator()); o.type = 'sawtooth'; o.frequency.value = ivHz(m); o.detune.value = det;
       const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 1.3;
-      f.frequency.setValueAtTime(240, t); f.frequency.exponentialRampToValueAtTime(2700, t + 0.2); f.frequency.exponentialRampToValueAtTime(1350, t + 0.9);
+      f.frequency.setValueAtTime(260, t); f.frequency.exponentialRampToValueAtTime(3400, t + 0.16); f.frequency.exponentialRampToValueAtTime(1500, t + 0.9);
       const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.06); g.gain.setTargetAtTime(v * 0.6, t + 0.14, 0.45); g.gain.setTargetAtTime(0.0001, t + dur, 0.4);
       o.connect(f); f.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + 3);
     }
@@ -445,8 +446,24 @@ function ivStudioSound(A) {
     }
   };
   const bell = (m, t, v) => { for (const [k, d, a] of [[1, 1.4, 1], [2.76, 0.6, 0.35], [5.4, 0.3, 0.18]]) { const o = keep(ac.createOscillator()); o.frequency.value = ivHz(m) * k; const g = env(t, 0.003, v * a, 0.01, d * 0.35); o.connect(g); g.connect(bus); o.start(t); o.stop(t + d * 3); } };
+  // Kriegstrommel: tiefer Schlag mit Fell, leicht angezerrt
+  const drive = ac.createWaveShaper(); { const c = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; c[i] = Math.tanh(x * 2.6); } drive.curve = c; }
+  const dg = ac.createGain(); dg.gain.value = 0.8; drive.connect(dg); dg.connect(bus);
+  const war = (t, v, f = 52) => {
+    const o = keep(ac.createOscillator()); o.frequency.setValueAtTime(f * 2.4, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.06);
+    const g = env(t, 0.003, v, 0.03, 0.17); o.connect(g); g.connect(drive); o.start(t); o.stop(t + 1.4);
+    noise(t, 0.22, 'lowpass', f > 80 ? 2200 : 1100, 0.7, env(t, 0.002, v * 0.55, 0.01, 0.035));
+  };
+  const ens = (t, v) => { war(t, v, 48); war(t + 0.012, v * 0.8, 53); war(t + 0.026, v * 0.7, 58); };
+  const SB = 60 / 110 / 4;   // Sechzehntel bei 110 Schlägen
   // Schlag: d-Moll, dann B-Dur, C-Dur und als Auflösung D-Dur
   const H = t0 + 1.4;
+  ens(H, 0.75); brass([38], H, 1.0, 0.05);
+  for (let k = 4; k < 16; k++) { const v = [0.5, 0, 0.22, 0.32][k % 4]; if (v) war(H + k * SB, v); }
+  ens(t0 + 2.4, 0.6);
+  for (let k = 1; k < 9; k++) { const v = [0, 0, 0.25, 0.35][k % 4] || (k % 4 === 0 ? 0.45 : 0); if (v) war(t0 + 2.4 + k * SB, v, k % 2 ? 90 : 52); }
+  ens(t0 + 3.78, 0.85);
+  for (let k = 0; k < 8; k++) war(t0 + 4.3 + k * 0.062, 0.2 + k * 0.06, k % 2 ? 95 : 60);
   timp(38, H, 0.9); timp(26, H, 0.5); crash(H, 0.35);
   brass([50, 57, 62, 65, 69], H, 1.0, 0.035); choir([62, 65, 69], H, 1.1, 0.05);
   brass([46, 53, 58, 62, 65], t0 + 2.4, 1.15, 0.033); choir([58, 62, 65], t0 + 2.4, 1.2, 0.05); timp(34, t0 + 2.4, 0.5);
@@ -458,7 +475,11 @@ function ivStudioSound(A) {
   // Wirbel in die Auflösung
   [4.28, 4.38, 4.46, 4.53, 4.59, 4.64, 4.69, 4.73, 4.765].forEach((d, i) => timp(38, t0 + d, 0.18 + i * 0.05));
   const R = t0 + 4.8;
-  timp(38, R, 1); timp(26, R, 0.6); crash(R, 0.4);
+  timp(38, R, 1); timp(26, R, 0.6); crash(R, 0.4); ens(R, 0.9); brass([38, 26], R, 3.0, 0.05);
+  // Kriegstrommel-Groove unter dem Höhepunkt
+  const G = [1, 0, 0.5, 0.7, 1, 0, 0.6, 0, 1, 0, 0.5, 0.7, 1, 0.6, 0.8, 1];
+  for (let k = 1; k < 2 * 16 + 4; k++) { const v = G[k % 16]; if (!v) continue; const tt = R + k * SB; if (tt > t0 + 7.55) break; war(tt, 0.48 * v, k % 4 === 0 ? 50 : k % 2 ? 100 + (k % 3) * 18 : 62); }
+  ens(t0 + 7.62, 0.8); crash(t0 + 7.62, 0.35);
   brass([50, 57, 62, 66, 69, 74], R, 3.3, 0.046); choir([62, 66, 69, 74], R, 3.4, 0.065);
   [86, 90, 93, 98, 93, 98, 102].forEach((m, i) => bell(m, R + 0.15 + i * 0.16, 0.06));
   bell(86, t0 + 7.1, 0.05); bell(93, t0 + 7.25, 0.05);
@@ -1061,18 +1082,19 @@ function ivFinale(I) {
 }
 
 // ================================================================ Tracker-Musik: 8-Bit-Samples wie auf dem Amiga
-const IV_SR = 16574, IV_BEAT = 60 / 96;
+const IV_SR = 16574, IV_BEAT = 60 / 110;
 const IV_CH = { Dm: [50, 57, 62, 65], Bb: [46, 53, 58, 62], F: [53, 57, 60, 65], C: [48, 55, 60, 64], A: [45, 52, 57, 61], Gm: [43, 50, 55, 58], D: [50, 57, 62, 66] };
 const IV_ROOT = { Dm: 38, Bb: 34, F: 41, C: 36, A: 33, Gm: 31, D: 38 };
 const IV_MEL_B = [[[69, 2], [74, 1], [76, 1]], [[77, 1.5], [76, 0.5], [74, 1], [72, 1]], [[72, 2], [69, 1], [72, 1]], [[67, 3], [64, 1]],
   [[69, 2], [74, 1], [76, 1]], [[77, 1], [79, 1], [77, 1], [74, 1]], [[76, 1.5], [72, 0.5], [76, 1], [79, 1]], [[76, 2], [73, 1], [69, 1]]];
 const IV_MEL_C = [[[74, 1], [70, 1], [67, 1], [70, 1]], [[69, 2], [65, 1], [69, 1]], [[73, 1], [76, 1], [81, 1], [79, 1]], [[77, 2], [74, 2]],
   [[74, 1], [77, 1], [82, 1], [81, 1]], [[81, 1.5], [79, 0.5], [77, 1], [72, 1]], [[76, 1], [79, 1], [76, 1], [72, 1]], [[76, 2], [73, 2]]];
+// Aufmarsch (Kriegstrommeln, Streicher galoppieren an), Thema mit Kampftrommeln, Marsch, Sturm (alles, Doppel-Kick)
 const IV_SONG = [
-  { ch: ['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'A', 'A'], harp: 16, drums: 'pauke', choir: 4 },
-  { ch: ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'C', 'A'], mel: IV_MEL_B, harp: 8, drums: 'zug', bass: true },
-  { ch: ['Gm', 'Dm', 'A', 'Dm', 'Bb', 'F', 'C', 'A'], mel: IV_MEL_C, drums: 'marsch', bass: true, choir: 0 },
-  { ch: ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'C', 'A'], mel: IV_MEL_B, harp: 16, drums: 'zug', bass: true, choir: 0 },
+  { ch: ['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'A', 'A'], drums: 'aufmarsch', choir: 2, stac: 4, harp: 16 },
+  { ch: ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'C', 'A'], mel: IV_MEL_B, drums: 'kampf', bass: true, stac: 0, blech: true, harp: 8 },
+  { ch: ['Gm', 'Dm', 'A', 'Dm', 'Bb', 'F', 'C', 'A'], mel: IV_MEL_C, drums: 'marsch', bass: true, choir: 0, stac: 0, blech: true },
+  { ch: ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'C', 'A'], mel: IV_MEL_B, drums: 'sturm', bass: true, choir: 0, stac: 0, blech: true, oct: true },
 ];
 
 function ivInstruments(ac) {
@@ -1104,7 +1126,14 @@ function ivInstruments(ac) {
   // Einzelne Schwingungen mit 64 Werten (wie Chip-Samples): Melodie und Bass
   const cycle = (fn) => { const d = new Float32Array(64); for (let i = 0; i < 64; i++) d[i] = q8(fn(i / 64)); return d; };
   I.lead = { buf: mk(cycle((u) => { let v = 0; for (let h = 1; h <= 14; h++) v += (Math.sin(Math.PI * h * 0.3) / h) * Math.cos(2 * Math.PI * h * u) * Math.pow(0.86, h); return v * 1.4; }), 64 * 261.63), base: 60, loop: true, a: 0.02, r: 0.12, vib: true };
-  I.bass = { buf: mk(cycle((u) => { let v = 0; for (let h = 1; h <= 9; h++) v += Math.sin(2 * Math.PI * h * u) / h * (h % 2 ? 1 : 0.6); return v * 0.75; }), 64 * 130.81), base: 48, loop: true, a: 0.005, r: 0.08, dec: 0.5 };
+  I.bass = { buf: mk(cycle((u) => { let v = 0; for (let h = 1; h <= 12; h++) v += Math.sin(2 * Math.PI * h * u) / h; return Math.tanh(v * 1.9) * 0.9; }), 64 * 130.81), base: 48, loop: true, a: 0.004, r: 0.06, dec: 0.35 };
+  // Blech: helle, angezerrte Sägezähne für kurze Stöße
+  {
+    const L = 0.5, N = Math.round(IV_SR * L), cyc = [0.995, 1, 1.006].map((d) => Math.round(261.63 * d * L));
+    const out = new Float32Array(N), a = lpA(3600); let lp = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < N; i++) { let v = 0; for (const cc of cyc) v += 2 * ((i * cc / N) % 1) - 1; lp += a * (v / cyc.length - lp); if (pass) out[i] = q8(Math.tanh(lp * 2.2) * 0.85); }
+    I.blech = { buf: mk(out), base: 60, loop: true, a: 0.012, r: 0.12, dec: 0.22 };
+  }
   // Harfe: gezupfte Saite
   {
     const N = Math.round(IV_SR * 1.6), P = Math.round(IV_SR / 523.25), ring = new Float32Array(P), out = new Float32Array(N);
@@ -1117,16 +1146,20 @@ function ivInstruments(ac) {
   const drum = (dur, fn) => { const N = Math.round(IV_SR * dur), out = new Float32Array(N); let s = { lp: 0, hp: 0, prev: 0, ph: 0 }; for (let i = 0; i < N; i++) out[i] = q8(fn(i / IV_SR, s)); return { buf: mk(out), base: 60, loop: false, a: 0.001, r: 0.1, one: true }; };
   I.pauke = drum(2, (t, s) => { const f = 98 * (1 + 0.16 * Math.exp(-t * 40)); s.ph += f / IV_SR; const n = Math.random() * 2 - 1; s.lp += lpA(380) * (n - s.lp); return Math.sin(2 * Math.PI * s.ph) * Math.exp(-t * 2.2) * 0.95 + Math.sin(2 * Math.PI * s.ph * 1.51) * Math.exp(-t * 6) * 0.25 + s.lp * Math.exp(-t * 30) * 1.4; });
   I.pauke.base = 43;
-  I.kick = drum(0.35, (t, s) => { const f = 45 + 110 * Math.exp(-t * 28); s.ph += f / IV_SR; return Math.sin(2 * Math.PI * s.ph) * Math.exp(-t * 9); });
-  I.snare = drum(0.25, (t, s) => { const n = Math.random() * 2 - 1; s.lp += lpA(5200) * (n - s.lp); s.ph += 185 / IV_SR; return (s.lp * 0.8 * Math.exp(-t * 16) + Math.sin(2 * Math.PI * s.ph) * 0.45 * Math.exp(-t * 30)); });
+  I.kick = drum(0.4, (t, s) => { const f = 48 + 150 * Math.exp(-t * 32); s.ph += f / IV_SR; const click = t < 0.006 ? (Math.random() * 2 - 1) * 0.6 : 0; return Math.tanh((Math.sin(2 * Math.PI * s.ph) * Math.exp(-t * 8) + click) * 1.8) * 0.95; });
+  I.snare = drum(0.3, (t, s) => { const n = Math.random() * 2 - 1; s.lp += lpA(6800) * (n - s.lp); s.ph += 190 / IV_SR; return Math.tanh((s.lp * 1.1 * Math.exp(-t * 13) + Math.sin(2 * Math.PI * s.ph) * 0.6 * Math.exp(-t * 26) + Math.sin(2 * Math.PI * s.ph * 1.74) * 0.3 * Math.exp(-t * 30)) * 1.7) * 0.9; });
+  // Große Kriegstrommel und Toms: tiefer Schlag mit Fell und etwas Zerrung
+  I.taiko = drum(1.1, (t, s) => { const f = 50 + 75 * Math.exp(-t * 24); s.ph += f / IV_SR; const n = Math.random() * 2 - 1; s.lp += lpA(950) * (n - s.lp); return Math.tanh((Math.sin(2 * Math.PI * s.ph) * Math.exp(-t * 4.2) * 1.4 + s.lp * Math.exp(-t * 16) * 1.3) * 1.7) * 0.95; });
+  I.tom = drum(0.6, (t, s) => { const f = 100 + 70 * Math.exp(-t * 20); s.ph += f / IV_SR; const n = Math.random() * 2 - 1; s.lp += lpA(2000) * (n - s.lp); return Math.tanh((Math.sin(2 * Math.PI * s.ph) * Math.exp(-t * 7) + s.lp * Math.exp(-t * 24) * 0.8) * 1.6) * 0.9; });
   I.hat = drum(0.08, (t, s) => { const n = Math.random() * 2 - 1, hp = n - s.prev; s.prev = n; return hp * 0.45 * Math.exp(-t * 60); });
   I.becken = drum(1.8, (t, s) => { const n = Math.random() * 2 - 1, hp = n - s.prev * 0.7; s.prev = n; return hp * 0.42 * Math.exp(-t * 2.4); });
+  I.stac = { ...I.str, a: 0.004, r: 0.06, dec: 0.1 };
   return I;
 }
 
 function ivTracker(A) {
   const { ac } = A;
-  const bus = ac.createGain(); bus.gain.value = 1.6; bus.connect(A.dry);
+  const bus = ac.createGain(); bus.gain.value = 1.05; bus.connect(A.dry);
   const send = ac.createGain(); send.gain.value = 0.3; bus.connect(send); send.connect(A.wet);
   const I = ivInstruments(ac), live = new Set();
   const T = {
@@ -1155,15 +1188,16 @@ function ivTracker(A) {
     // Schlussakkord in D-Dur mit Fanfare, eigener Ausgang, klingt aus, während der Titel erscheint
     finale() {
       const t = ac.currentTime + 0.08;
-      [[69, 0], [74, 0.25], [78, 0.5], [81, 0.75]].forEach(([m, d], k) => fbNote('lead', m, t + d, k === 3 ? 3.2 : 0.22, 0.16, -0.4));
-      for (const m of [57, 62, 66, 69]) { fbNote('str', m, t, 4.2, 0.11, m % 2 ? -0.3 : 0.3); fbNote('chor', m, t + 0.2, 4.0, 0.1, m % 2 ? 0.3 : -0.3); }
-      for (let k = 0; k < 8; k++) fbNote('pauke', 50, t + k * 0.06, 0.1, 0.2 + k * 0.05, 0);
-      fbNote('pauke', 50, t + 0.5, 1, 0.75, 0); fbNote('becken', 60, t + 0.5, 1, 0.5, 0.2);
-      [[74, 0.5], [81, 0.62], [86, 0.74]].forEach(([m, d]) => fbNote('harfe', m, t + d, 1, 0.18, 0.5));
+      [[69, 0], [74, 0.25], [78, 0.5], [81, 0.75]].forEach(([m, d], k) => { fbNote('lead', m, t + d, k === 3 ? 3.2 : 0.22, 0.16, -0.4); fbNote('blech', m - 12, t + d, k === 3 ? 2.6 : 0.2, 0.06, -0.2); });
+      for (const m of [57, 62, 66, 69]) { fbNote('str', m, t, 4.2, 0.11, m % 2 ? -0.3 : 0.3); fbNote('chor', m, t + 0.2, 4.0, 0.12, m % 2 ? 0.3 : -0.3); }
+      for (let k = 0; k < 12; k++) fbNote(k % 2 ? 'tom' : 'taiko', k % 2 ? 66 - k : 60, t + k * 0.06, 0.1, 0.2 + k * 0.04, k % 2 ? 0.35 : -0.35);
+      for (const [d, v] of [[0.75, 0.8], [1.3, 0.5], [1.5, 0.6], [2.05, 0.9]]) { fbNote('taiko', 57, t + d, 1, v, -0.2); fbNote('taiko', 61, t + d + 0.01, 1, v * 0.8, 0.2); }
+      fbNote('pauke', 50, t + 0.75, 1, 0.75, 0); fbNote('becken', 60, t + 0.75, 1, 0.5, 0.2); fbNote('becken', 60, t + 2.05, 1, 0.45, -0.2);
+      [[74, 0.8], [81, 0.92], [86, 1.04]].forEach(([m, d]) => fbNote('harfe', m, t + d, 1, 0.16, 0.5));
     },
   };
   // Eigener Bus für den Schluss, damit er nicht mit dem Tracker ausgeblendet wird
-  const fb = ac.createGain(); fb.gain.value = 1.5; fb.connect(A.dry); const fs = ac.createGain(); fs.gain.value = 0.4; fb.connect(fs); fs.connect(A.wet);
+  const fb = ac.createGain(); fb.gain.value = 1.1; fb.connect(A.dry); const fs = ac.createGain(); fs.gain.value = 0.4; fb.connect(fs); fs.connect(A.wet);
   const fbNote = (id, m, t, dur, vol, pan) => {
     const S = I[id], src = ac.createBufferSource(); src.buffer = S.buf; src.loop = S.loop; src.playbackRate.value = Math.pow(2, (m - S.base) / 12);
     const g = ac.createGain(), p = ac.createStereoPanner(); p.pan.value = pan;
@@ -1176,31 +1210,57 @@ function ivTracker(A) {
   return T;
 }
 
-// Ein Takt: Streicher, Chor, Harfe, Bass, Melodie, Schlagwerk (Stereo hart verteilt wie die vier Kanäle des Amiga)
+// Ein Takt: Flächen, Galopp in Bass und Streichern, Blechstöße, Melodie und viel Schlagwerk (Stereo hart verteilt wie
+// die vier Kanäle des Amiga)
 function ivBar(T, n, t) {
   const si = n < 32 ? Math.floor(n / 8) : 1 + (Math.floor((n - 32) / 8) % 3), sec = IV_SONG[si], b = n % 8;
-  const name = sec.ch[b], ch = IV_CH[name], root = IV_ROOT[name], B = IV_BEAT;
-  for (const m of ch.slice(1)) T.note('str', m, t, 4 * B * 0.97, 0.075, m % 2 ? -0.3 : 0.3);
-  if (sec.choir != null && b >= sec.choir) for (const m of ch.slice(1)) T.note('chor', m, t + 0.05, 4 * B * 0.95, 0.07, m % 2 ? 0.25 : -0.25);
+  const name = sec.ch[b], ch = IV_CH[name], root = IV_ROOT[name], B = IV_BEAT, S16 = B / 4;
+  const at = (k) => t + k * S16;
+  const hit = (id, k, v, m = 60, pan = 0) => T.note(id, m, at(k), 0.1, v, pan);
+  for (const m of ch.slice(1)) T.note('str', m, t, 4 * B * 0.97, 0.055, m % 2 ? -0.3 : 0.3);
+  if (sec.choir != null && b >= sec.choir) for (const m of ch.slice(1)) T.note('chor', m, t + 0.03, 4 * B * 0.95, 0.09, m % 2 ? 0.25 : -0.25);
+  if (sec.stac != null && b >= sec.stac) { const o = [ch[1], ch[1] + 12, ch[2], ch[1] + 12]; for (let k = 0; k < 16; k++) T.note('stac', o[k % 4], at(k), S16 * 0.8, k % 4 === 0 ? 0.085 : 0.055, 0.45); }
   if (sec.harp) {
     const arp = [ch[1] + 12, ch[2] + 12, ch[3] + 12, ch[1] + 24, ch[2] + 24], pat = [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1], step = 16 / sec.harp;
-    for (let k = 0; k < 16; k += step) T.note('harfe', arp[pat[k]], t + k * B / 4, B / 4, sec.mel ? 0.07 : 0.1, 0.55);
+    for (let k = 0; k < 16; k += step) T.note('harfe', arp[pat[k]], at(k), S16, sec.mel ? 0.06 : 0.08, 0.55);
   }
-  if (sec.bass) [0, 0, 12, 0, 7, 0, 12, 7].forEach((d, k) => T.note('bass', root + 12 + d, t + k * B / 2, B / 2 * 0.8, 0.2, -0.15));
-  if (sec.mel) { let tt = t; for (const [m, beats] of sec.mel[b]) { T.note('lead', m, tt, beats * B * 0.93, 0.12, -0.55); tt += beats * B; } }
-  const pk = root < 40 ? root + 12 : root;
-  if (sec.drums === 'pauke') {
-    if (b === 0 || b === 4) T.note('pauke', pk, t, 1, 0.55, 0.1);
-    if (b === 7) for (let k = 0; k < 16; k++) T.note('pauke', pk, t + k * B / 4, 0.1, 0.12 + k * 0.025, 0.1);
-  } else if (sec.drums === 'zug') {
-    if (b === 0) T.note('becken', 60, t, 1, 0.3, 0.35);
-    for (const k of [0, 2]) T.note('kick', 60, t + k * B, 0.3, 0.55, 0);
-    for (const k of [1, 3]) T.note('snare', 60, t + k * B, 0.2, 0.32, 0.2);
-    for (let k = 0; k < 8; k++) T.note('hat', 60, t + k * B / 2, 0.05, k % 2 ? 0.07 : 0.12, 0.45);
-  } else if (sec.drums === 'marsch') {
-    if (b === 0) T.note('becken', 60, t, 1, 0.3, 0.35);
-    T.note('pauke', pk, t, 1, 0.45, 0.1);
-    for (const k of [0, 2]) T.note('kick', 60, t + k * B, 0.3, 0.5, 0);
-    [1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1].forEach((on, k) => { if (on) T.note('snare', 60, t + k * B / 4, 0.15, k % 4 === 0 ? 0.3 : 0.16, 0.2); });
+  if (sec.bass) for (let q = 0; q < 4; q++) {
+    const m = root + 12 + (q === 3 && b % 2 ? 7 : 0);
+    T.note('bass', m, at(q * 4), S16 * 1.8, 0.26, -0.1); T.note('bass', m, at(q * 4 + 2), S16 * 0.85, 0.2, -0.1); T.note('bass', m, at(q * 4 + 3), S16 * 0.85, 0.22, -0.1);
+  }
+  if (sec.blech) for (const m of [ch[0] + 12, ...ch.slice(1)]) { T.note('blech', m, t, B * 0.9, 0.05, -0.2); if (sec.drums !== 'marsch') T.note('blech', m, at(6), B * 0.45, 0.04, -0.2); }
+  if (sec.mel) { let tt = t; for (const [m, beats] of sec.mel[b]) { T.note('lead', m, tt, beats * B * 0.93, 0.13, -0.55); if (sec.oct) T.note('blech', m - 12, tt, beats * B * 0.9, 0.035, -0.35); tt += beats * B; } }
+  const pk = root < 40 ? root + 12 : root, d = sec.drums;
+  const crash = (k = 0) => hit('becken', k, 0.34, 60, 0.35);
+  const fill = (from) => { for (let k = from; k < 16; k++) hit('tom', k, 0.3 + (k - from) * 0.045, 69 - (k - from) * 2, k % 2 ? -0.4 : 0.4); };
+  if (d === 'aufmarsch') {
+    const dense = b >= 6;
+    (dense ? [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] : [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0]).forEach((on, k) => { if (on) hit('taiko', k, (k % 4 === 0 ? 0.62 : 0.4) * (dense ? 0.75 + k / 40 : 1), k % 4 === 0 ? 58 : 62, k % 2 ? 0.25 : -0.25); });
+    if (b === 0 || b === 4) { hit('pauke', 0, 0.6, pk, 0.1); crash(); }
+    if (b >= 4 && b < 7) for (const k of [4, 12]) hit('snare', k, 0.24, 60, 0.15);
+    if (b === 7) fill(8);
+  } else if (d === 'kampf') {
+    for (const k of [0, 6, 8, 14]) hit('kick', k, 0.6);
+    for (const k of [4, 12]) hit('snare', k, 0.42, 60, 0.15);
+    for (const k of [7, 15]) hit('snare', k, 0.1, 60, 0.15);
+    for (let k = 0; k < 16; k++) hit('hat', k, k % 2 ? 0.06 : 0.11, 60, 0.45);
+    for (const k of [0, 10]) hit('taiko', k, 0.5, 58, -0.3);
+    if (b % 4 === 0) crash();
+    if (b % 4 === 3) fill(12);
+  } else if (d === 'marsch') {
+    [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1].forEach((on, k) => { if (on) hit('snare', k, k % 4 === 0 ? 0.4 : 0.2, 60, 0.15); });
+    for (const k of [0, 4, 8, 12]) hit('taiko', k, k === 0 ? 0.65 : 0.45, k % 8 ? 62 : 58, k % 8 ? 0.3 : -0.3);
+    for (const k of [0, 8]) hit('kick', k, 0.55);
+    hit('pauke', 0, 0.5, pk, 0.1);
+    if (b === 0 || b === 4) crash();
+    if (b === 7) fill(8);
+  } else if (d === 'sturm') {
+    const dbl = b >= 6;
+    for (let k = 0; k < 16; k += dbl ? 1 : 2) hit('kick', k, dbl ? 0.45 : 0.55);
+    for (const k of [4, 12]) { hit('snare', k, 0.45, 60, 0.15); hit('snare', k - 1, 0.1, 60, 0.15); }
+    for (const k of [0, 3, 6, 8, 11, 14]) hit('taiko', k, k % 8 === 0 ? 0.62 : 0.42, k % 8 === 0 ? 58 : 63, k % 2 ? 0.3 : -0.3);
+    for (let k = 0; k < 16; k++) hit('hat', k, k % 2 ? 0.07 : 0.12, 60, 0.45);
+    if (b % 2 === 0) crash();
+    if (b % 4 === 3) fill(b === 7 ? 8 : 12);
   }
 }

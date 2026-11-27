@@ -67,7 +67,7 @@ text, letters, words, logo, watermark, signature, faces, people, frame, border, 
 Prompt:
 
 ```
-epic cinematic film studio logo sting, 10 seconds, orchestral and choir: deep thunder rumble at the start, reverse cymbal swell rising into a massive orchestral hit at 1.4 seconds with timpani, brass and wordless choir in D minor, brass chord change to B flat major at 2.4 seconds, heavy stamp-like impact with a metallic clang at 3.8 seconds on C major, timpani roll into a triumphant D major resolution at 4.8 seconds with full choir and glockenspiel sparkles, long reverb tail fading out by 9.5 seconds, medieval heroic mood, no lyrics
+epic aggressive cinematic film studio logo sting, 10 seconds, orchestral, choir and pounding war drums: deep thunder rumble at the start, reverse cymbal swell rising into a massive orchestral hit at 1.4 seconds with timpani, brass and wordless choir in D minor, brass chord change to B flat major at 2.4 seconds, heavy stamp-like impact with a metallic clang at 3.8 seconds on C major, timpani roll into a triumphant D major resolution at 4.8 seconds with full choir and glockenspiel sparkles, long reverb tail fading out by 9.5 seconds, medieval heroic mood, no lyrics
 ```
 
 Kann Oakgen die Zeitmarken nicht genau treffen, schreib mir die Sekunden von Schlag, Stempel und Höhepunkt. Dann richte ich die Schrift nach der Musik.
@@ -110,12 +110,12 @@ Die Farbzyklen bleiben auch auf deinen Bildern: funkelnde Sterne, Mondglitzern, 
 
 - **Datei:** `assets/intro/geschichte.mp3`
 - **Format:** 90 bis 120 Sekunden, nahtlos wiederholbar (Anfang und Ende passen zusammen), 44,1 kHz, 192 kbit/s
-- **Klang:** wie ein Amiga-Tracker-Stück (vier Kanäle, 8-Bit-Samples, Stereo hart links und rechts), heroisch und etwas wehmütig
+- **Klang:** wie ein Amiga-Tracker-Stück (vier Kanäle, 8-Bit-Samples, Stereo hart links und rechts), episch und aggressiv mit vielen Trommeln, wie die Fassung im Spiel
 
 Prompt:
 
 ```
-1990s Amiga game soundtrack in ProTracker MOD style, 4 channels, crunchy 8-bit samples, hard left and right stereo panning, epic medieval theme in D minor at 96 BPM, harp arpeggios, string pad, wordless choir pad, flute-like lead melody with vibrato, timpani and marching snare drum, heroic and melancholic, 100 seconds, seamless loop, no vocals
+1990s Amiga game soundtrack in ProTracker MOD style, crunchy 8-bit samples, hard left and right stereo panning, epic and aggressive medieval battle theme in D minor at 110 BPM, pounding taiko war drums, tom fills, hard snare and punchy kick, galloping bass and string ostinato, brass stabs, wordless choir, flute-like lead melody with vibrato, harp arpeggios, builds from a war drum march to a full storm, 100 seconds, seamless loop, no vocals
 ```
 
 ---
