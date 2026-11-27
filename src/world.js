@@ -1458,7 +1458,7 @@ function genBuildings(W, s, rng) {
   });
   const props = (b) => {
     if (b.kind !== 'house' || rng() > 0.7) return;
-    const kinds = s.type === 'stadt' || s.type === 'abtei' ? ['fass', 'fass', 'karren', 'beet'] : ['heu', 'holzstapel', 'fass', 'karren', 'beet', 'heu'];
+    const kinds = s.type === 'stadt' || s.type === 'abtei' ? ['fass', 'fass', 'karren', 'beet', 'kisten'] : ['heu', 'holzstapel', 'fass', 'karren', 'beet', 'heu'];
     const n = rng() < 0.35 ? 2 : 1;
     for (let k = 0; k < n; k++) {
       const side = rng() < 0.5;
@@ -1565,9 +1565,11 @@ function genBuildings(W, s, rng) {
       smithy();
       break;
     case 'abtei':
-      if (!hasCathedral) { const ch = freeArea(W, s.x - 0.5, s.y - 1.8, 3.2, 1.3, 0.3, 3); if (ch) add({ kind: 'church', x: ch.x, y: ch.y, wx: 3.2, wy: 1.3, h: 34, big: true, abbey: true }); }
+      // Kloster mit Kirche und Kreuzgang (gemalt aus dem Paket York); wo eine Kathedrale steht, nur die Klostergebäude
+      let kloster = null;
+      if (!hasCathedral) { const ch = freeArea(W, s.x - 0.5, s.y - 1.6, 2.6, 2.4, 0.3, 3); if (ch) kloster = add({ kind: 'church', x: ch.x, y: ch.y, wx: 2.6, wy: 2.4, h: 34, big: true, abbey: true }); }
       // Klostergebäude: Dormitorium und Refektorium, wo neben der Kirche Platz ist
-      for (const [dx, dy, wx, wy, h, rh] of [[2.2, -1.2, 1.0, 2.2, 18, 12], [-2.6, 1.4, 2.0, 1.0, 16, 10]]) {
+      for (const [dx, dy, wx, wy, h, rh] of kloster ? [] : [[2.2, -1.2, 1.0, 2.2, 18, 12], [-2.6, 1.4, 2.0, 1.0, 16, 10]]) {
         const sp = freeArea(W, s.x + dx, s.y + dy, wx, wy, 0.3, 3.5);
         if (sp) add({ kind: 'house', x: sp.x, y: sp.y, wx, wy, h, rh, wall: 'stone', roof: 'tile', lit: true });
       }

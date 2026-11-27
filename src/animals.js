@@ -9,7 +9,7 @@ import { rand, randInt } from './rng.js';
 import { addCargo, cargoFree } from './economy.js';
 import { changeRep, isAlly } from './politics.js';
 
-const ANIMAL_SPEED = { schaf: 0.25, kuh: 0.2, huhn: 0.4, hirsch: 0.55, reh: 0.6, ente: 0.22 };
+const ANIMAL_SPEED = { schaf: 0.25, kuh: 0.2, huhn: 0.4, hirsch: 0.55, reh: 0.6, ente: 0.22, klepper: 0.28, packpferd: 0.24, schlachtross: 0.3 };
 // Wild im Wald: Hirsch und Reh fliehen, wenn du zu nahe kommst
 const WILD = { hirsch: 1, reh: 1 };
 
@@ -21,6 +21,11 @@ export const ANIMAL_INFO = {
   schaf: { name: 'Schaf', hp: 10, fleisch: [3, 5], felle: [1, 1], farm: true },
   kuh: { name: 'Kuh', hp: 20, fleisch: [8, 12], felle: [1, 2], farm: true },
   huhn: { name: 'Huhn', hp: 3, fleisch: [1, 1], farm: true },
+  // Pferde auf der Weide (Paket 8, Teil 2): Klepper bei Hallen, Dörfern und Höfen, Packpferde bei Märkten und Städten,
+  // Schlachtrösser in der Schabracke des Burgherrn
+  klepper: { name: 'Klepper', hp: 22, fleisch: [8, 12], felle: [1, 2], farm: true },
+  packpferd: { name: 'Packpferd', hp: 24, fleisch: [8, 12], felle: [1, 2], farm: true },
+  schlachtross: { name: 'Schlachtross', hp: 30, fleisch: [10, 14], felle: [1, 2], farm: true },
 };
 
 const DEER_TARGET = 130, DUCK_TARGET = 80;
@@ -71,6 +76,9 @@ function farmHerds(s) {
     schaf: pa ? { n: pa.n, home: { x: pa.x, y: pa.y }, r: pa.r } : { n: { dorf: 5, halle: 4, abtei: 6, spieler: 3, markt: 3, burg: 2, hof: 3 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
     kuh: { n: { dorf: 2, halle: 3, spieler: 2, hof: 1 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
     huhn: { n: { dorf: 4, halle: 3, spieler: 3, stadt: 3, abtei: 2, hof: 3 }[s.type] || 0, home: { x: s.x + 0.5, y: s.y + 0.8 }, r: 2.8 },
+    klepper: { n: { markt: 2, halle: 2, dorf: 1, hof: 1 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 3, r: 2.2 },
+    packpferd: { n: { markt: 2, stadt: 1 }[s.type] || 0, rMin: s.clear, rMax: s.clear + 4, r: 2 },
+    schlachtross: { n: { burg: 2 }[s.type] || 0, rMin: s.clear, rMax: s.clear + 3, r: 2 },
   };
 }
 

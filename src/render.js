@@ -403,11 +403,8 @@ function cachedDraw(c, o, bounds, fn) {
 function houseBounds(b) {
   const half = (b.wx + b.wy) * 16, r = [-half - 6, half + 44, -(b.h + b.rh * 1.1 + 24), half / 2 + 10];
   // gemaltes Haus: so groß wie sein Bild (Dach, Schornstein, Rauch, Bänke)
-  const hs = houseSprite(b), a = hs && P5[`bau_${hs.name}`], im = hs && ART[`bau_${hs.name}`];
-  if (a && im) {
-    const w = im.width * a[2] * hs.sc, h = im.height * a[2] * hs.sc, l = hs.flip ? -(w - a[0] * hs.sc) : -a[0] * hs.sc;
-    r[0] = Math.min(r[0], l - 4); r[1] = Math.max(r[1], l + w + 4); r[2] = Math.min(r[2], -a[1] * hs.sc - 4); r[3] = Math.max(r[3], h - a[1] * hs.sc + 4);
-  }
+  const hs = houseSprite(b), sb = hs && spriteBounds(hs.base, hs.sc, hs.flip);
+  if (sb) { r[0] = Math.min(r[0], sb[0]); r[1] = Math.max(r[1], sb[1]); r[2] = Math.min(r[2], sb[2] - 30); r[3] = Math.max(r[3], sb[3]); }
   return r;
 }
 function drawHouseFast(c, b) {
@@ -415,7 +412,20 @@ function drawHouseFast(c, b) {
   if (b.dmg > 0 || b.fire > G.time || b.tavern || abandonedId(b.site)) { drawHouse(c, b); return; }
   cachedDraw(c, b, houseBounds(b), (g) => drawHouse(g, b));
 }
-function drawChurchFast(c, b) { if (abandonedId(b.site)) { drawChurch(c, b); return; } const half = (b.wx + b.wy) * 16; cachedDraw(c, b, [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16], (g) => drawChurch(g, b)); }
+function drawChurchFast(c, b) {
+  if (abandonedId(b.site)) { drawChurch(c, b); return; }
+  const half = (b.wx + b.wy) * 16, r = [-half - 30, half + 90, -(b.abbey ? 160 : 140), half / 2 + 16];
+  const cs = churchSprite(b), sb = cs && spriteBounds(cs.base, cs.sc, cs.flip);
+  if (sb) { r[0] = Math.min(r[0], sb[0]); r[1] = Math.max(r[1], sb[1]); r[2] = Math.min(r[2], sb[2]); r[3] = Math.max(r[3], sb[3]); }
+  cachedDraw(c, b, r, (g) => drawChurch(g, b));
+}
+// Kirche als gemaltes Bild: Dorf- und Stadtkirchen mit Westturm, Abteien als Kloster mit Kreuzgang
+function churchSprite(b) {
+  const name = b.abbey ? 'kloster' : 'kirche_dorf';
+  if (!ART[`york_${name}`]) return null;
+  const f = yorkFit(name, b.wx, b.wy, 1.6, 0.6);
+  return { id: yorkId(name), base: `york_${name}`, flip: f.flip, sc: f.sc };
+}
 
 // Stadtmauer: ein Mauerstück je Feld, Türme in Abständen und an den Toren
 function drawCityWallPiece(c, o) {
@@ -1028,6 +1038,14 @@ function drawOpenGrave(c, g) {
 }
 
 function drawChurch(c, b) {
+  const cs = churchSprite(b);
+  if (cs) {
+    drawShadow(c, b.x, b.y, b.wx, b.wy, 60);
+    if (p5(c, cs.id, b.x, b.y, cs.sc, cs.flip)) {
+      if (darkness() > 0.2 && !abandonedId(b.site)) addLight(b.x, b.y + b.wy / 2, 10, 40, 0.9);
+      return;
+    }
+  }
   const stone = '#b5ae9f';
   const dark = abandonedId(b.site);
   const tx = b.x + b.wx / 2 - 0.45, ty = b.y;
@@ -1058,6 +1076,12 @@ const GLASS = () => (darkness() > 0.2 ? '#ffd27a' : '#3e4a5e');
 const CATHEDRAL_K = 1.3;
 // Romanische Kathedrale: Langhaus, Querhaus, Apsis, Vierungs- und Westtürme. Optional Gerüst, Brandruine, Felsen.
 function drawCathedral(c, b) {
+  // Gemalte Kathedrale aus dem Paket York: das Langhaus längs, so lang wie die Kathedrale im Spiel
+  if (!b.burned && ART.york_kathedrale) {
+    const L = (b.len || 4) * CATHEDRAL_K, sc = L / YORK.kathedrale[1];
+    drawShadow(c, b.x, b.y, L, 1.6, 70);
+    if (p5(c, yorkId('kathedrale'), b.x, b.y, sc, true)) { if (darkness() > 0.2) addLight(b.x, b.y + 0.8, 12, 70, 1); return; }
+  }
   const stone = b.color || '#cbc3af';
   const dark = shade(stone, 0.55);
   const L = (b.len || 4) * CATHEDRAL_K, w = 1.5, h = b.burned ? 32 : 40;
@@ -1167,6 +1191,8 @@ function drawGreatKeep(c, b) {
 
 // Burghügel (Motte) mit Holzturm oder steinernem Ringturm
 function drawMotte(c, b) {
+  // Gemalter Burghügel mit Palisade und Holzturm (York): Durchmesser wie der gezeichnete Hügel
+  if (ART.york_burghuegel && p5(c, yorkId('burghuegel'), b.x, b.y, 2.9 / YORK.burghuegel[0])) return;
   const mh = 26, R = 1.45;
   const g = P(b.x, b.y, 0), t = P(b.x, b.y, mh);
   const RX = R * 45, RY = R * 22.6, rx = R * 0.5 * 45, ry = R * 0.5 * 22.6;
@@ -1320,7 +1346,8 @@ function drawLonghall(c, b) {
   // Gemaltes sächsisches Langhaus: Rotherwood mit seinem Schild über der Tür, die anderen Hallen in der Gegenansicht
   // (gespiegelt, damit der First längs liegt); sonst die Holzhalle aus Paket 5
   const rw = b.site === 'rotherwood', lh = rw ? 'langhaus_rotherwood' : 'langhaus';
-  if (p5(c, bauId(lh), b.x, b.y, b.wx / 3.3, !rw) || p5(c, 'burg_holzhalle', b.x, b.y, Math.min(b.wx / 2.3, b.wy / 1.05))) {
+  const yf = !rw && ART.york_langhalle ? yorkFit('langhalle', b.wx, b.wy, 1.2, 0.6) : null;
+  if ((yf && p5(c, yorkId('langhalle'), b.x, b.y, yf.sc, yf.flip)) || p5(c, bauId(lh), b.x, b.y, b.wx / 3.3, !rw) || p5(c, 'burg_holzhalle', b.x, b.y, Math.min(b.wx / 2.3, b.wy / 1.05))) {
     if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, 6, 40, 1);
     return;
   }
@@ -1336,7 +1363,17 @@ function drawLonghall(c, b) {
   if (darkness() > 0.2) addLight(b.x, b.y + b.wy / 2, 6, 40, 1);
 }
 
+const CAMP_TENT = { '#6d6a4a': 1, '#7a6a4a': 1, '#8a7a5a': 1, '#6a5a3a': 1, '#5c6640': 1, '#d8ccb0': 1 };
+// Zelte: an Lagerfeuern, bei den Waldleuten und in der Burgruine das Flickzelt, auf dem Markt und vor belagerten Städten das runde
+// Prunkzelt in der Farbe des Zelts
 function drawTent(c, b) {
+  const camp = CAMP_TENT[b.color] || (b.site && String(b.site).startsWith('feuer'));
+  const tn = camp ? 'zelt_lager' : 'zelt_markt';
+  if (ART[`york_${tn}`]) {
+    const f = yorkFit(tn, b.wx, b.wy, 1.25, 0.8);
+    drawShadow(c, b.x, b.y, b.wx, b.wy, 16, 0.16);
+    if (p5(c, yorkId(tn), b.x, b.y, f.sc, f.flip, camp ? null : b.color)) return;
+  }
   const col = b.color || '#d8ccb0';
   drawShadow(c, b.x, b.y, b.wx, b.wy, 16, 0.16);
   drawGableRoof(c, b.x, b.y, b.wx, b.wy * 0.9, 0, 20, col, col, true, false);
@@ -1402,6 +1439,12 @@ function drawShip(c, b) {
 }
 
 function drawStall(c, b) {
+  // Gemalter Marktstand (Obst und Brot oder Tuch und Töpfe), das Sonnendach in der Farbe des Stands
+  const sn = hash2(Math.round(b.x * 10), Math.round(b.y * 10), 11) < 0.5 ? 'marktstand_1' : 'marktstand_2';
+  if (ART[`york_${sn}`]) {
+    const f = yorkFit(sn, b.wx || 0.8, b.wy || 0.6, 1.2, 0.8);
+    if (p5(c, yorkId(sn), b.x, b.y, f.sc, f.flip, b.color)) return;
+  }
   const x0 = b.x - 0.4, x1 = b.x + 0.4, y0 = b.y - 0.3, y1 = b.y + 0.3;
   c.strokeStyle = '#5a4030'; c.lineWidth = 1.5;
   for (const [x, y] of [[x0, y1], [x1, y1], [x1, y0]]) { const [a, bb] = P(x, y, 0); c.beginPath(); c.moveTo(a, bb); c.lineTo(a, bb - 16); c.stroke(); }
@@ -1415,6 +1458,7 @@ function drawStall(c, b) {
 }
 
 function drawWell(c, b) {
+  if (ART.york_brunnen && p5(c, yorkId('brunnen'), b.x, b.y, 0.6 / YORK.brunnen[0] * 1.15)) return;
   drawBox(c, b.x, b.y, 0.6, 0.6, 7, '#8f897c', 0, 'stone');
   poly(c, [P(b.x - 0.22, b.y - 0.22, 7), P(b.x + 0.22, b.y - 0.22, 7), P(b.x + 0.22, b.y + 0.22, 7), P(b.x - 0.22, b.y + 0.22, 7)], '#2f4a5a');
   c.strokeStyle = '#5a4030'; c.lineWidth = 1.5;
@@ -1425,10 +1469,13 @@ function drawWell(c, b) {
 
 function drawFire(c, b) {
   const [x, y] = P(b.x, b.y, 0);
-  c.fillStyle = '#6d665c';
-  for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; c.beginPath(); c.ellipse(x + Math.cos(a) * 8, y + Math.sin(a) * 4, 2.2, 1.6, 0, 0, Math.PI * 2); c.fill(); }
-  c.fillStyle = '#4a3322';
-  c.fillRect(x - 7, y - 2, 14, 3);
+  // Steinring mit verkohlten Scheiten (gemalt), die Flammen zeichnet das Spiel darüber
+  if (!(ART.york_feuerstelle && p5(c, yorkId('feuerstelle'), b.x, b.y, 0.95))) {
+    c.fillStyle = '#6d665c';
+    for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; c.beginPath(); c.ellipse(x + Math.cos(a) * 8, y + Math.sin(a) * 4, 2.2, 1.6, 0, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = '#4a3322';
+    c.fillRect(x - 7, y - 2, 14, 3);
+  }
   const f = 1 + Math.sin(G.time * 13 + b.x) * 0.15;
   c.fillStyle = '#e8762a';
   c.beginPath(); c.moveTo(x - 5, y); c.quadraticCurveTo(x, y - 16 * f, x + 5, y); c.fill();
@@ -1466,7 +1513,18 @@ function drawStones(c, x, y, n) {
   }
 }
 
+// Kleinkram aus York: Fässer, Heuhaufen, Karren, Kisten, Sitzstamm, Kohlenmeiler; gespiegelt nach Zufall des Ortes
+const PROP_YORK = { fass: ['fass', 1], heu: ['heu', 1], karren: ['karren', 1], kisten: ['kisten', 1], sitzstamm: ['sitzstamm', 1], meiler: ['kohlenmeiler', 1] };
 function drawProp(c, b) {
+  const py = PROP_YORK[b.prop];
+  if (py && ART[`york_${py[0]}`]) {
+    const [px, pyy] = P(b.x, b.y, 0);
+    c.fillStyle = 'rgba(25,35,15,0.18)'; c.beginPath(); c.ellipse(px + 2, pyy, 9, 3.6, 0, 0, Math.PI * 2); c.fill();
+    if (p5(c, yorkId(py[0]), b.x, b.y, py[1], (b.v || 0) > 0.5)) {
+      if (b.prop === 'meiler' && Math.random() < 0.08) smokeEmit(px + 2, pyy - 20, 0.6);
+      return;
+    }
+  }
   const [x, y] = P(b.x, b.y, 0);
   const winter = lookSeason() === 3;
   c.fillStyle = 'rgba(25,35,15,0.2)';
@@ -1604,24 +1662,86 @@ Object.assign(P5, {bau_langhaus_rotherwood:[85.12,98.7,0.3333],bau_langhaus_roth
 const BAU_FLAECHE = {langhaus_rotherwood:[3.3,1.6],langhaus:[1.6,3.3],kate_a:[0.95,0.95],kate_b:[0.95,0.95],taverne:[1.3,0.94],galgen:[1.2,0.9],galgen_besetzt:[1.2,0.9]};
 // Im Schnee das Winterbild, wenn es geladen ist
 function bauId(name) { const w = `bau_${name}_winter`; return lookSeason() === 3 && ART[w] ? w : `bau_${name}`; }
-// Haus als gemaltes Bild: Wirtshaus; strohgedeckte Holz- und Lehmhäuser als Kate (nicht zu lang gestreckt)
+// ---------------------------------------------------------------- Paket York (tools/york.py)
+// Häuser, Kirchen, Kloster, Langhalle, Burghügel, Brücken, Marktstände, Zelte, Brunnen und Kleinkram, je mit
+// Winterbild. YORK: Grundfläche beim Maßstab 1 (Kacheln entlang x und y) und die Seite mit der Tür (L heißt vorn
+// links wie im Spiel; R wird gespiegelt).
+Object.assign(P5, {"york_holz_1":[38.0,66.5,0.3333],"york_holz_1_winter":[38.0,66.5,0.3333],"york_holz_2":[37.0,64.38,0.3333],"york_holz_2_winter":[37.0,64.38,0.3333],"york_stein_1":[40.0,73.12,0.3333],"york_stein_1_winter":[40.0,73.12,0.3333],"york_stein_2":[44.12,68.38,0.3333],"york_stein_2_winter":[44.12,68.38,0.3333],"york_stein_3":[42.12,81.5,0.3333],"york_stein_3_winter":[42.12,81.5,0.3333],"york_stroh_2":[40.25,71.62,0.3333],"york_stroh_2_winter":[40.25,71.62,0.3333],"york_stroh_3":[48.75,63.75,0.3333],"york_stroh_3_winter":[48.75,63.75,0.3333],"york_stroh_4":[36.0,62.0,0.3333],"york_stroh_4_winter":[36.0,62.0,0.3333],"york_ziegel_1":[41.25,85.25,0.3333],"york_ziegel_1_winter":[41.25,85.25,0.3333],"york_ziegel_2":[40.62,85.88,0.3333],"york_ziegel_2_winter":[40.62,85.88,0.3333],"york_ziegel_3":[40.25,83.12,0.3333],"york_ziegel_3_winter":[40.25,83.12,0.3333],"york_ziegel_4":[42.25,92.5,0.3333],"york_ziegel_4_winter":[42.25,92.5,0.3333],"york_kathedrale":[99.62,168.75,0.3333],"york_kathedrale_winter":[99.62,168.75,0.3333],"york_kirche_dorf":[64.88,100.0,0.3333],"york_kirche_dorf_winter":[64.88,100.0,0.3333],"york_kloster":[61.12,80.25,0.3333],"york_kloster_winter":[61.12,80.25,0.3333],"york_langhalle":[92.5,94.38,0.3333],"york_langhalle_winter":[92.5,94.38,0.3333],"york_brunnen":[21.88,40.44,0.3333],"york_brunnen_winter":[22.0,40.38,0.3333],"york_marktstand_1":[28.25,46.0,0.3333],"york_marktstand_1_winter":[28.25,46.0,0.3333],"york_marktstand_2":[28.5,47.5,0.3333],"york_marktstand_2_winter":[28.5,47.5,0.3333],"york_zelt_markt":[30.75,48.62,0.3333],"york_zelt_markt_winter":[30.75,48.62,0.3333],"york_zelt_lager":[29.12,35.88,0.3333],"york_zelt_lager_winter":[29.12,35.88,0.3333],"york_kohlenmeiler":[30.12,27.94,0.3333],"york_kohlenmeiler_winter":[29.75,28.25,0.3333],"york_fass":[9.88,18.06,0.3333],"york_fass_winter":[9.88,18.06,0.3333],"york_heu":[15.62,17.19,0.3333],"york_heu_winter":[15.88,17.06,0.3333],"york_karren":[19.75,19.38,0.3333],"york_karren_winter":[19.88,19.06,0.3333],"york_kisten":[13.88,18.06,0.3333],"york_kisten_winter":[13.88,18.06,0.3333],"york_feuerstelle":[17.88,14.56,0.3333],"york_feuerstelle_winter":[17.88,14.56,0.3333],"york_sitzstamm":[21.88,12.69,0.3333],"york_sitzstamm_winter":[21.88,12.69,0.3333],"york_bruecke_x":[34.0,28.0,0.3333],"york_bruecke_x_winter":[34.0,28.0,0.3333],"york_bruecke_y":[34.0,28.0,0.3333],"york_bruecke_y_winter":[34.0,28.0,0.3333],"york_bruecke_ecke_nw_no":[34.0,28.0,0.3333],"york_bruecke_ecke_nw_no_winter":[34.0,28.0,0.3333],"york_bruecke_ecke_nw_sw":[34.0,28.0,0.3333],"york_bruecke_ecke_nw_sw_winter":[34.0,28.0,0.3333],"york_bruecke_ecke_so_no":[34.0,28.0,0.3333],"york_bruecke_ecke_so_no_winter":[34.0,28.0,0.3333],"york_bruecke_ecke_so_sw":[34.0,28.0,0.3333],"york_bruecke_ecke_so_sw_winter":[34.0,28.0,0.3333],"york_burghuegel":[100.0,138.75,0.3333],"york_burghuegel_winter":[100.0,138.75,0.3333]});
+const YORK = {"holz_1":[0.77,0.95,"L"],"holz_2":[0.95,0.77,"R"],"stein_1":[1.31,0.72,"L"],"stein_2":[1.45,0.92,"R"],"stein_3":[0.9,0.72,"L"],"stroh_2":[0.74,0.99,"R"],"stroh_3":[0.76,1.74,"R"],"stroh_4":[1.15,1.15,"L"],"ziegel_1":[0.77,1.0,"L"],"ziegel_2":[0.74,1.09,"R"],"ziegel_3":[0.69,0.7,"L"],"ziegel_4":[0.66,0.73,"L"],"kathedrale":[1.25,4.27,"L"],"kirche_dorf":[1.41,2.16,"L"],"kloster":[1.71,1.56,"L"],"langhalle":[1.02,4.14,"R"],"brunnen":[0.54,0.54,"L"],"marktstand_1":[1.0,0.36,"L"],"marktstand_2":[0.93,0.46,"L"],"zelt_markt":[0.92,0.92,"L"],"zelt_lager":[0.76,0.61,"L"],"kohlenmeiler":[0.82,0.82,"L"],"fass":[0.28,0.28,"L"],"heu":[0.43,0.43,"L"],"karren":[0.55,0.55,"L"],"kisten":[0.39,0.39,"L"],"feuerstelle":[0.5,0.5,"L"],"sitzstamm":[0.61,0.61,"L"],"bruecke_x":[0.76,0.76,"L"],"bruecke_y":[0.76,0.76,"L"],"bruecke_ecke_nw_no":[0.76,0.76,"L"],"bruecke_ecke_nw_sw":[0.64,0.64,"L"],"bruecke_ecke_so_no":[0.64,0.64,"L"],"bruecke_ecke_so_sw":[0.77,0.77,"L"],"burghuegel":[3.65,3.65,"R"]};
+// Schornsteine im Bild (Weltpixel): dort steigt Rauch auf
+const YORK_RAUCH = { stein_1: [58.75, 7], stein_3: [55.5, 5.5], stroh_2: [24.25, 5.5], stroh_3: [43, 18.75], ziegel_1: [26.25, 12], ziegel_2: [57, 7.5], ziegel_3: [49.5, 5.5], ziegel_4: [54.5, 6.25] };
+function yorkId(name) { const w = `york_${name}_winter`; return lookSeason() === 3 && ART[w] ? w : `york_${name}`; }
+// Ein gemalter Bau auf der Grundfläche wx × wy: gespiegelt, damit die Tür vorn links liegt, oder wenn sonst die lange
+// Seite quer stünde. Maßstab nach der Fläche, ohne weit über die Grundfläche hinauszuragen; die Bilder haben Türen in
+// Menschengröße, darum höchstens maxSc größer
+function yorkFit(name, wx, wy, maxSc = 1.3, minSc = 0.8) {
+  const [fw0, fh0, door] = YORK[name];
+  let flip = door === 'R', fw = flip ? fh0 : fw0, fh = flip ? fw0 : fh0;
+  const along = (a, b) => (a / b >= 1.2 ? 1 : b / a >= 1.2 ? -1 : 0);
+  const ho = along(wx, wy), so = along(fw, fh);
+  if (ho && so && ho !== so) { flip = !flip; [fw, fh] = [fh, fw]; }
+  const sc = Math.max(minSc, Math.min(maxSc, Math.sqrt((wx * wy) / (fw * fh)), 1.12 * Math.min(wx / fw, wy / fh)));
+  return { flip, sc, fw, fh };
+}
+// Ausdehnung eines Bildes um seinen Fußpunkt (für den Bildspeicher): [links, rechts, oben, unten]
+function spriteBounds(id, sc, flip) {
+  const a = P5[id], im = ART[id];
+  if (!a || !im) return null;
+  const w = im.width * a[2] * sc, h = im.height * a[2] * sc, l = flip ? -(w - a[0] * sc) : -a[0] * sc;
+  return [l - 4, l + w + 4, -a[1] * sc - 4, h - a[1] * sc + 4];
+}
+// Hausbilder nach Dach und Wand. „bau:“ sind die Katen aus dem sächsischen Dorf, die übrigen kommen aus York.
+const HAUS_BILDER = {
+  'thatch|wood': ['bau:kate_a', 'holz_1', 'holz_2'],
+  'thatch|plaster': ['bau:kate_b', 'stroh_2', 'stroh_4'],
+  'thatch|timber': ['stroh_2', 'stroh_3', 'bau:kate_b'],
+  'thatch|stone': ['stroh_2', 'stroh_3'],
+  'tile|timber': ['ziegel_1', 'ziegel_2', 'ziegel_4'],
+  'tile|plaster': ['ziegel_3', 'ziegel_1'],
+  'tile|stone': ['stein_3', 'stein_1'],
+  'slate|stone': ['stein_1', 'stein_2'],
+  'slate|timber': ['ziegel_4', 'ziegel_1', 'stein_1'],
+  'slate|plaster': ['stein_1', 'ziegel_3'],
+  'wood|wood': ['holz_1', 'holz_2'],
+};
+// Haus als gemaltes Bild: Wirtshaus, sonst nach Dach und Wand ein passendes Bild, dessen Grundriss zur Form des
+// Hauses passt (lang oder fast quadratisch). Welches, entscheidet der Ort des Hauses, also immer dasselbe.
 function houseSprite(b) {
   if (b.kind !== 'house' || b.cons < 1 || b.dmg > 0 || b.fire > G.time) return null;
-  let name = null;
-  if (b.tavern) name = 'taverne';
-  else if ((b.roof || 'thatch') === 'thatch' && Math.max(b.wx, b.wy) / Math.min(b.wx, b.wy) <= 1.4 && Math.max(b.wx, b.wy) <= 1.8) name = b.wall === 'wood' ? 'kate_a' : b.wall === 'plaster' ? 'kate_b' : null;
-  if (!name || !ART[`bau_${name}`]) return null;
-  const [fw, fh] = BAU_FLAECHE[name];
-  // Tür liegt im Bild auf der vorderen linken Seite; ein Haus, das quer steht, wird gespiegelt
-  const flip = name === 'taverne' ? b.wy > b.wx : false;
-  const sc = Math.sqrt((b.wx * b.wy) / (fw * fh));
-  return { name, flip, sc };
+  if (b.tavern) {
+    if (!ART.bau_taverne) return null;
+    const [fw, fh] = BAU_FLAECHE.taverne;
+    return { id: bauId('taverne'), base: 'bau_taverne', flip: b.wy > b.wx, sc: Math.sqrt((b.wx * b.wy) / (fw * fh)) };
+  }
+  const list = HAUS_BILDER[`${b.roof || 'thatch'}|${b.wall || 'plaster'}`];
+  if (!list) return null;
+  const A = Math.max(b.wx, b.wy) / Math.min(b.wx, b.wy), big = Math.max(b.wx, b.wy);
+  const part = (n) => (n.startsWith('bau:') ? ['bau', n.slice(4)] : ['york', n]);
+  const misfit = (n) => {
+    const [kind, name] = part(n);
+    const [fw, fh] = kind === 'bau' ? BAU_FLAECHE[name] : YORK[name];
+    const a = Math.max(fw, fh) / Math.min(fw, fh);
+    return Math.max(a / A, A / a);
+  };
+  const have = list.filter((n) => { const [kind, name] = part(n); return ART[`${kind}_${name}`] && !(name === 'stroh_4' && (A > 1.25 || big > 1.25)) && !(kind === 'bau' && big > 1.8); });
+  let ok = have.filter((n) => misfit(n) <= 1.5);
+  // Passt keines gut, das am wenigsten unpassende (die Form weicht dann etwas ab)
+  if (!ok.length && have.length) ok = [have.reduce((a, n) => (misfit(n) < misfit(a) ? n : a))];
+  if (!ok.length) return null;
+  const v = hash2(Math.round(b.x * 10), Math.round(b.y * 10), 7);
+  const [kind, name] = part(ok[Math.min(ok.length - 1, Math.floor(v * ok.length))]);
+  if (kind === 'bau') { const [fw, fh] = BAU_FLAECHE[name]; return { id: bauId(name), base: `bau_${name}`, flip: false, sc: Math.sqrt((b.wx * b.wy) / (fw * fh)) }; }
+  const f = yorkFit(name, b.wx, b.wy);
+  return { id: yorkId(name), base: `york_${name}`, name, flip: f.flip, sc: f.sc };
 }
 function drawHouseSprite(c, b, hs) {
   drawShadow(c, b.x, b.y, b.wx, b.wy, b.h + b.rh * 0.7);
-  if (!p5(c, bauId(hs.name), b.x, b.y, hs.sc, hs.flip)) return false;
-  const lit = b.lit && !abandonedId(b.site);
+  if (!p5(c, hs.id, b.x, b.y, hs.sc, hs.flip)) return false;
+  const empty = abandonedId(b.site), lit = b.lit && !empty;
   if (lit && darkness() > 0.2) { addLight(b.x, b.y + b.wy / 2, b.h * 0.5, 22, 0.8); addLight(b.x + b.wx / 2, b.y, b.h * 0.5, 22, 0.7); }
+  // Rauch aus dem gemalten Schornstein
+  const r = hs.name && YORK_RAUCH[hs.name], a = P5[hs.base];
+  if (r && a && !empty) { const [px, py] = P(b.x, b.y, 0); b.smoke = [px + (r[0] - a[0]) * hs.sc * (hs.flip ? -1 : 1), py + (r[1] - a[1]) * hs.sc]; }
   return true;
 }
 
@@ -3351,7 +3471,10 @@ function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
       if (h1 < 0.55) { c.fillStyle = shade(rc, 0.7); c.fillRect(g.ctr[0] - 4 + h1 * 8, g.ctr[1] - 1 + h2 * 3, 2, 1.5); c.fillRect(g.ctr[0] + 2 - h2 * 6, g.ctr[1] + 1, 1.5, 1.2); }
     }
   }
-  // Brücken: dunkler Rahmen, Bohlen darüber
+  // Brücken: gemalte Holzbrücken aus York, je nach den Anschlüssen gerade (x, y) oder als Ecke; sonst dunkler Rahmen
+  // mit Bohlen darüber
+  const painted = bridges.length && ART.york_bruecke_x ? bridges.filter((g) => drawBridgeSprite(c, W, g)) : [];
+  if (painted.length) bridges.splice(0, bridges.length, ...bridges.filter((g) => !painted.includes(g)));
   if (bridges.length) {
     trace(bridges, 8.5); c.strokeStyle = '#5a4128'; c.lineWidth = 17; c.stroke();
     trace(bridges, 6.5); c.strokeStyle = '#8f6e44'; c.lineWidth = 13; c.stroke();
@@ -3367,6 +3490,30 @@ function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
     c.stroke();
   }
   c.restore();
+}
+
+// Ein Brückenstück: Anschlüsse nach Himmelsrichtung im Bild (NW = −x, NO = −y, SO = +x, SW = +y)
+function drawBridgeSprite(c, W, g) {
+  const { i, j } = g, N = W.N;
+  const road = (a, b2) => isRoadish(W, a, b2);
+  const nw = road(i - 1, j), so = road(i + 1, j), no = road(i, j - 1), sw = road(i, j + 1);
+  let name;
+  if ((nw || so) && !(no || sw)) name = 'bruecke_x';
+  else if ((no || sw) && !(nw || so)) name = 'bruecke_y';
+  else if (nw && no && !so && !sw) name = 'bruecke_ecke_nw_no';
+  else if (nw && sw && !so && !no) name = 'bruecke_ecke_nw_sw';
+  else if (so && no && !nw && !sw) name = 'bruecke_ecke_so_no';
+  else if (so && sw && !nw && !no) name = 'bruecke_ecke_so_sw';
+  else {
+    // Kreuzung oder Ende: nach dem Wasser quer dazu
+    const wet = (a, b2) => W.tiles[b2 * N + a] === T.WATER;
+    name = wet(i, j - 1) || wet(i, j + 1) ? 'bruecke_x' : 'bruecke_y';
+  }
+  const id = yorkId(name), a = P5[id], im = ART[id];
+  if (!a || !im) return false;
+  const [x, y] = g.ctr;
+  c.drawImage(im, x - a[0], y - a[1] + 2, im.width * a[2], im.height * a[2]);
+  return true;
 }
 
 function renderChunk(cx, cy, cs = 1) {
@@ -4331,12 +4478,12 @@ function drawCorpse(c, f, x, y) {
 // Bögen mit 6 Spalten (stehen, gehen 1, gehen 2, grasen/picken, rennen, erlegt) und 2 Zeilen: von vorn (schaut nach
 // links unten) und von hinten (schaut nach rechts oben). Gespiegelt ergeben sich vier Blickrichtungen.
 // TIER: Zelle (Breite, Höhe) und Fußpunkt im Bild; TIER_K: Größe eines Bildpunkts in Figureneinheiten.
-const TIER = {'schaf':[128,112,58.5,99],'kuh':[176,144,97.0,128],'huhn':[72,72,38.0,63],'hirsch':[176,176,81.5,156],'reh':[160,160,72.5,142],'ente':[80,64,41.5,56],'pferd':[224,192,105.5,171]};
+const TIER = {'schaf':[128,112,58.5,99],'kuh':[176,144,97.0,128],'huhn':[72,72,38.0,63],'hirsch':[176,176,81.5,156],'reh':[160,160,72.5,142],'ente':[80,64,41.5,56],'pferd':[224,192,105.5,171],'klepper':[224,192,105.5,171],'packpferd':[224,192,105.5,171],'schlachtross':[224,192,105.5,171]};
 // Maßstab je Tier, aus der Höhe im Bild und der echten Größe (Schaf 0,9 m, Kuh 1,5 m, Hirsch mit Geweih 2 m, Reh 1,1 m, Huhn 0,45 m, Ente 0,3 m)
-const TIER_K = {'schaf':0.1783,'kuh':0.2327,'huhn':0.1233,'hirsch':0.3193,'reh':0.1723,'ente':0.141,'pferd':0.2616};
+const TIER_K = {'schaf':0.1783,'kuh':0.2327,'huhn':0.1233,'hirsch':0.3193,'reh':0.1723,'ente':0.141,'pferd':0.2616,'klepper':0.24,'packpferd':0.2616,'schlachtross':0.28};
 // Spalte und Zeile malen; flip spiegelt. Beim Herauszoomen die passende verkleinerte Stufe des Bogens.
-function drawTierCell(c, kind, col, row, flip) {
-  const T = TIER[kind], spr = T && ART[`tier_${kind}`] ? figSprite(`tier_${kind}`, '#808080') : null;
+function drawTierCell(c, kind, col, row, flip, color = '#808080') {
+  const T = TIER[kind], spr = T && ART[`tier_${kind}`] ? figSprite(`tier_${kind}`, color) : null;
   if (!spr) return false;
   const [cw, ch, ax, ay] = T, K = TIER_K[kind] || 0.2, t = c.getTransform(), on = Math.hypot(t.a, t.b) * K;
   const lv = Math.max(0, Math.min(spr.mips.length - 1, Math.floor(Math.log2(1 / Math.max(on, 1e-3)))));
@@ -4357,12 +4504,14 @@ function drawAnimal(c, a, x, y) {
   if (TIER[a.kind] && ART[`tier_${a.kind}`]) {
     const { row, flip } = tierView(a);
     const graze = !a.moving && Math.sin(G.time * (a.kind === 'huhn' ? 5 : 0.8) + a.v * 12) > (a.kind === 'huhn' ? 0.5 : 0.2);
-    const run = a.moving && a.flee > 0 && (a.kind === 'hirsch' || a.kind === 'reh' || a.kind === 'pferd');
+    const run = a.moving && a.flee > 0 && (a.kind === 'hirsch' || a.kind === 'reh' || TIER_K[a.kind] >= 0.24);
     const col = run ? 4 : a.moving ? 1 + (Math.floor(a.anim * (a.flee > 0 ? 9 : 4.5)) % 2) : graze ? 3 : 0;
     const bob = a.kind === 'ente' ? Math.sin(G.time * 2 + a.v * 10) * 0.5 : 0;
     if (a.kind === 'ente') { c.strokeStyle = 'rgba(255,255,255,0.4)'; c.lineWidth = 0.8; c.beginPath(); c.ellipse(0, 0.5, 5.5, 1.8, 0, 0, Math.PI * 2); c.stroke(); }
     c.translate(0, bob);
-    drawTierCell(c, a.kind, col, row, flip);
+    // Das Schlachtross trägt die Farbe des Burgherrn auf der Schabracke
+    const lord = a.kind === 'schlachtross' ? siteColor(G.world.sites.find((s) => s.id === a.site)) : null;
+    drawTierCell(c, a.kind, col, row, flip, lord || '#808080');
     if (a.flash > 0) { c.globalAlpha = Math.min(1, a.flash * 5); c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(0, -6, 7, 5, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; }
     c.restore();
     return;
@@ -4714,7 +4863,8 @@ onArt((id) => {
   if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
   if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
-  if (id.startsWith('bau_') || id.startsWith('pal_')) { partCache.clear(); G.staticDirty = true; }
+  if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_')) { partCache.clear(); G.staticDirty = true; }
+  if (id.startsWith('york_bruecke')) chunkCache.clear();
 });
 
 export function zAt(x, y) { return G.world ? groundZ(G.world, x, y) : 0; }
