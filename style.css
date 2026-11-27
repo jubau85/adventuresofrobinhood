@@ -135,9 +135,10 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .narrow-only { display: none !important; }
 
 /* ---------------------------------------------------------------- Tafeln */
+/* Oben verankert: Titel und Reiter bleiben an derselben Stelle, wie hoch der Inhalt auch ist */
 #panel {
-  position: absolute; z-index: 10; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(980px, calc(100% - 24px)); max-height: calc(100% - 96px);
+  position: absolute; z-index: 10; left: 50%; top: 48px; transform: translateX(-50%);
+  width: min(980px, calc(100% - 24px)); max-height: calc(100% - 48px - 64px);
   display: flex; flex-direction: column;
   background: var(--parchment); color: var(--ink);
   background-image: radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.35), transparent 60%), radial-gradient(ellipse at 90% 100%, rgba(120,80,30,0.18), transparent 55%);
@@ -416,7 +417,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   #toolbar button { padding: 6px 8px; font-size: 13px; }
   #toolbar kbd { display: none; }
   .narrow-only { display: inline-flex !important; }
-  #panel { top: auto; bottom: 0; transform: translateX(-50%); width: 100%; max-height: calc(100% - 56px); border-radius: 8px 8px 0 0; }
+  #panel { top: 56px; bottom: 0; transform: translateX(-50%); width: 100%; max-height: none; border-radius: 8px 8px 0 0; }
   .panel-head, .tabs, .panel-body { padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
   .panel-body { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
   #panel-title { font-size: 23px; }
