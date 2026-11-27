@@ -4,8 +4,10 @@
 //   --fragment schreibt zusätzlich eine Fassung ohne <html>/<head>/<body>-Gerüst.
 //   --extern bettet Dateien unter diesen Ordnern in das Fragment nicht ein: Sie bleiben relative Pfade und müssen
 //            neben der Seite liegen (Liste in <fragment>.dateien.json). Die Einzeldatei in dist/ enthält immer alles.
+//   --desktop <ordner> schreibt die Fassung für die Desktop-App (desktop/): eine volle Seite, alle Bilder und Töne als
+//            Dateien daneben (kopiert), die Schriften lokal aus assets/schriften/ statt von Google Fonts.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, copyFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -105,4 +107,24 @@ if (fi > 0 && process.argv[fi + 1]) {
   const body = html2.match(/<body>([\s\S]*)<\/body>/)[1];
   writeFileSync(process.argv[fi + 1], `${head.trim()}\n${body.trim()}\n`);
   console.log(`Fragment: ${process.argv[fi + 1]}`);
+}
+
+// Desktop-Fassung: volle Seite, Dateien daneben, Schriften lokal
+const di = process.argv.indexOf('--desktop');
+if (di > 0 && process.argv[di + 1]) {
+  const dir = process.argv[di + 1];
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const fr = page(['assets/']);
+  let dhtml = fr.html.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>/, '<link rel="stylesheet" href="assets/schriften/schriften.css">');
+  writeFileSync(join(dir, 'index.html'), dhtml);
+  const files = new Set(fr.kept);
+  for (const f of readdirSync(join(ROOT, 'assets', 'schriften'))) files.add(`assets/schriften/${f}`);
+  let bytes = 0;
+  for (const f of files) {
+    mkdirSync(join(dir, dirname(f)), { recursive: true });
+    copyFileSync(join(ROOT, f), join(dir, f));
+    bytes += statSync(join(ROOT, f)).size;
+  }
+  console.log(`Desktop: ${join(dir, 'index.html')} (${(dhtml.length / 1024).toFixed(0)} KB) und ${files.size} Dateien (${(bytes / 1024 / 1024).toFixed(1)} MB)`);
 }

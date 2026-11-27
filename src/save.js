@@ -1,4 +1,5 @@
-// Speichern und Laden im Browser (localStorage). Die Welt wird aus dem Seed neu erzeugt.
+// Speichern und Laden: im Browser über localStorage, in der Desktop-App (desktop/) als Datei im Benutzerordner über die
+// Brücke window.ritterDesktop (dort später auch für die Steam Cloud). Die Welt wird aus dem Seed neu erzeugt.
 
 import { G } from './state.js';
 import { SAVE_KEY, SAVE_VERSION } from './data.js';
@@ -63,10 +64,22 @@ function pruneRemovedSites() {
   if (s.hanging && !ids.has(s.hanging.site)) s.hanging = null;
 }
 
+const desktopStore = () => (typeof window !== 'undefined' && window.ritterDesktop && window.ritterDesktop.saves) || null;
+function storeWrite(key, text) {
+  const d = desktopStore();
+  if (d) return d.write(key, text);
+  localStorage.setItem(key, text);
+  return true;
+}
+function storeRead(key) {
+  const d = desktopStore();
+  if (d) return d.read(key);
+  return localStorage.getItem(key);
+}
+
 export function saveGame() {
   try {
-    localStorage.setItem(SAVE_KEY, serialize());
-    return true;
+    return storeWrite(SAVE_KEY, serialize()) !== false;
   } catch (e) {
     return false;
   }
@@ -74,7 +87,7 @@ export function saveGame() {
 
 export function readSave() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = storeRead(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (data.v !== SAVE_VERSION) return null;
