@@ -3,6 +3,7 @@
 // aufs Feld, an den Amboss oder hinter den Marktstand, mittags ein Schwatz, abends nach Hause.
 
 import { G, homeName, log } from './state.js';
+import { siteColor } from './holdings.js';
 import { changeRep, addRenown } from './politics.js';
 import { T, PEASANT_TUNICS, HAIR, GOODS, FACTIONS } from './data.js';
 import { isWalkable, doorOf, freeNear } from './world.js';
@@ -50,7 +51,7 @@ function dress(role, site) {
     case 'priester': o.look = 'moench'; o.tunic = '#2e2a2c'; break;
     case 'wirt': o.apron = '#e8e0cc'; o.tunic = '#7a4a3a'; break;
     case 'kind': o.small = true; o.female = Math.random() < 0.5; break;
-    case 'wache': o.tunic = site.faction ? FACTIONS[site.faction].color : '#556b7d'; o.helm = true; o.tool = 'speer'; break;
+    case 'wache': o.tunic = siteColor(site) || '#556b7d'; o.helm = true; o.tool = 'speer'; break;
     case 'waldmann': case 'holzer': o.look = 'wald'; o.tunic = null; break;
     case 'jaeger': o.tunic = pick(['#4a5a2a', '#5a5a32', '#4e4a2c']); o.cap = '#3e4a22'; o.bow = true; break;
     case 'fischer': o.tunic = pick(['#5a6a7a', '#6a6a5a', '#4a5a6a']); o.hat = '#8a7a5a'; break;

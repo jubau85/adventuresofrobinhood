@@ -23,6 +23,10 @@ import { abandonedId } from './dynamics.js';
 import { homeGateClosed, homeSite } from './siege.js';
 import { drawCharge, drawKnightPlate } from './heraldry.js';
 import { drawShires } from './shires.js';
+import { siteColor } from './holdings.js';
+
+// Farbe eines Heeres: dein Aufgebot in deinen Farben, sonst die der Partei
+function armyColor(g) { return g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -1966,7 +1970,7 @@ function buildStaticParts() {
         }, box: [o.x - hw, o.x + hw, o.y - hw, o.y + hw], big: true });
       });
     }
-    if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, FACTIONS[s.faction].color));
+    if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, siteColor(s)));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
     if (s.cemetery) {
       const cm = s.cemetery;
@@ -4805,7 +4809,7 @@ export function render() {
   if (G.siege) {
     const sg = G.siege;
     if (sg.stage !== 'anmarsch') {
-      for (const t of sg.tents) if (inView(t.x, t.y)) objs.push({ d: t.x + t.y, z: zAt(t.x, t.y), f: (c) => drawTent(c, { x: t.x, y: t.y, wx: 0.9, wy: 0.9, color: FACTIONS[sg.army.faction].color }) });
+      for (const t of sg.tents) if (inView(t.x, t.y)) objs.push({ d: t.x + t.y, z: zAt(t.x, t.y), f: (c) => drawTent(c, { x: t.x, y: t.y, wx: 0.9, wy: 0.9, color: armyColor(sg.army) }) });
       if (inView(sg.tre.x, sg.tre.y)) objs.push({ d: sg.tre.x + sg.tre.y, z: zAt(sg.tre.x, sg.tre.y), f: (c) => drawTrebuchet(c, sg.tre) });
     }
     for (const sh of sg.shots) objs.push({ d: 1e6, z: 0, f: (c) => drawSiegeShot(c, sh) });
@@ -4908,7 +4912,7 @@ export function render() {
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = 'rgba(28,20,14,0.72)';
     ctx.fillRect(sp.x - tw / 2 - 10, yy - 14, tw + 20, 20);
-    ctx.fillStyle = s.faction ? FACTIONS[s.faction].color : '#d6ad4c';
+    ctx.fillStyle = siteColor(s) || '#d6ad4c';
     ctx.fillRect(sp.x - tw / 2 - 10, yy + 5, tw + 20, 2);
     ctx.fillStyle = '#f3ead2';
     ctx.fillText(label, sp.x, yy);
@@ -5030,7 +5034,7 @@ export function drawMap(c, w, h, opts = {}) {
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);
-      c.fillStyle = FACTIONS[g.faction].color; c.strokeStyle = '#1d140c'; c.lineWidth = 1.5;
+      c.fillStyle = armyColor(g); c.strokeStyle = '#1d140c'; c.lineWidth = 1.5;
       c.beginPath(); c.arc(q.x, q.y, big ? 6 : 4.5, 0, Math.PI * 2); c.fill(); c.stroke();
       continue;
     }
@@ -5065,7 +5069,7 @@ export function drawMap(c, w, h, opts = {}) {
   for (const s of order) {
     const q = miniPos(s.x, s.y, v);
     if (q.x < -20 || q.y < -20 || q.x > w + 20 || q.y > h + 20) continue;
-    const col = abandonedId(s.id) ? '#7a7468' : s.faction ? FACTIONS[s.faction].color : '#ffd65a';
+    const col = abandonedId(s.id) ? '#7a7468' : siteColor(s) || '#ffd65a';
     const r = big ? (s.type === 'stadt' || s.type === 'spieler' ? 4.5 : 3.5) : 3;
     if (s.type === 'einsiedelei') {
       // Mystischer Ort: kleiner heller Stern

@@ -14,6 +14,7 @@ import { dailyTourney } from './tournament.js';
 import { dailyJustice } from './justice.js';
 import { passWeather } from './weather.js';
 import { dailyMines } from './mines.js';
+import { dailyHoldings } from './holdings.js';
 
 export function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
@@ -63,6 +64,7 @@ function newDay() {
   G.s.day++;
   dailyEconomy();
   dailyCastle();
+  dailyHoldings();
   dailyQuests();
   maintainGroups();
   replenishAnimals();

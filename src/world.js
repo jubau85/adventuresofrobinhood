@@ -144,6 +144,8 @@ function blockTiles(W, arr, list) {
   }
 }
 
+// Nach einem Ausbau fremder Burgen (holdings.js): Mauern und Bergfriede neu als Hindernis eintragen
+export function rebuildStaticWalls(W) { buildStaticWalls(W); }
 function buildStaticWalls(W) {
   W.wallStatic = new Uint8Array(W.N * W.N);
   markWalls(W, W.wallStatic);

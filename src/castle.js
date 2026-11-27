@@ -11,7 +11,8 @@ import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
 import { startSiege, homeGateClosed } from './siege.js';
 import { cheatOn } from './cheats.js';
-import { shireIncome, shireGoods, shireDef, shireRenown, ownsHomeShire } from './shires.js';
+import { SHIRES, ownedShires, shireGoods, shireDef, shireRenown, ownsHomeShire } from './shires.js';
+import { holdingIncome, holdingCosts, holdingGoods } from './holdings.js';
 import { CASTLE_TYPES, OUTER_ONLY, STACKABLE, castleType, ringR, plotLayout } from './plots.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
@@ -439,11 +440,12 @@ export function dailyBalance() {
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   const mills = workingPlots('felder').filter((w) => w.lv >= 3).length;
   if (mills) income.push([mills > 1 ? `Mahlgeld der ${mills} Windmühlen` : 'Mahlgeld der Windmühle', 10 * mills]);
-  // Eigene Grafschaften: Abgaben ihrer Orte
-  income.push(...shireIncome());
+  // Eigene Grafschaften: Abgaben ihrer Orte, abzüglich dessen, was die Kastellane für ihre Burgen behalten
+  for (const id of ownedShires()) income.push([`Abgaben ${SHIRES[id].name}`, holdingIncome(id)]);
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
+  costs.push(...holdingCosts());
   // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
   if (!isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
   // Erträge aller arbeitenden Gebäude zusammen (mehrere Holzfäller liefern mehrfach); vor der Mauer ruht bei
@@ -460,6 +462,8 @@ export function dailyBalance() {
   if (season === 3) { prod.holz = Math.floor(prod.holz / 2); prod.stein = Math.floor(prod.stein / 2); prod.wolle = Math.floor(prod.wolle / 2); }
   // Vorzüge eigener Grafschaften (Wolle aus dem West Riding, Caen-Stein …)
   for (const [g, n] of Object.entries(shireGoods())) prod[g] = (prod[g] || 0) + n;
+  // Holz aus den Forsten eroberter Grafschaften (Vorgabe „Holz erzeugen“)
+  for (const [g, n] of Object.entries(holdingGoods())) prod[g] = (prod[g] || 0) + n;
   // Verpflegung: was fehlt, kaufen die Knechte teuer zu
   const need = foodNeed();
   const avail = foodStock() + prod.getreide + prod.fleisch;
@@ -478,6 +482,9 @@ export function dailyCastle() {
   if (fame) addRenown(fame);
   const costOf = (name) => (bal.costs.find(([n]) => n === name) || [0, 0])[1];
   const wages = costOf('Sold'), tax = costOf('Abgaben an den Vogt');
+  // Lohn der Burgvögte in eroberten Burgen ohne Kastellan
+  const stewards = bal.costs.filter(([n]) => n.startsWith('Burgvogt')).reduce((a, [, v]) => a + v, 0);
+  if (stewards) G.s.gold = Math.max(0, G.s.gold - stewards);
   if (tax) {
     if (G.s.gold >= tax) G.s.gold -= tax;
     else { G.s.gold = 0; log('Du kannst die Abgaben nicht zahlen. Der Vogt ist verärgert.', 'bad'); changeRep('normannen', -4); }
@@ -546,6 +553,7 @@ export function dailyCastle() {
   const parts = [`+${inc} Gold`];
   if (tax) parts.push(`−${tax} Abgaben`);
   if (wages) parts.push(`−${wages} Sold`);
+  if (stewards) parts.push(`−${stewards} Burgvögte`);
   for (const [k, v] of Object.entries(bal.prod)) if (v) parts.push(`+${v} ${GOODS[k].name}`);
   parts.push(`${eaten + bought} Rationen gegessen${bought ? ` (${bought} zugekauft)` : ''}`);
   log(`Tag ${G.s.day} in ${homeName()}: ${parts.join(', ')}.`);

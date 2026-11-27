@@ -232,6 +232,11 @@ export const GROUP_TYPES = {
     gold: [300, 520], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['fr', 'fl', 'nd'],
     kill: { normannen: -14, franken: 12 },
   },
+  // Dein eigenes Aufgebot vor einer Grafschaftsburg (holdings.js); die Männer stellt startOwnSiege zusammen
+  heer_spieler: {
+    name: 'Dein Aufgebot', nom: 'Dein Aufgebot', acc: 'dein Aufgebot', pl: false, faction: null, army: true, own: true,
+    members: [['soeldner', 1, 1]], gold: [0, 0], renown: 0, count: 0, spawn: 'army', speed: 1.05,
+  },
   // Besatzung einer belagerten Burg oder Stadt (Fraktion wird beim Aufstellen gesetzt)
   verteidiger: {
     name: 'Besatzung', nom: 'Die Besatzung', acc: 'die Besatzung', pl: false, faction: null, defender: true,

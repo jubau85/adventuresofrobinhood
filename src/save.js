@@ -10,7 +10,7 @@ function unitData(u) {
   return {
     id: u.id, kind: u.kind, name: u.name, cls: u.cls, level: u.level, xp: u.xp, eq: { ...u.eq },
     hp: Math.round(u.hp), x: u.x, y: u.y, mounted: u.mounted, status: u.status, woundedDays: u.woundedDays,
-    wage: u.wage, cost: u.cost, look: u.look, npcType: u.npcType, female: u.female, tunic: u.tunic, hair: u.hair,
+    wage: u.wage, cost: u.cost, look: u.look, npcType: u.npcType, female: u.female, tunic: u.tunic, hair: u.hair, seat: u.seat,
   };
 }
 

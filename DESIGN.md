@@ -92,11 +92,21 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   sie müssen wieder aufgebaut werden. Innen läuft alles weiter.
 - Unterhalt je Gebäude und sinkende Marktpreise halten das Spezialisieren im Zaum.
 
-### Phase 3: Erobern und Halten
-- Eigene Belagerungen feindlicher Burgen mit Gefolge, Garnison und Söldnern; die Burg wechselt samt Grafschaft.
-- Eroberte Burgen baut man selbst aus oder setzt einen Kastellan ein, auch einen eigenen Gefolgsmann, mit einer
-  Vorgabe („zur Holzburg ausbauen“, „Holz erzeugen“, „Verteidigung“, „ausgewogen“).
-- Gegenangriffe der früheren Herren.
+### Phase 3: Erobern und Halten (umgesetzt)
+- Eigene Belagerung jeder Grafschaftsburg (ab Ruhm 15): ein Aufgebot aus 12, 20 oder 30 Söldnern (je 25 Gold) und
+  Belagerungsgerät (150 Gold), dazu das Gefolge und Hilfe von Verbündeten, die mit den Herren der Burg verfeindet
+  sind (Sachsen, Waldleute, Franzosen). Sturm auf dein Zeichen im Feldlager, sonst nach vier Minuten. Ansehen bei den
+  Herren −25 beim Aufbruch, −15 beim Fall; ihre Feinde +4 und +6. Die Burg wechselt samt Grafschaft, die
+  überlebenden Söldner bleiben als Besatzung (4 bis 30).
+- Eroberte Burgen führt ein Kastellan: ein eigener Gefolgsmann (100 % plus 10 % je Stufe, höchstens 180 %) oder ein
+  gedungener Burgvogt (70 %, 6 Gold am Tag). Vorgaben und was der Kastellan von den Abgaben behält:
+  ausgewogen (25 %, Besatzung bis 12), Burg ausbauen (70 %), Holz erzeugen (25 %, 12 Holz am Tag nach Hause),
+  Verteidigung (50 %, Besatzung bis 30, +15). Ausbau in Stufen: Graben, Wehrgang, Torhaus und zuletzt ein Donjon,
+  der eine Steinburg sichtbar zur Festung macht. Selbst Hand anlegen: Schäden sofort ausbessern, fünf Mann anwerben,
+  einen Bauabschnitt bezahlen.
+- Gegenangriffe der früheren Herren: frühestens sieben Tage nach dem letzten, etwa 7 % am Tag (13 %, wenn sie dich
+  hassen). In deiner Nähe eine echte Belagerung mit deiner Besatzung in deinen Farben, sonst Verteidigung gegen
+  45 + 2 je Tag. Fällt die Burg, geht die Grafschaft zurück, der Kastellan kommt verwundet heim. Der Ausbau bleibt.
 
 ### Phase 4: Gefolgsleute auf Reisen
 - Aufträge an Gefolgsleute abgeben: Botengänge, Geleit, Lieferungen.

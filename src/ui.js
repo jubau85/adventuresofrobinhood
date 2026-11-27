@@ -27,7 +27,12 @@ import {
   canRaid, raidBlock, raidable, startRaid, isBlighted, isAbandoned, canDonate, donate, donateCost, atone, atoneCost, siteHouses, underConstruction, standing,
 } from './dynamics.js';
 import { tourneyAt, canJoin, joinTourney } from './tournament.js';
-import { siegeAt, siegeStatus, sideBlock, sideOffer, joinSiege, canCallStorm, callStorm, hasHomeGate, homeGateClosed, setHomeGate } from './siege.js';
+import { siegeAt, siegeStatus, sideBlock, sideOffer, joinSiege, canCallStorm, callStorm, hasHomeGate, homeGateClosed, setHomeGate, abortOwnSiege } from './siege.js';
+import {
+  holdingOf, isHeld, isOwnSite, heldSites, ORDERS, ORDER_IDS, WORKS, castellanOf, holdingEff, worksDone, nextWork, holdingDefense, holdingIncome,
+  setHoldingOrder, appointCastellan, recallCastellan, repairCostHolding, repairHolding, RECRUIT, recruitHolding, workCost, payWork,
+  LEVIES, levyCost, SIEGE_GEAR, MERC_COST, siegeHelpers, besiegeBlock, startOwnSiege, counterStrength, holdingLine,
+} from './holdings.js';
 import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
@@ -194,6 +199,7 @@ function townPanel() {
   const site = G.ui.arg;
   if (site.type === 'einsiedelei') return hermitPanel(site);
   if (isAbandoned(site)) return abandonedPanel(site);
+  if (isHeld(site)) return holdingPanel(site);
   if (siegeAt(site) && G.siege.stage !== 'anmarsch') return siegePanel();
   const f = site.faction;
   const town = G.s.towns[site.id];
@@ -202,7 +208,7 @@ function townPanel() {
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
-      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${letterActions(site, 'den Herrn der Stadt; die Torwache reicht ihn weiter, auch wenn sie dich nicht einlässt')}${siegeAt(site) ? siegeActions() : ''}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
+      body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${letterActions(site, 'den Herrn der Stadt; die Torwache reicht ihn weiter, auch wenn sie dich nicht einlässt')}${siegeAt(site) ? siegeActions() : ''}${besiegeActions(site)}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
     };
   }
   const tabs = [['info', 'Übersicht'], ['markt', 'Markt'], ['waren', 'Ausrüster'], ['auftraege', `Aufträge (${town.quests.length + relevantQuests(site).length})`]];
@@ -231,6 +237,7 @@ function townInfo(site) {
     <div class="actions">
       ${letterActions(site)}
       ${siegeAt(site) ? siegeActions() : ''}
+      ${besiegeActions(site)}
       <h3>Am Hof</h3>
       <div class="action"><div><b>Geschenk an den Herrn</b><p>Ein Fass Wein, ein Ballen Tuch. Ansehen ${esc(beiFaction(f))} +3 bis +5, ihre Rivalen sehen das weniger gern. Einmal am Tag.</p></div><button class="btn" data-act="gift" ${G.s.towns[site.id].giftDay === G.s.day ? 'disabled' : ''}>${fmt(giftCost(site))} Gold</button></div>
       <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
@@ -241,6 +248,84 @@ function townInfo(site) {
       ${harbourActions(site)}
       ${blightActions(site)}
       ${raidAction(site)}
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- Erobern und Halten (holdings.js)
+// Vor einer Grafschaftsburg: ein Aufgebot zusammenrufen und belagern
+function garrisonGuess() { return Math.round(10 + 8 * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6)); }
+function besiegeActions(site) {
+  if (site.type !== 'burg' || !SHIRES[site.id] || isHeld(site) || siegeAt(site)) return '';
+  const why = besiegeBlock(site), helpers = siegeHelpers(site), sh = SHIRES[site.id], fs = FACTIONS[site.faction].short;
+  const home = site.id === HOME_SHIRE;
+  const help = helpers.length ? ` Deine Verbündeten schicken Männer: ${helpers.map((h) => `${h.n} ${esc(FACTIONS[h.f].short)}`).join(', ')}.` : '';
+  return `<h3>Burg belagern</h3>
+    <div class="notice${home ? ' good' : ''}">
+      ${home ? `<p><b>Hier sitzt Prinz Johns Vogt.</b> Pontefract ist der Sitz deiner Grafschaft. Nimmst du die Burg, gehört dir das ${esc(sh.name)} wieder, und die Abgaben an den Vogt entfallen.</p>` : ''}
+      <p>Mit einem Aufgebot aus Söldnern und deinem Gefolge ziehst du vor ${esc(site.name)}.${help} Das Trebuchet bricht eine Bresche in die Mauer, auf dein Zeichen wird gestürmt. Die Besatzung zählt rund ${garrisonGuess()} Mann.</p>
+      <p>Fällt die Burg, gehören dir Burg und Grafschaft <b>${esc(sh.name)}</b> mit ${fmt(shireTax(site.id))} Gold Abgaben am Tag. ${esc(sh.text)} Die überlebenden Söldner bleiben als Besatzung. Ansehen bei den ${esc(fs)} −25 sofort und −15 beim Fall, ihre Feinde freut es.</p>
+      ${why ? `<p class="muted">${esc(why)}</p>` : ''}
+    </div>
+    ${LEVIES.map((l) => `<div class="action"><div><b>${esc(l.name)}: ${l.n} Söldner</b><p>Handgeld für ${l.n} Mann (je ${MERC_COST} Gold) und das Belagerungsgerät mit Trebuchet (${SIEGE_GEAR} Gold).</p></div><button class="btn danger" data-act="besiege" data-n="${l.n}" ${besiegeBlock(site, l.n) ? 'disabled' : ''}>${fmt(levyCost(l.n))} Gold</button></div>`).join('')}`;
+}
+
+// Eine eroberte Burg: Kastellan, Vorgabe, Besatzung, Ausbau
+function holdingPanel(site) {
+  const h = holdingOf(site), sh = SHIRES[site.id];
+  const tabs = [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
+  if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'info';
+  let body = '';
+  if (G.ui.tab === 'info') body = holdingInfo(site, h);
+  if (G.ui.tab === 'markt') body = marketTable(site);
+  if (G.ui.tab === 'waren') body = shopView(site);
+  return { title: site.name, sub: `Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · erobert an Tag ${h.since}`, tabs, body };
+}
+function holdingInfo(site, h) {
+  const sh = SHIRES[site.id], c = castellanOf(h), eff = holdingEff(h), from = h.from;
+  const nw = nextWork(h), done = worksDone(h);
+  const sg = siegeAt(site);
+  const besieged = sg ? `<div class="notice bad"><p><b>${esc(site.name)} wird belagert!</b> ${esc(siegeStageText(sg))} Die Besatzung hält ${sg.def ? `mit ${sg.def.members.length} Mann ` : ''}die Mauer. Am Tor lassen dich deine Wachen durch die Pforte ein (E).</p></div>` : '';
+  const who = c ? `<div class="notice good"><p><b>${esc(c.name)}</b> (${esc(CLASSES[c.cls].name)}, Stufe ${c.level}) ist Kastellan und führt die Burg mit ${Math.round(eff * 100)} % der Kraft. Mit jedem Tag lernt er dazu.</p></div><div class="action"><div><b>Kastellan abberufen</b><p>Ein gedungener Burgvogt übernimmt (${Math.round(holdingEff({}) * 100)} %, 6 Gold am Tag).</p></div><button class="btn" data-act="hrecall">Abberufen</button></div>`
+    : `<div class="notice"><p>Ein gedungener Burgvogt führt die Geschäfte, mehr schlecht als recht: ${Math.round(eff * 100)} % der Kraft, 6 Gold Lohn am Tag. Ein eigener Gefolgsmann macht es besser, und je erfahrener er ist, desto mehr.</p></div>`;
+  const party = partyMembers();
+  const cand = party.length ? party.map((u) => `<div class="action"><div><b>${esc(u.name)}</b><p>${esc(CLASSES[u.cls].name)} · Stufe ${u.level}: führt die Burg mit ${Math.min(180, Math.round((1 + (u.level - 1) * 0.1) * 100))} %, verlässt dafür dein Gefolge.</p></div><button class="btn" data-act="hcast" data-u="${u.id}">${c ? 'Statt dessen einsetzen' : 'Als Kastellan einsetzen'}</button></div>`).join('')
+    : '<p class="muted">Niemand aus deinem Gefolge ist bei dir, den du einsetzen könntest.</p>';
+  const orders = ORDER_IDS.map((id) => {
+    const o = ORDERS[id], cur = h.order === id;
+    const share = Math.round((1 - o.keep) * 100);
+    const extra = o.wood ? ` Täglich etwa ${Math.round(o.wood * eff)} Holz.` : '';
+    return `<div class="action${cur ? ' current' : ''}"><div><b>${esc(o.name)}${cur ? ' · gilt jetzt' : ''}</b><p>${esc(o.text)}${extra} An dich gehen ${share} % der Abgaben.</p></div><button class="btn${cur ? '' : ' primary'}" data-act="horder" data-o="${id}" ${cur ? 'disabled' : ''}>${cur ? 'Gewählt' : 'Vorgeben'}</button></div>`;
+  }).join('');
+  const rc = repairCostHolding(h), wc = workCost(h);
+  return `${besieged}<div class="cols">
+    <div>
+      <p class="lede">Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}</p>
+      <dl class="facts">
+        <dt>Grafschaft</dt><dd>${esc(sh.name)}: ${esc(sh.text)}</dd>
+        <dt>Abgaben</dt><dd>${fmt(shireTax(site.id))} Gold am Tag, davon an dich ${fmt(holdingIncome(site.id))}</dd>
+        <dt>Besatzung</dt><dd>${h.garrison} Mann${h.garrison < ORDERS[h.order].cap ? `, der Kastellan wirbt bis ${ORDERS[h.order].cap} nach` : ''}</dd>
+        <dt>Zustand</dt><dd>${h.dmg > 0 ? `<span class="warn">Schäden ${Math.round(h.dmg * 100)} %</span>, wird ausgebessert` : 'unversehrt'}</dd>
+        <dt>Burg</dt><dd>${h.level >= 3 ? 'Festung' : 'Steinburg'}${done.length ? ` mit ${done.map((w) => esc(w.name)).join(', ')}` : ''}</dd>
+        <dt>Im Bau</dt><dd>${nw ? `${esc(nw.name)}: ${Math.floor(h.progress)} von ${nw.need}${ORDERS[h.order].works ? '' : ' (ruht bei dieser Vorgabe)'}` : 'Alles fertig gebaut.'}</dd>
+        <dt>Verteidigung</dt><dd><b>${holdingDefense(h)}</b> · Angriffe rechnen derzeit mit rund ${Math.round(counterStrength())}</dd>
+        ${from ? `<dt>Frühere Herren</dt><dd>${swatch(from)}${esc(FACTIONS[from].name)} · ${repPill(from)}</dd>` : ''}
+      </dl>
+    </div>
+    <div class="actions">
+      <h3>Kastellan</h3>
+      ${who}
+      ${cand}
+      <h3>Vorgabe</h3>
+      ${orders}
+      <h3>Selbst Hand anlegen</h3>
+      ${h.dmg > 0 ? `<div class="action"><div><b>Sofort instand setzen</b><p>Zimmerleute und Maurer aus der Stadt beheben alle Schäden auf einmal.</p></div><button class="btn" data-act="hrepair" ${G.s.gold < rc ? 'disabled' : ''}>${fmt(rc)} Gold</button></div>` : ''}
+      <div class="action"><div><b>Besatzung verstärken</b><p>${RECRUIT.n} Söldner ziehen gleich ein (höchstens ${RECRUIT.max} Mann).</p></div><button class="btn" data-act="hrecruit" ${G.s.gold < RECRUIT.cost || h.garrison >= RECRUIT.max ? 'disabled' : ''}>${fmt(RECRUIT.cost)} Gold</button></div>
+      ${nw ? `<div class="action"><div><b>${esc(nw.name)} bezahlen</b><p>${esc(nw.text)} +${nw.def} Verteidigung.${h.dmg > 0 ? ' Erst müssen die Schäden behoben sein.' : ''}</p></div><button class="btn" data-act="hwork" ${G.s.gold < wc || h.dmg > 0 ? 'disabled' : ''}>${fmt(wc)} Gold</button></div>` : ''}
+      <h3>Am Ort</h3>
+      <div class="action"><div><b>Rasten</b><p>Vier Stunden ausruhen. Du und dein Gefolge kommen wieder zu Kräften.</p></div><button class="btn" data-act="rest">Rasten</button></div>
+      ${tavernAction(site)}
+      ${harbourActions(site)}
     </div>
   </div>`;
 }
@@ -320,6 +405,25 @@ function siegePanel() {
   if (!sg) return { title: 'Belagerung', tabs: [], body: '<div class="notice"><p>Die Belagerung ist vorbei.</p></div>' };
   const s = sg.site, off = sideOffer();
   const inside = G.ui.panel === 'town';
+  if (sg.lead) {
+    const allies = sg.army.members.filter((m) => m.ally).length;
+    return {
+      title: `Deine Belagerung von ${s.name}`,
+      sub: `${ownerSwatch('spieler')}Dein Aufgebot gegen ${swatch(s.faction)}${esc(s.name)}`,
+      tabs: [],
+      body: `<div class="cols">
+        <div>
+          <p class="lede">Dein Feldlager vor ${esc(s.name)}: Zelte, Feuer und das Knarren des Trebuchets. ${esc(sg.stage === 'anmarsch' ? 'Dein Aufgebot ist noch auf dem Weg ins Lager.' : siegeStageText(sg))}</p>
+          <dl class="facts">
+            <dt>Dein Aufgebot</dt><dd><b>${st.att}</b> Mann${allies ? `, davon ${allies} von deinen Verbündeten` : ''}</dd>
+            <dt>Besatzung</dt><dd>${swatch(s.faction)}${sg.def ? `<b>${st.def}</b> Mann` : 'hinter den Mauern'} · ${repPill(s.faction)}</dd>
+            <dt>Zu gewinnen</dt><dd>Burg und Grafschaft ${esc(SHIRES[s.id] ? SHIRES[s.id].name : '')}</dd>
+          </dl>
+        </div>
+        <div class="actions">${siegeActions()}</div>
+      </div>`,
+    };
+  }
   return {
     title: `Belagerung von ${st.name}`,
     sub: `${swatch(off.fa)}${esc(st.army)} gegen ${swatch(off.fs)}${esc(s.name)}`,
@@ -339,7 +443,15 @@ function siegePanel() {
 
 function siegeActions() {
   const sg = G.siege;
-  if (!sg || sg.site.type === 'spieler') return '';
+  if (!sg || isOwnSite(sg.site)) return '';
+  if (sg.lead) {
+    const s = sg.site;
+    const storm = canCallStorm() ? `<div class="action"><div><b>Zum Sturm blasen</b><p>${sg.walls && !sg.walls.st.open ? 'Die Mauer hält noch. Auf dein Zeichen wirft das Trebuchet ohne Pause, und sobald die Bresche offen ist, stürmen alle.' : 'Die Bresche ist offen. Auf dein Zeichen stürmt das ganze Aufgebot.'}</p></div><button class="btn danger" data-act="ssturm">Sturm!</button></div>`
+      : sg.stage === 'sturm' ? '<div class="notice bad"><p>Der Sturm läuft! Kämpf mit an der Bresche. Ist die Besatzung auf ein Viertel geschmolzen, streckt sie die Waffen.</p></div>'
+        : sg.storm ? '<div class="notice"><p>Das Trebuchet wirft ohne Pause. Sobald die Bresche offen ist, stürmen alle.</p></div>' : '';
+    return `<h3>Deine Belagerung</h3><div class="notice good"><p>Du führst das Aufgebot vor ${esc(s.name)}. Das Trebuchet bricht eine Bresche in die Mauer. Gib das Zeichen zum Sturm, wenn du bereit bist; nach vier Minuten stürmen die Söldner von selbst. Entfernst du dich weit, entscheidet sich die Belagerung ohne dich.</p></div>${storm}
+      <div class="action"><div><b>Belagerung aufgeben</b><p>Die Söldner ziehen ab, das Handgeld ist fort.</p></div><button class="btn" data-act="sabort">Aufgeben</button></div>`;
+  }
   const s = sg.site, off = sideOffer(), fa = FACTIONS[off.fa].short, fs = FACTIONS[off.fs].short;
   if (sg.side) {
     const storm = canCallStorm() ? `<div class="action"><div><b>Zum Sturm blasen</b><p>${sg.walls && !sg.walls.st.open ? 'Die Mauer hält noch. Auf dein Zeichen wirft das Trebuchet ohne Pause, und sobald die Bresche offen ist, stürmen alle.' : 'Der Hauptmann wartet auf dein Zeichen. Dann stürmen alle durch die Bresche.'}</p></div><button class="btn danger" data-act="ssturm">Sturm!</button></div>` : '';
@@ -712,13 +824,15 @@ function selectedUnit() {
 function rosterButton(u) {
   const sel = selectedUnit() === u;
   const hp = Math.round((u.hp / u.st.maxHp) * 100);
-  return `<button class="ros${sel ? ' sel' : ''}" data-act="sel" data-u="${u.id}"><b>${esc(u.name)}</b><span>${CLASSES[u.cls].name} · St. ${u.level}${u.status === 'verwundet' ? ` · verwundet (${u.woundedDays} T.)` : ` · ${hp} %`}</span></button>`;
+  const where = u.status === 'kastellan' ? ` · Kastellan in ${esc((siteById(u.seat) || {}).name || '?')}` : u.status === 'verwundet' ? ` · verwundet (${u.woundedDays} T.)` : ` · ${hp} %`;
+  return `<button class="ros${sel ? ' sel' : ''}" data-act="sel" data-u="${u.id}"><b>${esc(u.name)}</b><span>${CLASSES[u.cls].name} · St. ${u.level}${where}</span></button>`;
 }
 
 function partyView(atCastle) {
   const party = partyMembers();
   const gar = G.s.companions.filter((c) => c.status === 'garnison');
   const wnd = G.s.companions.filter((c) => c.status === 'verwundet');
+  const cas = G.s.companions.filter((c) => c.status === 'kastellan');
   const u = selectedUnit();
   const isPlayer = u.kind === 'player';
   const slots = SLOTS.map((s) => {
@@ -736,7 +850,8 @@ function partyView(atCastle) {
   let moves = '';
   if (!isPlayer) {
     if (u.status === 'party') moves = '<button class="btn" data-act="status" data-s="garnison">In die Garnison schicken</button>';
-    if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : '<span class="muted">Ins Gefolge holen kannst du sie nur in ${esc(homeName())}.</span>';
+    if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : `<span class="muted">Ins Gefolge holen kannst du sie nur in ${esc(homeName())}.</span>`;
+    if (u.status === 'kastellan') moves = `<span class="muted">Abberufen kannst du den Kastellan in seiner Burg ${esc((siteById(u.seat) || {}).name || '')}.</span>`;
     moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
   }
   const xp = `${u.xp}/${xpNeeded(u.level)} EP`;
@@ -746,6 +861,7 @@ function partyView(atCastle) {
       ${rosterButton(G.s.player)}${party.map(rosterButton).join('')}
       ${gar.length ? `<h4>Garnison</h4>${gar.map(rosterButton).join('')}` : ''}
       ${wnd.length ? `<h4>Verwundet</h4>${wnd.map(rosterButton).join('')}` : ''}
+      ${cas.length ? `<h4>Kastellane</h4>${cas.map(rosterButton).join('')}` : ''}
     </aside>
     <div class="detail">
       <header><h3>${esc(u.name)}</h3><span class="muted">${CLASSES[u.cls].name} · Stufe ${u.level} · ${xp}${u.wage ? ` · Sold ${u.wage}/Tag` : ''}</span></header>
@@ -810,7 +926,7 @@ function eventTargets() {
   const sg = G.siege;
   if (sg) {
     const st = siegeStatus();
-    const own = sg.site.type === 'spieler';
+    const own = isOwnSite(sg.site);
     const t = own || sg.stage === 'anmarsch' ? { x: sg.site.x, y: sg.site.y + 1 } : { x: sg.camp.x, y: sg.camp.y + 1.5 };
     out.push({ k: 'siege', t, camp: !own && sg.stage !== 'anmarsch', text: `<b>Belagerung von ${esc(st.name)}</b> (${{ anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage]}), ${dirText(p, sg.site)}` });
   }
@@ -841,6 +957,7 @@ function shireCard(id, withSeat = false) {
     <div class="shire-head"><b>${esc(sh.name)}</b>${withSeat && seat ? `<span class="muted">Sitz: ${esc(seat.name)}</span>` : ''}<span>${ownerSwatch(own)}Herr: ${esc(ownerName(own))}</span></div>
     <p>${esc(sh.text)}</p>
     <p class="muted">Orte: ${placeList}. Abgaben für den Herrn: ${shireTax(id)} Gold am Tag.</p>
+    ${seat && isHeld(seat) ? `<p class="goal">${esc(seat.name)}: ${esc(holdingLine(seat))}</p>` : ''}
     ${home && own !== 'spieler' ? `<p class="goal">Dein Erbe ${esc(homeName())} liegt in dieser Grafschaft. Erobere ${esc(seat ? seat.name : 'den Sitz')} zurück, dann gehört das West Riding dir.</p>` : ''}
   </div>`;
 }
@@ -1047,6 +1164,8 @@ function helpPanel() {
         <li>Ab und zu ziehen zwei <b>Heere</b> heran und schlagen sich. Du kannst zusehen oder eingreifen: Wer ein Heer zerschlägt, gewinnt viel Ruhm und die Gunst der Gegenseite. Bei <b>Belagerungen</b> schließen sich die Tore, die Besatzung bezieht Stellung hinter der Mauer, und das Trebuchet schlägt eine <b>Bresche</b>. Durch sie stürmen die Angreifer. Danach bauen die Bewohner wieder auf, und die Toten werden auf dem Friedhof begraben. Sind dir Normannen oder Sachsen feindlich, ziehen sie auch gegen deine Burg. Durch die <b>Pforte</b> am Tor (<kbd>E</kbd>) kommst du hinein.</li>
         <li>Ab der Holzburg kannst du das <b>Burgtor</b> selbst schließen: in der Burgtafel unter Ausbau oder mit <kbd>B</kbd> in der Nähe der Burg. Geschlossen gibt es +10 Verteidigung, aber kein Marktgeld. Du selbst gehst durch die Pforte, ein Klick aufs Ziel genügt.</li>
         <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (durch die Pforte hinein, gemeinsam die Bresche halten, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
+        <li><b>Burgen erobern:</b> Vor jeder Grafschaftsburg kannst du ein <b>Aufgebot</b> zusammenrufen (ab Ruhm 15): 12, 20 oder 30 Söldner mit Trebuchet, dazu dein Gefolge und Männer deiner Verbündeten, wenn sie mit den Herren der Burg verfeindet sind. Im Feldlager gibst du das Zeichen zum Sturm. Fällt die Burg, gehören dir Burg und Grafschaft, und die überlebenden Söldner bleiben als Besatzung. Zuerst wohl <b>Pontefract</b>: Dann gehört dir das West Riding, und der Vogt verlangt nichts mehr.</li>
+        <li><b>Eroberte Burgen halten:</b> Setz einen Gefolgsmann als <b>Kastellan</b> ein (sonst führt ein gedungener Burgvogt die Burg, schlechter und gegen Lohn) und gib ihm eine Vorgabe: <i>Ausgewogen</i>, <i>Burg ausbauen</i> (Graben, Wehrgang, Torhaus, zuletzt ein Donjon, der die Burg zur Festung macht), <i>Holz erzeugen</i> (Fuhren nach Hause) oder <i>Verteidigung</i> (bis 30 Mann). Die früheren Herren greifen von Zeit zu Zeit an, und ihre Heere werden stärker. Bist du in der Nähe, kommt es zur Belagerung, bei der du hilfst; sonst entscheiden Mauern, Besatzung und Kastellan. Fällt die Burg, ist die Grafschaft fort, und der Kastellan schlägt sich verwundet heim.</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
@@ -1179,6 +1298,17 @@ const ACTIONS = {
   },
   castleall: () => { G.ui.arg = null; G.ui.tab = 'ausbau'; byId('panel-body').scrollTop = 0; },
   hire: (d) => hire(Number(d.i)),
+  besiege: (d) => {
+    const site = G.ui.arg, n = Number(d.n);
+    confirmDialog(`${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
+  },
+  sabort: () => confirmDialog('Die Belagerung aufgeben? Die Söldner ziehen ab, das Handgeld ist fort.', 'Aufgeben', () => { abortOwnSiege(); closePanel(); }),
+  hcast: (d) => { const u = G.s.companions.find((c) => c.id === Number(d.u)); if (u) appointCastellan(G.ui.arg, u); },
+  hrecall: () => recallCastellan(G.ui.arg),
+  horder: (d) => setHoldingOrder(G.ui.arg, d.o),
+  hrepair: () => repairHolding(G.ui.arg),
+  hrecruit: () => recruitHolding(G.ui.arg),
+  hwork: () => payWork(G.ui.arg),
   sel: (d) => { G.ui.sel = Number(d.u); },
   equip: (d) => equip(selectedUnit(), Number(d.i)),
   unequip: (d) => unequip(selectedUnit(), d.slot),

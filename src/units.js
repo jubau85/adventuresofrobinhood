@@ -55,7 +55,7 @@ export function makeUnit(o) {
     name: o.name ?? CLASSES[o.cls].name, cls: o.cls, level: o.level ?? 1, xp: o.xp ?? 0,
     eq: Object.assign({ waffe: null, ruestung: null, schild: null, pferd: null }, o.eq || {}),
     x: o.x ?? 0, y: o.y ?? 0, facing: 1, dirX: 0.7, dirY: 0.7, mounted: !!o.mounted,
-    status: o.status ?? null, woundedDays: o.woundedDays ?? 0, wage: o.wage ?? 0, cost: o.cost ?? 0,
+    status: o.status ?? null, woundedDays: o.woundedDays ?? 0, wage: o.wage ?? 0, cost: o.cost ?? 0, seat: o.seat ?? null,
     look: o.look ?? null, npcType: o.npcType ?? null, female: !!o.female,
     tunic: o.tunic ?? null, hair: o.hair ?? pick(HAIR),
     cd: Math.random() * 0.6, target: null, attackTarget: null, path: null, pathI: 0,
@@ -888,7 +888,7 @@ export function spawnGroup(type, opts = {}) {
   const g = {
     id: uid(), type, faction: gt.faction, x: pos.x, y: pos.y, home: { x: pos.x, y: pos.y },
     members: [], fallen: [], engaged: false, provoked: false, path: null, pathI: 0, wait: rand(0, 4),
-    questId: opts.questId || null, aggro: gt.hostile ? 7 : gt.army ? 12 : 6, army: !!gt.army,
+    questId: opts.questId || null, aggro: gt.hostile ? 7 : gt.army ? 12 : 6, army: !!gt.army, own: !!gt.own,
   };
   const bonus = Math.floor((G.s.day - 1) / 8) + (opts.luck || 0);
   if (opts.membersUnits) {

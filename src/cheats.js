@@ -3,6 +3,7 @@
 
 import { G, log } from './state.js';
 import { claimShire, shireAt, HOME_SHIRE } from './shires.js';
+import { grantHolding } from './holdings.js';
 import { GOOD_IDS, FACTION_IDS, BUILDINGS, BUILDING_IDS, DAYS_PER_SEASON, DAY_LEN } from './data.js';
 import { passHours } from './sim.js';
 import { finishConstruction, castleSite, refreshCastleBlock, castlePlots, castleLayout } from './castle.js';
@@ -117,8 +118,11 @@ const CHEAT_ACTIONS = {
     log(`Testmodus: ${castleSite().name} ist voll ausgebaut.`, 'gold');
   },
   repplus: () => { for (const f of FACTION_IDS) changeRep(f, 25); },
-  // Die Grafschaft, in der du stehst (sonst dein West Riding), gehört dir
-  grafschaft: () => { const p = G.s.player; claimShire(shireAt(p.x, p.y) || HOME_SHIRE); },
+  // Die Grafschaft, in der du stehst (sonst dein West Riding), gehört dir samt ihrer Burg
+  grafschaft: () => {
+    const p = G.s.player, id = shireAt(p.x, p.y) || HOME_SHIRE;
+    if (!grantHolding(G.world.sites.find((s) => s.id === id))) claimShire(id);
+  },
   repminus: () => { for (const f of FACTION_IDS) changeRep(f, -25); },
 };
 

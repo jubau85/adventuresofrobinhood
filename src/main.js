@@ -15,6 +15,8 @@ import {
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
 import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots } from './castle.js';
+import { applyHoldings, isHeld, grantHolding, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
+import { callStorm } from './siege.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, findLists, tourneyRects } from './tournament.js';
@@ -85,6 +87,7 @@ function startWorld() {
   }
   refreshCastleBlock();
   applyDamage();
+  applyHoldings();
   applyCons();
   initWeather();
   resetRender();
@@ -339,8 +342,8 @@ function checkNearSite() {
     const fc = nearestForestCamp();
     showPrompt(`<kbd>E</kbd> ${esc(fc.name)}: ${fc.camp === 'soeldner' ? 'Söldner anheuern, handeln' : 'handeln'}${G.s.freedAt && G.s.freedAt[fc.id] ? ' · <b>ein Geretteter wartet</b>' : ''}${battleText(' · ')}`);
   } else if (s && !inCombat()) {
-    const blocked = s.faction && isHostileFaction(s.faction);
-    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
+    const blocked = s.faction && isHostileFaction(s.faction) && !isHeld(s);
+    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : isHeld(s) ? `Deine Burg ${esc(s.name)} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
   } else if (inCombat()) {
     const cb = castleBonusAt(G.s.player.x, G.s.player.y);
     showPrompt(`<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>${cb ? ` · Mauerschutz +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr` : ''}${battleText(' · ')}`);
@@ -353,7 +356,7 @@ function battleText(prefix) {
   const sg = siegeStatus();
   if (sg && Math.hypot(sg.x - G.s.player.x, sg.y - G.s.player.y) < 50) {
     const st = { anmarsch: 'Anmarsch', belagerung: 'Beschuss', sturm: 'Sturm' }[sg.stage];
-    const side = sg.side === 'def' ? ' · du hilfst den Verteidigern' : sg.side === 'att' ? ' · du dienst den Belagerern' : '';
+    const side = sg.lead ? ' · du führst die Belagerung' : sg.own ? ' · deine Burg' : sg.side === 'def' ? ' · du hilfst den Verteidigern' : sg.side === 'att' ? ' · du dienst den Belagerern' : '';
     const wall = sg.wall === null ? '' : sg.wall < 0 ? ' · <span class="warn">Bresche offen</span>' : sg.stage !== 'anmarsch' ? ` · Mauer ${100 - sg.wall} %` : '';
     return `${prefix}<span class="warn">Belagerung von ${esc(sg.name)}</span> (${st}): ${esc(sg.army)} <b>${sg.att}</b> gegen die Besatzung <b>${sg.def}</b>${wall}${side}`;
   }
@@ -393,6 +396,11 @@ function clickUnit(u) {
     return true;
   }
   if (!g) return false;
+  // Dein eigenes Aufgebot und deine Besatzung greifst du nicht an
+  if (GROUP_TYPES[g.type].own || g.homeGuard) {
+    if (G.siege && G.siege.army === g && G.siege.lead) openPanel('siege');
+    return true;
+  }
   if (isSiegeGroup(g) && G.siege.site.type !== 'spieler' && !G.siege.side && !g.engaged && !groupHostile(g)) {
     if (Math.hypot(u.x - p.x, u.y - p.y) < 7 || nearSiegeCamp(7)) openPanel('siege');
     else if (setPlayerPath(G.siege.camp.x, G.siege.camp.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; }
@@ -853,4 +861,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, step: (dt) => { G.time += dt; step(dt); } };
