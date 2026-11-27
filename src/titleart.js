@@ -22,7 +22,7 @@ function fillRidge(c, w, h, base, amp, seed, freq, col) {
   c.fill();
 }
 
-function drawCastle(c, x, y, s, color, t) {
+export function drawCastle(c, x, y, s, color, t) {
   const dark = '#2a1a2a';
   c.fillStyle = dark;
   const rect = (rx, ry, rw, rh) => c.fillRect(x + rx * s, y - (ry + rh) * s, rw * s, rh * s);
@@ -68,7 +68,7 @@ function drawCastle(c, x, y, s, color, t) {
   flag(-49, 182, 40); flag(-123, 89, 30); flag(123, 89, 30);
 }
 
-function drawKnight(c, x, y, s, color, t) {
+export function drawKnight(c, x, y, s, color, t) {
   const sil = '#0e080d';
   const rim = 'rgba(255,170,90,0.85)';
   c.save();

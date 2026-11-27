@@ -54,6 +54,26 @@ function applyMaster() {
 
 export function setMood(m) { mood = m; }
 
+// Vorspann: Solange er läuft, schweigt die Spielmusik samt Hintergrund; der Vorspann spielt über introOut() seine
+// eigene Musik in denselben Hall. audioRunning sagt, ob der Browser schon Ton erlaubt.
+let hush = false;
+export function setHush(on) {
+  hush = !!on;
+  if (!ac || !hush) return;
+  if (track) { stopTrack(track, 0.3); track = null; }
+  if (ambTrack) { stopTrack(ambTrack, 0.3); ambTrack = null; }
+  if (droneNodes) setDrone(false);
+  playingMood = null; restUntil = 0;
+}
+export function introOut() {
+  if (!ac || !enabled) return null;
+  const now = ac.currentTime;
+  master.gain.cancelScheduledValues(now);
+  master.gain.setValueAtTime(0.55, now);
+  return { ac, dry, wet };
+}
+export function audioRunning() { return !!ac && ac.state === 'running'; }
+
 // ---------------------------------------------------------------- Aufbau
 function makeImpulse(seconds, decay) {
   const sr = ac.sampleRate, len = Math.floor(sr * seconds);
@@ -66,7 +86,9 @@ function makeImpulse(seconds, decay) {
 }
 
 export function startAudio() {
-  if (started || !(enabled || sfxOn)) return;
+  // Schon gestartet, aber vom Browser angehalten (vor der ersten Eingabe erzeugt): jetzt fortsetzen
+  if (started) { if (ac && ac.state === 'suspended' && (enabled || sfxOn) && !document.hidden) ac.resume(); return; }
+  if (!(enabled || sfxOn)) return;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   try { ac = new AC(); } catch (e) { return; }
@@ -554,6 +576,7 @@ function fileMusicActive() { return !!(want.music && buffers[want.music]) && (!!
 
 function tick() {
   if (!ac || !(enabled || sfxOn)) return;
+  if (hush) { nextTime = ac.currentTime + 0.3; return; }
   updateFiles();
   if (!enabled) { if (droneNodes) setDrone(false); playingMood = null; nextTime = ac.currentTime + 0.3; return; }
   // Läuft eine Aufnahme (oder die Pause danach), schweigt die erzeugte Musik

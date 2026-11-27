@@ -33,6 +33,7 @@ import {
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { mpHost, mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, seatName, mpLobbyBegin, mpLobbyUpdate } from './mp.js';
 import { initLobby } from './lobby.js';
+import { introWanted, startIntro } from './intro.js';
 import { nearestWalkable } from './world.js';
 import { baronSite } from './barons.js';
 import { giveAlms } from './life.js';
@@ -763,6 +764,7 @@ function bindInput() {
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
   byId('btn-continue').addEventListener('click', () => { startAudio(); showLoading('Die Welt wird erschaffen …'); setTimeout(() => { if (!loadGame()) byId('loading').hidden = true; }, 50); });
   byId('btn-music-title').addEventListener('click', () => { toggleMusic(); startAudio(); });
+  byId('btn-story').addEventListener('click', () => { startAudio(); startIntro({ storyOnly: true }); });
   // Browser erlauben Ton erst nach der ersten Eingabe
   const firstGesture = () => { startAudio(); window.removeEventListener('pointerdown', firstGesture); window.removeEventListener('keydown', firstGesture); };
   window.addEventListener('pointerdown', firstGesture);
@@ -882,6 +884,8 @@ function frameBody(now) {
     setScene('welt_sommer', !night && season <= 2 && precip() < 0.35 ? 'wiese_tag' : null);
   }
   if (G.mp && !G.started) mpLobbyUpdate(dt);
+  // Während des Vorspanns ruht das Titelbild darunter
+  if (G.intro) return;
   if (!byId('title').hidden) {
     setMood('titel');
     setScene('welt_sommer', null);
@@ -990,7 +994,7 @@ function boot(hotData) {
   if (hotData && hotData.save) {
     try { deserialize(hotData.save); spawnAnimals(); startWorld(); resumed = true; } catch (e) { resumed = false; }
   }
-  if (!resumed) showTitle();
+  if (!resumed) { showTitle(); if (introWanted()) startIntro(); }
   try {
     if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
       window.claude.hot.snapshot(() => (G.started ? { save: serialize() } : {}));

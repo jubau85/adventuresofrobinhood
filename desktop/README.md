@@ -17,7 +17,8 @@ npm start
 dann das Fenster. Fehlt nach `npm install` das Electron-Programm, hilft `node node_modules/electron/install.js`.
 
 Tasten: **F11** oder **Alt+Enter** Vollbild. Mit `npm start -- --entwickler` öffnet **F12** die Entwicklerwerkzeuge,
-mit `--vollbild` startet es gleich im Vollbild. `npm run start:zweite` startet eine zweite, getrennte Instanz (eigener
+mit `--vollbild` startet es gleich im Vollbild, mit `--ohne-intro` ohne Vorspann (für Tests). In der App spielt der
+Vorspann seine Musik sofort, ohne vorher auf einen Klick zu warten. `npm run start:zweite` startet eine zweite, getrennte Instanz (eigener
 Speicherordner), etwa um den Mehrspieler auf einem Rechner zu testen.
 
 ## Paket bauen

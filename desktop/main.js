@@ -11,6 +11,9 @@ const { startRelay, lanAddresses } = require('./relay.js');
 const GAME = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, 'game');
 const TITLE = "A Knight's Tale";
 
+// Der Vorspann spielt seine Musik gleich beim Start, ohne vorher auf einen Klick zu warten
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
@@ -68,7 +71,8 @@ function createWindow() {
   // Links nach draußen im Browser öffnen, nie im Spielfenster
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (ev, url) => { if (!url.startsWith('app://')) ev.preventDefault(); });
-  win.loadURL('app://spiel/index.html');
+  // --ohne-intro: gleich ins Startmenü (für Tests)
+  win.loadURL(`app://spiel/index.html${process.argv.includes('--ohne-intro') ? '?ohneintro' : ''}`);
   return win;
 }
 

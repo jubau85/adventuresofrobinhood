@@ -30,6 +30,7 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 
 ## Was schon drin ist
 
+- **Vorspann:** Zum Start erst das Studio: „KUKI & KARMEN PRODUCTIONS“ in Goldschrift mit Glut, Rauch und Lichtstrahlen, das Siegel „100% AI“ fällt wie ein Stempel, „Made by Jakob“ wird wie mit der Feder geschrieben, dazu Donner, Orchesterschlag, Chor und Pauken bis zur Auflösung in D-Dur. Dann die Vorgeschichte im Stil der Amiga-Spiele der 90er: sechs Bilder mit 320 × 200 Bildpunkten und je 32 Farben mit Raster-Dithering (Richard in Gefangenschaft, die Krone, Johanns Banner, die Geächteten am Feuer, die Heimkehr übers Meer, der verfallene Burgstall), mit Goldrahmen, Rasterzeilen und kleinen Farbzyklen (Sterne, Mondglitzern, Kerzen, Rauch, Feuer, Möwen, Krähen). Der Text läuft wie auf der Schreibmaschine in einer Pixelschrift, darunter spielt Tracker-Musik aus 8-Bit-Samples (Harfe, Streicher, Chor, Flöte, Pauken, Marschtrommel). Zum Schluss erscheint das Titelbild als Pixelbild, und der Schriftzug geht beim Überblenden in die Überschrift des Startmenüs über. <kbd>Leertaste</kbd> oder Klick blättert weiter, <kbd>Esc</kbd> überspringt alles; „Vorgeschichte“ im Startmenü zeigt sie noch einmal. Vorgaben für Oakgen-Fassungen von Bildern, Video und Musik: [assets/INTRO-BRIEF.md](assets/INTRO-BRIEF.md).
 - **Startmenü:** Animiertes Titelbild bei Sonnenuntergang, daneben ein Blatt Pergament mit gerissenem, angesengtem Rand. Darauf wählst du deinen Namen, den Namen deiner Burg, Ritter oder Ritterin und stellst dein Wappen zusammen: eine von sechs Farben, Gold oder Silber und ein Wappenbild, entweder ein Tier (Löwe, Adler, Hirsch, Eber, Rabe) oder ein Zeichen (Kreuz, Lilie, Stern, Turm, Mond, Schwerter, Rose). Die Wappenbilder sind gemalt, jedes in Gold und in Silber (der Rabe bleibt schwarz). Neben der Wahl steht die Vorschau als Seite einer Liederhandschrift um 1300, im Hochformat: oben in roter Tinte „Her Aldric von Ashcombe“ (als Ritterin „Frouwe …“) und eine Blattzahl in römischen Ziffern, ein Rahmen in Blau, Gold und Rot, im Grund scheinen blass die Verse der Rückseite durch. Der Ritter springt nach links, Pferdedecke und Banner an der Lanze sind mit deinem Wappenbild bestreut, das Wappenbild steht groß als Helmzier auf dem Topfhelm, vor der Brust hängt der Wappenschild, rechts und oben rankt eine Rose mit Blüten in Rankenkreisen. Falten sind mit Schatten und weißen Lichtern gemalt. Bei roter Wappenfarbe reitet der Ritter einen Schimmel, sonst ein rotes Pferd wie in den Handschriften. Farbe, Wappen und Name erscheinen im ganzen Spiel: Gefolge, Banner (mit dem Wappenbild), Burgfenster, Meldungen, Karte.
 - **Musik:** Wird live im Browser erzeugt, mit Laute, Flöte, Hörnern, Bordun und Trommeln. Es gibt ein episches Titelthema, Reisemusik im Dreiertakt, ruhigere Nachtmusik und Trommeln im Kampf. Taste L schaltet sie an und aus.
 
@@ -173,6 +174,8 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 | `src/animals.js` | Tiere und Jagd |
 | `src/heraldry.js` | Wappen: Wappenbilder als Pfade (SVG für das Menü, Canvas für Banner), Wappenschild, die Miniatur des Ritters im Startmenü |
 | `src/titleart.js` | Titelbild: das gemalte Bild aus `assets/titel`, sonst im Code gemalt |
+| `src/intro.js` | Vorspann: Studio in voller Auflösung, Vorgeschichte im Amiga-Stil (Bildspeicher 320 × 200, Median-Cut auf 32 Farben, Dithering, Farbzyklen, Tracker-Musik), Übergang ins Startmenü |
+| `src/pixelfont.js` | „Burgschrift“, die Bitmap-Schrift der Vorgeschichte (erzeugt von `tools/pixelschrift.py`) |
 | `src/assets.js` | Lädt handgemalte Grafiken aus `assets/`, fehlt eine, zeichnet das Spiel selbst |
 | `src/audio.js` | Musik mit Web Audio (Instrumente, Noten, Stimmungen) |
 | `src/ui.js` | Kopfleiste und alle Tafeln |
@@ -182,6 +185,7 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 | `src/lobby.js` | Oberfläche der Mehrspieler-Lobby: eröffnen, beitreten, Spielerliste, Burgwahl, Chat, Start |
 | `src/main.js` | Start, Hauptschleife, Eingabe |
 | `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
+| `tools/pixelschrift.py` | Rendert die Pixelschrift der Vorgeschichte ohne Kantenglättung aus Liberation Serif (SIL Open Font License) nach `src/pixelfont.js` |
 | `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |
 | `tools/meshy_pferd.py` | Erzeugt das Pferd bei Meshy (Vorschau, Bemalung), ohne Sattelzeug; Rohmodell in `assets/roh/3d/pferd_meshy.glb` |
 | `tools/orte.py` | Liest das Paket Orte auf der Karte ein (auch in Teilen nacheinander): Fußpunkt und Grundfläche aus `orte.json`, ein WebP je Bild unter `assets/orte/`, Anker für `ORTE_P5` in `src/render.js` |

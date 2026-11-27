@@ -120,6 +120,7 @@
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
           <button type="button" class="btn" id="btn-mp">Mehrspieler …</button>
+          <button type="button" class="btn" id="btn-story">Vorgeschichte</button>
         </div>
         <p class="hint" id="continue-info"></p>
       </form>
@@ -127,6 +128,7 @@
     <section id="lobby" hidden role="dialog" aria-modal="true" aria-label="Mehrspieler"><div class="title-card lobby-card" id="lobby-card"></div></section>
     <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
   </section>
+  <section id="intro" hidden aria-label="Vorspann"><canvas id="intro-cv"></canvas><p class="intro-hint" id="intro-hint"></p><p class="sr-only" id="intro-text" aria-live="polite"></p></section>
 </div>
 <input id="chat-input" hidden maxlength="200" placeholder="Zu allen in der Partie sprechen … (Enter schickt, Esc schließt)" autocomplete="off">
 <div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
