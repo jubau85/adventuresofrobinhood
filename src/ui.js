@@ -3,7 +3,7 @@
 import { G, log, homeName, playerColor } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, FOOD_GOODS, GROUP_TYPES, DAY_LEN,
+  TYPE_NAME, siteTypeName, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, FOOD_GOODS, GROUP_TYPES, DAY_LEN,
 } from './data.js';
 import {
   buy, sell, sellStored, storedSellPrice, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
@@ -211,7 +211,7 @@ function townPanel() {
   const f = site.faction;
   const town = G.s.towns[site.id];
   const shire = shireOfSite(site);
-  const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
+  const sub = `${esc(siteTypeName(site))} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
   if (isHostileFaction(f)) {
     return {
       title: site.name, sub, tabs: [],
@@ -351,7 +351,7 @@ function letterActions(site, who = null) {
 function abandonedPanel(site) {
   const back = G.s.abandoned[site.id];
   return {
-    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · verlassen`, tabs: [],
+    title: site.name, sub: `${esc(siteTypeName(site))} · verlassen`, tabs: [],
     body: `<div class="notice bad"><p>Die Türen stehen offen, die Herdstellen sind kalt. Seit deinem Überfall wohnt in ${esc(site.name)} niemand mehr. Markt, Gasthaus und Werkstätten sind verlassen.</p><p>Erst um Tag ${back} wagen sich die ersten Leute zurück.</p></div>
       <div class="actions">${letterActions(site, 'die wenigen, die geblieben sind')}${blightActions(site)}${site.port ? harbourActions(site) : ''}</div>`,
   };
@@ -385,7 +385,7 @@ function hermitPanel(site) {
   const st = hermitState(site);
   const bless = canBless(site);
   return {
-    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · Einsiedelei`, tabs: [],
+    title: site.name, sub: `${esc(siteTypeName(site))} · Einsiedelei`, tabs: [],
     body: `<div class="cols">
       <div><p class="lede">${esc(site.desc)}</p><p>${esc(FEATURE_TEXT[site.feature] || '')} Glühwürmchen tanzen hier in der Dämmerung, und es ist seltsam still.</p></div>
       <div class="actions">
@@ -1074,7 +1074,7 @@ function ownerSwatch(o) { return `<span class="swatch" style="--c:${ownerColor(o
 function shireCard(id, withSeat = false) {
   const seat = G.world.sites.find((s) => s.id === id), sh = SHIRES[id], own = shireOwner(id);
   const places = shireSites(id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(TYPE_NAME[s.type])})</span>`).join(', ') : 'keine weiteren Orte';
+  const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(siteTypeName(s))})</span>`).join(', ') : 'keine weiteren Orte';
   const home = id === HOME_SHIRE;
   return `<div class="shire${home ? ' home' : ''}${own === 'spieler' ? ' mine' : ''}">
     <div class="shire-head"><b>${esc(sh.name)}</b>${withSeat && seat ? `<span class="muted">Sitz: ${esc(seat.name)}</span>` : ''}<span>${ownerSwatch(own)}Herr: ${esc(ownerName(own))}</span></div>
@@ -1085,7 +1085,7 @@ function shireCard(id, withSeat = false) {
   </div>`;
 }
 function shiresList() {
-  const realmRank = { en: 0, wa: 1, nd: 2, fr: 3 };
+  const realmRank = { en: 0, wa: 1, sc: 2, ir: 3, nd: 4, fr: 5, fl: 6 };
   const ids = Object.keys(SHIRES).filter((id) => G.world.sites.some((s) => s.id === id));
   const seatOf = (id) => G.world.sites.find((s) => s.id === id);
   ids.sort((a, b) => (a === HOME_SHIRE ? -1 : b === HOME_SHIRE ? 1 : 0) || (shireOwner(a) === 'spieler' ? -1 : 0) - (shireOwner(b) === 'spieler' ? -1 : 0) || realmRank[seatOf(a).realm] - realmRank[seatOf(b).realm] || SHIRES[a].name.localeCompare(SHIRES[b].name, 'de'));

@@ -52,7 +52,7 @@ function newGame(opts) {
   });
   G.s = {
     seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
-    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
+    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },

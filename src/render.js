@@ -1288,6 +1288,32 @@ function drawRoundKeep(c, b) {
   }
 }
 
+// Irischer Rundturm neben einer kleinen Steinkirche: schlank, mit steinerner Kegelhaube und der Tür hoch über dem Boden
+function drawIrishRoundTower(c, b) {
+  const kx = b.x - 0.45, ky = b.y + 0.15;
+  drawShadow(c, kx, ky, 1.3, 0.75, 16);
+  drawBox(c, kx, ky, 1.3, 0.72, 13, '#bdb6a5', 0, 'stone');
+  drawGableRoof(c, kx, ky, 1.3, 0.72, 13, 9, ROOFS.slate, '#bdb6a5', true);
+  const tx = b.x + 0.7, ty = b.y - 0.25, g = P(tx, ty, 0), RX = 12, RY = 6.1, H = 104;
+  c.fillStyle = 'rgba(30,40,20,0.25)'; c.beginPath(); c.ellipse(g[0] + 10, g[1] + 3, RX + 8, RY + 3, 0, 0, Math.PI * 2); c.fill();
+  const grad = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
+  grad.addColorStop(0, '#dcd5c4'); grad.addColorStop(0.5, '#c2baa7'); grad.addColorStop(1, '#8c8577');
+  c.fillStyle = grad;
+  c.beginPath(); c.moveTo(g[0] - RX, g[1]); c.lineTo(g[0] - RX * 0.86, g[1] - H); c.lineTo(g[0] + RX * 0.86, g[1] - H); c.lineTo(g[0] + RX, g[1]);
+  c.ellipse(g[0], g[1], RX, RY, 0, 0, Math.PI, false); c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(60,50,40,0.3)'; c.lineWidth = 1;
+  for (let z = 9; z < H; z += 9) { const f = 1 - (z / H) * 0.14; c.beginPath(); c.ellipse(g[0], g[1] - z, RX * f, RY * f, 0, 0.15, Math.PI - 0.15, false); c.stroke(); }
+  // Tür hoch oben, Schlitzfenster und vier Fenster unter der Haube
+  c.fillStyle = '#3a332c'; c.beginPath(); c.moveTo(g[0] - 3, g[1] - 30); c.lineTo(g[0] - 3, g[1] - 39); c.arc(g[0], g[1] - 39, 3, Math.PI, 0); c.lineTo(g[0] + 3, g[1] - 30); c.fill();
+  c.fillStyle = GLASS(); c.fillRect(g[0] + 3, g[1] - 62, 2, 6);
+  for (const dx of [-6, 0, 6]) c.fillRect(g[0] + dx - 1, g[1] - H + 6, 2.5, 6);
+  // Kegelhaube aus Stein
+  const cg = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
+  cg.addColorStop(0, '#a49d8e'); cg.addColorStop(1, '#6c665c');
+  c.fillStyle = cg; c.beginPath(); c.moveTo(g[0] - RX * 0.95, g[1] - H); c.lineTo(g[0], g[1] - H - 28); c.lineTo(g[0] + RX * 0.95, g[1] - H);
+  c.ellipse(g[0], g[1] - H, RX * 0.95, RY * 0.9, 0, 0, Math.PI, false); c.closePath(); c.fill();
+}
+
 // Tuch- und Messehalle mit Arkaden, in Brügge mit Belfried
 function drawClothHall(c, b) {
   const col = '#cdbfa2', wx = 3.2, wy = 1.3, h = 22;
@@ -1337,6 +1363,7 @@ function drawLandmark(c, b) {
     case 'tower': if (b.grey && flemish(b) && drawGravensteen(c, b)) return null; return drawGreatKeep(c, b);
     case 'motte': return drawMotte(c, b);
     case 'rundturm': return drawRoundKeep(c, b);
+    case 'rundturm_ir': return drawIrishRoundTower(c, b);
     case 'tuchhalle': if (flemish(b) && drawFlemishClothHall(c, b)) return null; return drawClothHall(c, b);
     case 'tor': return drawTor(c, b);
     default: return null;

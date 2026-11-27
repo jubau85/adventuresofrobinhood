@@ -299,9 +299,11 @@ export function grantHolding(s) {
 // ---------------------------------------------------------------- Gegenangriffe
 // Welches Heer die früheren Herren schicken
 const COUNTER = {
-  normannen: { en: 'heer_john', wa: 'heer_john', nd: 'heer_normandie', fr: 'heer_normandie', fl: 'heer_normandie' },
+  normannen: { en: 'heer_john', wa: 'heer_john', nd: 'heer_normandie', fr: 'heer_normandie', fl: 'heer_normandie', ir: 'heer_john', sc: 'heer_john' },
   franken: { en: 'heer_philipp', wa: 'heer_philipp', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp' },
   sachsen: { en: 'heer_richard', wa: 'heer_richard' },
+  schotten: { sc: 'heer_schotten', en: 'heer_schotten' },
+  iren: { ir: 'heer_iren' },
 };
 // Angriffsstärke der früheren Herren: wächst mit der Zeit, also muss die Burg mitwachsen
 export function counterStrength() { return 45 + G.s.day * 2; }

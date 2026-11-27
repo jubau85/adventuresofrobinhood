@@ -461,6 +461,8 @@ export function castleDefense() {
   let d = [5, 25, 55, 90][G.s.castle.level] + (G.s.castle.level ? CASTLE_TYPES[castleType()].def : 0) + bSum('wehr', [0, 15, 35, 60]) + shireDef();
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
+  if (isAlly('schotten')) d += 15;
+  if (isAlly('iren')) d += 10;
   if (homeGateClosed()) d += 10;
   return Math.round(d);
 }

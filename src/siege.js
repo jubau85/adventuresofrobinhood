@@ -18,11 +18,13 @@ import { SHIRES } from './shires.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
-  normannen: { en: 'heer_richard', wa: 'heer_richard', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp' },
+  normannen: { en: 'heer_richard', wa: 'heer_richard', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp', ir: 'heer_iren' },
   sachsen: { en: 'heer_john', wa: 'heer_john' },
   franken: { fr: 'heer_normandie', fl: 'heer_normandie', nd: 'heer_normandie' },
+  // Die Barone in Irland greifen nach den Ländern der gälischen Könige
+  iren: { ir: 'heer_john' },
 };
-export const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'] };
+export const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'], schotten: ['freisasse', 'sachs_bogen'], iren: ['freisasse', 'waldmann'] };
 
 // ---------------------------------------------------------------- Schäden und Reparatur
 export function siteBuildings(siteId) { return G.world.buildings.filter((b) => b.site === siteId && b.kind === 'house' && !(b.cons < 1)); }

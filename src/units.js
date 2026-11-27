@@ -822,9 +822,11 @@ function settledLand(x, y) {
 function sitesFor(type) {
   const S = G.world.sites;
   const gt = GROUP_TYPES[type];
-  if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && (s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle'));
+  // Prinz Johns Steuereintreiber: in England, Wales, der Normandie und im normannischen Irland
+  if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && s.realm !== 'sc' && (s.faction === 'normannen' || (s.realm !== 'ir' && (s.type === 'dorf' || s.type === 'halle'))));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction));
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction)
+    && (!gt.realmFaction || !gt.realmFaction[s.realm] || s.faction === gt.realmFaction[s.realm]));
   return S.filter((s) => s.type !== 'einsiedelei');
 }
 
@@ -1038,7 +1040,7 @@ export function maintainGroups(initial = false) {
     if (gt.minDay && G.s.day < gt.minDay && !initial) continue;
     if (gt.minDay && initial) continue;
     // Auf der größeren Karte gibt es mehr Gruppen, aber nicht im Verhältnis der Fläche: es bleibt mehr Platz zwischen ihnen
-    const want = Math.round((gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0)) * MAP_K);
+    const want = Math.round((gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0)) * MAP_K * 1.2);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
     const n = initial ? want : Math.min(3, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });
@@ -1059,6 +1061,8 @@ export function ferryCost(route) {
   const from = siteById(route.a), to = siteById(route.b);
   const french = (s) => s && (s.realm === 'fr' || s.realm === 'fl');
   if (isAlly('franken') && (french(from) || french(to))) return 0;
+  const irish = (s) => s && s.realm === 'ir';
+  if (isAlly('iren') && (irish(from) || irish(to))) return 0;
   const riders = [G.s.player, ...partyMembers()];
   const horses = riders.filter((u) => u.eq && u.eq.pferd).length;
   return Math.round((route.cost * riders.length + horses * Math.ceil(route.cost / 2)) * shireFerryFactor());
@@ -1260,6 +1264,8 @@ export function startBattle(force = null) {
   if (G.battle) return false;
   const land = landAt(W, p.x, p.y);
   const site = W.sites.reduce((a, s) => (s.land === land && (!a || Math.hypot(s.x - p.x, s.y - p.y) < Math.hypot(a.x - p.x, a.y - p.y)) ? s : a), null);
+  // In Schottland und Irland ziehen Richards und Johanns Heere nicht gegeneinander
+  if (site && (site.realm === 'sc' || site.realm === 'ir')) return false;
   const french = site && (site.realm === 'fr' || site.realm === 'fl' || site.realm === 'nd');
   const [ta, tb] = french ? ['heer_normandie', 'heer_philipp'] : ['heer_john', 'heer_richard'];
   // Schlachtfeld: offenes Land 16 bis 26 Felder vom Spieler, nicht in einem Ort

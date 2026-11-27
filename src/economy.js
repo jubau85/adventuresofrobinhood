@@ -42,11 +42,11 @@ export function price(site, good) {
 }
 
 export function buyPrice(site, good) {
-  return Math.max(1, Math.ceil(price(site, good) * 1.08 * (isAlly('gilde') ? 0.95 : 1)));
+  return Math.max(1, Math.ceil(price(site, good) * 1.08 * (isAlly('gilde') ? 0.95 : 1) * (site.realm === 'sc' && isAlly('schotten') ? 0.95 : 1)));
 }
 
 export function sellPrice(site, good) {
-  return Math.max(1, Math.floor(price(site, good) * 0.9 * (isAlly('gilde') ? 1.04 : 1)));
+  return Math.max(1, Math.floor(price(site, good) * 0.9 * (isAlly('gilde') ? 1.04 : 1) * (site.realm === 'sc' && isAlly('schotten') ? 1.04 : 1)));
 }
 
 export function cargoUsed() {

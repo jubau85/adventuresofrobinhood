@@ -1396,7 +1396,7 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
 }
 
 // Grundfläche so groß, wie das Wahrzeichen gezeichnet wird (Ringmauer, Querhaus, Baukran)
-const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [3.7, 3.4], motte: [3.2, 3.2], rundturm: [2.6, 2.6], tuchhalle: [3.4, 1.8], tor: [5.5, 5.5] };
+const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [3.7, 3.4], motte: [3.2, 3.2], rundturm: [2.6, 2.6], rundturm_ir: [2.4, 1.6], tuchhalle: [3.4, 1.8], tor: [5.5, 5.5] };
 
 // Freie Stelle für eine Grundfläche in der Nähe eines Wunschortes suchen
 function freeArea(W, px, py, wx, wy, margin, maxR) {
@@ -1431,7 +1431,7 @@ function placeLandmark(W, s, lm) {
     const abbey = s.type === 'abtei';
     pref = {
       kathedrale: abbey ? { x: s.x - 0.3, y: s.y - 2.8 } : { x: s.x - 3.8, y: s.y - 4.0 },
-      tower: { x: s.x + 4.2, y: s.y + 1.6 }, motte: { x: s.x + 5, y: s.y - 4 }, rundturm: { x: s.x + 4.4, y: s.y + 2.4 },
+      tower: { x: s.x + 4.2, y: s.y + 1.6 }, motte: { x: s.x + 5, y: s.y - 4 }, rundturm: { x: s.x + 4.4, y: s.y + 2.4 }, rundturm_ir: { x: s.x + 3.2, y: s.y - 3.0 },
       tuchhalle: { x: s.x - 2.8, y: s.y - 3.2 }, tor: { x: s.x - 10, y: s.y + 7 },
     }[lm.kind];
   }
@@ -1532,16 +1532,18 @@ function genBuildings(W, s, rng) {
     case 'markt': {
       // Marktzelte, Pferch und Stände zuerst, damit die Häuser sich darum herum ordnen
       let tents = 0;
+      // Zelte und Stände nur auf trockenem Land (in Hafenorten reicht das Wasser bis an den Markt)
+      const dry = (x, y, wx, wy) => { for (const [px, py] of [[x - wx / 2, y - wy / 2], [x + wx / 2, y - wy / 2], [x - wx / 2, y + wy / 2 + 0.7], [x + wx / 2, y + wy / 2 + 0.7]]) if (W.tiles[Math.floor(py) * W.N + Math.floor(px)] === T.WATER) return false; return true; };
       for (let k = 0; k < 5; k++) {
         const col = rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#e8e0cc', '#5b8a3c']);
         const x = s.x + 3 + k * 1.15, y = s.y - 3.6;
-        if (!clearOfBuildings(W, x, y, 0.9, 0.9, 0.15)) continue;
+        if (!clearOfBuildings(W, x, y, 0.9, 0.9, 0.15) || !dry(x, y, 0.9, 0.9)) continue;
         add({ kind: 'tent', x, y, wx: 0.9, wy: 0.9, color: col, noCost: true });
         tents++;
       }
-      if (tents >= 3 && clearOfBuildings(W, s.x + 5.3, s.y - 2.2, 5.8, 0.4, 0.1)) add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, wx: 5.8, wy: 0.3, noCost: true });
+      if (tents >= 3 && clearOfBuildings(W, s.x + 5.3, s.y - 2.2, 5.8, 0.4, 0.1) && dry(s.x + 5.3, s.y - 2.2, 5.8, 0.4)) add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, wx: 5.8, wy: 0.3, noCost: true });
       for (const [dx, dy, col] of [[1.2, 1.1, '#a33b32'], [-1.3, 0.9, '#d6ad4c']]) {
-        if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
+        if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1) && dry(s.x + dx, s.y + dy, 0.8, 0.6)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
       }
       smithy();
       ring(9, 7, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));

@@ -2,21 +2,25 @@
 
 export const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 export const TH = 32;            // Kachelhöhe
-export const MAP = 1024;         // Kartengröße in Kacheln (eine Kachel gut 800 m)
-// Maßstab gegenüber der Karte mit 512 Kacheln: Reichweiten zwischen Orten wachsen mit MAP_K, Anzahlen mit der Fläche
-export const MAP_K = MAP / 512, MAP_AREA = MAP_K * MAP_K;
+export const MAP = 1536;         // Kartengröße in Kacheln (eine Kachel gut 800 m)
+// Maßstab gegenüber der Karte mit 512 Kacheln: Reichweiten zwischen Orten wachsen mit MAP_K, Anzahlen mit der Fläche.
+// Seit Schottland und Irland dazugekommen sind, ist die Karte größer, der Maßstab der Kacheln aber derselbe: MAP_K bleibt 2,
+// die Landfläche ist um rund die Hälfte gewachsen.
+export const MAP_K = 2, MAP_AREA = MAP_K * MAP_K * 1.5;
 export const CHUNK = 8;          // Kacheln pro Render-Chunk
 export const HMAX = 52;          // größte Geländehöhe in Pixeln
 export const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 export const DAYS_PER_SEASON = 6;
 export const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
 export const SAVE_KEY = 'a-knights-tale-v4';
-export const SAVE_VERSION = 5;   // 5: Karte mit 1024 Kacheln
+export const SAVE_VERSION = 6;   // 5: Karte mit 1024 Kacheln, 6: mit Schottland und Irland (1536 Kacheln)
 
-// Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
-// Eine Kachel entspricht gut 800 m (bei MAP 1024). Längengrade sind mit cos(51,5°) gestaucht.
-const LAT_N = 55.3, LAT_S = 47.9;
-export const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
+// Die Karte bildet England, Wales, Schottland, Irland und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
+// Eine Kachel entspricht gut 800 m. Längengrade sind mit cos(51,5°) gestaucht. Gegenüber der Karte mit 1024 Kacheln liegt
+// alles um 416 Kacheln weiter östlich und 512 weiter südlich (westlicher und nördlicher Rand für Irland und Schottland).
+const LAT_N = 59.0, LAT_S = 47.9;
+const D_LAT = (LAT_N - LAT_S) / MAP, D_LON = D_LAT / 0.6225;
+export const GEO = { lonW: -6.4 - 416 * D_LON, latN: LAT_N, dLat: D_LAT, dLon: D_LON };
 export const KM_PER_TILE = GEO.dLat * 111.2;
 
 // Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
@@ -29,8 +33,8 @@ export function dirText(from, to) {
   const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
   return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
 }
-// Maßstab gegenüber der ersten Fassung (320 Kacheln): Reichweiten in geo.js sind darauf bezogen
-export const GEO_SCALE = MAP / 320;
+// Maßstab gegenüber der ersten Fassung (320 Kacheln für England): Reichweiten in geo.js sind darauf bezogen
+export const GEO_SCALE = 3.2;
 export function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }
 
 export const T = { WATER: 0, GRASS: 1, FOREST: 2, HILLS: 3, ROAD: 4, FIELD: 5, BRIDGE: 6, SAND: 7 };
@@ -46,7 +50,7 @@ export const FACTIONS = {
     ally: 'Sächsische Freisassen verstärken deine Burg (+20 Verteidigung), Anwerben kostet 20 % weniger.',
   },
   normannen: {
-    name: 'Normannische Barone', short: 'Normannen', color: '#a33b32', rivals: ['sachsen', 'waldleute'],
+    name: 'Normannische Barone', short: 'Normannen', color: '#a33b32', rivals: ['sachsen', 'waldleute', 'schotten', 'iren'],
     desc: 'Prinz Johns Gefolgsleute. Sie halten die Burgen, die Gerichte und die Steuerkassen.',
     ally: 'Der Vogt verlangt keine Abgaben mehr, Patrouillen lassen dich in Ruhe.',
   },
@@ -69,6 +73,16 @@ export const FACTIONS = {
     name: 'Krone Frankreichs', short: 'Franzosen', color: '#3a56a8', rivals: ['normannen'],
     desc: 'König Philipp und seine Barone. Sie wollen die Normandie, solange Richard fern ist.',
     ally: 'Französische Häfen verlangen keinen Fährlohn, im Rittersaal melden sich Armbrustschützen.',
+  },
+  schotten: {
+    name: 'Schottische Krone', short: 'Schotten', color: '#2f8291', rivals: ['normannen'],
+    desc: 'König Wilhelm der Löwe, seine Earls und die Clans. Richard hat ihnen die Freiheit verkauft, aber Northumberland wollen sie noch immer.',
+    ally: 'Schottische Grenzer stärken deine Burg (+15 Verteidigung), auf schottischen Märkten kaufst und verkaufst du besser.',
+  },
+  iren: {
+    name: 'Gälische Könige', short: 'Iren', color: '#b8682c', rivals: ['normannen'],
+    desc: 'Die Ó Néill, Ó Conchobair, Ó Briain und Mac Cárthaigh. Sie halten den Westen Irlands gegen Prinz Johns Barone.',
+    ally: 'Irische Häfen verlangen keinen Fährlohn, irische Speerträger stärken deine Burg (+10 Verteidigung).',
   },
 };
 export const FACTION_IDS = Object.keys(FACTIONS);
@@ -183,7 +197,7 @@ export const GROUP_TYPES = {
   },
   patrouille: {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
-    gold: [25, 50], itemChance: 0.3, renown: 2, count: 9, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
+    gold: [25, 50], itemChance: 0.3, renown: 2, count: 10, spawn: 'patrol', realms: ['en', 'nd', 'wa', 'ir'], realmFaction: { ir: 'normannen' }, speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
   },
   steuer: {
@@ -205,6 +219,16 @@ export const GROUP_TYPES = {
     name: 'Sächsische Freisassen', nom: 'Sächsische Freisassen', acc: 'die sächsischen Freisassen', pl: true, faction: 'sachsen', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
     gold: [20, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.24, realms: ['en', 'wa'], siteFaction: 'sachsen',
     kill: { sachsen: -14, normannen: 5 },
+  },
+  schotten: {
+    name: 'Schottische Grenzer', nom: 'Schottische Grenzer', acc: 'die schottischen Grenzer', pl: true, faction: 'schotten', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
+    gold: [20, 55], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.26, realms: ['sc'], siteFaction: 'schotten',
+    kill: { schotten: -14, normannen: 4 },
+  },
+  iren: {
+    name: 'Irische Kerne', nom: 'Irische Kerne', acc: 'die irischen Kerne', pl: true, faction: 'iren', members: [['waldmann', 1, 2], ['freisasse', 1, 2]],
+    gold: [15, 45], itemChance: 0.25, renown: 2, count: 5, spawn: 'patrol', speed: 1.3, realms: ['ir'], siteFaction: 'iren',
+    kill: { iren: -14, normannen: 4 },
   },
   // Heere für Schlacht-Ereignisse (je 50 Mann, bei wenig Leistung kleiner)
   heer_john: {
@@ -231,6 +255,18 @@ export const GROUP_TYPES = {
     members: [['ritter_n', 6, 6], ['soldat', 20, 20], ['armbrust', 12, 12], ['soeldner', 12, 12]],
     gold: [300, 520], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['fr', 'fl', 'nd'],
     kill: { normannen: -14, franken: 12 },
+  },
+  heer_schotten: {
+    name: 'Das Heer König Wilhelms', nom: 'Das Heer König Wilhelms', acc: 'das Heer König Wilhelms', pl: false, faction: 'schotten', army: true,
+    members: [['thane', 5, 5], ['huskarl', 8, 8], ['freisasse', 20, 20], ['sachs_bogen', 12, 12], ['waldmann', 5, 5]],
+    gold: [260, 480], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['sc'],
+    kill: { schotten: -14, normannen: 10 },
+  },
+  heer_iren: {
+    name: 'Das Aufgebot der gälischen Könige', nom: 'Das Aufgebot der gälischen Könige', acc: 'das Aufgebot der gälischen Könige', pl: false, faction: 'iren', army: true,
+    members: [['thane', 4, 4], ['huskarl', 6, 6], ['freisasse', 18, 18], ['waldmann', 14, 14], ['sachs_bogen', 8, 8]],
+    gold: [220, 420], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['ir'],
+    kill: { iren: -14, normannen: 10 },
   },
   // Dein eigenes Aufgebot vor einer Grafschaftsburg (holdings.js); die Männer stellt startOwnSiege zusammen
   heer_spieler: {
@@ -476,7 +512,7 @@ export const SETTLEMENTS = [
     desc: 'Die Insel in den Fens. Mönche, Aale und Schilf, so weit das Auge reicht.' },
   { id: 'oxford', name: 'Oxford', type: 'markt', faction: 'gilde', clear: 8, realm: 'en', lon: -1.26, lat: 51.75, produces: ['bier', 'wolle'], demands: ['wein', 'salz', 'fleisch', 'holz'],
     desc: 'Marktstadt an der Themse, wo neuerdings Magister Latein und Logik lehren.' },
-  { id: 'bristol', name: 'Bristol', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -2.59, lat: 51.45, produces: ['wein', 'felle', 'eisen'], demands: ['getreide', 'wolle', 'bier'],
+  { id: 'bristol', name: 'Bristol', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -2.59, lat: 51.45, port: true, produces: ['wein', 'felle', 'eisen'], demands: ['getreide', 'wolle', 'bier'],
     desc: 'Hafenstadt am Avon. Wein aus der Gascogne, Felle aus Irland.' },
   { id: 'winchester', name: 'Winchester', type: 'stadt', faction: 'normannen', clear: 8, realm: 'en', lon: -1.31, lat: 51.06, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Winchester', len: 4.8, central: 'stumpf' }], produces: ['wein', 'eisen'], demands: ['getreide', 'fleisch', 'wolle', 'holz'],
     desc: 'Die alte Königsstadt mit dem Schatz der Krone. Hier wird Richard ein zweites Mal gekrönt.' },
@@ -515,7 +551,7 @@ export const SETTLEMENTS = [
     desc: 'Die Kathedrale am Ende der Welt. Zwei Pilgerfahrten hierher wiegen eine nach Rom auf.' },
   { id: 'brecon', name: 'Brecon', type: 'halle', faction: 'sachsen', clear: 6, realm: 'wa', lon: -3.39, lat: 51.95, produces: ['wolle', 'fleisch', 'felle'], demands: ['salz', 'eisen', 'wein'],
     desc: 'Halle eines walisischen Fürsten in den Bergen. Man spricht hier nicht gern Französisch.' },
-  { id: 'pembroke', name: 'Pembroke', type: 'burg', faction: 'normannen', clear: 7, realm: 'wa', lon: -4.92, lat: 51.67, produces: ['wolle', 'fleisch'], demands: ['wein', 'getreide', 'eisen'],
+  { id: 'pembroke', name: 'Pembroke', type: 'burg', faction: 'normannen', clear: 7, realm: 'wa', lon: -4.92, lat: 51.67, port: true, produces: ['wolle', 'fleisch'], demands: ['wein', 'getreide', 'eisen'],
     desc: 'Die Burg des Marschalls am Ende von Wales. Von hier segeln die Normannen nach Irland.' },
   { id: 'cardiff', name: 'Cardiff', type: 'burg', faction: 'normannen', clear: 7, realm: 'wa', lon: -3.18, lat: 51.48, produces: ['eisen', 'stein'], demands: ['getreide', 'wein', 'bier'],
     desc: 'Eine normannische Burg über dem Taff. Die walisischen Fürsten in den Bergen warten auf ihre Gelegenheit.' },
@@ -567,6 +603,102 @@ export const SETTLEMENTS = [
     desc: 'Königspfalz am großen Forst. König Philipp jagt hier, wenn er nicht gerade Krieg führt.' },
   { id: 'provins', name: 'Provins', type: 'markt', faction: 'gilde', clear: 7, realm: 'fr', lon: 3.30, lat: 48.56, landmarks: [{ kind: 'tuchhalle', name: 'Messehalle von Provins' }], produces: ['wolle', 'wein', 'salz'], demands: ['felle', 'fleisch', 'eisen'],
     desc: 'Eine der Messestädte der Champagne. Kaufleute aus Italien und Flandern treffen sich hier unter dem Schutz des Grafen.' },
+  // ---------------- Schottland (König Wilhelm der Löwe; Richard hat den Schotten ihre Freiheit für Silber zurückverkauft)
+  { id: 'edinburgh', name: 'Edinburgh', type: 'stadt', cityR: 13, faction: 'schotten', clear: 8, realm: 'sc', lon: -3.19, lat: 55.95, landmarks: [{ kind: 'tower', name: 'Burg auf dem Felsen', grey: true }], produces: ['wolle', 'felle', 'salz'], demands: ['wein', 'getreide', 'eisen', 'holz'],
+    desc: 'Die Burg auf dem schwarzen Felsen und darunter die Häuser bis hinab nach Holyrood. Englische Truppen sind erst vor ein paar Jahren abgezogen.' },
+  { id: 'stirling', name: 'Stirling', type: 'burg', faction: 'schotten', clear: 7, realm: 'sc', lon: -3.95, lat: 56.125, castleLevel: 3, produces: ['stein', 'fleisch'], demands: ['wein', 'getreide', 'eisen'],
+    desc: 'Die Brücke über den Forth und die Burg darüber: Wer Stirling hält, hält den Schlüssel zu den Highlands.' },
+  { id: 'roxburgh', name: 'Roxburgh', type: 'burg', faction: 'schotten', clear: 7, realm: 'sc', lon: -2.45, lat: 55.59, produces: ['wolle', 'felle'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Königsburg zwischen Tweed und Teviot an der Grenze. Hier treffen schottische und englische Viehdiebe aufeinander.' },
+  { id: 'berwick', name: 'Berwick', type: 'markt', faction: 'gilde', clear: 7, realm: 'sc', lon: -2.02, lat: 55.78, port: true, produces: ['wolle', 'salz', 'fleisch'], demands: ['wein', 'eisen', 'holz'],
+    desc: 'Der reichste Hafen Schottlands an der Mündung des Tweed. Flämische Schiffe holen hier die Wolle der Abteien ab.' },
+  { id: 'melrose', name: 'Melrose', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -2.74, lat: 55.6, produces: ['wolle', 'bier'], demands: ['salz', 'wein', 'eisen'],
+    desc: 'Die große Zisterzienserabtei im Tweedtal. Ihre Schafherden sind die größten des ganzen Königreichs.' },
+  { id: 'glasgow', name: 'Glasgow', type: 'abtei', faction: 'kirche', clear: 7, realm: 'sc', lon: -4.24, lat: 55.865, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale des heiligen Mungo', len: 3.8, central: 'turm' }], produces: ['fleisch', 'bier'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Ein Bischofssitz am Clyde mit einem jungen Markt. Der Bischof baut eine neue Kathedrale über dem Grab des heiligen Mungo.' },
+  { id: 'ayr', name: 'Ayr', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -4.62, lat: 55.46, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'eisen', 'bier'],
+    desc: 'Ein junger Königsflecken an der Westküste, mit einer neuen Burg gegen die Herren von Galloway.' },
+  { id: 'dumfries', name: 'Dumfries', type: 'markt', faction: 'gilde', clear: 6, realm: 'sc', lon: -3.61, lat: 55.07, produces: ['wolle', 'felle'], demands: ['wein', 'salz', 'getreide'],
+    desc: 'Markt am Nith, wo die Leute aus Galloway ihr Vieh verkaufen. Man hört hier noch Gälisch.' },
+  { id: 'dunfermline', name: 'Dunfermline', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -3.46, lat: 56.07, landmarks: [{ kind: 'kathedrale', name: 'Abteikirche der Königin Margarete', len: 3.6, westTowers: 2 }], produces: ['bier', 'getreide'], demands: ['wein', 'salz', 'stein'],
+    desc: 'Die Benediktiner hüten hier die Gräber der schottischen Könige und der heiligen Königin Margarete.' },
+  { id: 'standrews', name: 'St Andrews', type: 'abtei', faction: 'kirche', clear: 7, realm: 'sc', lon: -2.8, lat: 56.335, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale des heiligen Andreas (im Bau)', len: 4.6, westTowers: 2, scaffold: true }], produces: ['wolle', 'fleisch'], demands: ['stein', 'wein', 'eisen'],
+    desc: 'Pilger kommen über das Meer zu den Gebeinen des Apostels. Die Bischöfe bauen die größte Kirche Schottlands.' },
+  { id: 'perth', name: 'Perth', type: 'markt', faction: 'gilde', clear: 7, realm: 'sc', lon: -3.44, lat: 56.395, produces: ['wolle', 'felle', 'getreide'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Die Stadt am Tay, bis wohin die Schiffe fahren. Nebenan in Scone werden die Könige auf dem Schicksalsstein gekrönt.' },
+  { id: 'dundee', name: 'Dundee', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -2.97, lat: 56.465, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'holz', 'bier'],
+    desc: 'Fischer und Kaufleute an der Mündung des Tay. Der Bruder des Königs hat hier eine Kirche gestiftet.' },
+  { id: 'dunkeld', name: 'Dunkeld', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -3.59, lat: 56.565, produces: ['holz', 'felle'], demands: ['getreide', 'salz', 'wein'],
+    desc: 'Ein alter Bischofssitz am Tor zu den Highlands, wo der Tay aus den Bergen kommt.' },
+  { id: 'aberdeen', name: 'Aberdeen', type: 'markt', faction: 'gilde', clear: 7, realm: 'sc', lon: -2.1, lat: 57.15, port: true, produces: ['fleisch', 'felle', 'salz'], demands: ['getreide', 'wein', 'eisen', 'bier'],
+    desc: 'Hafen zwischen Dee und Don. Kaufleute aus Norwegen und Flandern handeln hier Lachs und Felle.' },
+  { id: 'kinloss', name: 'Kinloss', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -3.56, lat: 57.63, produces: ['getreide', 'bier'], demands: ['salz', 'eisen', 'wein'],
+    desc: 'Eine Zisterzienserabtei an der Küste von Moray, gestiftet von König David, mit Gärten und Obstbäumen.' },
+  { id: 'inverness', name: 'Inverness', type: 'burg', faction: 'schotten', clear: 7, realm: 'sc', lon: -4.23, lat: 57.475, produces: ['felle', 'holz'], demands: ['getreide', 'wein', 'eisen', 'salz'],
+    desc: 'Die Königsburg an der Mündung der Ness, der letzte feste Platz des Königs. Dahinter beginnen die Länder der Clans.' },
+  { id: 'dornoch', name: 'Dornoch', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -4.03, lat: 57.88, produces: ['fleisch', 'felle'], demands: ['getreide', 'salz', 'eisen'],
+    desc: 'Ein Dorf am Firth im Land Sutherland. Nördlich davon herrschen die Jarle von Orkney.' },
+  { id: 'thurso', name: 'Thurso', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -3.53, lat: 58.585, produces: ['fleisch', 'salz'], demands: ['getreide', 'holz', 'eisen'],
+    desc: 'Am Rand der Welt: ein nordischer Fischerort in Caithness. Hier spricht man mehr Norwegisch als Gälisch.' },
+  { id: 'inverlochy', name: 'Inverlochy', type: 'halle', faction: 'schotten', clear: 6, realm: 'sc', lon: -5.08, lat: 56.83, produces: ['felle', 'fleisch', 'holz'], demands: ['salz', 'getreide', 'wein'],
+    desc: 'Die Halle eines Clanherrn am Fuß des Ben Nevis. Hier gilt das Wort des Clans mehr als das des Königs.' },
+  { id: 'dunstaffnage', name: 'Dunstaffnage', type: 'halle', faction: 'schotten', clear: 6, realm: 'sc', lon: -5.42, lat: 56.45, produces: ['fleisch', 'felle'], demands: ['eisen', 'wein', 'getreide'],
+    desc: 'Die Seefeste der Herren von Lorn, Nachkommen des großen Somerled. Ihre Galeeren beherrschen die Inseln.' },
+  { id: 'leadhills', name: 'Bleigruben von Leadhills', type: 'mine', ore: 'blei', faction: 'schotten', clear: 4, realm: 'sc', lon: -3.76, lat: 55.43, produces: ['blei', 'silber'], demands: ['getreide', 'bier', 'fleisch'],
+    desc: 'Gruben hoch in den Lowther Hills. Die Mönche von Newbattle waschen hier Blei und ein wenig Silber.' },
+  { id: 'ettrick', name: 'Lager im Ettrick Forest', type: 'lager', faction: 'waldleute', clear: 3, realm: 'sc', lon: -3.12, lat: 55.43, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
+    desc: 'Im königlichen Jagdforst zwischen den Grenzhügeln verstecken sich Geächtete beider Reiche.' },
+  { id: 'whithorn', name: 'Höhle des heiligen Ninian', type: 'einsiedelei', feature: 'hoehle', faction: 'kirche', clear: 3, realm: 'sc', lon: -4.48, lat: 54.71, produces: [], demands: [],
+    desc: 'Eine Höhle an der Küste von Galloway, in der der heilige Ninian betete. Pilger ritzen Kreuze in den Fels.' },
+  { id: 'clava', name: 'Steingräber von Clava', type: 'einsiedelei', feature: 'grab', faction: 'kirche', clear: 3, realm: 'sc', lon: -4.07, lat: 57.46, produces: [], demands: [],
+    desc: 'Runde Steinhügel im Kreis aufrechter Steine. Die Alten sagen, darunter schlafen die Feen.' },
+  // ---------------- Irland (Prinz John ist Herr von Irland; die gälischen Könige halten den Westen)
+  { id: 'dublin', name: 'Dublin', type: 'stadt', cityR: 14, faction: 'normannen', clear: 8, realm: 'ir', lon: -6.27, lat: 53.345, port: true, landmarks: [{ kind: 'kathedrale', name: 'Christ Church', len: 4.0, central: 'turm' }], produces: ['felle', 'fleisch', 'salz'], demands: ['wein', 'eisen', 'getreide', 'wolle'],
+    desc: 'Die alte Stadt der Nordmänner an der Liffey, heute in normannischer Hand. Prinz John hat sie den Bürgern von Bristol gegeben.' },
+  { id: 'drogheda', name: 'Drogheda', type: 'dorf', faction: 'normannen', clear: 6, realm: 'ir', lon: -6.36, lat: 53.71, produces: ['getreide', 'fleisch'], demands: ['salz', 'eisen', 'wein'],
+    desc: 'Ein normannischer Brückenort an der Mündung der Boyne. Getreide aus Meath geht hier aufs Schiff.' },
+  { id: 'trim', name: 'Trim', type: 'burg', faction: 'normannen', clear: 7, realm: 'ir', lon: -6.79, lat: 53.553, castleLevel: 3, produces: ['getreide', 'stein'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Der gewaltige Bergfried der de Lacys an der Boyne: die größte Burg Irlands, mitten im fruchtbaren Meath.' },
+  { id: 'carrickfergus', name: 'Carrickfergus', type: 'burg', faction: 'normannen', clear: 7, realm: 'ir', lon: -5.81, lat: 54.715, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'wein', 'eisen'],
+    desc: 'Die Burg des John de Courcy auf dem Felsen am Belfast Lough. Er hat Ulster auf eigene Faust erobert.' },
+  { id: 'downpatrick', name: 'Downpatrick', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -5.72, lat: 54.33, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Down', len: 3.4, central: 'turm' }], produces: ['bier', 'fleisch'], demands: ['salz', 'wein', 'eisen'],
+    desc: 'Hier sollen der heilige Patrick, Brigid und Columba begraben liegen. De Courcy hat die Gebeine feierlich erhoben.' },
+  { id: 'armagh', name: 'Armagh', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -6.65, lat: 54.35, landmarks: [{ kind: 'rundturm_ir', name: 'Rundturm von Armagh' }], produces: ['wolle', 'bier'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Der Sitz des Nachfolgers des heiligen Patrick, Haupt aller Kirchen Irlands. Gelehrte kommen von weit her.' },
+  { id: 'dungannon', name: 'Tullyhogue', type: 'halle', faction: 'iren', clear: 6, realm: 'ir', lon: -6.77, lat: 54.58, produces: ['fleisch', 'felle', 'wolle'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Die Halle der Ó Néill beim Krönungshügel von Tír Eoghain. Ihre Könige weichen keinem Normannen.' },
+  { id: 'donegal', name: 'Donegal', type: 'halle', faction: 'iren', clear: 6, realm: 'ir', lon: -8.1, lat: 54.655, produces: ['fleisch', 'felle'], demands: ['wein', 'salz', 'getreide'],
+    desc: 'Die Festung der Fremden an der Mündung des Eske, heute Halle der Ó Domhnaill von Tír Chonaill.' },
+  { id: 'galway', name: 'Galway', type: 'burg', faction: 'iren', clear: 7, realm: 'ir', lon: -9.05, lat: 53.28, produces: ['fleisch', 'felle', 'salz'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Burg der Ó Conchobair an der Mündung der Corrib, Bollwerk der Könige von Connacht gegen die Normannen.' },
+  { id: 'clonmacnoise', name: 'Clonmacnoise', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -7.99, lat: 53.325, landmarks: [{ kind: 'rundturm_ir', name: 'Rundturm von Clonmacnoise' }], produces: ['bier', 'wolle'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Die Klosterstadt am Shannon mit ihren Hochkreuzen und Rundtürmen. Hier liegen die Könige von Connacht begraben.' },
+  { id: 'kilkenny', name: 'Kilkenny', type: 'burg', faction: 'normannen', clear: 7, realm: 'ir', lon: -7.25, lat: 52.655, produces: ['getreide', 'wolle'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Die Burg des Marschalls über der Nore, Herz der Herrschaft Leinster. Um sie herum wächst eine Stadt.' },
+  { id: 'wexford', name: 'Wexford', type: 'dorf', faction: 'normannen', clear: 6, realm: 'ir', lon: -6.47, lat: 52.34, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'eisen', 'bier'],
+    desc: 'Hier landeten die ersten Normannen. Der Hafen der Nordmänner liegt im Schutz der Sandbänke.' },
+  { id: 'waterford', name: 'Waterford', type: 'markt', faction: 'gilde', clear: 7, realm: 'ir', lon: -7.11, lat: 52.258, port: true, landmarks: [{ kind: 'rundturm', name: 'Reginalds Turm' }], produces: ['wein', 'salz', 'felle'], demands: ['wolle', 'getreide', 'eisen'],
+    desc: 'Die Hafenstadt am Suir mit dem runden Turm der Nordmänner. Hier hat Strongbow die Königstochter Aoife geheiratet.' },
+  { id: 'cashel', name: 'Cashel', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -7.885, lat: 52.52, landmarks: [{ kind: 'rundturm_ir', name: 'Fels von Cashel' }], produces: ['wolle', 'getreide'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Auf dem Felsen der alten Könige von Munster stehen heute die Kapelle des Cormac und der Sitz eines Erzbischofs.' },
+  { id: 'cork', name: 'Cork', type: 'markt', faction: 'gilde', clear: 7, realm: 'ir', lon: -8.47, lat: 51.895, port: true, produces: ['fleisch', 'felle', 'salz'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Stadt auf den Inseln im Sumpf des Lee. Normannische Ritter halten sie gegen die Könige von Desmond.' },
+  { id: 'killarney', name: 'Lough Léin', type: 'halle', faction: 'iren', clear: 6, realm: 'ir', lon: -9.5, lat: 52.06, produces: ['fleisch', 'felle', 'holz'], demands: ['salz', 'wein', 'eisen'],
+    desc: 'Am See unter den höchsten Bergen Irlands hält der Mac Cárthaigh Mór von Desmond Hof.' },
+  { id: 'limerick', name: 'Limerick', type: 'burg', faction: 'iren', clear: 7, realm: 'ir', lon: -8.625, lat: 52.67, produces: ['fleisch', 'salz', 'felle'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Königsstadt der Ó Briain am Shannon. Der alte König Domnall hat sie lieber angezündet, als sie den Normannen zu lassen.' },
+  { id: 'silvermines', name: 'Silbergruben von Ormond', type: 'mine', ore: 'silber', faction: 'iren', clear: 4, realm: 'ir', lon: -8.24, lat: 52.8, produces: ['silber', 'blei'], demands: ['getreide', 'bier', 'fleisch'],
+    desc: 'Alte Gruben in den Bergen über dem Lough Derg. Wer hier gräbt, zahlt dem König von Thomond seinen Teil.' },
+  { id: 'wicklow', name: 'Lager in den Wicklow-Bergen', type: 'lager', faction: 'waldleute', clear: 3, realm: 'ir', lon: -6.55, lat: 52.88, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
+    desc: 'In den Tälern der Berge sitzen Vertriebene, die von hier aus die Höfe um Dublin heimsuchen.' },
+  { id: 'newgrange', name: 'Hügel von Brú na Bóinne', type: 'einsiedelei', feature: 'grab', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.48, lat: 53.695, produces: [], demands: [],
+    desc: 'Ein riesiger Grabhügel mit weißen Steinen an der Boyne. Die Iren sagen, hier wohnt der Gott Aengus.' },
+  { id: 'glendalough', name: 'Klause des heiligen Kevin', type: 'einsiedelei', feature: 'hoehle', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.33, lat: 53.01, produces: [], demands: [],
+    desc: 'Im Tal der zwei Seen lebte der heilige Kevin in einer Felsenhöhle. Noch immer kommen Einsiedler hierher.' },
+  { id: 'tara', name: 'Hügel von Tara', type: 'einsiedelei', feature: 'steine', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.61, lat: 53.58, produces: [], demands: [],
+    desc: 'Der Sitz der alten Hochkönige. Auf dem Hügel steht der Stein des Schicksals, der aufschreit, wenn der wahre König ihn berührt.' },
+  { id: 'kildare', name: 'Quelle der heiligen Brigid', type: 'einsiedelei', feature: 'quelle', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.93, lat: 53.15, produces: [], demands: [],
+    desc: 'Bei Kildare entspringt die Quelle der heiligen Brigid. Die Nonnen hüten dort ein Feuer, das nie erlischt.' },
 ];
 
 // Fähren zwischen den Häfen: Kosten in Gold je Person, Dauer in Stunden
@@ -574,6 +706,9 @@ export const FERRIES = [
   { a: 'dover', b: 'calais', cost: 4, hours: 5, ship: 'Fährschiff' },
   { a: 'portsmouth', b: 'barfleur', cost: 7, hours: 12, ship: 'Kogge' },
   { a: 'london', b: 'brugge', cost: 9, hours: 20, ship: 'Wollschiff' },
+  { a: 'pembroke', b: 'waterford', cost: 7, hours: 14, ship: 'Kogge' },
+  { a: 'bristol', b: 'dublin', cost: 10, hours: 30, ship: 'Weinschiff' },
+  { a: 'carrickfergus', b: 'ayr', cost: 5, hours: 9, ship: 'Galeere' },
 ];
 
 // Sehenswürdigkeiten: Wer sie zum ersten Mal besucht, gewinnt Ruhm
@@ -589,11 +724,17 @@ export const REGIONS = [
   { name: 'ENGLAND', lon: -1.2, lat: 52.3, size: 1.3 }, { name: 'WALES', lon: -3.7, lat: 52.35, size: 1 },
   { name: 'NORMANDIE', lon: 0.2, lat: 49.0, size: 1 }, { name: 'FRANKREICH', lon: 2.9, lat: 48.6, size: 1.3 },
   { name: 'FLANDERN', lon: 3.2, lat: 50.75, size: 0.9 }, { name: 'BRETAGNE', lon: -3.1, lat: 48.25, size: 0.9 },
-  { name: 'IRLAND', lon: -6.36, lat: 53.15, size: 0.8, align: 'left' }, { name: 'SCHOTTLAND', lon: -3.9, lat: 55.18, size: 0.8 },
+  { name: 'IRLAND', lon: -8.1, lat: 53.05, size: 1.3 }, { name: 'SCHOTTLAND', lon: -4.3, lat: 57.0, size: 1.3 },
+  { name: 'HIGHLANDS', lon: -5.0, lat: 57.75, size: 0.8 }, { name: 'ULSTER', lon: -6.9, lat: 54.7, size: 0.8 }, { name: 'CONNACHT', lon: -9.0, lat: 53.75, size: 0.8 },
+  { name: 'MUNSTER', lon: -8.9, lat: 52.3, size: 0.8 }, { name: 'LEINSTER', lon: -6.95, lat: 52.95, size: 0.8 },
+  { name: 'Atlantik', lon: -10.2, lat: 55.6, size: 1.1, sea: true }, { name: 'Nordsee', lon: -0.8, lat: 57.2, size: 1.1, sea: true },
   { name: 'Ärmelkanal', lon: -2.3, lat: 50.05, size: 0.9, sea: true }, { name: 'Nordsee', lon: 2.6, lat: 53.6, size: 1.1, sea: true },
-  { name: 'Irische See', lon: -4.6, lat: 53.7, size: 0.8, sea: true }, { name: 'Atlantik', lon: -5.6, lat: 49.2, size: 0.9, sea: true },
+  { name: 'Irische See', lon: -5.0, lat: 53.75, size: 0.9, sea: true }, { name: 'Atlantik', lon: -5.6, lat: 49.2, size: 0.9, sea: true },
 ];
 
+// Hallen heißen je nach Land anders
+const HALL_NAME = { en: 'Sächsische Halle', wa: 'Walisische Fürstenhalle', sc: 'Halle eines Clanherrn', ir: 'Halle eines irischen Königs' };
+export function siteTypeName(s) { return s.type === 'halle' && HALL_NAME[s.realm] ? HALL_NAME[s.realm] : TYPE_NAME[s.type]; }
 export const TYPE_NAME = {
   spieler: 'Dein Burgstall', stadt: 'Stadt', markt: 'Marktflecken', halle: 'Sächsische Halle', burg: 'Burg',
   abtei: 'Abtei', lager: 'Lager', dorf: 'Dorf', mine: 'Erzgrube', einsiedelei: 'Mystischer Ort',
@@ -616,7 +757,7 @@ export const LOOKS = {
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
 // Livree der Bewaffneten je Partei: kräftig, damit man die Seiten im Gewühl unterscheidet (Waffenrock und Ring am Boden)
-export const LIVERY = { normannen: '#d2382a', sachsen: '#3f9e32', franken: '#2c62d6', waldleute: '#8a9a2a', gilde: '#a052d0', kirche: '#e0c25a' };
+export const LIVERY = { normannen: '#d2382a', sachsen: '#3f9e32', franken: '#2c62d6', waldleute: '#8a9a2a', gilde: '#a052d0', kirche: '#e0c25a', schotten: '#1fa2b4', iren: '#e8822c' };
 // Wappenfarben zur Wahl im Startmenü
 export const HERALDRY = [
   { id: 'blau', name: 'Königsblau', color: '#2c4f86' },

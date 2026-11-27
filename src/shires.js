@@ -31,6 +31,16 @@ export const SHIRES = {
   evreux: { name: 'Grafschaft Évreux', goods: { getreide: 8 }, text: 'Die Kornkammer an der Eure: täglich 8 Getreide.' },
   gisors: { name: 'Vexin', def: 25, text: 'Die umkämpfte Grenzfeste zwischen Normandie und Frankreich (+25 Verteidigung).' },
   compiegne: { name: 'Île-de-France', weight: 0.72, goods: { holz: 8 }, text: 'Die Krondomäne um Paris mit dem königlichen Forst von Compiègne: täglich 8 Holz.' },
+  // Schottland
+  roxburgh: { name: 'Teviotdale', goods: { wolle: 6 }, text: 'Die Schafweiden der Grenzabteien: täglich 6 Wolle.' },
+  stirling: { name: 'Stirlingshire', weight: 0.85, def: 20, text: 'Die Brücke über den Forth: Wer sie hält, hält das Reich zusammen (+20 Verteidigung).' },
+  inverness: { name: 'Moray', weight: 0.8, goods: { felle: 4, holz: 4 }, text: 'Der Zugang zu den Highlands: täglich Felle und Holz aus den Wäldern der Clans.' },
+  // Irland
+  carrickfergus: { name: 'Ulster', weight: 0.85, goods: { fleisch: 5 }, text: 'Die Rinderweiden von Antrim und Down: täglich 5 Fleisch.' },
+  trim: { name: 'Meath', goods: { getreide: 8 }, text: 'Das fruchtbarste Land Irlands: täglich 8 Getreide.' },
+  kilkenny: { name: 'Leinster', gold: 15, text: 'Das Erbe Strongbows mit seinen Märkten und Häfen: täglich 15 Gold.' },
+  limerick: { name: 'Thomond', goods: { fleisch: 3, salz: 2 }, text: 'Das Königreich der Ó Briain am Shannon: täglich Fleisch und Salz.' },
+  galway: { name: 'Connacht', weight: 0.8, goods: { felle: 3, wolle: 3 }, text: 'Das weite Land jenseits des Shannon: täglich Felle und Wolle.' },
 };
 export const HOME_SHIRE = 'pontefract';
 // Abgaben je Ort in einer eigenen Grafschaft (Gold am Tag)
@@ -39,14 +49,14 @@ const TAX = { stadt: 15, markt: 8, abtei: 6, halle: 6, dorf: 3, burg: 10 };
 const K = 4;                 // Rastergröße in Kacheln
 // Reichweite in Rastern: in England und Wales bis rund 160 km (auch Devon und Cornwall), auf dem Festland rund
 // 115 km (Flandern und die Bretagne bleiben eigene Herrschaften)
-const SHIRE_REACH = { en: 50 * 10, wa: 50 * 10, nd: 36 * 10, fr: 36 * 10 };
+const SHIRE_REACH = { en: 50 * 10, wa: 50 * 10, nd: 36 * 10, fr: 36 * 10, sc: 50 * 10, ir: 50 * 10 };
 
-// Schottland gehört zu keiner Grafschaft (grob: nördlich von Solway und Tweed)
+// Schottland (grob: nördlich von Solway und Tweed) hat eigene Grafschaften: Die Grenze trennt sie von den englischen
 function scotland(lon, lat) {
   if (lon < -3.3) return lat > 54.6;
   if (lon < -3.05) return lat > 54.95;
-  if (lon < -2.0) return lat > 54.98 + (lon + 3.05) * 0.78;
-  return lat > 55.8;
+  if (lon < -2.0) return lat > 54.98 + (lon + 3.05) * 0.7;
+  return lat > 55.74;
 }
 
 // Raster der Grafschaften: Flutung über Land von allen Sitzen zugleich (Kosten 10 gerade, 14 schräg)
@@ -56,18 +66,20 @@ export function buildShires(W) {
   const seats = W.sites.filter((s) => s.type === 'burg' && SHIRES[s.id]);
   const grid = new Uint8Array(S * S), cost = new Int32Array(S * S).fill(1 << 30), orig = new Uint8Array(S * S);
   const land = new Int32Array(S * S);
+  const york = W.sites.find((s) => s.id === 'york'), gbLand = york ? landAt(W, york.x, york.y) : 0;
   for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
     const x = i * K + K / 2, y = j * K + K / 2;
     const l = landAt(W, x, y);
     if (!l) continue;
     const lon = GEO.lonW + x * GEO.dLon, lat = GEO.latN - y * GEO.dLat;
-    if (scotland(lon, lat)) continue;
-    land[j * S + i] = l;
+    // Schottische Felder bekommen eine eigene Nummer: Englische Sitze greifen nicht über die Grenze und umgekehrt
+    land[j * S + i] = l === gbLand && scotland(lon, lat) ? -l : l;
   }
   const buckets = [];
   const push = (c, v, k) => { (buckets[c] || (buckets[c] = [])).push(v, k); };
   seats.forEach((s, n) => {
     s.landSeat = landAt(W, s.x, s.y);
+    if (s.realm === 'sc') s.landSeat = -s.landSeat;
     // Weitere Ausgangspunkte: Das Umland von York (das Ainsty) gehört zum West Riding
     const from = [s, ...(SHIRES[s.id].also || []).map((id) => W.sites.find((o) => o.id === id)).filter(Boolean)];
     from.forEach((o, q) => {
