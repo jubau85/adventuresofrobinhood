@@ -2,6 +2,8 @@
 # Aufruf: python3 tools/figuren_rendern.py <arbeitsordner> <held-ordner mit teile/topfhelm.glb> [schlüssel ...]
 # Schlüssel held_<stufe> rendern den Helden (edel, gambeson, leder, kette, schuppe, ritter) nach <held-ordner>/sp_<stufe>/.
 # Ohne Schlüssel: erst der Held, dann alle übrigen Figuren.
+# Liegt im Arbeitsordner der Unterordner neubemalung/ (tools/meshy_bemalung.py), gilt dessen Bemalung <schlüssel>_farbe.png
+# (Held: edel_farbe.png, edel_<stufe>_farbe.png) vor der alten.
 import subprocess, sys, os, json, time, shutil
 D = os.path.abspath(sys.argv[1]); R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 B = '/opt/blender-venv/bin/python'
@@ -31,6 +33,10 @@ KEYS['ritterin'] = ('ritterin', 'wams', False)
 for v in ['leder', 'kette', 'schuppe']: KEYS[f'soldat_{v}'] = ('soldat', v, False)
 for v in ['gambeson', 'leder', 'kette', 'schuppe', 'ritter']: KEYS[f'ritterin_{v}'] = ('ritterin', v, v == 'ritter')
 HELD = ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']
+NEU = os.path.join(os.path.dirname(D), 'neubemalung')
+def neu(name):
+    f = os.path.join(NEU, f'{name}_farbe.png')
+    return f if os.path.exists(f) else None
 want = sys.argv[3:] or [f'held_{v}' for v in HELD] + list(KEYS)
 # Bildgüte: dreifach … zweifach groß rendern und flächig verkleinern (statt kleiner Bilder mit Entrauscher, der die
 # Bemalung verschmiert), dünner Umriss, kräftigere Sonne mit Gegenlicht und Umgebungsverdeckung in den Falten
@@ -48,7 +54,7 @@ for key in [k for k in want if k.startswith('held_')]:
     v = key[5:]; out = os.path.join(E, f'sp_{v}'); t0 = time.time(); fresh(out)
     X = ['--meter', '1.8', '--zelle', '224', '--figur', '120', '--punkt', 'RightHand,LeftHand,Hips'] + QUALI
     # ohne Rüstung das Wams cyan (tools/wams.py), damit es die Wappenfarbe trägt
-    X += ['--textur', os.path.join(E, f'{"wams" if v == "edel" else v}_farbe.png')]
+    X += ['--textur', neu('edel' if v == 'edel' else f'edel_{v}') or os.path.join(E, f'{"wams" if v == "edel" else v}_farbe.png')]
     if v == 'ritter': X += ['--helm', os.path.join(E, 'teile', 'topfhelm.glb')]
     print(key, flush=True)
     run([os.path.join(E, 'edel_walking.glb'), out] + X + ['--bilder', 'walking_man=8'])
@@ -65,7 +71,8 @@ for key in [k for k in want if not k.startswith('held_')]:
     t0 = time.time(); fresh(out)
     # Spielgröße (Zelle 168, Figur 90 px), intern doppelt so groß gerendert
     X = ['--meter', '1.8', '--zelle', '168', '--figur', '90', '--punkt', 'RightHand,LeftHand,Hips'] + QUALI
-    if var: X += ['--textur', os.path.join(D, folder, f'{var}_farbe.png')]
+    if neu(key): X += ['--textur', neu(key)]
+    elif var: X += ['--textur', os.path.join(D, folder, f'{var}_farbe.png')]
     if helm: X += ['--helm', os.path.join(E, 'teile', 'topfhelm.glb')]
     rig = os.path.join(src, 'rig.glb')
     print(key, flush=True)

@@ -43,6 +43,20 @@ out = {'zelle': CELL, 'fusspunkt': [round((meta['fusspunkt'][0] - X0) * KX, 1), 
        'figur_px': round(meta['figur_px'] * KY, 1), 'richtungen': meta['richtungen'], 'bewegungen': {}}
 if opt.get('zuschnitt'): out['breite'], out['hoehe'] = CW, CH
 
+# Farbanpassung (--farbe hell,satt,kontrast,waerme,gamma): die gerenderten Figuren heller, kräftiger und etwas wärmer,
+# damit sie neben den gemalten Häusern nicht matt wirken; gilt auch für die umzufärbende Fläche
+FARBE = [float(v) for v in opt['farbe'].split(',')] if opt.get('farbe') else None
+def grade(a):
+    if not FARBE: return a
+    hell, satt, kon, warm, gam = (FARBE + [1, 1, 1, 0, 1])[:5] if len(FARBE) < 5 else FARBE[:5]
+    rgb = np.clip(a[..., :3] * hell, 0, 1) ** gam
+    rgb = np.clip((rgb - 0.5) * kon + 0.5, 0, 1)
+    lum = (rgb * np.array([0.299, 0.587, 0.114], np.float32)).sum(-1, keepdims=True)
+    rgb = np.clip(lum + (rgb - lum) * satt, 0, 1)
+    rgb = np.clip(rgb * np.array([1 + warm, 1 + warm * 0.3, 1 - warm], np.float32), 0, 1)
+    a = a.copy(); a[..., :3] = rgb
+    return a
+
 def hue_sat(a):
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     mx, mn = a[..., :3].max(-1), a[..., :3].min(-1)
@@ -65,7 +79,7 @@ for old, info in meta['bewegungen'].items():
                 cut.paste(im.crop((q * Z + X0, r * Z + Y0, q * Z + X1, r * Z + Y1)), (q * (X1 - X0), r * (Y1 - Y0)))
         im = cut
     if (CW, CH) != (X1 - X0, Y1 - Y0): im = im.resize((cols * CW, rows * CH), Image.LANCZOS)
-    a = np.asarray(im).astype(np.float32) / 255
+    a = grade(np.asarray(im).astype(np.float32) / 255)
     hue, sat, val = hue_sat(a)
     # Gewicht „Cyan“: Farbton um 180°, kräftig genug gesättigt
     wgt = np.clip(1 - np.abs(hue - HUE) / HUE_W, 0, 1) * np.clip((sat - 0.18) / 0.2, 0, 1) * (val > 0.12)

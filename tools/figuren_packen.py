@@ -4,6 +4,8 @@
 import json, glob, os, subprocess, sys
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = os.path.abspath(sys.argv[1]); E = os.path.abspath(sys.argv[2])
+# Farbanpassung aller Figuren (tools/sprite_pack.py --farbe): heller, kräftiger, etwas wärmer
+FARBE = ['--farbe', '1.25,1.35,1.08,0.05,0.92']
 NAMEN = ('walking_man=gehen,walking=gehen,walking_woman=gehen,running=laufen,Idle=stehen,Walking_Woman=gehen,Elderly_Shaky_Walk=gehen,'
          'Female_Crouch_Pick_Up_Place_Side=aufheben,Male_Bend_Over_Pick_Up=aufheben,Stand_and_Drink=trinken,Cheer_with_Both_Hands_Up=jubeln,'
          'Talk_with_Hands_Open=reden,Carry_Water_Bucket_Walk=eimer,Sit_Cross_Legged_on_Floor=sitzen,Hit_Reaction=getroffen,'
@@ -39,7 +41,7 @@ if not only_fig:
     for v in ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']:
         # Ritter: Waffenrock, Edelmann: Wams in der Wappenfarbe; die übrigen Rüstungen ohne Farbe
         x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if v == 'ritter' else ['--farbton', '188', '--breite', '34'] if v == 'edel' else ['--ohne-maske', '1']
-        hero[v] = entry(pack(os.path.join(E, f'sp_{v}'), os.path.join(R, 'assets/held'), f'held_{v}', ['--zelle', '224', '--qualitaet', '84'] + x))
+        hero[v] = entry(pack(os.path.join(E, f'sp_{v}'), os.path.join(R, 'assets/held'), f'held_{v}', ['--zelle', '224', '--qualitaet', '84'] + x + FARBE))
     # nur der Held: die Figuren bleiben, wie sie sind
     if only_hero: fig.update(tables()['FIG3D'])
 else:
@@ -52,7 +54,7 @@ for sp in [] if only_hero else sorted(glob.glob(os.path.join(D, 'sp_*'))):
     if keys and key not in keys: continue
     if not os.path.exists(os.path.join(sp, 'sprites.json')): continue
     x = ['--farbton', '190', '--breite', '16', '--hell', '0.55'] if key == 'ritterin_ritter' else ['--farbton', '188', '--breite', '34'] if key.startswith('soldat') or key == 'ritterin' else []
-    fig[key] = entry(pack(sp, os.path.join(R, 'assets/figuren3d'), key, ['--zelle', '168', '--qualitaet', '76', '--maske-qualitaet', '60', '--alpha', '50'] + x))
+    fig[key] = entry(pack(sp, os.path.join(R, 'assets/figuren3d'), key, ['--zelle', '168', '--qualitaet', '76', '--maske-qualitaet', '60', '--alpha', '50'] + x + FARBE))
 js = lambda o: json.dumps(o, separators=(',', ':')).replace('"', "'")
 lines = ['// 3D-Figuren aus Meshy, gerendert mit tools/sprites.py, gepackt mit tools/sprite_pack.py (Rand abgeschnitten).',
          '// HERO3D: der Held je Rüstung (Bilder held_<stufe>_<bewegung>), FIG3D: alle übrigen Figuren (fig3d_<modell>_<bewegung>).',
