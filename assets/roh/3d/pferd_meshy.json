@@ -1,0 +1,10 @@
+{
+ "zweck": "Reit- und Schlachtpferd: bemaltes Meshy-Pferd, Skelett und Gangarten aus tools/pferd.py --meshy",
+ "meshy": {
+  "vorschau_text_to_3d": "01a21c3c-79c1-725e-8a4e-f9f288a96c0c",
+  "bemalung_refine": "01a21c3d-7527-74b0-8e17-392c71a5f1d5",
+  "credits": 30
+ },
+ "erzeugt": "tools/meshy_pferd.py",
+ "rendern": "tools/pferd.py <ziel.glb> [--art ross] --meshy assets/roh/3d/pferd_meshy.glb, dann tools/sprites.py --zelle 288 --figur 120 --meter 1.75 mit der Bildgüte aus tools/figuren_rendern.py"
+}
