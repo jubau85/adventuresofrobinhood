@@ -31,6 +31,8 @@ function siteLevels() { return G.s.siteLevel || (G.s.siteLevel = {}); }
 // Nach dem Laden und nach jedem Wechsel: Herr, Stufe, Farben
 export function applyHoldings() {
   let walls = false;
+  // Burgen, die im Krieg den Herrn gewechselt haben (war.js, loseHolding)
+  for (const [id, f] of Object.entries(G.s.siteFaction || {})) { const s = siteById(id); if (s && FACTIONS[f]) s.faction = f; }
   for (const [id, lv] of Object.entries(siteLevels())) {
     const s = siteById(id);
     if (s && s.castleLevel !== lv) { s.castleLevel = lv; walls = true; }
@@ -269,7 +271,8 @@ export function conquer(sg) {
 }
 
 // Die Burg ist verloren: Die Grafschaft geht an die früheren Herren, der Kastellan schlägt sich verwundet heim
-export function loseHolding(s, text) {
+// to: wer die Burg bekommt (sonst die früheren Herren); eine andere Partei als die frühere wird neuer Herr des Ortes
+export function loseHolding(s, text, to = null) {
   const h = holdingOf(s);
   if (!h) return;
   const c = castellanOf(h);
@@ -277,7 +280,9 @@ export function loseHolding(s, text) {
   if (c) { c.status = 'verwundet'; c.woundedDays = 4; c.seat = null; c.hp = Math.max(1, Math.round(c.st.maxHp * 0.2)); }
   log(text, 'bad');
   if (c) log(`${c.name} hat sich verwundet nach Hause durchgeschlagen.`, 'bad');
-  claimShire(s.id, h.from);
+  const lord = to || h.from;
+  if (lord && lord !== s.faction) { (G.s.siteFaction || (G.s.siteFaction = {}))[s.id] = lord; s.faction = lord; }
+  claimShire(s.id, lord);
   applyHoldings();
   rebuildUnits();
 }
@@ -321,10 +326,10 @@ function counterattack(s, h) {
 }
 
 // Nach einer echten Belagerung deiner eroberten Burg (siege.js)
-export function holdingSiegeOver(s, how, defenders) {
+export function holdingSiegeOver(s, how, defenders, by = null) {
   const h = holdingOf(s);
   if (!h) return;
-  if (how === 'gefallen') { loseHolding(s, `${s.name} ist gefallen! Die Grafschaft ${shireName(s.id)} geht an die früheren Herren zurück.`); return; }
+  if (how === 'gefallen') { loseHolding(s, `${s.name} ist gefallen! Die Grafschaft ${shireName(s.id)} ${by && by !== h.from ? `fällt an die ${FACTIONS[by].short}` : 'geht an die früheren Herren zurück'}.`, by); return; }
   h.garrison = Math.max(3, defenders);
   h.dmg = Math.min(0.8, h.dmg + 0.25);
   if (how === 'abgewehrt') { addRenown(10); const c = castellanOf(h); if (c) grantXp(c, 40); }

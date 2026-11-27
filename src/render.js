@@ -25,6 +25,29 @@ import { drawCharge, drawKnightPlate } from './heraldry.js';
 import { drawShires } from './shires.js';
 import { siteColor } from './holdings.js';
 import { tripPos } from './travels.js';
+import { campaignArrows } from './war.js';
+
+// Heere im Krieg (war.js): Pfeil von der Ausgangsburg zum Ziel in der Farbe der Partei, der Punkt zeigt, wie weit sie sind
+function drawCampaigns(c, v) {
+  for (const a of campaignArrows()) {
+    const p0 = miniPos(a.from.x, a.from.y, v), p1 = miniPos(a.to.x, a.to.y, v);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
+    const end = { x: p1.x - ux * 9, y: p1.y - uy * 9 };
+    c.save();
+    c.lineCap = 'round';
+    c.strokeStyle = 'rgba(250,240,220,0.85)'; c.lineWidth = 5.5;
+    c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(end.x, end.y); c.stroke();
+    c.strokeStyle = a.color; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(end.x, end.y); c.stroke();
+    // Spitze
+    c.fillStyle = a.color; c.strokeStyle = 'rgba(250,240,220,0.9)'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(p1.x - ux * 2, p1.y - uy * 2); c.lineTo(end.x - uy * 6, end.y + ux * 6); c.lineTo(end.x + uy * 6, end.y - ux * 6); c.closePath(); c.fill(); c.stroke();
+    const q = { x: p0.x + (end.x - p0.x) * a.k, y: p0.y + (end.y - p0.y) * a.k };
+    c.fillStyle = '#1d140c'; c.beginPath(); c.arc(q.x, q.y, 4.5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = a.color; c.beginPath(); c.arc(q.x, q.y, 3, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+}
 
 // Farbe eines Heeres: dein Aufgebot in deinen Farben, sonst die der Partei
 function armyColor(g) { return g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
@@ -5031,7 +5054,7 @@ export function drawMap(c, w, h, opts = {}) {
   c.imageSmoothingEnabled = false;
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
-  if (big) { drawMapDecor(c, v); drawShires(c, v); }
+  if (big) { drawMapDecor(c, v); drawShires(c, v); drawCampaigns(c, v); }
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);

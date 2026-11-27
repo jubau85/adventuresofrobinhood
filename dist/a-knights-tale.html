@@ -217,6 +217,18 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .action { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); }
 .action p { margin: 2px 0 0; font-size: 14px; color: var(--ink-soft); }
 .action .btn { flex: none; }
+/* Krieg: zwei Kriegsschauplätze */
+.theaters { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.theater { padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); display: flex; flex-direction: column; gap: 6px; }
+.theater header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.theater header h3 { margin: 0; }
+.warbar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(90,67,48,0.18); }
+.warbar span { display: block; height: 100%; }
+.warside { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 14px; }
+.seats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0; font-size: 14px; }
+.seat { white-space: nowrap; }
+.warnews { margin: 0; padding-left: 18px; font-size: 14px; }
+.warnews li { margin-bottom: 3px; }
 /* Reisen & Handel: kleine Formulare */
 .trip-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 14px; align-items: end; padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); margin-bottom: 10px; }
 .trip-form label { display: flex; flex-direction: column; gap: 3px; font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); }
@@ -3976,6 +3988,7 @@ function placeTrees(W, rng) {
 
 
 
+
 // ---------------------------------------------------------------- Werte
 function computeStats(u) {
   const c = CLASSES[u.cls];
@@ -5130,6 +5143,7 @@ function endFeud(g) {
 // Fern vom Spieler wird eine Fehde einfach ausgewürfelt
 function resolveFeud(a, b) {
   const win = strength(a) >= strength(b) ? a : b, lose = win === a ? b : a;
+  if (win.army && lose.army && !win.siege && !lose.siege) armyVictory(win);
   endFeud(a);
   removeGroup(lose);
   const n = Math.floor(win.members.length * rand(0.1, 0.45));
@@ -5267,6 +5281,7 @@ function updateArmy(g, p) {
   } else if (G.battle && (G.battle.a === g || G.battle.b === g)) {
     // Der Gegner ist geschlagen oder fort: Sieg melden, dann heimziehen
     if (nearPlayer(g, 60)) log(`${GROUP_TYPES[g.type].nom} ${GROUP_TYPES[g.type].pl ? 'haben' : 'hat'} die Schlacht gewonnen.`, 'gold');
+    armyVictory(g);
     G.battle = null;
     g.foe = null;
   }
@@ -6934,6 +6949,8 @@ function updateFunerals(dt) {
 
 
 
+
+
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
   normannen: { en: 'heer_richard', wa: 'heer_richard', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp' },
@@ -7035,7 +7052,8 @@ function startSiege(target = null, armyType = null, scale = null, opts = {}) {
   if (G.siege) return false;
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
-    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
+    // Grafschaftsburgen belagern die Heere im Krieg (war.js); hier geht es um Städte, Hallen und Märkte
+    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && !SHIRES[s.id] && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
       && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85 * MAP_K);
     if (!cand.length) return false;
     target = pick(cand);
@@ -7483,7 +7501,7 @@ function endSiege(sg, how, quiet = false) {
     else if (how === 'abgewehrt') log(`Dein Sturm auf ${name} ist gescheitert. Die Überlebenden deines Aufgebots zerstreuen sich.`, 'bad');
     else log(`Dein Aufgebot zieht von ${name} ab, ohne die Burg genommen zu haben. Die Söldner gehen ihrer Wege.`, 'bad');
   } else if (mine) {
-    holdingSiegeOver(s, how, sg.def && G.groups.includes(sg.def) ? sg.def.members.length : 0);
+    holdingSiegeOver(s, how, sg.def && G.groups.includes(sg.def) ? sg.def.members.length : 0, sg.army && sg.army.faction);
     if (how === 'abgewehrt') log(`Die Belagerung deiner Burg ${name} ist abgeschlagen!`, 'good');
   } else if (how === 'gefallen') {
     for (const b of siteBuildings(s.id)) if (Math.random() < 0.4) damageBuilding(b, rand(0.2, 0.45));
@@ -7501,6 +7519,8 @@ function endSiege(sg, how, quiet = false) {
     if (near) log(s.type === 'spieler' ? `Die Belagerung von ${name} ist abgeschlagen!` : `Die Belagerung von ${name} ist abgeschlagen. Die Verteidiger jubeln.`, 'good');
   } else if (near) log(`Die Belagerer ziehen von ${name} ab.`);
   if (!sg.lead && !mine) sideOutcome(sg, how, quiet);
+  // Im Krieg: Fällt eine Grafschaftsburg, wechselt sie den Herrn
+  if (!sg.lead && !mine && s.type !== 'spieler') seatSiegeOver(s, sg.army, how);
   // Tore wieder auf (die Bresche bleibt, bis sie vermauert ist). Heer zieht heim, Besatzung kehrt in die Häuser zurück.
   openGates(sg);
   const army = sg.army;
@@ -10123,6 +10143,8 @@ function siteLevels() { return G.s.siteLevel || (G.s.siteLevel = {}); }
 // Nach dem Laden und nach jedem Wechsel: Herr, Stufe, Farben
 function applyHoldings() {
   let walls = false;
+  // Burgen, die im Krieg den Herrn gewechselt haben (war.js, loseHolding)
+  for (const [id, f] of Object.entries(G.s.siteFaction || {})) { const s = siteById(id); if (s && FACTIONS[f]) s.faction = f; }
   for (const [id, lv] of Object.entries(siteLevels())) {
     const s = siteById(id);
     if (s && s.castleLevel !== lv) { s.castleLevel = lv; walls = true; }
@@ -10361,7 +10383,8 @@ function conquer(sg) {
 }
 
 // Die Burg ist verloren: Die Grafschaft geht an die früheren Herren, der Kastellan schlägt sich verwundet heim
-function loseHolding(s, text) {
+// to: wer die Burg bekommt (sonst die früheren Herren); eine andere Partei als die frühere wird neuer Herr des Ortes
+function loseHolding(s, text, to = null) {
   const h = holdingOf(s);
   if (!h) return;
   const c = castellanOf(h);
@@ -10369,7 +10392,9 @@ function loseHolding(s, text) {
   if (c) { c.status = 'verwundet'; c.woundedDays = 4; c.seat = null; c.hp = Math.max(1, Math.round(c.st.maxHp * 0.2)); }
   log(text, 'bad');
   if (c) log(`${c.name} hat sich verwundet nach Hause durchgeschlagen.`, 'bad');
-  claimShire(s.id, h.from);
+  const lord = to || h.from;
+  if (lord && lord !== s.faction) { (G.s.siteFaction || (G.s.siteFaction = {}))[s.id] = lord; s.faction = lord; }
+  claimShire(s.id, lord);
   applyHoldings();
   rebuildUnits();
 }
@@ -10413,10 +10438,10 @@ function counterattack(s, h) {
 }
 
 // Nach einer echten Belagerung deiner eroberten Burg (siege.js)
-function holdingSiegeOver(s, how, defenders) {
+function holdingSiegeOver(s, how, defenders, by = null) {
   const h = holdingOf(s);
   if (!h) return;
-  if (how === 'gefallen') { loseHolding(s, `${s.name} ist gefallen! Die Grafschaft ${shireName(s.id)} geht an die früheren Herren zurück.`); return; }
+  if (how === 'gefallen') { loseHolding(s, `${s.name} ist gefallen! Die Grafschaft ${shireName(s.id)} ${by && by !== h.from ? `fällt an die ${FACTIONS[by].short}` : 'geht an die früheren Herren zurück'}.`, by); return; }
   h.garrison = Math.max(3, defenders);
   h.dmg = Math.min(0.8, h.dmg + 0.25);
   if (how === 'abgewehrt') { addRenown(10); const c = castellanOf(h); if (c) grantXp(c, 40); }
@@ -10850,6 +10875,300 @@ function travelerTrip(u) { return trips().find((t) => t.who.includes(u.id)) || n
 function tripEta(t) { return t.stops.length ? t.stops[t.stops.length - 1] : null; }
 function className(u) { return CLASSES[u.cls].name; }
 
+// ===== war.js =====
+// Kriegskarte (Phase 5). Zwei Kriege laufen, ob du hinsiehst oder nicht:
+//   England: Richards Getreue (die Sachsen) gegen Prinz Johns Barone (die Normannen).
+//   Normandie: das normannische Aufgebot, das Richard die Treue hält, gegen König Philipp von Frankreich.
+// Jede Partei schickt Heere gegen die Grafschaften der Gegenseite. Fällt die Burg, wechselt die Grafschaft den Herrn.
+// In deiner Nähe wird daraus eine echte Belagerung, sonst entscheiden Stärke, Kriegsglück und Mauern. Feldschlachten
+// und deine Hilfe verschieben das Kriegsglück. Schwörst du einer Seite den Treueid, zählen deine Grafschaften für
+// sie, und ihre Feinde ziehen auch gegen dich. Ziel: ein geeintes England unter Richard oder die zurückgewonnene
+// Normandie (oder, wenn du Johann dienst, ein England unter Johann).
+
+
+
+
+
+
+
+
+
+
+const THEATERS = {
+  england: {
+    name: 'England', realms: ['en', 'wa'], goal: null,
+    sides: { richard: 'sachsen', john: 'normannen' },
+    names: { richard: 'Richards Getreue', john: 'Prinz Johns Barone' },
+    armies: { richard: 'heer_richard', john: 'heer_john' },
+    base: { richard: 85, john: 55 }, lead: { richard: 0.6, john: 0.4 },
+  },
+  normandie: {
+    // Ziel sind die vier Burgen der Normandie bis an die Grenze im Vexin; Compiègne bleibt Philipps Krondomäne
+    name: 'Normandie', realms: ['nd', 'fr'], goal: ['caen', 'falaise', 'evreux', 'gisors'],
+    sides: { richard: 'normannen', philipp: 'franken' },
+    names: { richard: 'das normannische Aufgebot', philipp: 'König Philipp' },
+    armies: { richard: 'heer_normandie', philipp: 'heer_philipp' },
+    base: { richard: 60, philipp: 75 }, lead: { richard: 0.5, philipp: 0.5 },
+  },
+};
+const THEATER_IDS = Object.keys(THEATERS);
+// Wem du die Treue schwören kannst
+const ALLEGIANCE = {
+  richard: { name: 'König Richard', text: 'Löwenherz ist frei und will sein Reich zurück: England von Johanns Baronen, die Normandie von Philipp.', rep: { sachsen: 15, waldleute: 5, normannen: -15 } },
+  john: { name: 'Prinz Johann', text: 'Johann ohne Land hält die Burgen und das Geld. Wer ihm dient, wird reich belehnt, und um die Normandie kümmert er sich nicht.', rep: { normannen: 15, sachsen: -20, waldleute: -10 } },
+};
+const CAMPAIGN_CHANCE = 0.25;   // je Kriegsschauplatz und Tag, solange dort kein Feldzug läuft
+const SUPPORT = { cost: 250, add: 20, days: 7 };
+
+function war() {
+  const w = G.s.war || (G.s.war = {});
+  w.morale = w.morale || {};
+  w.campaigns = w.campaigns || [];
+  w.log = w.log || [];
+  w.ended = w.ended || {};
+  return w;
+}
+function allegiance() { return war().allegiance || null; }
+function warLog(text, kind = 'info', loud = true) {
+  const w = war();
+  w.log.push({ day: G.s.day, text });
+  if (w.log.length > 40) w.log.splice(0, w.log.length - 40);
+  if (loud) log(text, kind);
+}
+
+// ---------------------------------------------------------------- Seiten und Grafschaften
+function theaterOf(site) { return THEATER_IDS.find((t) => THEATERS[t].realms.includes(site.realm)) || null; }
+function theaterSeats(th) { return G.world.sites.filter((s) => SHIRES[s.id] && THEATERS[th].realms.includes(s.realm)); }
+// Wem eine Grafschaft im Krieg zählt: der Partei ihres Herrn; deine nur der Seite, der du die Treue geschworen hast
+function sideOfOwner(th, owner) {
+  if (owner === 'spieler') { const a = allegiance(); return a && THEATERS[th].sides[a] ? a : null; }
+  return Object.keys(THEATERS[th].sides).find((k) => THEATERS[th].sides[k] === owner) || null;
+}
+function sideOfSeat(th, s) { return sideOfOwner(th, shireOwner(s.id)); }
+function sideName(th, side) { return THEATERS[th].names[side]; }
+function sideTitle(th, side) { const n = sideName(th, side); return n[0].toUpperCase() + n.slice(1); }
+function goalSeats(th) { const T = THEATERS[th]; return theaterSeats(th).filter((s) => (T.goal ? T.goal.includes(s.id) : true)); }
+function sideColor(th, side) { return FACTIONS[THEATERS[th].sides[side]].color; }
+function enemyOf(th, side) { return Object.keys(THEATERS[th].sides).find((k) => k !== side); }
+
+// Stärke einer Seite: Grundstärke, je Grafschaft mehr, Kriegsglück, deine Heerfolge
+function sideStrength(th, side) {
+  const T = THEATERS[th], w = war();
+  const seats = theaterSeats(th).filter((s) => sideOfSeat(th, s) === side).length;
+  let st = T.base[side] + seats * 3 + (w.morale[side] || 0);
+  if (w.support && w.support.side === side && w.support.until >= G.s.day) st += w.support.add;
+  if (allegiance() === side) st += Math.min(30, Math.round(G.s.renown / 8));
+  return Math.max(10, Math.round(st));
+}
+
+// ---------------------------------------------------------------- Feldzüge
+// Ziel: eine Grafschaft der Gegenseite, möglichst nah an den eigenen; deine Burgen nur, wenn du der Gegenseite dienst
+function pickTarget(th, side) {
+  const seats = theaterSeats(th), foe = enemyOf(th, side);
+  const own = seats.filter((s) => sideOfSeat(th, s) === side);
+  const cand = seats.filter((s) => sideOfSeat(th, s) === foe && !(G.siege && G.siege.site === s) && !war().campaigns.some((c) => c.target === s.id));
+  if (!cand.length) return null;
+  // Ohne eigene Burg: von den Orten der eigenen Partei aus (Hallen, Städte)
+  const fac = THEATERS[th].sides[side];
+  const bases = own.length ? own : G.world.sites.filter((s) => s.faction === fac && THEATERS[th].realms.includes(s.realm));
+  const dist = (s) => Math.min(...bases.map((b) => Math.hypot(b.x - s.x, b.y - s.y)), 9e9);
+  cand.sort((a, b) => dist(a) - dist(b));
+  const t = pick(cand.slice(0, 3));
+  const from = bases.length ? bases.reduce((a, b) => (Math.hypot(b.x - t.x, b.y - t.y) < Math.hypot(a.x - t.x, a.y - t.y) ? b : a)) : null;
+  return { target: t, from };
+}
+
+function launchCampaign(th) {
+  const T = THEATERS[th], sides = Object.keys(T.sides);
+  // Wer angreift: nach Stärke und Angriffslust
+  const wts = sides.map((sd) => sideStrength(th, sd) * T.lead[sd]);
+  let r = Math.random() * wts.reduce((a, b) => a + b, 0), side = sides[0];
+  for (let k = 0; k < sides.length; k++) { r -= wts[k]; if (r <= 0) { side = sides[k]; break; } }
+  const tg = pickTarget(th, side);
+  if (!tg) return;
+  const days = Math.max(1, Math.min(4, Math.round((tg.from ? Math.hypot(tg.from.x - tg.target.x, tg.from.y - tg.target.y) : 200) / (90 * MAP_K / 2))));
+  const c = { th, side, army: T.armies[side], target: tg.target.id, from: tg.from ? tg.from.id : null, day0: G.s.day, arrive: G.s.day + days };
+  war().campaigns.push(c);
+  const own = shireOwner(tg.target.id) === 'spieler';
+  warLog(`Kriegsnachricht: ${GROUP_TYPES[c.army].nom} zieht ${tg.from ? `von ${tg.from.name} ` : ''}gegen ${tg.target.name} (${shireName(tg.target.id)}). Ankunft in etwa ${days} ${days === 1 ? 'Tag' : 'Tagen'}.`, own ? 'bad' : 'info');
+}
+
+// Das Heer ist vor der Burg: in deiner Nähe eine echte Belagerung, sonst nach Stärke ausgewürfelt
+function resolveCampaign(c) {
+  const s = siteById(c.target), th = c.th, T = THEATERS[th];
+  if (!s || sideOfSeat(th, s) === c.side) return;
+  const p = G.s.player;
+  if (!G.siege && !G.battle && Math.hypot(s.x - p.x, s.y - p.y) < 100 * MAP_K && startSiege(s, c.army, Math.min(0.8, 0.45 + G.s.day * 0.01))) {
+    warLog(`${GROUP_TYPES[c.army].nom} schlägt vor ${s.name} das Lager auf. Die Belagerung beginnt, ganz in deiner Nähe.`, 'bad', false);
+    return;
+  }
+  const A = sideStrength(th, c.side) * rand(0.8, 1.2);
+  const foe = enemyOf(th, c.side);
+  let won;
+  if (isHeld(s)) won = A * 0.9 > holdingDefense(holdingOf(s)) * rand(0.8, 1.2);
+  else {
+    const D = sideStrength(th, foe) * (s.castleLevel >= 3 ? 1.35 : 1.15) * rand(0.8, 1.2);
+    won = Math.random() < Math.max(0.15, Math.min(0.85, 0.4 + ((A - D) / (A + D)) * 0.9));
+  }
+  const w = war();
+  if (won) {
+    w.morale[c.side] = (w.morale[c.side] || 0) + 8;
+    w.morale[foe] = (w.morale[foe] || 0) - 5;
+    takeSeat(s, T.sides[c.side], `${GROUP_TYPES[c.army].nom} hat ${s.name} gestürmt`);
+  } else {
+    w.morale[c.side] = (w.morale[c.side] || 0) - 6;
+    w.morale[foe] = (w.morale[foe] || 0) + 4;
+    warLog(`Kriegsnachricht: Vor ${s.name} ist ${GROUP_TYPES[c.army].acc} gescheitert und zieht ab.`, isHeld(s) ? 'good' : 'info');
+  }
+}
+
+// Eine Burg wechselt im Krieg den Herrn. Deine eigene verlierst du an den Sieger.
+function takeSeat(s, faction, how) {
+  if (isHeld(s)) { loseHolding(s, `Kriegsnachricht: ${how}! Deine Burg ${s.name} ist verloren, die Grafschaft ${shireName(s.id)} fällt an die ${FACTIONS[faction].short}.`, faction); checkEnds(); return; }
+  if (s.faction === faction) return;
+  (G.s.siteFaction || (G.s.siteFaction = {}))[s.id] = faction;
+  s.faction = faction;
+  claimShire(s.id, faction);
+  applyHoldings();
+  const th = theaterOf(s), side = th && sideOfOwner(th, faction);
+  warLog(`Kriegsnachricht: ${how}. ${s.name} und die Grafschaft ${shireName(s.id)} fallen an ${side ? sideName(th, side) : `die ${FACTIONS[faction].short}`}.`, allegiance() && side === allegiance() ? 'good' : 'info');
+  checkEnds();
+}
+
+// Eine echte Belagerung in deiner Nähe ist zu Ende (siege.js): Fällt eine Grafschaftsburg, wechselt sie den Herrn
+function seatSiegeOver(s, army, how) {
+  if (!SHIRES[s.id] || s.type !== 'burg' || !army || !army.faction) return;
+  const th = theaterOf(s), side = th && sideOfOwner(th, army.faction), w = war();
+  if (side) {
+    const foe = enemyOf(th, side);
+    w.morale[side] = (w.morale[side] || 0) + (how === 'gefallen' ? 8 : -6);
+    w.morale[foe] = (w.morale[foe] || 0) + (how === 'gefallen' ? -5 : 4);
+  }
+  if (how === 'gefallen' && !isHeld(s) && army.faction !== s.faction) takeSeat(s, army.faction, `${GROUP_TYPES[army.type].nom} hat ${s.name} gestürmt`);
+}
+
+// Feldschlachten verschieben das Kriegsglück (units.js)
+function armyVictory(g) {
+  if (!g || !g.faction) return;
+  const p = G.s.player, here = G.world.sites.reduce((a, s) => (!a || Math.hypot(s.x - g.x, s.y - g.y) < Math.hypot(a.x - g.x, a.y - g.y) ? s : a), null);
+  const th = here && theaterOf(here), side = th && sideOfOwner(th, g.faction);
+  if (!side) return;
+  const w = war(), foe = enemyOf(th, side);
+  w.morale[side] = (w.morale[side] || 0) + 12;
+  w.morale[foe] = (w.morale[foe] || 0) - 8;
+  warLog(`Kriegsnachricht: ${GROUP_TYPES[g.type].nom} hat bei ${here.name} eine Feldschlacht gewonnen. Das Kriegsglück spricht für ${sideName(th, side)}.`, 'info', Math.hypot(g.x - p.x, g.y - p.y) > 70);
+}
+
+// ---------------------------------------------------------------- Deine Rolle
+function swearTo(side) {
+  const w = war(), old = w.allegiance;
+  if (!ALLEGIANCE[side] || old === side) return false;
+  if (old) {
+    addRenown(-20);
+    for (const [f, v] of Object.entries(ALLEGIANCE[old].rep)) if (v > 0) changeRep(f, -30);
+    log(`Du brichst deinen Eid gegenüber ${ALLEGIANCE[old].name}. Eidbrecher sieht man nicht gern.`, 'bad');
+  }
+  w.allegiance = side;
+  for (const [f, v] of Object.entries(ALLEGIANCE[side].rep)) changeRep(f, v);
+  warLog(`Du schwörst ${ALLEGIANCE[side].name} den Treueid. Deine Grafschaften zählen für seine Seite, und seine Feinde sind jetzt die deinen.`, 'gold');
+  G.shireTint = null;
+  checkEnds();
+  return true;
+}
+function supportCost() { return SUPPORT.cost; }
+function supportActive() { const s = war().support; return s && s.until >= G.s.day ? s : null; }
+// Heerfolge: Söldner für deine Seite, eine Woche lang stärker
+function sendSupport() {
+  const side = allegiance();
+  if (!side) { log('Erst musst du einer Seite die Treue schwören.', 'bad'); return false; }
+  if (supportActive()) { log('Deine Männer stehen schon im Feld.', 'bad'); return false; }
+  if (G.s.gold < SUPPORT.cost) { log('Nicht genug Gold.', 'bad'); return false; }
+  G.s.gold -= SUPPORT.cost;
+  war().support = { side, until: G.s.day + SUPPORT.days, add: SUPPORT.add };
+  addRenown(3);
+  for (const [f, v] of Object.entries(ALLEGIANCE[side].rep)) if (v > 0) changeRep(f, 3);
+  warLog(`Du schickst ${ALLEGIANCE[side].name} Söldner und Gold: Eine Woche lang kämpft seine Seite stärker (+${SUPPORT.add}).`, 'good');
+  return true;
+}
+
+// ---------------------------------------------------------------- Kriegsziele
+// Wer den Kriegsschauplatz geeint hat (alle Grafschaften des Ziels), sonst null
+function theaterWinner(th) {
+  const seats = goalSeats(th);
+  if (!seats.length) return null;
+  const sides = new Set(seats.map((s) => sideOfSeat(th, s)));
+  return sides.size === 1 && [...sides][0] ? [...sides][0] : null;
+}
+function goalProgress(th, side) {
+  const seats = goalSeats(th);
+  return { have: seats.filter((s) => sideOfSeat(th, s) === side).length, of: seats.length };
+}
+const END_TEXT = {
+  england: {
+    richard: 'England ist geeint! Keine Burg hält mehr zu Prinz Johann. König Richard reitet in Westminster ein, und der Chronist schreibt deinen Namen unter die seiner Getreuen.',
+    john: 'Prinz Johann hält alle Burgen Englands. Richards Getreue sind zerstreut, und Johann lässt sich in London als Herr des Reiches feiern.',
+  },
+  normandie: {
+    richard: 'Die Normandie ist zurückgewonnen! Von Caen bis Gisors weht das Banner des Herzogs, Philipp ist hinter den Vexin zurückgeworfen.',
+    philipp: 'Die Normandie ist an Frankreich gefallen. König Philipp hält Caen, Falaise und Évreux, und Rouen öffnet ihm die Tore.',
+  },
+};
+// Ein Kriegsschauplatz gilt als entschieden, wenn eine Seite alle Burgen des Ziels hält. Der Stand zu Spielbeginn
+// (Johann hält ganz England) zählt nicht: Erst wer etwas erobert hat, kann siegen. Für Johanns Sieg musst du ihm
+// selbst mindestens zwei Grafschaften erobert haben.
+function checkEnds() {
+  const w = war();
+  if (!w.unified) { w.unified = {}; for (const th of THEATER_IDS) w.unified[th] = theaterWinner(th); return; }
+  for (const th of THEATER_IDS) {
+    const win = theaterWinner(th);
+    if (win === w.unified[th]) continue;
+    w.unified[th] = win;
+    if (!win) continue;
+    const a = allegiance();
+    const ownHere = goalSeats(th).filter((s) => shireOwner(s.id) === 'spieler').length;
+    const mine = !!a && win === a && (a !== 'john' || ownHere >= 2);
+    w.ended[th] = win;
+    warLog(END_TEXT[th][win], mine ? 'gold' : win === a ? 'good' : 'bad');
+    if (mine) addRenown(th === 'england' ? 100 : 60);
+    if (G.onWarEnd) G.onWarEnd(th, win, mine);
+  }
+}
+function warEnded(th) { return war().ended[th] || null; }
+// Beim Start und nach dem Laden: Ausgangslage merken (zählt nicht als Sieg)
+function initWar() { war(); checkEnds(); }
+
+// ---------------------------------------------------------------- Tageswechsel
+function dailyWar() {
+  const w = war();
+  // Kriegsglück verblasst langsam
+  for (const k of Object.keys(w.morale)) { w.morale[k] = Math.round(w.morale[k] * 0.9); if (!w.morale[k]) delete w.morale[k]; }
+  if (w.support && w.support.until < G.s.day) w.support = null;
+  // Heere, die angekommen sind
+  for (const c of [...w.campaigns]) {
+    if (G.s.day < c.arrive) continue;
+    w.campaigns = w.campaigns.filter((x) => x !== c);
+    resolveCampaign(c);
+  }
+  // Neue Feldzüge: höchstens einer je Kriegsschauplatz. Die unterlegene Seite gibt nicht auf.
+  if (G.s.day >= 3) {
+    for (const th of THEATER_IDS) {
+      if (w.campaigns.some((c) => c.th === th) || Math.random() >= CAMPAIGN_CHANCE) continue;
+      launchCampaign(th);
+    }
+  }
+  checkEnds();
+}
+
+// Für die Karte: Heere unterwegs als Pfeile (Ausgangsburg → Ziel), Fortschritt nach Tagen
+function campaignArrows() {
+  return war().campaigns.map((c) => {
+    const t = siteById(c.target), f = c.from ? siteById(c.from) : null;
+    if (!t) return null;
+    const k = Math.max(0, Math.min(1, (G.s.day - c.day0 + G.s.time / DAY_LEN) / Math.max(1, c.arrive - c.day0)));
+    return { from: f || { x: t.x - 30, y: t.y - 30 }, to: t, k, color: sideColor(c.th, c.side), c };
+  }).filter(Boolean);
+}
+
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
 // an der Quelle (billiger als in der Stadt, aber nur, was sie gerade haben). Im Waldlager heuern Söldner an, und wer
@@ -11001,6 +11320,7 @@ function mercFaction(site) { return FACTIONS[site.faction] ? FACTIONS[site.facti
 
 
 
+
 function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
@@ -11052,6 +11372,7 @@ function newDay() {
   dailyEconomy();
   dailyCastle();
   dailyHoldings();
+  dailyWar();
   dailyQuests();
   maintainGroups();
   replenishAnimals();
@@ -11799,6 +12120,29 @@ function drawKnightPlate(c, w, h, arms, t = 0, opt = {}) {
 
 
 
+
+
+// Heere im Krieg (war.js): Pfeil von der Ausgangsburg zum Ziel in der Farbe der Partei, der Punkt zeigt, wie weit sie sind
+function drawCampaigns(c, v) {
+  for (const a of campaignArrows()) {
+    const p0 = miniPos(a.from.x, a.from.y, v), p1 = miniPos(a.to.x, a.to.y, v);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
+    const end = { x: p1.x - ux * 9, y: p1.y - uy * 9 };
+    c.save();
+    c.lineCap = 'round';
+    c.strokeStyle = 'rgba(250,240,220,0.85)'; c.lineWidth = 5.5;
+    c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(end.x, end.y); c.stroke();
+    c.strokeStyle = a.color; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(end.x, end.y); c.stroke();
+    // Spitze
+    c.fillStyle = a.color; c.strokeStyle = 'rgba(250,240,220,0.9)'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(p1.x - ux * 2, p1.y - uy * 2); c.lineTo(end.x - uy * 6, end.y + ux * 6); c.lineTo(end.x + uy * 6, end.y - ux * 6); c.closePath(); c.fill(); c.stroke();
+    const q = { x: p0.x + (end.x - p0.x) * a.k, y: p0.y + (end.y - p0.y) * a.k };
+    c.fillStyle = '#1d140c'; c.beginPath(); c.arc(q.x, q.y, 4.5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = a.color; c.beginPath(); c.arc(q.x, q.y, 3, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+}
 
 // Farbe eines Heeres: dein Aufgebot in deinen Farben, sonst die der Partei
 function armyColor(g) { return g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
@@ -16805,7 +17149,7 @@ function drawMap(c, w, h, opts = {}) {
   c.imageSmoothingEnabled = false;
   c.drawImage(minimapBase, v.dx - v.ox * v.s, v.dy - v.oy * v.s, N * v.s, N * v.s);
   c.imageSmoothingEnabled = true;
-  if (big) { drawMapDecor(c, v); drawShires(c, v); }
+  if (big) { drawMapDecor(c, v); drawShires(c, v); drawCampaigns(c, v); }
   for (const g of G.groups) {
     if (g.army) {
       const q = miniPos(g.x, g.y, v);
@@ -17928,6 +18272,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -18886,6 +19231,8 @@ function questsPanel() {
     <h3>Dein Ziel</h3>
     <p>Mach ${esc(homeName())} zur Festung und gewinne zwei Fraktionen als Verbündete. Dann kennt man deinen Namen von York bis Paris.</p>
     <div class="chips"><span class="chip ${G.s.castle.level >= 3 ? 'ok' : ''}">Burg: ${esc(levelName())} (${G.s.castle.level}/3)</span><span class="chip ${alliesCount() >= 2 ? 'ok' : ''}">Verbündete ${alliesCount()}/2</span><span class="chip">Ruhm ${fmt(G.s.renown)}</span><span class="chip">${G.s.stats.quests} Aufträge erfüllt</span></div>
+    <p>Das große Ziel: ${allegiance() === 'john' ? 'ganz England für Prinz Johann, mit mindestens zwei Grafschaften in deiner Hand' : 'ein geeintes England unter König Richard und die zurückgewonnene Normandie'}. Den Stand zeigt die Karte unter „Krieg“.</p>
+    <div class="chips">${allegiance() ? `<span class="chip ok">Treueid: ${esc(ALLEGIANCE[allegiance()].name)}</span>` : '<span class="chip">Noch kein Treueid</span>'}${(allegiance() === 'john' ? [['england', 'john']] : [['england', 'richard'], ['normandie', 'richard']]).map(([th, sd]) => { const g = goalProgress(th, sd); return `<span class="chip ${g.have === g.of ? 'ok' : ''}">${esc(THEATERS[th].name)}: ${g.have}/${g.of}</span>`; }).join('')}</div>
   </div>`;
   const list = G.s.quests.map((q) => {
     const t = questTarget(q);
@@ -18976,12 +19323,55 @@ function homeShireNote() {
   return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;
 }
 
+// ---------------------------------------------------------------- Krieg (war.js)
+function warView() {
+  const w = war(), a = allegiance();
+  const theaters = THEATER_IDS.map((th) => {
+    const T = THEATERS[th], sides = Object.keys(T.sides);
+    const st = sides.map((sd) => sideStrength(th, sd)), tot = st.reduce((x, y) => x + y, 0) || 1;
+    const rows = sides.map((sd, k) => {
+      const g = goalProgress(th, sd), mo = w.morale[sd] || 0;
+      return `<div class="warside"><span class="swatch" style="--c:${sideColor(th, sd)}"></span><b>${esc(sideTitle(th, sd))}</b><span class="muted">${g.have} von ${g.of} Zielburgen · Stärke ${st[k]}${mo ? ` · Kriegsglück ${mo > 0 ? '+' : ''}${mo}` : ''}${a === sd ? ' · <b>deine Seite</b>' : ''}</span></div>`;
+    }).join('');
+    const bar = `<div class="warbar" role="img" aria-label="Kräfteverhältnis">${sides.map((sd, k) => `<span style="width:${(st[k] / tot) * 100}%;background:${sideColor(th, sd)}"></span>`).join('')}</div>`;
+    const seats = theaterSeats(th).map((s) => { const sd = sideOfSeat(th, s), own = shireOwner(s.id); return `<span class="seat">${ownerSwatch(own)}${esc(s.name)}${sd ? '' : own === 'spieler' ? ' <span class="muted">(dein, ohne Treueid)</span>' : ''}</span>`; }).join('');
+    const camps = w.campaigns.filter((c) => c.th === th).map((c) => {
+      const t = siteById(c.target);
+      return `<div class="action"><div><b>${esc(GROUP_TYPES[c.army].nom)}</b><p>zieht gegen ${esc(t.name)} (${esc(shireName(c.target))}), Ankunft Tag ${c.arrive}. ${dirText(G.s.player, t)}.</p></div><button class="btn sm" data-act="wargo" data-s="${t.id}">Hinreisen</button></div>`;
+    }).join('');
+    const end = warEnded(th);
+    const goal = th === 'england' ? 'Ziel: alle Grafschaften Englands und Wales' : 'Ziel: Caen, Falaise, Évreux und Gisors';
+    return `<article class="theater"><header><h3>${esc(T.name)}</h3><span class="muted">${esc(goal)}</span></header>
+      ${bar}${rows}
+      <p class="seats">${seats}</p>
+      ${end ? `<p class="goal">Entschieden: ${esc(sideTitle(th, end))} ${th === 'england' ? 'hält ganz England' : 'hält die Normandie'}. Verliert die Seite eine Burg, geht der Krieg weiter.</p>` : ''}
+      ${camps || '<p class="muted">Gerade ist hier kein Heer unterwegs.</p>'}
+    </article>`;
+  }).join('');
+  let oath;
+  if (a) {
+    const sup = supportActive();
+    oath = `<div class="notice good"><p>Du hast <b>${esc(ALLEGIANCE[a].name)}</b> den Treueid geschworen. Deine Grafschaften zählen für ihn${a === 'john' ? ' (in England)' : ''}, seine Feinde ziehen auch gegen deine Burgen, und dein Ruhm stärkt seine Seite.</p></div>
+      <div class="action"><div><b>Heerfolge leisten</b><p>Söldner und Gold für ${esc(ALLEGIANCE[a].name)}: Eine Woche lang kämpft seine Seite stärker (+20).${sup ? ` Deine Männer stehen noch bis Tag ${sup.until} im Feld.` : ''}</p></div><button class="btn primary" data-act="warsupport" ${sup || G.s.gold < supportCost() ? 'disabled' : ''}>${fmt(supportCost())} Gold</button></div>
+      ${Object.keys(ALLEGIANCE).filter((k) => k !== a).map((k) => `<div class="action"><div><b>Eid brechen, zu ${esc(ALLEGIANCE[k].name)} wechseln</b><p>Ruhm −20, Ansehen bei deinen bisherigen Freunden −30.</p></div><button class="btn danger" data-act="warswear" data-side="${k}">Wechseln</button></div>`).join('')}`;
+  } else {
+    oath = `<p>Noch hast du niemandem die Treue geschworen. Ohne Eid zählen deine Grafschaften für keine Seite, und keine Seite kann ohne sie ganz England einen.</p>
+      ${Object.entries(ALLEGIANCE).map(([k, al]) => `<div class="action"><div><b>Treueid: ${esc(al.name)}</b><p>${esc(al.text)} Ansehen: ${Object.entries(al.rep).map(([f, v]) => `${FACTIONS[f].short} ${v > 0 ? '+' : ''}${v}`).join(', ')}.</p></div><button class="btn primary" data-act="warswear" data-side="${k}">Schwören</button></div>`).join('')}`;
+  }
+  const news = w.log.slice(-10).reverse().map((e) => `<li><span class="muted">Tag ${e.day}</span> ${esc(e.text.replace(/^Kriegsnachricht: /, ''))}</li>`).join('');
+  return `<div class="theaters">${theaters}</div>
+    <h3>Deine Rolle</h3>${oath}
+    <h3>Kriegsnachrichten</h3>${news ? `<ul class="warnews">${news}</ul>` : '<p class="muted">Noch ist es ruhig.</p>'}`;
+}
+
+const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften']];
 function mapPanel() {
   if (G.ui.tab === 'grafschaften') {
-    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']], body: shiresList() };
+    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: MAP_TABS, body: shiresList() };
   }
+  if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: MAP_TABS, body: warView() };
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']],
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: MAP_TABS,
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
@@ -19169,6 +19559,7 @@ function helpPanel() {
         <li><b>Burgen erobern:</b> Vor jeder Grafschaftsburg kannst du ein <b>Aufgebot</b> zusammenrufen (ab Ruhm 15): 12, 20 oder 30 Söldner mit Trebuchet, dazu dein Gefolge und Männer deiner Verbündeten, wenn sie mit den Herren der Burg verfeindet sind. Im Feldlager gibst du das Zeichen zum Sturm. Fällt die Burg, gehören dir Burg und Grafschaft, und die überlebenden Söldner bleiben als Besatzung. Zuerst wohl <b>Pontefract</b>: Dann gehört dir das West Riding, und der Vogt verlangt nichts mehr.</li>
         <li><b>Eroberte Burgen halten:</b> Setz einen Gefolgsmann als <b>Kastellan</b> ein (sonst führt ein gedungener Burgvogt die Burg, schlechter und gegen Lohn) und gib ihm eine Vorgabe: <i>Ausgewogen</i>, <i>Burg ausbauen</i> (Graben, Wehrgang, Torhaus, zuletzt ein Donjon, der die Burg zur Festung macht), <i>Holz erzeugen</i> (Fuhren nach Hause) oder <i>Verteidigung</i> (bis 30 Mann). Die früheren Herren greifen von Zeit zu Zeit an, und ihre Heere werden stärker. Bist du in der Nähe, kommt es zur Belagerung, bei der du hilfst; sonst entscheiden Mauern, Besatzung und Kastellan. Fällt die Burg, ist die Grafschaft fort, und der Kastellan schlägt sich verwundet heim.</li>
         <li><b>Gefährten auf Reisen</b> (Gefolge, Reiter „Reisen &amp; Handel“, oder „Jemanden schicken“ bei einem Auftrag): Gefährten aus Gefolge oder Garnison bringen Briefe und Lieferungen, stellen mit bis zu zwei Begleitern eine Bande oder fahren als <b>Händler</b>: Fracht aus dem Burglager an einem Ort verkaufen, dort mit allem Geld einkaufen, das Eingekaufte heimbringen oder an einem zweiten Ort verkaufen. Mit „Wiederholen“ wird daraus eine <b>feste Route</b>. Unterwegs lauern Wegelagerer; die Tafel nennt Dauer, Zehrgeld, Gefahr und Aussicht. Erledigte Aufträge bringen Gold und Ansehen, aber nur den halben Ruhm. Alle kehren in die Garnison zurück; auf der Karte siehst du, wo sie gerade sind.</li>
+        <li><b>Der Krieg</b> (Karte, Reiter „Krieg“): In England kämpfen Richards Getreue gegen Prinz Johns Barone, in der Normandie das normannische Aufgebot gegen König Philipp. Heere ziehen gegen die Burgen der Gegenseite (Pfeile auf der Karte); fällt eine, wechselt die Grafschaft den Herrn. In deiner Nähe wird belagert, sonst entscheiden Stärke, Kriegsglück und Mauern. Gewonnene Feldschlachten bringen Kriegsglück. Schwör einer Seite den <b>Treueid</b>: Dann zählen deine Grafschaften für sie, ihre Feinde ziehen auch gegen dich, und mit <b>Heerfolge</b> stärkst du sie eine Woche lang. Ziel: ein geeintes England unter Richard und die zurückgewonnene Normandie, oder ganz England für Johann.</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
@@ -19182,6 +19573,16 @@ function helpPanel() {
 }
 
 function victoryPanel() {
+  const v = G.ui.arg;
+  if (v && v.th) {
+    const T = THEATERS[v.th];
+    return {
+      title: v.th === 'england' ? (v.side === 'richard' ? 'Ein geeintes England' : 'England unter Johann') : 'Die Normandie', tabs: [],
+      body: `<div class="victory"><p class="lede">${v.th === 'england' ? (v.side === 'richard' ? 'Keine Burg in England hält mehr zu Prinz Johann. König Richard reitet in Westminster ein, und als er an dir vorbeikommt, zügelt er sein Pferd und nennt dich beim Namen.' : 'Ganz England gehorcht Prinz Johann, und du sitzt an seiner Tafel. Die Getreuen des Königs sind zerstreut, ihre Burgen gehören seinen Baronen und dir.') : 'Von Caen bis Gisors weht wieder das Banner des Herzogs der Normandie. König Philipp ist hinter den Vexin zurückgeworfen, und in Rouen läuten die Glocken für die Sieger.'}</p>
+        <p>${esc(T.name)} ist entschieden. Du hast in ${G.s.day} Tagen ${fmt(G.s.renown)} Ruhm gesammelt und hältst ${Object.keys(SHIRES).filter((id) => shireOwner(id) === 'spieler').length} Grafschaften.</p>
+        <button class="btn primary" data-act="resume">Weiterregieren</button></div>`,
+    };
+  }
   return {
     title: `${G.s.player.female ? 'Herrin' : 'Herr'} von ${homeName()}`, tabs: [],
     body: `<div class="victory"><p class="lede">Die Festung ${esc(homeName())} steht, und zwei mächtige Verbündete stehen hinter dir. Als die Nachricht kommt, dass König Richard frei ist und nach England zurückkehrt, reiten Boten aus ganz England und aus der Normandie zu deinem Tor.</p>
@@ -19306,6 +19707,12 @@ const ACTIONS = {
     confirmDialog(`${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
   },
   sabort: () => confirmDialog('Die Belagerung aufgeben? Die Söldner ziehen ab, das Handgeld ist fort.', 'Aufgeben', () => { abortOwnSiege(); closePanel(); }),
+  warswear: (d) => {
+    const al = ALLEGIANCE[d.side];
+    confirmDialog(allegiance() ? `Den Eid brechen und zu ${al.name} wechseln? Das kostet Ruhm und Freunde.` : `${al.name} den Treueid schwören? Seine Feinde werden auch deine.`, allegiance() ? 'Wechseln' : 'Schwören', () => { swearTo(d.side); refreshPanel(); });
+  },
+  warsupport: () => sendSupport(),
+  wargo: (d) => { const s = siteById(d.s); if (s) travelTo({ x: s.x, y: s.y + 6 }, null); },
   tquest: (d) => { const f = (G.ui.qf || {})[d.q] || {}; startTrip({ kind: 'auftrag', quest: Number(d.q), who: [f.who, f.e1, f.e2].filter(Boolean) }); },
   ttrade: () => { const f = G.ui.form || {}; if (startTrip({ kind: 'handel', who: [f.who, f.e1].filter(Boolean), good: f.good, qty: f.qty === 'alle' ? 9999 : f.qty, budget: f.budget, to: f.to, buy: f.buy, to2: f.to2, repeat: f.repeat })) { G.ui.form = { qty: f.qty, budget: f.budget, repeat: false }; } },
   tsend: () => { openPanel('party', null, 'reisen'); },
@@ -19494,6 +19901,7 @@ function saveSummary(data = readSave()) {
 
 
 
+
 const keys = new Set();
 let viewCanvas, mini;
 
@@ -19549,6 +19957,7 @@ function startWorld() {
   refreshCastleBlock();
   applyDamage();
   applyHoldings();
+  initWar();
   applyCons();
   initWeather();
   resetRender();
@@ -19685,6 +20094,8 @@ G.showTitle = showTitle;
 G.onSeason = onSeasonChanged;
 G.onNewDay = () => { G.saveGame(true); };
 G.onVictory = () => openPanel('victory');
+// Ein Kriegsschauplatz ist entschieden: Bist du auf der Siegerseite, gibt es die Tafel dazu
+G.onWarEnd = (th, side, mine) => { if (mine) openPanel('victory', { th, side }); };
 G.animalTitle = animalTitle;
 
 // ---------------------------------------------------------------- Interaktion
@@ -20333,7 +20744,7 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
 
 })();
 </script>

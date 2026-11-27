@@ -121,10 +121,20 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   von Ladung und Geld und kehrt verwundet heim. Zurückrufen jederzeit.
 - Noch offen: Wagenzüge sichtbar in der Welt, die du begleiten kannst.
 
-### Phase 5: Kriegskarte
-- Die Parteien erobern Grafschaften auch untereinander: Richards Getreue gegen Prinz Johns Barone, Frankreich gegen
-  das normannische Aufgebot.
-- Ziel: ein geeintes England unter Richard oder die zurückgewonnene Normandie.
+### Phase 5: Kriegskarte (umgesetzt)
+- Zwei Kriegsschauplätze: England (Richards Getreue = Sachsen gegen Prinz Johns Barone = Normannen, alle Burgen
+  Englands und Wales) und Normandie (das normannische Aufgebot gegen König Philipp, Ziel Caen, Falaise, Évreux, Gisors;
+  Compiègne bleibt Philipps Krondomäne).
+- Feldzüge: je Schauplatz höchstens einer, 25 % am Tag. Angreifer nach Stärke × Angriffslust (Richard 0,6 / Johann
+  0,4, in der Normandie je 0,5), Ziel die nächste Burg der Gegenseite, Ausgang nach 1 bis 4 Tagen Anmarsch. In deiner
+  Nähe (100 Felder × Kartenmaß) eine echte Belagerung, sonst 0,4 + 0,9 × (A − V) / (A + V), mindestens 15 %,
+  höchstens 85 %; Verteidiger mit Mauern ×1,15, Festung ×1,35. Deine Burgen verteidigen nach ihrem Verteidigungswert.
+- Stärke: Grundstärke (Richard 85, Johann 55, Aufgebot 60, Philipp 75), +3 je Grafschaft, Kriegsglück (Sieg +8,
+  Niederlage −6, Feldschlacht +12/−8, verblasst um 10 % am Tag), Heerfolge +20 für eine Woche, dein Ruhm / 8
+  (höchstens +30) für die Seite deines Treueids.
+- Zufällige Belagerungen treffen nur noch Städte, Hallen und Märkte; Grafschaftsburgen belagern die Heere im Krieg.
+- Ende: Eine Seite hält alle Burgen ihres Ziels (der Stand zu Spielbeginn zählt nicht). Die Siegtafel gibt es, wenn
+  es deine Seite ist; für Johann musst du selbst mindestens zwei Grafschaften halten.
 
 ### Phase 6: Mehrspieler (2 bis 6)
 - Jeder beginnt in einer anderen Grafschaft mit einer Burgruine, wächst, schließt Bündnisse, handelt und führt

@@ -22,6 +22,7 @@ import { cheatOn } from './cheats.js';
 import { sfxAt } from './audio.js';
 import { startTactics, updateTactics, updateTacMember, DEPLOY_DIST } from './tactics.js';
 import { shireFerryFactor } from './shires.js';
+import { armyVictory } from './war.js';
 
 // ---------------------------------------------------------------- Werte
 export function computeStats(u) {
@@ -1177,6 +1178,7 @@ export function endFeud(g) {
 // Fern vom Spieler wird eine Fehde einfach ausgewürfelt
 function resolveFeud(a, b) {
   const win = strength(a) >= strength(b) ? a : b, lose = win === a ? b : a;
+  if (win.army && lose.army && !win.siege && !lose.siege) armyVictory(win);
   endFeud(a);
   removeGroup(lose);
   const n = Math.floor(win.members.length * rand(0.1, 0.45));
@@ -1314,6 +1316,7 @@ function updateArmy(g, p) {
   } else if (G.battle && (G.battle.a === g || G.battle.b === g)) {
     // Der Gegner ist geschlagen oder fort: Sieg melden, dann heimziehen
     if (nearPlayer(g, 60)) log(`${GROUP_TYPES[g.type].nom} ${GROUP_TYPES[g.type].pl ? 'haben' : 'hat'} die Schlacht gewonnen.`, 'gold');
+    armyVictory(g);
     G.battle = null;
     g.foe = null;
   }

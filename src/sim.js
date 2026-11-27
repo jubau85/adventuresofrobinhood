@@ -16,6 +16,7 @@ import { passWeather } from './weather.js';
 import { dailyMines } from './mines.js';
 import { dailyHoldings } from './holdings.js';
 import { updateTrips } from './travels.js';
+import { dailyWar } from './war.js';
 
 export function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
@@ -68,6 +69,7 @@ function newDay() {
   dailyEconomy();
   dailyCastle();
   dailyHoldings();
+  dailyWar();
   dailyQuests();
   maintainGroups();
   replenishAnimals();

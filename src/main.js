@@ -18,6 +18,7 @@ import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBloc
 import { applyHoldings, isHeld, grantHolding, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
 import { callStorm } from './siege.js';
 import { startTrip, planTrip, updateTrips } from './travels.js';
+import { initWar, dailyWar, swearTo, takeSeat, war } from './war.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, findLists, tourneyRects } from './tournament.js';
@@ -89,6 +90,7 @@ function startWorld() {
   refreshCastleBlock();
   applyDamage();
   applyHoldings();
+  initWar();
   applyCons();
   initWeather();
   resetRender();
@@ -225,6 +227,8 @@ G.showTitle = showTitle;
 G.onSeason = onSeasonChanged;
 G.onNewDay = () => { G.saveGame(true); };
 G.onVictory = () => openPanel('victory');
+// Ein Kriegsschauplatz ist entschieden: Bist du auf der Siegerseite, gibt es die Tafel dazu
+G.onWarEnd = (th, side, mine) => { if (mine) openPanel('victory', { th, side }); };
 G.animalTitle = animalTitle;
 
 // ---------------------------------------------------------------- Interaktion
@@ -873,4 +877,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };

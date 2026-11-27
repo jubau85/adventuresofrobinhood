@@ -13,6 +13,8 @@ import { villageHouses, castleDefense, bSum, burnOuterPlots } from './castle.js'
 import { ringR } from './plots.js';
 import { sfxAt } from './audio.js';
 import { isHeld, isOwnSite, holdingOf, conquer, holdingSiegeOver, holdingHolds } from './holdings.js';
+import { seatSiegeOver } from './war.js';
+import { SHIRES } from './shires.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
@@ -115,7 +117,8 @@ export function startSiege(target = null, armyType = null, scale = null, opts = 
   if (G.siege) return false;
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
-    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
+    // Grafschaftsburgen belagern die Heere im Krieg (war.js); hier geht es um Städte, Hallen und Märkte
+    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && !SHIRES[s.id] && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
       && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85 * MAP_K);
     if (!cand.length) return false;
     target = pick(cand);
@@ -563,7 +566,7 @@ function endSiege(sg, how, quiet = false) {
     else if (how === 'abgewehrt') log(`Dein Sturm auf ${name} ist gescheitert. Die Überlebenden deines Aufgebots zerstreuen sich.`, 'bad');
     else log(`Dein Aufgebot zieht von ${name} ab, ohne die Burg genommen zu haben. Die Söldner gehen ihrer Wege.`, 'bad');
   } else if (mine) {
-    holdingSiegeOver(s, how, sg.def && G.groups.includes(sg.def) ? sg.def.members.length : 0);
+    holdingSiegeOver(s, how, sg.def && G.groups.includes(sg.def) ? sg.def.members.length : 0, sg.army && sg.army.faction);
     if (how === 'abgewehrt') log(`Die Belagerung deiner Burg ${name} ist abgeschlagen!`, 'good');
   } else if (how === 'gefallen') {
     for (const b of siteBuildings(s.id)) if (Math.random() < 0.4) damageBuilding(b, rand(0.2, 0.45));
@@ -581,6 +584,8 @@ function endSiege(sg, how, quiet = false) {
     if (near) log(s.type === 'spieler' ? `Die Belagerung von ${name} ist abgeschlagen!` : `Die Belagerung von ${name} ist abgeschlagen. Die Verteidiger jubeln.`, 'good');
   } else if (near) log(`Die Belagerer ziehen von ${name} ab.`);
   if (!sg.lead && !mine) sideOutcome(sg, how, quiet);
+  // Im Krieg: Fällt eine Grafschaftsburg, wechselt sie den Herrn
+  if (!sg.lead && !mine && s.type !== 'spieler') seatSiegeOver(s, sg.army, how);
   // Tore wieder auf (die Bresche bleibt, bis sie vermauert ist). Heer zieht heim, Besatzung kehrt in die Häuser zurück.
   openGates(sg);
   const army = sg.army;
