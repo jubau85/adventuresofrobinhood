@@ -12,7 +12,7 @@ import { rand, randInt, pick, clamp } from './rng.js';
 import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed } from './politics.js';
 import { changeBaronRel } from './barons.js';
 import { cargoFree, addCargo, siteById } from './economy.js';
-import { castleSite, bLevel, castleBonusAt, workingPlots } from './castle.js';
+import { castleSite, homeBase, bLevel, castleBonusAt, workingPlots } from './castle.js';
 import { hourOf, passHours } from './sim.js';
 import { hitAnimal, takeAnimal } from './animals.js';
 import { spawnVillagers, updateVillager, updateSayings, buffActive } from './life.js';
@@ -545,9 +545,10 @@ function playerDefeated() {
   G.s.gold -= lost;
   for (const k of Object.keys(G.s.cargo)) G.s.cargo[k] = Math.floor(G.s.cargo[k] / 2);
   log(`Du wurdest niedergeschlagen. Bauern bringen dich nach ${homeName()}. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
-  const site = castleSite();
+  const site = homeBase();
   p.dead = false;
-  p.x = site.x + 0.3; p.y = site.y + 2.6;
+  const spot = site.type === 'spieler' ? { x: site.x + 0.3, y: site.y + 2.6 } : (nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: site.x, y: site.y + 8 });
+  p.x = spot.x + (site.type === 'spieler' ? 0 : 0.5); p.y = spot.y + (site.type === 'spieler' ? 0 : 0.5);
   p.hp = Math.round(p.st.maxHp * 0.5);
   p.path = null; p.attackTarget = null; p.mounted = false;
   for (const c of partyMembers()) { placeNear(c, p.x, p.y, 1.5); c.hp = Math.max(c.hp, Math.round(c.st.maxHp * 0.3)); c.path = null; }

@@ -115,7 +115,7 @@ const CHEAT_ACTIONS = {
     refreshCastleHerd();
     spawnPeasants(); rebuildUnits();
     G.castleDirty = true;
-    log(`Testmodus: ${castleSite().name} ist voll ausgebaut.`, 'gold');
+    log(`Testmodus: ${(castleSite() || { name: 'Die Burg' }).name} ist voll ausgebaut.`, 'gold');
   },
   repplus: () => { for (const f of FACTION_IDS) changeRep(f, 25); },
   // Die Grafschaft, in der du stehst (sonst dein West Riding), gehört dir samt ihrer Burg

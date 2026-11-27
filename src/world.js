@@ -380,7 +380,7 @@ export function setPlayerWalls(W, on, rects, R) {
   W.penTile = new Uint8Array(N * N);
   if (on) {
     const s = W.sites.find((x) => x.type === 'spieler');
-    blockTiles(W, W.block, wallRing(W, s, W.playerR || 4));
+    if (s) blockTiles(W, W.block, wallRing(W, s, W.playerR || 4));
   }
   for (const o of W.castleObs || []) for (const [x, y] of obstacleTiles(W, o, false)) {
     const i = y * N + x;
@@ -470,7 +470,11 @@ export function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
 }
 
 // ---------------------------------------------------------------- Generator
-export function generateWorld(seed) {
+// opts.mp: Mehrspieler-Welt ohne Heimburg (jeder Spieler sitzt auf der Burg seiner Grafschaft); alle Teilnehmer
+// erzeugen sie gleich
+let GEN_MP = false;
+export function generateWorld(seed, opts = {}) {
+  GEN_MP = !!opts.mp;
   const N = MAP;
   const rng = mulberry32(seed);
   const tiles = new Uint8Array(N * N);
@@ -954,7 +958,8 @@ const REMOTE = { mine: 1, einsiedelei: 1 };
 const REMOTE_GAP = 17;
 function placeSettlements(W, rng) {
   const N = W.N;
-  const order = SETTLEMENTS.filter((d) => !REMOTE[d.type]).concat(SETTLEMENTS.filter((d) => REMOTE[d.type]));
+  const defs = GEN_MP ? SETTLEMENTS.filter((d) => d.type !== 'spieler') : SETTLEMENTS;
+  const order = defs.filter((d) => !REMOTE[d.type]).concat(defs.filter((d) => REMOTE[d.type]));
   for (const def0 of order) {
     const def = { ...def0, clear: siteRadius(def0) };
     const g = geoToTile(def.lon, def.lat);

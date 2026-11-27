@@ -49,7 +49,17 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await A.waitForFunction(() => document.querySelectorAll('#lb-players tr').length === 2, null, { timeout: 20000 });
   ok(true, 'beide sehen sich in der Lobby');
   ok(await A.evaluate(() => document.querySelector('[data-lb="start"]').disabled), 'Start gesperrt, solange B nicht bereit ist');
-  await B.selectOption('#lb-seat', 'malcolm');
+  // B stellt seinen Ritter ein: Grafschaft, Ritterin, Wappenbild, Silber; die Farbe von A ist für B gesperrt
+  const colA = await A.evaluate(() => window.__ritter.mp.profile.color);
+  await B.waitForSelector('#lb-seat option[value="chester"]', { state: 'attached' });
+  await B.selectOption('#lb-seat', 'chester');
+  await B.waitForTimeout(500);
+  ok(await B.evaluate((c) => { const b = document.querySelector(`.lb-swatch[data-v="${c}"]`); return !!b && b.disabled; }, colA), 'Die Wappenfarbe von A ist für B gesperrt');
+  await B.click('[data-lb="fig"][data-v="f"]');
+  await B.waitForTimeout(300);
+  await B.click('[data-lb="charge"][data-v="hirsch"]');
+  await B.waitForTimeout(300);
+  await B.click('[data-lb="metal"][data-v="silber"]');
   await B.waitForTimeout(600);
   await B.click('[data-lb="ready"]');
   await B.fill('#lb-chat', 'Bin bereit!');
@@ -57,7 +67,10 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await A.waitForFunction(() => !document.querySelector('[data-lb="start"]').disabled, null, { timeout: 10000 });
   const lobbyA = await A.evaluate(() => ({ rows: [...document.querySelectorAll('#lb-players tr')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()), chat: document.getElementById('lb-chatlog').textContent }));
   console.log('Lobby A', JSON.stringify(lobbyA));
-  ok(lobbyA.rows.some((r) => /Brida/.test(r) && /Glenarden/.test(r) && /✔/.test(r)), 'A sieht Brida auf Glenarden, bereit');
+  ok(lobbyA.rows.some((r) => /Brida/.test(r) && /Cheshire/.test(r) && /✔/.test(r)), 'A sieht Brida in Cheshire, bereit');
+  const profB = await A.evaluate(() => { const p = window.__ritter.mp.lobby.state.players.find((x) => x.name === 'Brida'); return p && { female: p.female, arms: p.arms, color: p.color }; });
+  ok(profB && profB.female && profB.arms.charge === 'hirsch' && profB.arms.metal === 'silber' && profB.color !== colA, `A kennt Bridas Wappen (${JSON.stringify(profB)})`);
+  ok(await A.evaluate(() => [...document.querySelectorAll('#lb-seat option')].some((o) => o.value === 'chester' && o.disabled)), 'Cheshire ist für A gesperrt');
   ok(/Brida: Bin bereit!/.test(lobbyA.chat), 'Chat in der Lobby kommt an');
   await A.screenshot({ path: `${OUT}/lobby_A.png` });
   await B.screenshot({ path: `${OUT}/lobby_B.png` });
@@ -65,11 +78,18 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await A.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.phase === 'game' && !window.__ritter.loadingArt, null, { timeout: 120000 });
   await B.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.welcomed && !window.__ritter.loadingArt, null, { timeout: 120000 });
   ok(true, 'A hat gestartet, beide sind im Spiel');
-  const sB = await ev(B, () => { const G = window.__ritter; return { seat: G.mp.seat, seed: G.s.seed, day: G.s.day, role: G.mp.role, name: G.s.player.name, pos: [G.s.player.x, G.s.player.y] }; });
-  const sA = await ev(A, () => { const G = window.__ritter; return { seed: G.s.seed, day: G.s.day, seats: G.mp.seats, human: Object.entries(G.s.barons).filter(([k, b]) => b.human).map(([k, b]) => [k, b.human.name]) }; });
+  const sB = await ev(B, () => { const G = window.__ritter; return { seat: G.mp.seat, seed: G.s.seed, day: G.s.day, role: G.mp.role, name: G.s.player.name, female: G.s.player.female, arms: G.s.arms, pos: [G.s.player.x, G.s.player.y], held: Object.keys(G.s.holdings || {}), owner: G.s.shires.chester.owner, ownerA: G.s.shires[G.mp.peers.values().next().value.seat || 'nottingham'].owner, home: G.world.sites.some((s) => s.type === 'spieler'), castleName: G.s.castleName }; });
+  const sA = await ev(A, () => { const G = window.__ritter; return { seed: G.s.seed, day: G.s.day, seat: G.mp.seat, seats: G.mp.seats, held: Object.keys(G.s.holdings || {}), own: G.s.shires[G.mp.seat].owner, chester: G.s.shires.chester.owner, home: G.world.sites.some((s) => s.type === 'spieler'), sites: G.world.sites.length }; });
+  const sitesB = await ev(B, () => window.__ritter.world.sites.length);
   console.log('B', JSON.stringify(sB)); console.log('A', JSON.stringify(sA));
-  ok(sB.seed === sA.seed, 'gleiche Welt (Startwert)');
-  ok(sB.seat === 'malcolm' && sA.human.some(([k, n]) => k === 'malcolm' && n === 'Brida'), `B sitzt auf der gewählten Burg (${sB.seat}), die KI dort ruht`);
+  ok(sB.seed === sA.seed && sitesB === sA.sites, 'gleiche Welt (Startwert, gleiche Orte)');
+  ok(!sA.home && !sB.home, 'keine Heimburg Ashcombe in der Mehrspieler-Welt');
+  ok(sA.held.includes(sA.seat) && sA.own === 'spieler', `A herrscht über seine Grafschaft (${sA.seat})`);
+  ok(sB.seat === 'chester' && sB.held.includes('chester') && sB.owner === 'spieler' && sB.castleName === 'Chester', `B herrscht über Cheshire, Burg ${sB.castleName}`);
+  ok(sA.chester === 'p:chester' && sB.ownerA === `p:${sA.seat}`, `Jeder sieht die Grafschaft des anderen als dessen (${sA.chester}, ${sB.ownerA})`);
+  ok(sB.female && sB.arms.charge === 'hirsch' && sB.arms.metal === 'silber', 'B spielt die Ritterin mit dem gewählten Wappen');
+  const names = await ev(A, () => { const G = window.__ritter; return [G.mpSeatInfo('chester').name, G.world.sites.find((s) => s.id === 'chester')]; });
+  ok(names[0] === 'Brida', 'Die Karte nennt Brida als Herrin von Cheshire');
   // Helden: B geht ein Stück, A sieht ihn
   await B.waitForTimeout(1500);
   await ev(B, () => { const p = window.__ritter.s.player; p.x += 3; p.y += 1; });
@@ -93,16 +113,26 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await B.waitForTimeout(9000);
   const bSees = await ev(B, (id) => window.__ritter.s.towns[id].stock.getreide, town.id);
   ok(bSees === after, `B bekommt das Lager vom Gastgeber (${bSees})`);
-  // Uhr: A springt einen Tag weiter, B zieht nach und zahlt Sold
-  const gold0 = await ev(B, () => window.__ritter.s.gold);
+  // Uhr: A springt einen Tag weiter, B zieht nach und rechnet seine Grafschaft (Abgaben, Salz ins Lager)
+  const b1 = await ev(B, () => ({ gold: window.__ritter.s.gold, salz: window.__ritter.s.castle.storage.salz || 0 }));
   const dayA = await ev(A, () => { window.__ritterDebug.passHours(24); return window.__ritter.s.day; });
   await B.waitForTimeout(1500);
-  const b2 = await ev(B, () => ({ day: window.__ritter.s.day, gold: window.__ritter.s.gold }));
+  const b2 = await ev(B, () => ({ day: window.__ritter.s.day, gold: window.__ritter.s.gold, salz: window.__ritter.s.castle.storage.salz || 0, held: Object.keys(window.__ritter.s.holdings || {}) }));
   ok(b2.day === dayA, `B folgt dem Tag (${b2.day} = ${dayA})`);
-  ok(b2.gold < gold0, `B zahlt Sold (${gold0} -> ${b2.gold})`);
-  // Baron-KI ruht auf Bridas Platz
-  const bar = await ev(A, (seat) => { const G = window.__ritter, b = G.s.barons[seat]; const before = JSON.stringify({ gold: b.gold, men: b.men }); window.__ritterDebug.dailyBarons(); return [before, JSON.stringify({ gold: b.gold, men: b.men })]; }, sB.seat);
-  ok(bar[0] === bar[1], `Baron-KI auf ${sB.seat} ruht (${bar[0]})`);
+  ok(b2.gold > b1.gold && b2.salz > b1.salz && b2.held.includes('chester'), `B bekommt die Abgaben von Cheshire (${b1.gold} -> ${b2.gold} Gold, Salz ${b1.salz} -> ${b2.salz}) und hält die Burg`);
+  // Die Burg der eigenen Grafschaft: Tafel mit Rittersaal, Gefolge und Lager
+  const tabs = await ev(B, () => { window.__ritterDebug.openPanel('town', window.__ritter.world.sites.find((s) => s.id === 'chester')); return [...document.querySelectorAll('#panel-tabs button')].map((b) => b.textContent.trim()); });
+  ok(['Rittersaal', 'Gefolge', 'Lager'].every((t) => tabs.some((x) => x.startsWith(t))), `Burgtafel mit ${tabs.join(', ')}`);
+  await B.screenshot({ path: `${OUT}/mp_B_burg.png` });
+  await ev(B, () => { const b = document.querySelector('#panel [data-act="close"], #panel .close'); if (b) b.click(); });
+  // B gewinnt eine weitere Grafschaft (wie nach einer Eroberung): der Gastgeber trägt sie für B ein, B behält sie
+  await ev(B, () => window.__ritterDebug.grantHolding(window.__ritter.world.sites.find((s) => s.id === 'warwick')));
+  await A.waitForTimeout(1500);
+  const warA = await ev(A, () => window.__ritter.s.shires.warwick.owner);
+  await ev(A, () => window.__ritterDebug.passHours(24));
+  await B.waitForTimeout(4500);
+  const warB = await ev(B, () => ({ owner: window.__ritter.s.shires.warwick.owner, held: Object.keys(window.__ritter.s.holdings) }));
+  ok(warA === 'p:chester' && warB.owner === 'spieler' && warB.held.includes('warwick'), `Eroberung eines Gastes kommt beim Gastgeber an (${warA}) und bleibt (${JSON.stringify(warB)})`);
   // Chat
   await ev(A, () => window.__ritter.mpChat('Seid gegrüßt!'));
   await B.waitForTimeout(800);

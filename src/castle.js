@@ -17,6 +17,13 @@ import { CASTLE_TYPES, OUTER_ONLY, STACKABLE, castleType, ringR, plotLayout } fr
 import { artKnown } from './assets.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
+// Mehrspieler: Die Welt hat keine Heimburg; jeder sitzt auf der Burg seiner Grafschaft (G.s.seat). Dort sind Lager,
+// Rittersaal und Garnison. homeBase ist, wo du zu Hause bist: die Heimburg, sonst diese Burg.
+export function seatSite() { return (G.s && G.s.seat && G.world && G.world.sites.find((s) => s.id === G.s.seat)) || null; }
+export function homeBase() { return castleSite() || seatSite(); }
+export function isHomeBase(s) { return !!s && (s.type === 'spieler' || (s === seatSite() && !castleSite())); }
+// Was die Burg einer Grafschaft schon mitbringt (ohne Bauplätze)
+const SEAT_LEVELS = { halle: 2, kaserne: 2, schmiede: 1, stall: 1 };
 
 // ---------------------------------------------------------------- Bauplätze (plots.js)
 // Gebäude je Platz: { id, lv, dmg } oder null. Ein alter Spielstand (eine Stufe je Gebäude) zieht beim ersten Blick
@@ -30,7 +37,9 @@ function freePlotFor(id, lay, plots) {
 export function castlePlots() {
   const C = G.s.castle;
   if (!CASTLE_TYPES[C.type]) C.type = 'turm';
-  const lay = plotLayout(castleSite(), C.type);
+  const site = castleSite();
+  if (!site) return [];
+  const lay = plotLayout(site, C.type);
   if (!C.plots) {
     C.plots = lay.map(() => null);
     for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'kapelle', 'hospiz', 'markt', 'wehr', 'holzfaeller', 'steinbruch', 'felder', 'schafzucht']) {
@@ -44,13 +53,14 @@ export function castlePlots() {
   if (C.plots.length > lay.length) C.plots.length = lay.length;
   return C.plots;
 }
-export function castleLayout() { return plotLayout(castleSite(), castleType()); }
+export function castleLayout() { const s = castleSite(); return s ? plotLayout(s, castleType()) : []; }
 // Belagert? Dann ruht die Arbeit vor der Mauer
 export function homeBesieged() { return !!(G.siege && G.siege.site && G.siege.site.type === 'spieler' && G.siege.stage !== 'anmarsch'); }
 function working(p, lay) { return !!p && !p.dmg && !(homeBesieged() && !lay.inner); }
 // Höchste arbeitende Stufe eines Gebäudes (der Bergfried: Burgstufe)
 export function bLevel(id) {
   if (id === 'burg') return G.s.castle.level;
+  if (!castleSite()) return SEAT_LEVELS[id] || 0;
   const plots = castlePlots(), lay = castleLayout();
   let m = 0;
   for (let i = 0; i < plots.length; i++) { const p = plots[i]; if (p && p.id === id && working(p, lay[i]) && p.lv > m) m = p.lv; }
@@ -113,6 +123,7 @@ export function villageSpots(s) {
 // Dort geht niemand hindurch; Äcker und Wege bleiben frei.
 export function castleObstacles() {
   const s = castleSite(), C = G.s.castle, out = [];
+  if (!s) return out;
   const k = CASTLE_KEEP[C.level];
   out.push({ x: s.x + k.dx, y: s.y + k.dy, wx: k.w, wy: k.w, pen: false });
   const plots = castlePlots(), lay = castleLayout();
@@ -297,6 +308,7 @@ export function typeChangeCost(type) {
 export function typeChangeDays(type) { return G.s.castle.level ? 1 + G.s.castle.level + (CASTLE_TYPES[type].R > ringR() ? 1 : 0) : 0; }
 // Welche Gebäude passen nach dem Wechsel nicht mehr hin?
 export function typeChangeLosses(type) {
+  if (!castleSite()) return [];
   const plots = castlePlots(), lay = castleLayout(), nlay = plotLayout(castleSite(), type);
   const free = { in: nlay.filter((p) => p.inner).length, out: nlay.filter((p) => !p.inner).length };
   const lost = [];
@@ -323,6 +335,7 @@ export function startTypeChange(type) {
   return begin({ id: 'umbau', type, done: G.s.day + days, days }, `Umbau zur ${CASTLE_TYPES[type].name}`);
 }
 function applyTypeChange(type) {
+  if (!castleSite()) return [];
   const C = G.s.castle, plots = castlePlots(), lay = castleLayout();
   const nlay = plotLayout(castleSite(), type), next = nlay.map(() => null);
   const lost = [];
@@ -468,11 +481,12 @@ export function castleDefense() {
 }
 
 export function dailyBalance() {
-  const lvl = G.s.castle.level;
-  const income = [
+  const lvl = G.s.castle.level, home = !!castleSite();
+  // Ohne Heimburg (Mehrspieler) leben Herr und Gefolge allein von den Grafschaften
+  const income = home ? [
     ['Pacht der Bauern', 20 + lvl * 15],
     ['Marktgeld', homeGateClosed() ? 0 : [0, 15, 35, 60][bLevel('markt')]],
-  ];
+  ] : [];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   const mills = workingPlots('felder').filter((w) => w.lv >= 3).length;
   if (mills) income.push([mills > 1 ? `Mahlgeld der ${mills} Windmühlen` : 'Mahlgeld der Windmühle', 10 * mills]);
@@ -483,7 +497,7 @@ export function dailyBalance() {
   if (wages) costs.push(['Sold', wages]);
   costs.push(...holdingCosts());
   // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
-  if (!isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  if (home && !isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
   // Erträge aller arbeitenden Gebäude zusammen (mehrere Holzfäller liefern mehrfach); vor der Mauer ruht bei
   // einer Belagerung die Arbeit, Abgebranntes liefert nichts
   const season = seasonIndex();
@@ -596,7 +610,7 @@ export function dailyCastle() {
 }
 
 function checkRaid() {
-  if (G.s.day < 5) return;
+  if (G.s.day < 5 || !castleSite()) return;
   const threats = [];
   // Feindliche Fraktionen mit Heeren belagern die Burg. Ab −60 (sehr feindlich) kommen sie öfter.
   for (const [f, by, army] of [['normannen', 'Normannische Truppen', 'heer_john'], ['sachsen', 'Sächsische Aufgebote', 'heer_richard']]) {

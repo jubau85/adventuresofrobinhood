@@ -506,8 +506,8 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 /* Mehrspieler: Lobby über dem Startmenü (Pergament wie das Startmenü, Felder in gut lesbarer Schrift) */
 #lobby { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(12,8,4,0.55); }
 #lobby[hidden] { display: none; }
-.lobby-card { width: min(780px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
-.lobby-card h3 { margin: 0 0 6px; font-family: var(--uncial); font-weight: 400; font-size: 19px; color: #2e1d10; }
+.lobby-card { width: min(940px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.lobby-card h3 { margin: 0 0 6px; font-family: var(--font-head); font-weight: 400; font-size: 20px; color: #2e1d10; }
 .lb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 @media (max-width: 640px) { .lb-cols { grid-template-columns: 1fr; } }
 .lb-col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -521,7 +521,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .lb-hint { font-size: 14px; color: #5a4128; }
 .lb-status { margin: 0; padding: 6px 10px; font-family: var(--font-body); background: rgba(150,40,30,0.12); border-left: 3px solid #8a2a1e; color: #5a1a10; }
 .lb-players { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 16px; color: var(--tinte); }
-.lb-players th { text-align: left; font-family: var(--uncial); font-weight: 400; font-size: 14px; padding: 4px 6px; border-bottom: 1.5px solid #4a3018; }
+.lb-players th { text-align: left; font-family: var(--font-head); font-weight: 400; font-size: 15px; padding: 4px 6px; border-bottom: 1.5px solid #4a3018; }
 .lb-players td { padding: 5px 6px; border-bottom: 1px solid rgba(74,48,24,0.25); }
 .lb-players tr.me td { background: rgba(214,157,60,0.18); }
 .lb-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 7px; border: 1px solid rgba(0,0,0,0.45); vertical-align: -1px; }
@@ -529,6 +529,9 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .lb-chat { display: flex; flex-direction: column; gap: 6px; }
 .lb-chatlog { height: 110px; overflow-y: auto; padding: 6px 8px; font-family: var(--font-body); font-size: 15px; color: var(--tinte); background: rgba(255,247,226,0.35); border: 1px solid rgba(46,31,18,0.5); }
 .lobby-card .seg .btn { border-radius: 0; }
+/* Umschalter in der Lobby: alle gleich groß, der gewählte nur farbig hervorgehoben */
+.lobby-card .seg .btn, .lobby-card .seg .btn.primary { font: 600 15px var(--font-ui); letter-spacing: 0; text-transform: none; padding: 6px 14px; min-height: 34px; transform: none; clip-path: none; }
+.lobby-card .seg .btn.primary { background: #c89a3a; color: #2a1a08; border-color: #6a4a1a; box-shadow: inset 0 0 0 1px rgba(255,240,200,0.5); }
 .mp-box { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid rgba(200,170,110,0.25); }
 .mp-in { padding: 5px 7px; border: 1px solid rgba(60,40,20,0.4); border-radius: 3px; background: rgba(255,250,235,0.85); font: inherit; color: #2a1c10; }
 .mp-roster { list-style: none; margin: 0; padding: 0; }
@@ -544,6 +547,24 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 #intro-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .intro-hint { position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom, 0px)); margin: 0; text-align: center; font: 500 13px var(--font-ui); letter-spacing: 0.04em; color: rgba(255,236,200,0.45); pointer-events: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Lobby: dein Ritter und deine Grafschaft */
+.lb-hero { display: flex; gap: 14px; align-items: flex-start; width: 100%; }
+.lb-arms svg { display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
+.lb-hero-fields { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+.lb-sub { font-size: 13px; color: #5a4128; font-style: italic; }
+.lb-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.lb-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(46,31,18,0.55); background: var(--c); cursor: pointer; padding: 0; box-shadow: inset 0 -3px 6px rgba(0,0,0,0.25); }
+.lb-swatch.sel { outline: 3px solid #b8862b; outline-offset: 2px; }
+.lb-swatch:disabled { opacity: 0.28; cursor: not-allowed; background-image: linear-gradient(135deg, transparent 45%, rgba(255,247,226,0.9) 45%, rgba(255,247,226,0.9) 55%, transparent 55%); }
+.lb-swatch:focus-visible, .lb-charge:focus-visible { outline: 3px solid #2c4f86; outline-offset: 2px; }
+.lb-charges { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 5px; width: 100%; }
+.lb-charge { display: grid; place-items: center; height: 40px; padding: 0; border: 1px solid rgba(46,31,18,0.45); border-radius: 3px; background: rgba(255,247,226,0.45); cursor: pointer; }
+.lb-charge.sel { background: rgba(214,157,60,0.35); border-color: #8a5a14; box-shadow: inset 0 0 0 1px #8a5a14; }
+.lb-seatinfo { width: 100%; font-family: var(--font-body); font-size: 15px; line-height: 1.45; color: #3a2614; }
+.lb-seatinfo p { margin: 0 0 6px; }
+.lb-mini svg { vertical-align: -5px; margin-right: 7px; }
+.lobby-card .lb-players { margin-top: 14px; }
 </style>
 </head>
 <body>
@@ -3272,7 +3293,7 @@ function setPlayerWalls(W, on, rects, R) {
   W.penTile = new Uint8Array(N * N);
   if (on) {
     const s = W.sites.find((x) => x.type === 'spieler');
-    blockTiles(W, W.block, wallRing(W, s, W.playerR || 4));
+    if (s) blockTiles(W, W.block, wallRing(W, s, W.playerR || 4));
   }
   for (const o of W.castleObs || []) for (const [x, y] of obstacleTiles(W, o, false)) {
     const i = y * N + x;
@@ -3362,7 +3383,11 @@ function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
 }
 
 // ---------------------------------------------------------------- Generator
-function generateWorld(seed) {
+// opts.mp: Mehrspieler-Welt ohne Heimburg (jeder Spieler sitzt auf der Burg seiner Grafschaft); alle Teilnehmer
+// erzeugen sie gleich
+let GEN_MP = false;
+function generateWorld(seed, opts = {}) {
+  GEN_MP = !!opts.mp;
   const N = MAP;
   const rng = mulberry32(seed);
   const tiles = new Uint8Array(N * N);
@@ -3846,7 +3871,8 @@ const REMOTE = { mine: 1, einsiedelei: 1 };
 const REMOTE_GAP = 17;
 function placeSettlements(W, rng) {
   const N = W.N;
-  const order = SETTLEMENTS.filter((d) => !REMOTE[d.type]).concat(SETTLEMENTS.filter((d) => REMOTE[d.type]));
+  const defs = GEN_MP ? SETTLEMENTS.filter((d) => d.type !== 'spieler') : SETTLEMENTS;
+  const order = defs.filter((d) => !REMOTE[d.type]).concat(defs.filter((d) => REMOTE[d.type]));
   for (const def0 of order) {
     const def = { ...def0, clear: siteRadius(def0) };
     const g = geoToTile(def.lon, def.lat);
@@ -5338,9 +5364,10 @@ function playerDefeated() {
   G.s.gold -= lost;
   for (const k of Object.keys(G.s.cargo)) G.s.cargo[k] = Math.floor(G.s.cargo[k] / 2);
   log(`Du wurdest niedergeschlagen. Bauern bringen dich nach ${homeName()}. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
-  const site = castleSite();
+  const site = homeBase();
   p.dead = false;
-  p.x = site.x + 0.3; p.y = site.y + 2.6;
+  const spot = site.type === 'spieler' ? { x: site.x + 0.3, y: site.y + 2.6 } : (nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: site.x, y: site.y + 8 });
+  p.x = spot.x + (site.type === 'spieler' ? 0 : 0.5); p.y = spot.y + (site.type === 'spieler' ? 0 : 0.5);
   p.hp = Math.round(p.st.maxHp * 0.5);
   p.path = null; p.attackTarget = null; p.mounted = false;
   for (const c of partyMembers()) { placeNear(c, p.x, p.y, 1.5); c.hp = Math.max(c.hp, Math.round(c.st.maxHp * 0.3)); c.path = null; }
@@ -6639,9 +6666,12 @@ function shireState() {
 }
 function shireOwner(id) { return (shireState()[id] || {}).owner || null; }
 function ownedShires() { const st = shireState(); return Object.keys(SHIRES).filter((id) => st[id].owner === 'spieler'); }
-function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
-function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
-function ownerColor(o) { return o === 'spieler' ? playerColor() : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
+// Mehrspieler: Grafschaften eines anderen Menschen heißen 'p:<seine Grafschaft>'; Name und Farbe kennt mp.js (G.mpSeatInfo)
+function isHumanOwner(o) { return typeof o === 'string' && o.startsWith('p:'); }
+function humanInfo(o) { return (G.mpSeatInfo && G.mpSeatInfo(o.slice(2))) || { name: `Herr von ${SHIRES[o.slice(2)] ? SHIRES[o.slice(2)].name : '?'}`, color: '#8a8070' }; }
+function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isHumanOwner(o) ? `in der Hand von ${humanInfo(o).name}` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
+function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isHumanOwner(o) ? humanInfo(o).name : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+function ownerColor(o) { return o === 'spieler' ? playerColor() : isHumanOwner(o) ? humanInfo(o).color : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
 
 // Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)
 function shireTax(id) {
@@ -6662,11 +6692,14 @@ function shireFerryFactor() { return ownedShires().reduce((a, id) => Math.min(a,
 function ownsHomeShire() { return shireOwner(HOME_SHIRE) === 'spieler'; }
 
 // Grafschaft übernehmen (Eroberung, Testmodus)
-function claimShire(id, who = 'spieler') {
+// quiet: ohne Meldung (Mehrspieler-Start). Ein Gast meldet den Wechsel dem Gastgeber (G.onClaimShire, mp.js).
+function claimShire(id, who = 'spieler', quiet = false) {
   const st = shireState();
   if (!st[id] || st[id].owner === who) return;
   st[id].owner = who;
   G.shireTint = null;
+  if (G.onClaimShire) G.onClaimShire(id, who);
+  if (quiet) return;
   if (who === 'spieler') log(`Du beherrschst jetzt die Grafschaft ${SHIRES[id].name}. ${SHIRES[id].text}`, 'gold');
   else log(`${SHIRES[id].name} fällt an ${ownerName(who)}.`);
 }
@@ -6938,6 +6971,7 @@ function spawnAnimals() {
 // Nach dem Ausbau der Schafzucht: die Herde zieht auf die neue Weide
 function refreshCastleHerd() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
+  if (!s) return;
   const pa = castlePasture(s);
   G.animals = G.animals.filter((a) => !(a.kind === 'schaf' && a.site === s.id));
   if (pa) addHerd('schaf', { x: pa.x, y: pa.y }, pa.n, pa.r, s.id);
@@ -8074,7 +8108,7 @@ function openGates(sg) {
 // ---------------------------------------------------------------- Burgtor von deiner Burg
 // Ab der Holzburg lässt sich das Tor schließen. Zu bleibt es, bis du es wieder öffnest, auch über das Speichern hinaus.
 function homeSite() { return G.world.sites.find((x) => x.type === 'spieler'); }
-function hasHomeGate() { return !!G.s && G.s.castle.level >= 1; }
+function hasHomeGate() { return !!G.s && G.s.castle.level >= 1 && !!homeSite(); }
 function homeGateClosed() { return hasHomeGate() && !!G.s.gateClosed; }
 function homeGateTiles() {
   const W = G.world, N = W.N;
@@ -9976,7 +10010,7 @@ const CHEAT_ACTIONS = {
     refreshCastleHerd();
     spawnPeasants(); rebuildUnits();
     G.castleDirty = true;
-    log(`Testmodus: ${castleSite().name} ist voll ausgebaut.`, 'gold');
+    log(`Testmodus: ${(castleSite() || { name: 'Die Burg' }).name} ist voll ausgebaut.`, 'gold');
   },
   repplus: () => { for (const f of FACTION_IDS) changeRep(f, 25); },
   // Die Grafschaft, in der du stehst (sonst dein West Riding), gehört dir samt ihrer Burg
@@ -10403,6 +10437,13 @@ function giveGift(site) {
 
 
 function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
+// Mehrspieler: Die Welt hat keine Heimburg; jeder sitzt auf der Burg seiner Grafschaft (G.s.seat). Dort sind Lager,
+// Rittersaal und Garnison. homeBase ist, wo du zu Hause bist: die Heimburg, sonst diese Burg.
+function seatSite() { return (G.s && G.s.seat && G.world && G.world.sites.find((s) => s.id === G.s.seat)) || null; }
+function homeBase() { return castleSite() || seatSite(); }
+function isHomeBase(s) { return !!s && (s.type === 'spieler' || (s === seatSite() && !castleSite())); }
+// Was die Burg einer Grafschaft schon mitbringt (ohne Bauplätze)
+const SEAT_LEVELS = { halle: 2, kaserne: 2, schmiede: 1, stall: 1 };
 
 // ---------------------------------------------------------------- Bauplätze (plots.js)
 // Gebäude je Platz: { id, lv, dmg } oder null. Ein alter Spielstand (eine Stufe je Gebäude) zieht beim ersten Blick
@@ -10416,7 +10457,9 @@ function freePlotFor(id, lay, plots) {
 function castlePlots() {
   const C = G.s.castle;
   if (!CASTLE_TYPES[C.type]) C.type = 'turm';
-  const lay = plotLayout(castleSite(), C.type);
+  const site = castleSite();
+  if (!site) return [];
+  const lay = plotLayout(site, C.type);
   if (!C.plots) {
     C.plots = lay.map(() => null);
     for (const id of ['halle', 'kaserne', 'schmiede', 'stall', 'kapelle', 'hospiz', 'markt', 'wehr', 'holzfaeller', 'steinbruch', 'felder', 'schafzucht']) {
@@ -10430,13 +10473,14 @@ function castlePlots() {
   if (C.plots.length > lay.length) C.plots.length = lay.length;
   return C.plots;
 }
-function castleLayout() { return plotLayout(castleSite(), castleType()); }
+function castleLayout() { const s = castleSite(); return s ? plotLayout(s, castleType()) : []; }
 // Belagert? Dann ruht die Arbeit vor der Mauer
 function homeBesieged() { return !!(G.siege && G.siege.site && G.siege.site.type === 'spieler' && G.siege.stage !== 'anmarsch'); }
 function working(p, lay) { return !!p && !p.dmg && !(homeBesieged() && !lay.inner); }
 // Höchste arbeitende Stufe eines Gebäudes (der Bergfried: Burgstufe)
 function bLevel(id) {
   if (id === 'burg') return G.s.castle.level;
+  if (!castleSite()) return SEAT_LEVELS[id] || 0;
   const plots = castlePlots(), lay = castleLayout();
   let m = 0;
   for (let i = 0; i < plots.length; i++) { const p = plots[i]; if (p && p.id === id && working(p, lay[i]) && p.lv > m) m = p.lv; }
@@ -10499,6 +10543,7 @@ function villageSpots(s) {
 // Dort geht niemand hindurch; Äcker und Wege bleiben frei.
 function castleObstacles() {
   const s = castleSite(), C = G.s.castle, out = [];
+  if (!s) return out;
   const k = CASTLE_KEEP[C.level];
   out.push({ x: s.x + k.dx, y: s.y + k.dy, wx: k.w, wy: k.w, pen: false });
   const plots = castlePlots(), lay = castleLayout();
@@ -10683,6 +10728,7 @@ function typeChangeCost(type) {
 function typeChangeDays(type) { return G.s.castle.level ? 1 + G.s.castle.level + (CASTLE_TYPES[type].R > ringR() ? 1 : 0) : 0; }
 // Welche Gebäude passen nach dem Wechsel nicht mehr hin?
 function typeChangeLosses(type) {
+  if (!castleSite()) return [];
   const plots = castlePlots(), lay = castleLayout(), nlay = plotLayout(castleSite(), type);
   const free = { in: nlay.filter((p) => p.inner).length, out: nlay.filter((p) => !p.inner).length };
   const lost = [];
@@ -10709,6 +10755,7 @@ function startTypeChange(type) {
   return begin({ id: 'umbau', type, done: G.s.day + days, days }, `Umbau zur ${CASTLE_TYPES[type].name}`);
 }
 function applyTypeChange(type) {
+  if (!castleSite()) return [];
   const C = G.s.castle, plots = castlePlots(), lay = castleLayout();
   const nlay = plotLayout(castleSite(), type), next = nlay.map(() => null);
   const lost = [];
@@ -10854,11 +10901,12 @@ function castleDefense() {
 }
 
 function dailyBalance() {
-  const lvl = G.s.castle.level;
-  const income = [
+  const lvl = G.s.castle.level, home = !!castleSite();
+  // Ohne Heimburg (Mehrspieler) leben Herr und Gefolge allein von den Grafschaften
+  const income = home ? [
     ['Pacht der Bauern', 20 + lvl * 15],
     ['Marktgeld', homeGateClosed() ? 0 : [0, 15, 35, 60][bLevel('markt')]],
-  ];
+  ] : [];
   if (isAlly('gilde')) income.push(['Handelsanteile der Gilde', 15]);
   const mills = workingPlots('felder').filter((w) => w.lv >= 3).length;
   if (mills) income.push([mills > 1 ? `Mahlgeld der ${mills} Windmühlen` : 'Mahlgeld der Windmühle', 10 * mills]);
@@ -10869,7 +10917,7 @@ function dailyBalance() {
   if (wages) costs.push(['Sold', wages]);
   costs.push(...holdingCosts());
   // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
-  if (!isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  if (home && !isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
   // Erträge aller arbeitenden Gebäude zusammen (mehrere Holzfäller liefern mehrfach); vor der Mauer ruht bei
   // einer Belagerung die Arbeit, Abgebranntes liefert nichts
   const season = seasonIndex();
@@ -10982,7 +11030,7 @@ function dailyCastle() {
 }
 
 function checkRaid() {
-  if (G.s.day < 5) return;
+  if (G.s.day < 5 || !castleSite()) return;
   const threats = [];
   // Feindliche Fraktionen mit Heeren belagern die Burg. Ab −60 (sehr feindlich) kommen sie öfter.
   for (const [f, by, army] of [['normannen', 'Normannische Truppen', 'heer_john'], ['sachsen', 'Sächsische Aufgebote', 'heer_richard']]) {
@@ -11056,7 +11104,13 @@ function isHeld(s) { return !!holdingOf(s); }
 // Deine Burg Ashcombe oder eine eroberte
 function isOwnSite(s) { return !!s && (s.type === 'spieler' || isHeld(s)); }
 // Farbe der Herrschaft eines Ortes (Banner, Wachen, Kartenzeichen)
-function siteColor(s) { return isHeld(s) ? playerColor() : s && s.baron ? baronColor(s.baron) : s && s.faction ? FACTIONS[s.faction].color : null; }
+function siteColor(s) {
+  if (isHeld(s)) return playerColor();
+  // Mehrspieler: die Burg eines anderen Menschen in seiner Farbe
+  const o = s && SHIRES[s.id] ? shireOwner(s.id) : null;
+  if (isHumanOwner(o)) return ownerColor(o);
+  return s && s.baron ? baronColor(s.baron) : s && s.faction ? FACTIONS[s.faction].color : null;
+}
 function heldSites() { return Object.keys(holdings()).map(siteById).filter(Boolean); }
 
 // Ausbau der Burgen bleibt, auch wenn sie den Herrn wechseln (die Welt wird beim Laden neu erzeugt)
@@ -11331,6 +11385,26 @@ function loseHolding(s, text, to = null) {
   rebuildUnits();
 }
 
+// Mehrspieler-Start: die Burg deiner Grafschaft samt Besatzung. Die früheren Herren lassen dich zwei Wochen in Ruhe.
+function grantSeat(s) {
+  if (!s || !SHIRES[s.id]) return false;
+  holdings()[s.id] = { since: G.s.day, from: s.faction, seat: true, castellan: null, order: 'ausgewogen', garrison: 16, dmg: 0, works: 0, progress: 0, level: s.castleLevel || 2, lastAttack: G.s.day + 14 };
+  applyHoldings();
+  claimShire(s.id, 'spieler', true);
+  return true;
+}
+// Nur hier verloren (der Gastgeber hat die Grafschaft einem anderen zugesprochen): ohne den gemeinsamen Stand anzufassen
+function dropHolding(s, text) {
+  const h = holdingOf(s);
+  if (!h) return;
+  const c = castellanOf(h);
+  delete holdings()[s.id];
+  if (c) { c.status = 'verwundet'; c.woundedDays = 4; c.seat = null; c.hp = Math.max(1, Math.round(c.st.maxHp * 0.2)); }
+  log(text, 'bad');
+  applyHoldings();
+  rebuildUnits();
+}
+
 // Testmodus: eine Burg ohne Belagerung übernehmen
 function grantHolding(s) {
   if (!s || isHeld(s) || !SHIRES[s.id]) return false;
@@ -11386,7 +11460,8 @@ function holdingHolds(s) {
 }
 
 // ---------------------------------------------------------------- Tageswechsel
-function dailyHoldings() {
+// attacks: false beim Mehrspieler-Gast (Angriffe auf die gemeinsame Welt bestimmt der Gastgeber)
+function dailyHoldings(attacks = true) {
   for (const s of heldSites()) {
     const h = holdingOf(s), o = ORDERS[h.order], eff = holdingEff(h);
     // Schäden ausbessern, dann weiterbauen
@@ -11401,6 +11476,7 @@ function dailyHoldings() {
     if (c) grantXp(c, h.order === 'verteidigung' ? 12 : 8);
   }
   // Höchstens ein Gegenangriff am Tag
+  if (!attacks) return;
   for (const s of heldSites()) {
     const h = holdingOf(s), f = h.from;
     if (!f || G.s.day - (h.lastAttack ?? h.since) < ATTACK_PAUSE) continue;
@@ -11463,7 +11539,7 @@ function partyStrength(us) { return us.reduce((a, u) => a + u.st.atk * 2 + u.st.
 function groupStrength(g) { return g.members.reduce((a, m) => a + m.st.atk * 2 + m.st.def + m.hp / 8, 0); }
 
 // ---------------------------------------------------------------- Strecken
-function homePt() { const s = castleSite(); return { x: s.x, y: s.y + 4, land: s.land, name: homeName() }; }
+function homePt() { const s = homeBase(); return { x: s.x, y: s.y + 4, land: s.land, name: s.type === 'spieler' ? homeName() : s.name }; }
 function sitePt(s) { return { x: s.x, y: s.y + 1, land: s.land, name: s.name, site: s.id }; }
 function playerPt() { const p = G.s.player; return { x: p.x, y: p.y, land: landAt(G.world, p.x, p.y), name: 'deinem Lager' }; }
 function legDays(a, b, mode) {
@@ -12669,7 +12745,7 @@ function baronPlanCampaign(id, say) {
 function baronPlanFeud(id, say) {
   const b = baron(id), s = baronSite(id), home = G.world.sites.find((o) => o.type === 'spieler');
   const held = G.world.sites.filter((o) => shireOwner(o.id) === 'spieler' && SHIRES[o.id] && o.land === s.land);
-  const targets = [...(home.land === s.land || Math.random() < 0.4 ? [home] : []), ...held];
+  const targets = [...(home && (home.land === s.land || Math.random() < 0.4) ? [home] : []), ...held];
   if (!targets.length) return;
   const t = pick(targets);
   const days = Math.max(1, Math.min(5, Math.round(Math.hypot(t.x - s.x, t.y - s.y) / (45 * MAP_K))));
@@ -12851,10 +12927,14 @@ function openTransport({ kind = 'kanal', room = 'burg', url = '', id = netId() }
 // Mehrspieler (Phase 7, Kern): Ein Spieler ist Gastgeber und rechnet die gemeinsame Welt – Uhrzeit und Tage, Märkte,
 // Barone, Krieg, Grafschaften, Schäden und Bauten, Wetter. Die Gäste spielen ihren Helden mit Gefolge, Gold und
 // Aufträgen selbst und bekommen die Welt vom Gastgeber; ihr Dorfleben, Tiere und Begegnungen unterwegs rechnet jeder
-// für sich. Jeder Mensch sitzt auf einem Platz: der Gastgeber auf seiner Burg ('heim'), Gäste auf der Burg eines
-// Barons, dessen KI dann ruht. Was die gemeinsame Welt ändert, schickt ein Gast als Befehl an den Gastgeber.
+// für sich. Die Welt hat keine Heimburg: Jeder Mensch herrscht über eine Grafschaft (sein Platz), hält ihre Burg und
+// rechnet Burg, Lager und Abgaben selbst. Im gemeinsamen Stand heißen die Grafschaften eines Menschen
+// 'p:<seine Grafschaft>'; jeder sieht die eigenen als 'spieler'. Was die gemeinsame Welt ändert, schickt ein Gast als
+// Befehl an den Gastgeber.
 // Geht der Gastgeber, übernimmt der Gast mit der kleinsten Kennung mit dem zuletzt empfangenen Weltstand.
 // Die Verbindung selbst liegt in net.js (Browser-Kanal, Relais, später Steam).
+
+
 
 
 
@@ -12867,7 +12947,7 @@ function openTransport({ kind = 'kanal', room = 'burg', url = '', id = netId() }
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
-  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'castle', 'castleName', 'hostArms'];
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
 const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
@@ -12880,16 +12960,38 @@ function hashText(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { 
 function pickKeys(s, keys) { const o = {}; for (const k of keys) if (s[k] !== undefined) o[k] = s[k]; return o; }
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
-// Plätze: 'heim' (die Burg des ersten Gastgebers) und je Baron seine Burg
-function seatIds() { return ['heim', ...BARON_IDS]; }
+// Plätze: die Grafschaften (Sitz = ihre Burg). Vorschläge für neue Spieler in dieser Reihenfolge, gut verteilt.
+function seatIds() { return Object.keys(SHIRES); }
+const SEAT_ORDER = ['nottingham', 'chester', 'gloucester', 'carlisle', 'dover', 'warwick', 'cardiff', 'caen', 'stirling', 'kilkenny', 'lancaster', 'colchester'];
+const seatOrder = () => [...SEAT_ORDER, ...seatIds().filter((id) => !SEAT_ORDER.includes(id))];
 function seatName(seat) {
-  if (seat === 'heim') return (G.s && (G.s.castleName)) || 'Ashcombe';
-  const s = G.world && baronSite(seat);
-  return s ? s.name : (BARONS[seat] ? BARONS[seat].short : seat);
+  const sh = SHIRES[seat];
+  if (!sh) return String(seat || '');
+  const st = SETTLEMENTS.find((x) => x.id === seat);
+  return `${sh.name} (Burg ${st ? st.name : seat})`;
 }
+// Besitz übersetzen: eigene Grafschaften heißen hier 'spieler', im gemeinsamen Stand 'p:<Grafschaft>'
+function shiresSwap(shires, from, to) {
+  if (!shires || !from || !to) return shires;
+  const o = {};
+  for (const [k, v] of Object.entries(shires)) o[k] = v && v.owner === from ? { ...v, owner: to } : v;
+  return o;
+}
+function shiresOut(shires, seat) { return shiresSwap(shires, 'spieler', seat ? `p:${seat}` : null); }
+function shiresIn(shires, seat) { return shiresSwap(shires, seat ? `p:${seat}` : null, 'spieler'); }
+function worldOut(mp, keys) { const w = pickKeys(G.s, keys); if (w.shires) w.shires = shiresOut(w.shires, mp.seat); return w; }
+// Name und Farbe des Menschen auf einem Platz (auch wenn er gerade nicht da ist)
+G.mpSeatInfo = (seat) => {
+  const mp = G.mp;
+  if (!mp) return null;
+  if (seat === mp.seat && G.s) return { name: G.s.player.name, color: G.s.color };
+  for (const p of mp.peers.values()) if (p.seat === seat) return { name: p.name, color: p.color };
+  return (mp.known && mp.known[seat]) || null;
+};
+function remember(mp, p) { if (p && p.seat) (mp.known || (mp.known = {}))[p.seat] = { name: p.name, color: p.color }; }
 
 function me() {
-  if (!G.s && G.mp && G.mp.profile) { const f = G.mp.profile; return { name: f.name, color: f.color, arms: f.arms, female: !!f.female }; }
+  if ((!G.s || !G.started) && G.mp && G.mp.profile) { const f = G.mp.profile; return { name: f.name, color: f.color, arms: f.arms, female: !!f.female }; }
   return { name: G.s ? G.s.player.name : '?', color: G.s ? G.s.color : '#888', arms: G.s ? G.s.arms : null, female: G.s ? !!G.s.player.female : false };
 }
 
@@ -12905,19 +13007,7 @@ function newSession(role, opts) {
   return mp;
 }
 
-// ---------------------------------------------------------------- Partie eröffnen und beitreten
-// Gastgeber: die laufende Partie (eigener Spielstand) wird geöffnet; der Gastgeber sitzt auf seiner Burg
-function mpHost(opts = {}) {
-  const mp = newSession('host', opts);
-  mp.seats.heim = mp.id;
-  mp.seat = 'heim';
-  G.mp = mp;
-  G.s.hostArms = { arms: G.s.arms, color: G.s.color, name: G.s.player.name };
-  hookGame();
-  log(`Die Partie „${mp.room}“ ist offen. Mitspieler treten mit diesem Namen bei.`, 'gold');
-  return mp;
-}
-
+// ---------------------------------------------------------------- Beitreten (Spiel läuft schon)
 // Gast: Lebenszeichen senden, bis ein Gastgeber mit dem Weltstand antwortet. onWelcome baut daraus das Spiel (main.js).
 function mpJoin(opts, onWelcome, onFail) {
   const mp = newSession('guest', opts);
@@ -12975,7 +13065,7 @@ function heroState() {
 }
 
 function sendWorld(mp, force, to = null) {
-  const w = pickKeys(G.s, SHARED_KEYS), text = JSON.stringify(w), h = hashText(text);
+  const w = worldOut(mp, SHARED_KEYS), text = JSON.stringify(w), h = hashText(text);
   if (!force && h === mp.hash.world) return;
   mp.hash.world = h;
   if (to) mp.tr.send(to, 'welt', w); else mp.tr.broadcast('welt', w);
@@ -13005,7 +13095,7 @@ function onMessage(mp, env) {
   const p = peer(mp, from);
   if (from === mp.hostId) mp.lastHost = performance.now() / 1000;
   switch (type) {
-    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; if (mp.role === 'host') reseat(mp, from, p); break;
+    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); remember(mp, p); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; if (mp.role === 'host') reseat(mp, from, p); break;
     case 'held': p.hero = d; p.name = d.name || p.name; p.color = d.col || p.color; break;
     case 'uhr': if (mp.role === 'guest' && from === mp.hostId) applyClock(d); break;
     case 'welt': if (mp.role === 'guest' && from === mp.hostId) applyWorld(d); break;
@@ -13020,48 +13110,61 @@ function onMessage(mp, env) {
   }
 }
 
-// Gastgeber: ein neuer Mitspieler klopft an. Er bekommt einen freien Platz (den gewünschten, wenn er frei ist) und den
-// ganzen Weltstand.
+// Gastgeber: ein neuer Mitspieler klopft an. Er bekommt eine freie Grafschaft (die gewünschte, wenn sie frei ist) und
+// den ganzen Weltstand. Frei ist, was keinem Menschen und keinem Baron gehört; eine verwaiste Grafschaft
+// ('p:<sie selbst>') bekommt nur, wer sie vorher hatte.
+function seatFree(mp, id, want) {
+  if (!SHIRES[id] || mp.seats[id]) return false;
+  const o = ((G.s.shires || {})[id] || {}).owner;
+  if (o === 'spieler' || (typeof o === 'string' && o.startsWith('b:'))) return false;
+  if (typeof o === 'string' && o.startsWith('p:')) return o === `p:${id}` && want === id;
+  return true;
+}
 function welcome(mp, from, d) {
   const p = peer(mp, from);
   Object.assign(p, { name: d.name || 'Gast', color: d.color, arms: d.arms, female: d.female });
   let seat = Object.keys(mp.seats).find((s) => mp.seats[s] === from) || null;
   if (!seat) {
-    const free = seatIds().filter((s) => !mp.seats[s] && s !== 'heim' && G.s.barons && G.s.barons[s] && !G.s.barons[s].gone);
-    seat = d.want && free.includes(d.want) ? d.want : free[0] || null;
+    seat = d.want && seatFree(mp, d.want, d.want) ? d.want : seatOrder().find((id) => seatFree(mp, id, null)) || null;
     if (!seat) { mp.tr.send(from, 'willkommen', { voll: true }); return; }
     mp.seats[seat] = from;
-    if (G.s.barons[seat]) G.s.barons[seat].human = { id: from, name: p.name, color: p.color };
-    log(`${p.name} tritt der Partie bei und übernimmt ${seatName(seat)}.`, 'gold');
+    claimShire(seat, `p:${seat}`, true);
+    log(`${p.name} tritt der Partie bei und herrscht über ${seatName(seat)}.`, 'gold');
   }
   p.seat = seat;
+  remember(mp, p);
   p.joinUntil = performance.now() / 1000 + JOIN_GRACE;
-  mp.tr.send(from, 'willkommen', { hostId: mp.id, host: me(), seat, seats: mp.seats, world: pickKeys(G.s, [...SHARED_KEYS, ...MARKET_KEYS]), seed: G.s.seed });
+  mp.tr.send(from, 'willkommen', { hostId: mp.id, host: { ...me(), seat: mp.seat }, seat, seats: mp.seats, world: worldOut(mp, [...SHARED_KEYS, ...MARKET_KEYS]), seed: G.s.seed, known: mp.known || {} });
   mp.tr.broadcast('sitze', { seats: mp.seats });
   mp.hash.world = '';
 }
 
-// Gastgeber: ein Gast, der nach einem Aussetzer wieder da ist, bekommt seine Burg zurück, wenn sie noch frei ist
+// Gastgeber: ein Gast, der nach einem Aussetzer wieder da ist, bekommt seinen Platz zurück, wenn er noch frei ist
 function reseat(mp, from, p) {
   const seat = p.seat;
-  if (!seat || seat === 'heim' || mp.seats[seat] === from) return;
-  const b = G.s.barons && G.s.barons[seat];
-  if (mp.seats[seat] || !b || b.gone || Object.values(mp.seats).includes(from)) return;
+  if (!seat || !SHIRES[seat] || mp.seats[seat] === from || mp.seats[seat] || Object.values(mp.seats).includes(from)) return;
+  if (((G.s.shires || {})[seat] || {}).owner !== `p:${seat}`) return;
   mp.seats[seat] = from;
-  b.human = { id: from, name: p.name, color: p.color };
-  log(`${p.name} ist wieder da und übernimmt ${seatName(seat)}.`, 'gold');
+  log(`${p.name} ist wieder da und herrscht wieder über ${seatName(seat)}.`, 'gold');
   mp.tr.broadcast('sitze', { seats: mp.seats });
 }
 
 function welcomed(mp, from, d) {
-  if (d.voll) { mpLeave(); if (mp.onWelcome) mp.onWelcome(null, 'Alle Plätze in dieser Partie sind besetzt.'); return; }
+  if (d.voll) { mpLeave(); if (mp.onWelcome) mp.onWelcome(null, 'Alle Grafschaften in dieser Partie sind vergeben.'); return; }
   mp.welcomed = true;
   mp.hostId = from;
-  if (d.host) Object.assign(peer(mp, from), { name: d.host.name, color: d.host.color, arms: d.host.arms, female: d.host.female, seat: 'heim' });
+  mp.known = { ...(d.known || {}) };
+  if (d.host) { const h = peer(mp, from); Object.assign(h, { name: d.host.name, color: d.host.color, arms: d.host.arms, female: d.host.female, seat: d.host.seat }); remember(mp, h); }
   mp.seat = d.seat;
   mp.seats = d.seats;
   mp.lastHost = performance.now() / 1000;
+  G.onClaimShire = (id, who) => claimToHost(mp, id, who);
   if (mp.onWelcome) mp.onWelcome(d);
+}
+// Gast: eine Grafschaft gewonnen oder verloren (Eroberung, Gegenangriff) – der Gastgeber trägt es in den gemeinsamen Stand ein
+function claimToHost(mp, id, who) {
+  if (G.mp !== mp || mp.role !== 'guest' || mp.applying) return;
+  mpCommand('grafschaft', { id, who });
 }
 
 // ---------------------------------------------------------------- Weltstand beim Gast
@@ -13075,15 +13178,31 @@ function applyClock(d) {
 }
 
 function applyWorld(w) {
-  const s = G.s, before = { barons: JSON.stringify(s.barons || null), damage: JSON.stringify(s.damage || null), cons: JSON.stringify(s.cons || null), castle: JSON.stringify(s.castle || null) };
+  const s = G.s, mp = G.mp, before = { barons: JSON.stringify(s.barons || null), damage: JSON.stringify(s.damage || null), cons: JSON.stringify(s.cons || null) };
   const day = s.day, time = s.time;
+  if (w.shires && mp) w.shires = shiresIn(w.shires, mp.seat);
   Object.assign(s, w);
   s.day = day; s.time = time;   // die Uhr kommt über 'uhr'
   if (JSON.stringify(s.barons || null) !== before.barons) applyBarons();
   if (JSON.stringify(s.damage || null) !== before.damage) applyDamage();
   if (JSON.stringify(s.cons || null) !== before.cons) applyCons();
-  if (JSON.stringify(s.castle || null) !== before.castle) G.castleDirty = true;
+  G.shireTint = null;
   G.staticDirty = true;
+  syncHoldings();
+}
+// Eine eigene Burg, deren Grafschaft der Gastgeber einem anderen zuschreibt, ist verloren (nicht am Tag der Eroberung:
+// dann ist die Meldung an den Gastgeber vielleicht noch unterwegs)
+function syncHoldings() {
+  const mp = G.mp;
+  if (!mp) return;
+  mp.applying = true;
+  try {
+    for (const site of heldSites()) {
+      const h = holdingOf(site), o = ((G.s.shires || {})[site.id] || {}).owner;
+      if (!SHIRES[site.id] || o === 'spieler' || G.s.day <= h.since) continue;
+      dropHolding(site, `${site.name} ist nicht mehr in deiner Hand: Die Grafschaft ${SHIRES[site.id].name} gehört jetzt ${o ? 'anderen' : 'niemandem'}.`);
+    }
+  } finally { mp.applying = false; }
 }
 
 // ---------------------------------------------------------------- Befehle (Gast -> Gastgeber)
@@ -13108,17 +13227,14 @@ const COMMANDS = {
     town.stock[a.good] = Math.max(0, (town.stock[a.good] || 0) + Math.max(-50, Math.min(50, a.delta | 0)));
     return { ok: true, stock: town.stock[a.good] };
   },
-  // Platz wechseln (auf eine freie Baronsburg)
-  sitz(mp, from, a) {
-    const seat = a.seat;
-    if (!BARONS[seat] || mp.seats[seat] || !G.s.barons[seat] || G.s.barons[seat].gone) return { ok: false, msg: 'Dieser Platz ist nicht frei.' };
-    const old = Object.keys(mp.seats).find((s) => mp.seats[s] === from);
-    if (old && old !== 'heim') { delete mp.seats[old]; if (G.s.barons[old]) delete G.s.barons[old].human; }
-    mp.seats[seat] = from;
-    const p = mp.peers.get(from) || { name: 'Gast' };
-    G.s.barons[seat].human = { id: from, name: p.name, color: p.color };
-    mp.tr.broadcast('sitze', { seats: mp.seats });
-    return { ok: true, seat };
+  // Ein Gast hat eine Grafschaft gewonnen (who 'spieler') oder an andere verloren
+  grafschaft(mp, from, a) {
+    const seat = Object.keys(mp.seats).find((k) => mp.seats[k] === from);
+    if (!SHIRES[a.id] || !seat) return { ok: false };
+    const who = a.who === 'spieler' ? `p:${seat}` : a.who;
+    if (typeof who !== 'string' || who === 'spieler') return { ok: false };
+    claimShire(a.id, who);
+    return { ok: true };
   },
 };
 function execCommand(mp, from, cmd, args) {
@@ -13160,7 +13276,7 @@ function peerGone(mp, id, why) {
   dropHero(p);
   log(`${p.name} ${why}.`, 'info');
   if (mp.role === 'host') {
-    for (const [s, pid] of Object.entries(mp.seats)) if (pid === id) { delete mp.seats[s]; if (G.s.barons && G.s.barons[s]) delete G.s.barons[s].human; }
+    for (const [s, pid] of Object.entries(mp.seats)) if (pid === id) delete mp.seats[s];
     mp.tr.broadcast('sitze', { seats: mp.seats });
   } else if (id === mp.hostId) migrate(mp);
 }
@@ -13243,10 +13359,42 @@ function mpHookGuest() {
 // seinen Willkommensgruß mit dem Weltstand (wie beim späteren Beitreten). Was die Lobby anzeigt, liefert lobbyView().
 // ev: { onLobby(view), onStart(), onWelcome(d), onClosed(msg), onFail(msg) } – Rückmeldungen an die Oberfläche
 const LOBBY_EVERY = 1.5;
+const LOBBY_COLORS = HERALDRY.map((h) => h.color);
+
+// Profil aus der Lobby: Name, Figur und Wappen; die Wappenfarbe ist die Farbe des Spielers und gehört nur ihm
+function cleanProfile(f = {}, old = {}) {
+  const a = { ...(old.arms || {}), ...(f.arms || {}) };
+  const name = String(f.name ?? old.name ?? '').trim().slice(0, 24) || old.name || 'Ritter';
+  const color = LOBBY_COLORS.includes(f.color) ? f.color : (LOBBY_COLORS.includes(old.color) ? old.color : LOBBY_COLORS[0]);
+  const charge = /^[a-z_]{2,20}$/.test(a.charge || '') ? a.charge : 'loewe';
+  return { name, female: 'female' in f ? !!f.female : !!old.female, color, arms: { field: color, metal: a.metal === 'silber' ? 'silber' : 'gold', charge } };
+}
+function colorsTaken(mp, exceptId) {
+  const t = new Set();
+  if (exceptId !== mp.id && mp.profile) t.add(mp.profile.color);
+  for (const p of mp.peers.values()) if (p.id !== exceptId && p.color) t.add(p.color);
+  return t;
+}
+function freeColor(mp, forId, want) { const t = colorsTaken(mp, forId); return want && !t.has(want) ? want : LOBBY_COLORS.find((c) => !t.has(c)) || want; }
+function seatsTaken(mp, exceptId) {
+  const t = new Set();
+  if (exceptId !== mp.id && mp.seat) t.add(mp.seat);
+  for (const p of mp.peers.values()) if (p.id !== exceptId && p.seat) t.add(p.seat);
+  return t;
+}
+function freeSeat(mp, forId, want) { const t = seatsTaken(mp, forId); return want && SHIRES[want] && !t.has(want) ? want : seatOrder().find((id) => !t.has(id)) || null; }
+// Neues Profil übernehmen; eine Farbe, die schon ein anderer trägt, bleibt die alte
+function takeProfile(mp, forId, f, old) {
+  const np = cleanProfile(f, old);
+  if (colorsTaken(mp, forId).has(np.color)) { np.color = old.color; np.arms.field = old.color; }
+  return np;
+}
 
 function mpLobbyHost(opts, profile, ev = {}) {
   const mp = newSession('host', opts);
-  mp.phase = 'lobby'; mp.profile = profile; mp.ev = ev; mp.seat = 'heim'; mp.seats.heim = mp.id;
+  mp.phase = 'lobby'; mp.ev = ev;
+  mp.profile = { ...profile, ...cleanProfile(profile, profile) };
+  mp.seat = freeSeat(mp, mp.id, profile.seat);
   mp.lobby = { difficulty: profile.difficulty || 'leicht', chat: [] };
   mp.lan = opts.lan || null;
   G.mp = mp;
@@ -13256,8 +13404,9 @@ function mpLobbyHost(opts, profile, ev = {}) {
 
 function mpLobbyJoin(opts, profile, ev = {}) {
   const mp = newSession('guest', opts);
-  mp.phase = 'lobby'; mp.profile = profile; mp.ev = ev; mp.lobby = { chat: [] };
-  mp.join = { name: profile.name, color: profile.color, arms: profile.arms, female: !!profile.female, want: null };
+  mp.phase = 'lobby'; mp.ev = ev; mp.lobby = { chat: [] };
+  mp.profile = { ...profile, ...cleanProfile(profile, profile) };
+  mp.join = { ...cleanProfile(profile, profile), want: null };
   mp.onWelcome = (d, err) => { if (ev.onWelcome) ev.onWelcome(d, err); };
   G.mp = mp;
   let tries = 0;
@@ -13271,12 +13420,18 @@ function mpLobbyJoin(opts, profile, ev = {}) {
   return mp;
 }
 
-// Gast: Burg wählen oder Bereit umschalten
+// Grafschaft, Profil, Bereit (Gast) oder Schwierigkeit (Gastgeber) ändern
 function mpLobbyChoose(patch) {
   const mp = G.mp;
   if (!mp || mp.phase !== 'lobby') return;
-  if (mp.role === 'guest') { mp.tr.send(mp.hostId, 'wahl', patch); return; }
+  if (mp.role === 'guest') {
+    if (patch.profile) mp.profile = { ...mp.profile, ...cleanProfile(patch.profile, mp.profile) };
+    mp.tr.send(mp.hostId, 'wahl', patch);
+    return;
+  }
   if (patch.difficulty && ['leicht', 'mittel', 'schwer'].includes(patch.difficulty)) mp.lobby.difficulty = patch.difficulty;
+  if (patch.seat && freeSeat(mp, mp.id, patch.seat) === patch.seat) mp.seat = patch.seat;
+  if (patch.profile) mp.profile = { ...mp.profile, ...takeProfile(mp, mp.id, patch.profile, mp.profile) };
   lobbyChanged(mp);
 }
 
@@ -13285,13 +13440,13 @@ function mpLobbyStart() {
   const mp = G.mp;
   if (!mp || mp.role !== 'host' || mp.phase !== 'lobby') return null;
   mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty });
-  return { difficulty: mp.lobby.difficulty };
+  return { difficulty: mp.lobby.difficulty, seat: mp.seat, profile: { ...mp.profile } };
 }
 function mpLobbyBegin() {
   const mp = G.mp;
   if (!mp || !G.s) return;
   mp.phase = 'game';
-  G.s.hostArms = { arms: G.s.arms, color: G.s.color, name: G.s.player.name };
+  mp.seats = { [mp.seat]: mp.id };
   hookGame();
   const now = performance.now() / 1000;
   for (const p of mp.peers.values()) {
@@ -13316,14 +13471,8 @@ function lobbyChat(mp, name, text) {
   if (mp.ev && mp.ev.onLobby) mp.ev.onLobby(lobbyView());
 }
 
-// Freie Baronsburgen für einen Gast (seine eigene zählt als frei)
-function freeSeats(mp, forId) {
-  const taken = new Set([...mp.peers.values()].filter((p) => p.id !== forId && p.seat).map((p) => p.seat));
-  return BARON_IDS.filter((b) => !taken.has(b));
-}
-
 function lobbyState(mp) {
-  const players = [{ id: mp.id, ...me(), seat: 'heim', ready: true, host: true }];
+  const players = [{ id: mp.id, ...me(), seat: mp.seat, ready: true, host: true }];
   for (const p of mp.peers.values()) players.push({ id: p.id, name: p.name, color: p.color, arms: p.arms, female: p.female, seat: p.seat, ready: !!p.ready, host: false });
   return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, players, lan: mp.lan || null };
 }
@@ -13338,17 +13487,19 @@ function lobbyMessage(mp, from, type, d) {
   if (type === 'chat') { lobbyChat(mp, d.name || '?', String(d.text || '').slice(0, 200)); return; }
   if (mp.role === 'host') {
     if (type === 'hallo') {
-      const p = peer(mp, from);
-      Object.assign(p, { name: String(d.name || 'Gast').slice(0, 24), color: d.color, arms: d.arms, female: !!d.female });
-      if (!p.seat || !freeSeats(mp, from).includes(p.seat)) { const free = freeSeats(mp, from); p.seat = free[0] || null; }
+      const p = peer(mp, from), pr = cleanProfile(d, p.name ? p : {});
+      pr.color = freeColor(mp, from, pr.color); pr.arms.field = pr.color;
+      Object.assign(p, pr);
+      p.seat = freeSeat(mp, from, p.seat || null);
       if (!p.seat) { mp.tr.send(from, 'willkommen', { voll: true }); mp.peers.delete(from); return; }
       lobbyChanged(mp);
     } else if (type === 'wahl') {
       const p = mp.peers.get(from);
       if (!p) return;
       p.last = now;
-      if (d.seat && BARONS[d.seat] && freeSeats(mp, from).includes(d.seat)) p.seat = d.seat;
+      if (d.seat && freeSeat(mp, from, d.seat) === d.seat) p.seat = d.seat;
       if (typeof d.ready === 'boolean') p.ready = d.ready;
+      if (d.profile) Object.assign(p, takeProfile(mp, from, d.profile, p));
       lobbyChanged(mp);
     } else if (type === 'da') { const p = mp.peers.get(from); if (p) p.last = now; }
     else if (type === 'tschuess') { if (mp.peers.delete(from)) lobbyChanged(mp); }
@@ -13361,6 +13512,7 @@ function lobbyMessage(mp, from, type, d) {
     mp.lobby.state = d;
     const meRow = d.players.find((p) => p.id === mp.id);
     mp.seat = meRow.seat;
+    mp.profile = { ...mp.profile, name: meRow.name, color: meRow.color, arms: meRow.arms, female: !!meRow.female };
     if (mp.ev.onLobby) mp.ev.onLobby(lobbyView());
   } else if (type === 'start' && from === mp.hostId) {
     mp.lastHost = now + 180;   // der Gastgeber erschafft jetzt die Welt und schweigt eine Weile
@@ -13394,27 +13546,29 @@ function mpLobbyUpdate(dt) {
   }
 }
 
-// Für die Oberfläche: wer ist da, wer sitzt wo, wer ist bereit, was darf ich
+// Für die Oberfläche: wer ist da, wer herrscht wo, wer ist bereit, welche Farben und Grafschaften sind noch frei
 function lobbyView() {
   const mp = G.mp;
   if (!mp || !mp.lobby) return null;
   const st = mp.role === 'host' ? (mp.lobby.state || lobbyState(mp)) : mp.lobby.state;
   if (!st) return { role: mp.role, room: mp.room, waiting: true, chat: mp.lobby.chat };
   const mine = st.players.find((p) => p.id === mp.id) || {};
-  const taken = new Set(st.players.filter((p) => p.id !== mp.id).map((p) => p.seat));
+  const others = st.players.filter((p) => p.id !== mp.id);
+  const seatBy = new Map(others.map((p) => [p.seat, p.name])), colorBy = new Map(others.map((p) => [p.color, p.name]));
   return {
     role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, players: st.players, me: mine,
-    seats: BARON_IDS.map((id) => ({ id, free: !taken.has(id), label: lobbySeatLabel(id) })),
+    seats: seatIds().map((id) => ({ id, free: !seatBy.has(id), by: seatBy.get(id) || null, ...lobbySeatInfo(id) })),
+    colors: HERALDRY.map((h) => ({ ...h, by: colorBy.get(h.color) || null })),
     allReady: st.players.every((p) => p.ready), chat: mp.lobby.chat,
   };
 }
-function lobbySeatLabel(seat) {
-  if (seat === 'heim') return 'Heimburg des Gastgebers';
-  const b = BARONS[seat];
-  if (!b) return seat;
-  const site = SETTLEMENTS.find((s) => s.id === b.seat);
-  return `${site ? site.name : b.seat} (${b.region}) – statt ${b.name}`;
+// Was die Lobby über eine Grafschaft weiß, bevor es eine Welt gibt: Name, Burg, Reich, Vorzug, heutiger Herr
+const REALM_NAME = { en: 'England', wa: 'Wales', sc: 'Schottland', ir: 'Irland', nd: 'Normandie', fr: 'Frankreich', fl: 'Flandern' };
+function lobbySeatInfo(seat) {
+  const sh = SHIRES[seat], site = SETTLEMENTS.find((x) => x.id === seat) || {};
+  return { name: sh ? sh.name : seat, castle: site.name || seat, realm: REALM_NAME[site.realm] || 'Anderswo', text: sh ? sh.text : '', lord: site.faction && FACTIONS[site.faction] ? FACTIONS[site.faction].name : 'niemand' };
 }
+function lobbySeatLabel(seat) { const i = lobbySeatInfo(seat); return `${i.name} · Burg ${i.castle}`; }
 
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
@@ -13618,12 +13772,9 @@ function passHours(h) {
 function guestDay() {
   const before = seasonIndex();
   G.s.day++;
-  // Sold für das Gefolge aus der eigenen Kasse
-  const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
-  if (wages) {
-    if (G.s.gold >= wages) G.s.gold -= wages;
-    else { G.s.gold = 0; log('Die Kasse reicht nicht für den Sold. Dein Gefolge murrt.', 'bad'); }
-  }
+  // Eigene Grafschaften, Burgen, Lager, Sold und Verpflegung rechnet jeder selbst
+  dailyCastle();
+  dailyHoldings(false);
   dailyQuests();
   maintainGroups();
   replenishAnimals();
@@ -17675,6 +17826,7 @@ function prefetchArt(dt) {
 
 function buildPlayerCastle() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
+  if (!s) return [];
   const C = G.s.castle;
   const parts = castlePieces(s, C.level, playerColor(), ringR());
   const z0 = groundZ(G.world, s.x, s.y);
@@ -17812,7 +17964,7 @@ function buildingAtScreen(px, py) {
 function drawCelebration(c, dt) {
   const ce = G.celebrate;
   if (ce && G.time - ce.t0 < 45 && G.world) {
-    const s = G.world.sites.find((x) => x.type === 'spieler');
+    const s = G.world.sites.find((x) => x.type === 'spieler') || G.s.player;
     let px = s.x - 1, py = s.y - 1;
     if (ce.x !== undefined) { px = ce.x; py = ce.y; }
     else if (ce.plot !== undefined && castleLayout()[ce.plot]) { const q = castleLayout()[ce.plot]; px = q.x; py = q.y; }
@@ -21860,13 +22012,20 @@ function besiegeActions(site) {
 // Eine eroberte Burg: Kastellan, Vorgabe, Besatzung, Ausbau
 function holdingPanel(site) {
   const h = holdingOf(site), sh = SHIRES[site.id];
-  const tabs = [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
+  // Mehrspieler: Die Burg deiner Grafschaft ist dein Sitz, mit Rittersaal, Gefolge und Lager
+  const seat = isHomeBase(site);
+  const tabs = seat ? [['info', 'Burg'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager'], ['markt', 'Markt'], ['waren', 'Ausrüster']]
+    : [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
   if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'info';
   let body = '';
   if (G.ui.tab === 'info') body = holdingInfo(site, h);
+  if (G.ui.tab === 'halle') body = castleHall();
+  if (G.ui.tab === 'gefolge') body = partyView(true);
+  if (G.ui.tab === 'lager') body = castleStore();
   if (G.ui.tab === 'markt') body = marketTable(site);
   if (G.ui.tab === 'waren') body = shopView(site);
-  return { title: site.name, sub: `Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · erobert an Tag ${h.since}`, tabs, body };
+  const since = seat ? 'dein Sitz' : `erobert an Tag ${h.since}`;
+  return { title: site.name, sub: `${seat && G.s.arms ? `<span class="arms-mini">${armsSVG(G.s.arms, 22, 'Dein Wappen')}</span>` : ''}Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · ${since}`, tabs, body };
 }
 function holdingInfo(site, h) {
   const sh = SHIRES[site.id], c = castellanOf(h), eff = holdingEff(h), from = h.from;
@@ -21887,7 +22046,7 @@ function holdingInfo(site, h) {
   const rc = repairCostHolding(h), wc = workCost(h);
   return `${besieged}<div class="cols">
     <div>
-      <p class="lede">Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}</p>
+      <p class="lede">${h.seat ? `Dein Banner weht über ${esc(site.name)}, dem Sitz deiner Grafschaft. ${from ? `Bisher hielten die ${esc(FACTIONS[from].short)} die Burg; sie hätten sie gern zurück.` : ''}` : `Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}`}</p>
       <dl class="facts">
         <dt>Grafschaft</dt><dd>${esc(sh.name)}: ${esc(sh.text)}</dd>
         <dt>Abgaben</dt><dd>${fmt(shireTax(site.id))} Gold am Tag, davon an dich ${fmt(holdingIncome(site.id))}</dd>
@@ -22466,7 +22625,7 @@ function partyView(atCastle) {
 }
 
 function partyPanel() {
-  const atCastle = G.nearSite && G.nearSite.type === 'spieler';
+  const atCastle = isHomeBase(G.nearSite);
   const n = trips().length;
   const tabs = [['gefolge', 'Gefolge'], ['reisen', `Reisen & Handel${n ? ` (${n})` : ''}`]];
   if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'gefolge';
@@ -22530,14 +22689,14 @@ function tradeForm() {
   if (!f.who || !cand.some((u) => String(u.id) === String(f.who))) f.who = cand[0] ? String(cand[0].id) : '';
   if (f.e1 && (f.e1 === f.who || !cand.some((u) => String(u.id) === String(f.e1)))) f.e1 = '';
   const u = cand.find((x) => String(x.id) === String(f.who));
-  const fromStore = !u || u.status === 'garnison' || (G.nearSite && G.nearSite.type === 'spieler');
+  const fromStore = !u || u.status === 'garnison' || isHomeBase(G.nearSite);
   const store = fromStore ? G.s.castle.storage : G.s.cargo;
   const goods = GOOD_IDS.filter((g) => (store[g] || 0) > 0);
   if (f.good && !goods.includes(f.good)) f.good = '';
   const markets = G.world.sites.filter((s) => !['spieler', 'lager', 'einsiedelei'].includes(s.type) && !isHostileFaction(s.faction))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   if (f.to && !markets.some((s) => s.id === f.to)) f.to = '';
-  const home = castleSite();
+  const home = homeBase();
   const dist = (s) => Math.round(Math.hypot(s.x - home.x, s.y - home.y) * 1.25 / 75 * 2) / 2;
   const price = (s, g, buyIt) => (g ? ` · ${GOODS[g].name} ${buyIt ? buyPrice(s, g) : sellPrice(s, g)} G` : '');
   const opt = (s, sel, g, buyIt) => `<option value="${s.id}" ${sel === s.id ? 'selected' : ''}>${esc(s.name)} (${String(dist(s)).replace('.', ',')} T.${price(s, g, buyIt)})</option>`;
@@ -22913,9 +23072,7 @@ function menuPanel() {
 function mpMenu() {
   const mp = G.mp;
   if (!mp) return `<div class="mp-box"><span class="label">Mehrspieler</span>
-      <input id="mpm-room" class="mp-in" value="burg" maxlength="32" aria-label="Name der Partie">
-      <input id="mpm-relay" class="mp-in" placeholder="Relais (leer: dieser Rechner)" aria-label="Relais-Adresse">
-      <button class="btn sm" data-act="mphost">Diese Partie eröffnen</button></div>`;
+      <p class="hint">Eine Partie mit anderen beginnt im Startmenü unter „Mehrspieler …“: Dort wählt jeder Ritter, Wappen und Grafschaft.</p></div>`;
   const rows = mpRoster().map((r) => `<li><span class="dot" style="background:${esc(r.color || '#888')}"></span>${esc(r.name)}${r.you ? ' (du)' : ''}${r.host ? ' · Gastgeber' : ''} <span class="muted">${r.seat ? esc(seatName(r.seat)) : ''}</span></li>`).join('');
   return `<div class="mp-box"><span class="label">Partie „${esc(mp.room)}“ (${mp.kind === 'relais' ? 'Relais' : 'dieser Rechner'})</span>
       <ul class="mp-roster">${rows}</ul>
@@ -23041,7 +23198,6 @@ function questById(id) { return G.s.quests.find((q) => q.id === Number(id)); }
 const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
-  mphost: () => { const room = (byId('mpm-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg'; if (G.mpHostNow) G.mpHostNow(room, byId('mpm-relay').value.trim()); refreshPanel(); },
   mpleave: () => { if (G.mpLeaveNow) G.mpLeaveNow(); refreshPanel(); },
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
@@ -23110,9 +23266,8 @@ const ACTIONS = {
   campbuy: (d) => buyAtCamp(G.ui.arg, d.good, Number(d.n)),
   camphire: (d) => hireAtCamp(G.ui.arg, Number(d.i)),
   mercHire: (d) => hireInTown(G.ui.arg, Number(d.i)),
-  sellstore: (d) => { if (G.mp && G.mp.role === 'guest') return; const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
+  sellstore: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
   sellstoreall: () => {
-    if (G.mp && G.mp.role === 'guest') return;
     const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg;
     let n = 0, gold = 0;
     for (const g of GOOD_IDS) { const r = sellStored(site, g, 9999, storeKeep(g)); n += r.sold; gold += r.earned; }
@@ -24503,16 +24658,18 @@ function ivBar(T, n, t) {
 }
 
 // ===== lobby.js =====
-// Mehrspieler-Lobby im Startmenü: Partie eröffnen oder beitreten, dann alle in einer Liste mit Wappenfarbe, Burg und
-// „bereit“; der Gastgeber stellt die Schwierigkeit ein und startet, Gäste wählen ihre Burg und melden sich bereit.
-// Chat für alle. Die Regeln dahinter stehen in mp.js; hier nur die Oberfläche. main.js reicht über initLobby die Dinge
-// herein, die zum Spielstart gehören (Profil aus dem Startmenü, Welt erschaffen, als Gast einsteigen, Ladetafel).
+// Mehrspieler-Lobby im Startmenü: Partie eröffnen oder beitreten. In der Lobby stellt jeder seinen Ritter ein (Name,
+// Figur, Wappen mit eigener Farbe) und wählt die Grafschaft, über die er herrscht; der Gastgeber stellt die
+// Schwierigkeit ein und startet, sobald alle bereit sind. Chat für alle. Die Regeln dahinter stehen in mp.js; hier nur
+// die Oberfläche. main.js reicht über initLobby die Dinge herein, die zum Spielstart gehören (Profil aus dem Startmenü
+// als Vorschlag, Welt erschaffen, als Gast einsteigen, Ladetafel).
 
 
 
 
 
-let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '';
+
+let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null;
 const LOBBY_DIFF = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']];
 const isDesktop = () => !!(window.ritterDesktop && window.ritterDesktop.relay);
 
@@ -24523,6 +24680,7 @@ function initLobby(h) {
   box.addEventListener('click', onLobbyClick);
   box.addEventListener('change', onLobbyChange);
   box.addEventListener('keydown', onLobbyKey);
+  box.addEventListener('input', onLobbyInput);
 }
 
 function openLobby() {
@@ -24549,7 +24707,8 @@ const lobbyEvents = {
     if (!d) { lbHooks.hideLoading(); lbStep = 'wahl'; lbStatus = err || 'Beitreten fehlgeschlagen.'; byId('lobby').hidden = false; renderLobby(); return; }
     closeLobby();
     lbHooks.showLoading('Die Welt wird erschaffen …');
-    setTimeout(() => lbHooks.startGuest(d, lbProfile), 30);
+    const prof = { ...lbProfile, ...((G.mp && G.mp.profile) || {}) };
+    setTimeout(() => lbHooks.startGuest(d, prof), 30);
   },
   onClosed: (msg) => { lbHooks.hideLoading(); lbStep = 'wahl'; lbStatus = msg; byId('lobby').hidden = false; renderLobby(); },
   onFail: (msg) => { lbStep = 'wahl'; lbStatus = msg; renderLobby(); },
@@ -24557,14 +24716,14 @@ const lobbyEvents = {
 
 function renderLobby() {
   const card = byId('lobby-card');
-  lbSig = '';
+  lbSig = ''; lbSigArms = '';
   if (lbStep === 'wahl') {
     const hint = isDesktop()
       ? 'Wer eröffnet, ist Gastgeber. Seine Mitspieler im Heimnetz tragen die Adresse ein, die ihm hier gleich angezeigt wird. Auf demselben PC (zweites Fenster) bleibt das Adressfeld leer.'
       : 'In dieser Browser-Fassung spielen zwei Fenster im selben Browser miteinander; das Adressfeld bleibt dann leer. Mit Freunden im Netz spielt ihr über die Desktop-App.';
     card.innerHTML = `
       <h2>Mehrspieler</h2>
-      <p class="lb-note">Dein Held kommt aus dem Startmenü: Name, Figur und Wappen dort einstellen, dann hier eröffnen oder beitreten.</p>
+      <p class="lb-note">Im Mehrspieler gibt es keine Heimburg: Jeder herrscht von Anfang an über eine Grafschaft. Ritter, Wappen und Grafschaft wählst du gleich in der Lobby.</p>
       <div class="lb-cols">
         <div class="lb-col">
           <h3>Partie eröffnen</h3>
@@ -24586,9 +24745,28 @@ function renderLobby() {
   card.innerHTML = `
     <h2 id="lb-title">Partie</h2>
     <p class="lb-note" id="lb-info"></p>
-    <table class="lb-players"><thead><tr><th>Spieler</th><th>Burg</th><th>Bereit</th></tr></thead><tbody id="lb-players"></tbody></table>
-    <div id="lb-mine"></div>
-    <div id="lb-diff"></div>
+    <div class="lb-cols">
+      <section class="lb-col" aria-label="Dein Ritter">
+        <h3>Dein Ritter</h3>
+        <div class="lb-hero">
+          <div class="lb-arms" id="lb-arms"></div>
+          <div class="lb-hero-fields">
+            <label class="lb-field">Name<input id="lb-name" maxlength="24" autocomplete="off"></label>
+            <div class="lb-field">Figur<div class="seg" id="lb-fig"></div></div>
+          </div>
+        </div>
+        <div class="lb-field">Wappenfarbe <span class="lb-sub" id="lb-colorname"></span><div class="lb-swatches" id="lb-colors"></div></div>
+        <div class="lb-field">Metall<div class="seg" id="lb-metal"></div></div>
+        <div class="lb-field">Wappenbild <span class="lb-sub" id="lb-chargename"></span><div class="lb-charges" id="lb-charges"></div></div>
+      </section>
+      <section class="lb-col" aria-label="Deine Grafschaft">
+        <h3>Deine Grafschaft</h3>
+        <label class="lb-field">Hier beginnst du als Herr<select id="lb-seat"></select></label>
+        <div class="lb-seatinfo" id="lb-seatinfo"></div>
+        <div id="lb-diff"></div>
+      </section>
+    </div>
+    <table class="lb-players"><thead><tr><th>Spieler</th><th>Grafschaft</th><th>Bereit</th></tr></thead><tbody id="lb-players"></tbody></table>
     <div class="lb-chat"><div class="lb-chatlog" id="lb-chatlog" aria-live="polite"></div>
       <input id="lb-chat" maxlength="200" placeholder="Nachricht an alle … (Enter schickt)" autocomplete="off"></div>
     <div class="row" id="lb-actions"></div>`;
@@ -24605,28 +24783,51 @@ function renderLobbyParts() {
     set('lb-actions', '<button type="button" class="btn" data-lb="leave">Abbrechen</button>');
     return;
   }
+  const me = v.me, arms = me.arms || { field: me.color, metal: 'gold', charge: 'loewe' };
   const info = v.role === 'host'
     ? (v.lan && v.lan.length ? `Du bist Gastgeber. Mitspieler tragen ein: Partie <b>${esc(v.room)}</b>, Adresse <b>${esc(v.lan.map((a) => a.replace(/^ws:\/\//, '').replace(/:8765$/, '')).join(' oder '))}</b>.`
       : `Du bist Gastgeber. Mitspieler treten der Partie <b>${esc(v.room)}</b> bei.`)
-    : 'Wähle deine Burg und melde dich bereit. Der Gastgeber startet das Spiel.';
+    : 'Stell deinen Ritter ein, wähl deine Grafschaft und melde dich bereit. Der Gastgeber startet das Spiel.';
   set('lb-info', info);
-  set('lb-players', v.players.map((p) => `<tr${p.id === v.me.id ? ' class="me"' : ''}>
-      <td><span class="lb-dot" style="background:${esc(p.color || '#888')}"></span>${esc(p.name)}${p.host ? ' <span class="lb-tag">Gastgeber</span>' : ''}${p.id === v.me.id ? ' <span class="lb-tag">du</span>' : ''}</td>
-      <td>${esc(p.seat === 'heim' ? 'Heimburg' : (v.seats.find((s) => s.id === p.seat) || { label: '–' }).label)}</td>
-      <td>${p.ready ? '✔' : '…'}</td></tr>`).join(''));
-  // Burgwahl (Gäste): nur neu zeichnen, wenn sich die Auswahl ändert, sonst klappt das Menü beim Öffnen zu
-  if (v.role === 'guest') {
-    const s2 = JSON.stringify([v.me.seat, v.seats.map((s) => s.free)]);
-    if (s2 !== lbSig) {
-      lbSig = s2;
-      set('lb-mine', `<label class="lb-field">Deine Burg
-        <select id="lb-seat">${v.seats.map((s) => `<option value="${esc(s.id)}"${s.id === v.me.seat ? ' selected' : ''}${s.free || s.id === v.me.seat ? '' : ' disabled'}>${esc(s.label)}${s.free || s.id === v.me.seat ? '' : ' (vergeben)'}</option>`).join('')}</select></label>`);
-    }
-  } else set('lb-mine', '');
+  // Dein Ritter: Wappen, Name, Figur, Farbe, Metall, Bild
+  set('lb-arms', armsSVG(arms, 64, 'Dein Wappen'));
+  const nameEl = byId('lb-name');
+  if (nameEl && document.activeElement !== nameEl && nameEl.value !== me.name) nameEl.value = me.name || '';
+  set('lb-fig', [['m', 'Ritter'], ['f', 'Ritterin']].map(([k, n]) => `<button type="button" class="btn sm${(k === 'f') === !!me.female ? ' primary' : ''}" data-lb="fig" data-v="${k}" aria-pressed="${(k === 'f') === !!me.female}">${n}</button>`).join(''));
+  const cur = v.colors.find((c) => c.color === me.color);
+  set('lb-colorname', cur ? esc(cur.name) : '');
+  set('lb-colors', v.colors.map((c) => {
+    const sel = c.color === me.color, by = c.by;
+    return `<button type="button" class="lb-swatch${sel ? ' sel' : ''}" style="--c:${esc(c.color)}" data-lb="color" data-v="${esc(c.color)}" ${by ? 'disabled' : ''} aria-pressed="${sel}" title="${esc(c.name)}${by ? ` · trägt schon ${esc(by)}` : ''}" aria-label="${esc(c.name)}${by ? `, trägt schon ${esc(by)}` : ''}"></button>`;
+  }).join(''));
+  set('lb-metal', [['gold', 'Gold'], ['silber', 'Silber']].map(([k, n]) => `<button type="button" class="btn sm${arms.metal === k ? ' primary' : ''}" data-lb="metal" data-v="${k}" aria-pressed="${arms.metal === k}">${n}</button>`).join(''));
+  set('lb-chargename', CHARGES[arms.charge] ? esc(CHARGES[arms.charge].name) : '');
+  const sa = JSON.stringify(arms);
+  if (sa !== lbSigArms) {
+    lbSigArms = sa;
+    set('lb-charges', CHARGE_IDS.map((id) => `<button type="button" class="lb-charge${arms.charge === id ? ' sel' : ''}" data-lb="charge" data-v="${id}" title="${esc(CHARGES[id].name)}" aria-label="${esc(CHARGES[id].name)}" aria-pressed="${arms.charge === id}">${chargeSVG(id, arms, 30)}</button>`).join(''));
+  }
+  // Grafschaft: nach Reichen, vergebene gesperrt; nur neu zeichnen, wenn sich etwas ändert (sonst klappt das Menü zu)
+  const sel = byId('lb-seat'), s2 = JSON.stringify([me.seat, v.seats.map((x) => x.by)]);
+  if (sel && s2 !== lbSig && document.activeElement !== sel) {
+    lbSig = s2;
+    const realms = [...new Set(v.seats.map((x) => x.realm))];
+    sel.innerHTML = realms.map((r) => `<optgroup label="${esc(r)}">${v.seats.filter((x) => x.realm === r).map((x) => `<option value="${esc(x.id)}"${x.id === me.seat ? ' selected' : ''}${x.by ? ' disabled' : ''}>${esc(x.name)} · Burg ${esc(x.castle)}${x.by ? ` (${esc(x.by)})` : ''}</option>`).join('')}</optgroup>`).join('');
+  }
+  const seat = v.seats.find((x) => x.id === me.seat);
+  set('lb-seatinfo', seat ? `<p><b>${esc(seat.name)}</b>, Sitz auf der Burg ${esc(seat.castle)} (${esc(seat.realm)}).</p><p>${esc(seat.text)}</p><p class="lb-sub">Bisher halten ${esc(seat.lord)} die Burg. Du beginnst als ihr Herr mit Besatzung, Rittersaal und Lager; die Abgaben der Grafschaft gehören dir.</p>` : '');
   const diffName = (LOBBY_DIFF.find((d) => d[0] === v.difficulty) || LOBBY_DIFF[0])[1];
   set('lb-diff', v.role === 'host'
     ? `<div class="lb-field">Schwierigkeit der Barone <div class="seg">${LOBBY_DIFF.map(([k, n]) => `<button type="button" class="btn sm${v.difficulty === k ? ' primary' : ''}" data-lb="diff" data-v="${k}">${n}</button>`).join('')}</div></div>`
     : `<p class="lb-note">Schwierigkeit der Barone: <b>${esc(diffName)}</b></p>`);
+  // Spieler
+  set('lb-players', v.players.map((p) => {
+    const st = v.seats.find((x) => x.id === p.seat);
+    return `<tr${p.id === me.id ? ' class="me"' : ''}>
+      <td><span class="lb-mini">${armsSVG(p.arms || { field: p.color || '#888', metal: 'gold', charge: 'loewe' }, 20, esc(p.name))}</span>${esc(p.name)}${p.host ? ' <span class="lb-tag">Gastgeber</span>' : ''}${p.id === me.id ? ' <span class="lb-tag">du</span>' : ''}</td>
+      <td>${st ? `${esc(st.name)} <span class="lb-sub">(${esc(st.castle)})</span>` : '–'}</td>
+      <td>${p.ready ? '✔' : '…'}</td></tr>`;
+  }).join(''));
   set('lb-chatlog', v.chat.map((c) => `<div><b>${esc(c.name)}:</b> ${esc(c.text)}</div>`).join('') || '<div class="muted">Noch keine Nachrichten.</div>');
   const log = byId('lb-chatlog'); if (log) log.scrollTop = log.scrollHeight;
   const guests = v.players.filter((p) => !p.host);
@@ -24634,7 +24835,7 @@ function renderLobbyParts() {
     ? `<button type="button" class="btn primary" data-lb="start"${v.allReady ? '' : ' disabled'}>Spiel starten</button>
        <button type="button" class="btn" data-lb="leave">Partie schließen</button>
        <span class="lb-hint">${guests.length ? (v.allReady ? 'Alle sind bereit.' : 'Warte, bis alle bereit sind.') : 'Du kannst auch allein starten; Mitspieler können später noch beitreten.'}</span>`
-    : `<button type="button" class="btn primary" data-lb="ready">${v.me.ready ? 'Doch nicht bereit' : 'Bereit'}</button>
+    : `<button type="button" class="btn primary" data-lb="ready">${me.ready ? 'Doch nicht bereit' : 'Bereit'}</button>
        <button type="button" class="btn" data-lb="leave">Verlassen</button>`);
 }
 
@@ -24654,19 +24855,32 @@ function onLobbyClick(e) {
     mpLobbyJoin({ room: roomName(byId('lb-room-join').value), kind: url ? 'relais' : 'kanal', url }, lbProfile, lobbyEvents);
     lbStep = 'lobby'; lbStatus = ''; renderLobby();
   } else if (act === 'ready') { const v = lobbyView(); mpLobbyChoose({ ready: !(v && v.me && v.me.ready) }); }
+  else if (act === 'fig') mpLobbyChoose({ profile: { female: b.dataset.v === 'f' } });
+  else if (act === 'color') mpLobbyChoose({ profile: { color: b.dataset.v } });
+  else if (act === 'metal') mpLobbyChoose({ profile: { arms: { metal: b.dataset.v } } });
+  else if (act === 'charge') mpLobbyChoose({ profile: { arms: { charge: b.dataset.v } } });
   else if (act === 'diff') mpLobbyChoose({ difficulty: b.dataset.v });
   else if (act === 'start') {
     const r = mpLobbyStart();
     if (!r) return;
     closeLobby();
-    lbHooks.startHost({ ...lbProfile, difficulty: r.difficulty });
+    lbHooks.startHost({ ...lbProfile, ...r.profile, difficulty: r.difficulty, seat: r.seat });
   } else if (act === 'leave') { mpLobbyLeave(); lbStep = 'wahl'; lbStatus = ''; renderLobby(); }
   else if (act === 'back') { if (G.mp && G.mp.phase === 'lobby') mpLobbyLeave(); closeLobby(); }
 }
 
 function onLobbyChange(e) {
-  if (e.target.id === 'lb-seat') mpLobbyChoose({ seat: e.target.value });
+  if (e.target.id === 'lb-seat') { mpLobbyChoose({ seat: e.target.value }); e.target.blur(); }
+  if (e.target.id === 'lb-name') sendName(e.target.value);
 }
+// Name: kurz nach dem Tippen an alle
+function onLobbyInput(e) {
+  if (e.target.id !== 'lb-name') return;
+  clearTimeout(lbNameT);
+  const v = e.target.value;
+  lbNameT = setTimeout(() => sendName(v), 450);
+}
+function sendName(v) { const n = String(v || '').trim(); if (n) mpLobbyChoose({ profile: { name: n } }); }
 
 function onLobbyKey(e) {
   if (e.target.id === 'lb-chat' && e.key === 'Enter') { e.preventDefault(); mpChat(e.target.value); e.target.value = ''; }
@@ -24712,7 +24926,7 @@ function deserialize(json) {
   const data = typeof json === 'string' ? JSON.parse(json) : json;
   if (!data || data.v !== SAVE_VERSION) throw new Error('Der Spielstand passt nicht zu dieser Version.');
   const s = data.s;
-  G.world = generateWorld(s.seed);
+  G.world = generateWorld(s.seed, { mp: !!s.mpWorld });
   G.nextId = 1;
   s.player = makeUnit(s.player);
   s.companions = s.companions.map((c) => makeUnit(c));
@@ -24822,19 +25036,22 @@ const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
+// opts.seat (Mehrspieler): keine Heimburg, du beginnst als Herr dieser Grafschaft auf ihrer Burg
 function newGame(opts) {
-  const { name, castleName, color, female, arms, difficulty } = opts;
+  const { name, color, female, arms, difficulty, seat } = opts;
   const seed = (Math.random() * 2147483647) | 0;
-  G.world = generateWorld(seed);
+  G.world = generateWorld(seed, { mp: !!seat });
   G.nextId = 1;
-  const site = G.world.sites.find((s) => s.type === 'spieler');
+  const site = seat ? G.world.sites.find((s) => s.id === seat) : G.world.sites.find((s) => s.type === 'spieler');
+  const castleName = seat ? site.name : opts.castleName;
+  const at = seat ? seatSpawn(site) : { x: site.x + 0.3, y: site.y + 2.6 };
   const player = makeUnit({
     kind: 'player', cls: 'ritter', name, level: 1, female, hair: female ? '#7a3a1e' : '#3b2a1e',
     eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' },
-    x: site.x + 0.3, y: site.y + 2.6,
+    x: at.x, y: at.y,
   });
   G.s = {
-    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
+    seed, castleName, color, seat: seat || null, mpWorld: !!seat, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
@@ -24855,27 +25072,48 @@ function newGame(opts) {
   rebuildUnits();
   spawnAnimals();
   for (const s of G.world.sites) refreshTownQuests(s);
+  if (seat) lordStart(site);
   startWorld();
-  log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
-  log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
+  if (seat) welcomeLord(site, name);
+  else {
+    log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
+    log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
+  }
+}
+
+// Mehrspieler: Platz vor dem Tor der Grafschaftsburg, Burg samt Grafschaft, erste Anwärter im Rittersaal
+function seatSpawn(site) {
+  const at = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
+  return { x: at.x + 0.5, y: at.y + 0.5 };
+}
+function lordStart(site) {
+  grantSeat(site);
+  refreshRecruits();
+}
+function welcomeLord(site, name) {
+  const sh = SHIRES[site.id];
+  log(`Willkommen in ${site.name}, ${name}. Die Grafschaft ${sh.name} gehört dir: ${sh.text}`, 'gold');
+  log(`Deine Burg ${site.name} hat eine Besatzung von 16 Mann, einen Rittersaal und ein Lager (E an der Burg). Die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
 }
 
 // Mehrspieler-Gast: Welt aus dem Startwert des Gastgebers, gemeinsamer Stand von ihm, eigener Held an der Burg des Platzes
 function startGuest(d, who) {
-  const w = d.world;
-  G.world = generateWorld(w.seed);
+  const w = { ...d.world, shires: shiresIn(d.world.shires, d.seat) };
+  G.world = generateWorld(w.seed, { mp: true });
   G.nextId = 1;
-  const site = baronSite(d.seat) || G.world.sites.find((s) => s.type === 'spieler');
-  const spot = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
+  const site = G.world.sites.find((s) => s.id === d.seat);
+  const spot = seatSpawn(site);
   const player = makeUnit({
     kind: 'player', cls: 'ritter', name: who.name, level: 1, female: who.female, hair: who.female ? '#7a3a1e' : '#3b2a1e',
-    eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' }, x: spot.x + 0.5, y: spot.y + 0.5,
+    eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' }, x: spot.x, y: spot.y,
   });
   G.s = {
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     gold: 300, renown: 0, buff: null, cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
+    castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
     ...w,
+    seat: d.seat, mpWorld: true, castleName: site.name,
     color: who.color, arms: who.arms, player,
   };
   const squire = makeUnit({ kind: 'companion', cls: 'knecht', name: 'Oswin Langbein', level: 1, eq: { ...CLASSES.knecht.start }, status: 'party' });
@@ -24890,8 +25128,10 @@ function startGuest(d, who) {
   for (const s of G.world.sites) refreshTownQuests(s);
   mpHookGuest();
   G.onStock = mpNoteStock;
+  G.mp.applying = true; lordStart(site); G.mp.applying = false;
   startWorld();
-  log(`Du bist der Partie „${G.mp.room}“ beigetreten. Dein Platz: ${seatName(d.seat)}.`, 'gold');
+  log(`Du bist der Partie „${G.mp.room}“ beigetreten.`, 'gold');
+  welcomeLord(site, who.name);
 }
 
 // Mehrspieler (Lobby in lobby.js): Leere Adresse heißt Browser-Kanal (zweites Fenster im selben Browser), sonst WebSocket.
@@ -24905,23 +25145,15 @@ function desktopRelay() {
   G.mpLan = (r.addresses || []).map((a) => `ws://${a}:${r.port}`);
   return `ws://127.0.0.1:${r.port}`;
 }
-function relayKind(url) { return url ? 'relais' : 'kanal'; }
 function hostNote() {
   if (G.mpLan && G.mpLan.length) log(`Mitspieler im Heimnetz tragen als Relais ein: ${G.mpLan.join(' oder ')} (Partie „${G.mp.room}“).`, 'gold');
 }
-G.mpHostNow = (room, url) => {
-  if (G.mp) return;
-  if (url && !/^wss?:\/\//.test(url)) url = `ws://${url}${/:\d+$/.test(url) ? '' : ':8765'}`;
-  if (!url) url = desktopRelay() || '';
-  mpHost({ room: room || 'burg', kind: relayKind(url), url });
-  hostNote();
-};
 G.mpLeaveNow = () => { mpLeave(); log('Du hast die Partie verlassen.', 'info'); };
 G.mpChat = (t) => mpChat(t);
 
 function startWorld() {
   const home = G.world.sites.find((s) => s.type === 'spieler');
-  home.name = homeName();
+  if (home) home.name = homeName();
   // Spielstand aus einer Version mit anderer Ortsanlage: Bau- und Schadensstand der Häuser neu auswürfeln
   const sig = worldSig(G.world);
   if (G.s.worldSig !== sig) {
@@ -25159,11 +25391,9 @@ function buildingReach(a) {
   return (p ? p.size : 2) / 2 + 1.9;
 }
 // a: Anker aus render.js ({ id: 'burg' } oder { id: 'plot', plot, bid })
-function guestCastleNote() { log(`Die Burg ${homeName()} gehört ${(G.s.hostArms && G.s.hostArms.name) || 'dem Gastgeber'}. Deine Burg ist ${seatName(G.mp.seat)}.`, 'info'); }
 function openCastleBuilding(a) {
   G.pendingBuild = null;
   G.s.player.path = null;
-  if (mpGuest()) { guestCastleNote(); return; }
   if (a.id === 'burg') openPanel('castle');
   else openPanel('castle', { focus: 'plot', plot: a.plot }, castleFocusTab(a.plot));
 }
@@ -25181,7 +25411,7 @@ function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
   G.s.player.path = null;
-  if (s.type === 'spieler') { if (mpGuest()) guestCastleNote(); else openPanel('castle'); }
+  if (s.type === 'spieler') openPanel('castle');
   else openPanel('town', s);
 }
 

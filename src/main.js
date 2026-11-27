@@ -14,8 +14,8 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots } from './castle.js';
-import { applyHoldings, isHeld, grantHolding, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots, refreshRecruits } from './castle.js';
+import { applyHoldings, isHeld, grantHolding, grantSeat, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
 import { callStorm } from './siege.js';
 import { startTrip, planTrip, updateTrips } from './travels.js';
 import { initWar, dailyWar, swearTo, takeSeat, war } from './war.js';
@@ -31,11 +31,11 @@ import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog, castleFocusTab,
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
-import { mpHost, mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, seatName, mpLobbyBegin, mpLobbyUpdate } from './mp.js';
+import { mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, mpLobbyBegin, mpLobbyUpdate, shiresIn } from './mp.js';
 import { initLobby } from './lobby.js';
 import { introWanted, startIntro } from './intro.js';
 import { nearestWalkable } from './world.js';
-import { baronSite } from './barons.js';
+import { SHIRES } from './shires.js';
 import { giveAlms } from './life.js';
 import { rescueCondemned, updateJustice, canRescue, gallowsFor } from './justice.js';
 import { darkness, seasonIndex, hourOf } from './sim.js';
@@ -45,19 +45,22 @@ const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
+// opts.seat (Mehrspieler): keine Heimburg, du beginnst als Herr dieser Grafschaft auf ihrer Burg
 function newGame(opts) {
-  const { name, castleName, color, female, arms, difficulty } = opts;
+  const { name, color, female, arms, difficulty, seat } = opts;
   const seed = (Math.random() * 2147483647) | 0;
-  G.world = generateWorld(seed);
+  G.world = generateWorld(seed, { mp: !!seat });
   G.nextId = 1;
-  const site = G.world.sites.find((s) => s.type === 'spieler');
+  const site = seat ? G.world.sites.find((s) => s.id === seat) : G.world.sites.find((s) => s.type === 'spieler');
+  const castleName = seat ? site.name : opts.castleName;
+  const at = seat ? seatSpawn(site) : { x: site.x + 0.3, y: site.y + 2.6 };
   const player = makeUnit({
     kind: 'player', cls: 'ritter', name, level: 1, female, hair: female ? '#7a3a1e' : '#3b2a1e',
     eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' },
-    x: site.x + 0.3, y: site.y + 2.6,
+    x: at.x, y: at.y,
   });
   G.s = {
-    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
+    seed, castleName, color, seat: seat || null, mpWorld: !!seat, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
@@ -78,27 +81,48 @@ function newGame(opts) {
   rebuildUnits();
   spawnAnimals();
   for (const s of G.world.sites) refreshTownQuests(s);
+  if (seat) lordStart(site);
   startWorld();
-  log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
-  log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
+  if (seat) welcomeLord(site, name);
+  else {
+    log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
+    log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
+  }
+}
+
+// Mehrspieler: Platz vor dem Tor der Grafschaftsburg, Burg samt Grafschaft, erste Anwärter im Rittersaal
+function seatSpawn(site) {
+  const at = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
+  return { x: at.x + 0.5, y: at.y + 0.5 };
+}
+function lordStart(site) {
+  grantSeat(site);
+  refreshRecruits();
+}
+function welcomeLord(site, name) {
+  const sh = SHIRES[site.id];
+  log(`Willkommen in ${site.name}, ${name}. Die Grafschaft ${sh.name} gehört dir: ${sh.text}`, 'gold');
+  log(`Deine Burg ${site.name} hat eine Besatzung von 16 Mann, einen Rittersaal und ein Lager (E an der Burg). Die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
 }
 
 // Mehrspieler-Gast: Welt aus dem Startwert des Gastgebers, gemeinsamer Stand von ihm, eigener Held an der Burg des Platzes
 function startGuest(d, who) {
-  const w = d.world;
-  G.world = generateWorld(w.seed);
+  const w = { ...d.world, shires: shiresIn(d.world.shires, d.seat) };
+  G.world = generateWorld(w.seed, { mp: true });
   G.nextId = 1;
-  const site = baronSite(d.seat) || G.world.sites.find((s) => s.type === 'spieler');
-  const spot = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
+  const site = G.world.sites.find((s) => s.id === d.seat);
+  const spot = seatSpawn(site);
   const player = makeUnit({
     kind: 'player', cls: 'ritter', name: who.name, level: 1, female: who.female, hair: who.female ? '#7a3a1e' : '#3b2a1e',
-    eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' }, x: spot.x + 0.5, y: spot.y + 0.5,
+    eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' }, x: spot.x, y: spot.y,
   });
   G.s = {
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     gold: 300, renown: 0, buff: null, cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
+    castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
     quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
     ...w,
+    seat: d.seat, mpWorld: true, castleName: site.name,
     color: who.color, arms: who.arms, player,
   };
   const squire = makeUnit({ kind: 'companion', cls: 'knecht', name: 'Oswin Langbein', level: 1, eq: { ...CLASSES.knecht.start }, status: 'party' });
@@ -113,8 +137,10 @@ function startGuest(d, who) {
   for (const s of G.world.sites) refreshTownQuests(s);
   mpHookGuest();
   G.onStock = mpNoteStock;
+  G.mp.applying = true; lordStart(site); G.mp.applying = false;
   startWorld();
-  log(`Du bist der Partie „${G.mp.room}“ beigetreten. Dein Platz: ${seatName(d.seat)}.`, 'gold');
+  log(`Du bist der Partie „${G.mp.room}“ beigetreten.`, 'gold');
+  welcomeLord(site, who.name);
 }
 
 // Mehrspieler (Lobby in lobby.js): Leere Adresse heißt Browser-Kanal (zweites Fenster im selben Browser), sonst WebSocket.
@@ -128,23 +154,15 @@ function desktopRelay() {
   G.mpLan = (r.addresses || []).map((a) => `ws://${a}:${r.port}`);
   return `ws://127.0.0.1:${r.port}`;
 }
-function relayKind(url) { return url ? 'relais' : 'kanal'; }
 function hostNote() {
   if (G.mpLan && G.mpLan.length) log(`Mitspieler im Heimnetz tragen als Relais ein: ${G.mpLan.join(' oder ')} (Partie „${G.mp.room}“).`, 'gold');
 }
-G.mpHostNow = (room, url) => {
-  if (G.mp) return;
-  if (url && !/^wss?:\/\//.test(url)) url = `ws://${url}${/:\d+$/.test(url) ? '' : ':8765'}`;
-  if (!url) url = desktopRelay() || '';
-  mpHost({ room: room || 'burg', kind: relayKind(url), url });
-  hostNote();
-};
 G.mpLeaveNow = () => { mpLeave(); log('Du hast die Partie verlassen.', 'info'); };
 G.mpChat = (t) => mpChat(t);
 
 function startWorld() {
   const home = G.world.sites.find((s) => s.type === 'spieler');
-  home.name = homeName();
+  if (home) home.name = homeName();
   // Spielstand aus einer Version mit anderer Ortsanlage: Bau- und Schadensstand der Häuser neu auswürfeln
   const sig = worldSig(G.world);
   if (G.s.worldSig !== sig) {
@@ -382,11 +400,9 @@ function buildingReach(a) {
   return (p ? p.size : 2) / 2 + 1.9;
 }
 // a: Anker aus render.js ({ id: 'burg' } oder { id: 'plot', plot, bid })
-function guestCastleNote() { log(`Die Burg ${homeName()} gehört ${(G.s.hostArms && G.s.hostArms.name) || 'dem Gastgeber'}. Deine Burg ist ${seatName(G.mp.seat)}.`, 'info'); }
 function openCastleBuilding(a) {
   G.pendingBuild = null;
   G.s.player.path = null;
-  if (mpGuest()) { guestCastleNote(); return; }
   if (a.id === 'burg') openPanel('castle');
   else openPanel('castle', { focus: 'plot', plot: a.plot }, castleFocusTab(a.plot));
 }
@@ -404,7 +420,7 @@ function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
   G.s.player.path = null;
-  if (s.type === 'spieler') { if (mpGuest()) guestCastleNote(); else openPanel('castle'); }
+  if (s.type === 'spieler') openPanel('castle');
   else openPanel('town', s);
 }
 

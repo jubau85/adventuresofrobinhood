@@ -152,9 +152,12 @@ export function shireState() {
 }
 export function shireOwner(id) { return (shireState()[id] || {}).owner || null; }
 export function ownedShires() { const st = shireState(); return Object.keys(SHIRES).filter((id) => st[id].owner === 'spieler'); }
-export function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
-export function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
-export function ownerColor(o) { return o === 'spieler' ? playerColor() : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
+// Mehrspieler: Grafschaften eines anderen Menschen heißen 'p:<seine Grafschaft>'; Name und Farbe kennt mp.js (G.mpSeatInfo)
+export function isHumanOwner(o) { return typeof o === 'string' && o.startsWith('p:'); }
+function humanInfo(o) { return (G.mpSeatInfo && G.mpSeatInfo(o.slice(2))) || { name: `Herr von ${SHIRES[o.slice(2)] ? SHIRES[o.slice(2)].name : '?'}`, color: '#8a8070' }; }
+export function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isHumanOwner(o) ? `in der Hand von ${humanInfo(o).name}` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
+export function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isHumanOwner(o) ? humanInfo(o).name : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+export function ownerColor(o) { return o === 'spieler' ? playerColor() : isHumanOwner(o) ? humanInfo(o).color : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
 
 // Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)
 export function shireTax(id) {
@@ -175,11 +178,14 @@ export function shireFerryFactor() { return ownedShires().reduce((a, id) => Math
 export function ownsHomeShire() { return shireOwner(HOME_SHIRE) === 'spieler'; }
 
 // Grafschaft übernehmen (Eroberung, Testmodus)
-export function claimShire(id, who = 'spieler') {
+// quiet: ohne Meldung (Mehrspieler-Start). Ein Gast meldet den Wechsel dem Gastgeber (G.onClaimShire, mp.js).
+export function claimShire(id, who = 'spieler', quiet = false) {
   const st = shireState();
   if (!st[id] || st[id].owner === who) return;
   st[id].owner = who;
   G.shireTint = null;
+  if (G.onClaimShire) G.onClaimShire(id, who);
+  if (quiet) return;
   if (who === 'spieler') log(`Du beherrschst jetzt die Grafschaft ${SHIRES[id].name}. ${SHIRES[id].text}`, 'gold');
   else log(`${SHIRES[id].name} fällt an ${ownerName(who)}.`);
 }

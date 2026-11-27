@@ -68,12 +68,9 @@ export function passHours(h) {
 function guestDay() {
   const before = seasonIndex();
   G.s.day++;
-  // Sold für das Gefolge aus der eigenen Kasse
-  const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
-  if (wages) {
-    if (G.s.gold >= wages) G.s.gold -= wages;
-    else { G.s.gold = 0; log('Die Kasse reicht nicht für den Sold. Dein Gefolge murrt.', 'bad'); }
-  }
+  // Eigene Grafschaften, Burgen, Lager, Sold und Verpflegung rechnet jeder selbst
+  dailyCastle();
+  dailyHoldings(false);
   dailyQuests();
   maintainGroups();
   replenishAnimals();

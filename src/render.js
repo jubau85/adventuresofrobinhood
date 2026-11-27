@@ -3312,6 +3312,7 @@ export function prefetchArt(dt) {
 
 function buildPlayerCastle() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
+  if (!s) return [];
   const C = G.s.castle;
   const parts = castlePieces(s, C.level, playerColor(), ringR());
   const z0 = groundZ(G.world, s.x, s.y);
@@ -3449,7 +3450,7 @@ export function buildingAtScreen(px, py) {
 function drawCelebration(c, dt) {
   const ce = G.celebrate;
   if (ce && G.time - ce.t0 < 45 && G.world) {
-    const s = G.world.sites.find((x) => x.type === 'spieler');
+    const s = G.world.sites.find((x) => x.type === 'spieler') || G.s.player;
     let px = s.x - 1, py = s.y - 1;
     if (ce.x !== undefined) { px = ce.x; py = ce.y; }
     else if (ce.plot !== undefined && castleLayout()[ce.plot]) { const q = castleLayout()[ce.plot]; px = q.x; py = q.y; }

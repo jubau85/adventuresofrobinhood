@@ -11,7 +11,7 @@ import { rand, randInt } from './rng.js';
 import { siteById, sellPrice, buyPrice } from './economy.js';
 import { changeRep, isAlly, isHostileFaction, rewardQuest } from './politics.js';
 import { rebuildUnits, grantXp, removeGroup } from './units.js';
-import { castleSite } from './castle.js';
+import { castleSite, homeBase } from './castle.js';
 import { landAt } from './world.js';
 
 export function trips() { return G.s.trips || (G.s.trips = []); }
@@ -41,7 +41,7 @@ export function partyStrength(us) { return us.reduce((a, u) => a + u.st.atk * 2 
 function groupStrength(g) { return g.members.reduce((a, m) => a + m.st.atk * 2 + m.st.def + m.hp / 8, 0); }
 
 // ---------------------------------------------------------------- Strecken
-function homePt() { const s = castleSite(); return { x: s.x, y: s.y + 4, land: s.land, name: homeName() }; }
+function homePt() { const s = homeBase(); return { x: s.x, y: s.y + 4, land: s.land, name: s.type === 'spieler' ? homeName() : s.name }; }
 function sitePt(s) { return { x: s.x, y: s.y + 1, land: s.land, name: s.name, site: s.id }; }
 function playerPt() { const p = G.s.player; return { x: p.x, y: p.y, land: landAt(G.world, p.x, p.y), name: 'deinem Lager' }; }
 function legDays(a, b, mode) {

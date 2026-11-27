@@ -8,7 +8,7 @@ import { G, log, playerColor } from './state.js';
 import { FACTIONS, LIVERY, MAP_K } from './data.js';
 import { baronColor, baronSiegeBlock, baronHelpers } from './barons.js';
 import { rand, randInt } from './rng.js';
-import { SHIRES, HOME_SHIRE, claimShire, shireTax, shireName } from './shires.js';
+import { SHIRES, HOME_SHIRE, claimShire, shireTax, shireName, shireOwner, ownerColor, isHumanOwner } from './shires.js';
 import { changeRep, addRenown, isAlly } from './politics.js';
 import { makeNpc, partyMembers, placeNear, rebuildUnits, inCombat, grantXp } from './units.js';
 import { rebuildStaticWalls } from './world.js';
@@ -23,7 +23,13 @@ export function isHeld(s) { return !!holdingOf(s); }
 // Deine Burg Ashcombe oder eine eroberte
 export function isOwnSite(s) { return !!s && (s.type === 'spieler' || isHeld(s)); }
 // Farbe der Herrschaft eines Ortes (Banner, Wachen, Kartenzeichen)
-export function siteColor(s) { return isHeld(s) ? playerColor() : s && s.baron ? baronColor(s.baron) : s && s.faction ? FACTIONS[s.faction].color : null; }
+export function siteColor(s) {
+  if (isHeld(s)) return playerColor();
+  // Mehrspieler: die Burg eines anderen Menschen in seiner Farbe
+  const o = s && SHIRES[s.id] ? shireOwner(s.id) : null;
+  if (isHumanOwner(o)) return ownerColor(o);
+  return s && s.baron ? baronColor(s.baron) : s && s.faction ? FACTIONS[s.faction].color : null;
+}
 export function heldSites() { return Object.keys(holdings()).map(siteById).filter(Boolean); }
 
 // Ausbau der Burgen bleibt, auch wenn sie den Herrn wechseln (die Welt wird beim Laden neu erzeugt)
@@ -298,6 +304,26 @@ export function loseHolding(s, text, to = null) {
   rebuildUnits();
 }
 
+// Mehrspieler-Start: die Burg deiner Grafschaft samt Besatzung. Die früheren Herren lassen dich zwei Wochen in Ruhe.
+export function grantSeat(s) {
+  if (!s || !SHIRES[s.id]) return false;
+  holdings()[s.id] = { since: G.s.day, from: s.faction, seat: true, castellan: null, order: 'ausgewogen', garrison: 16, dmg: 0, works: 0, progress: 0, level: s.castleLevel || 2, lastAttack: G.s.day + 14 };
+  applyHoldings();
+  claimShire(s.id, 'spieler', true);
+  return true;
+}
+// Nur hier verloren (der Gastgeber hat die Grafschaft einem anderen zugesprochen): ohne den gemeinsamen Stand anzufassen
+export function dropHolding(s, text) {
+  const h = holdingOf(s);
+  if (!h) return;
+  const c = castellanOf(h);
+  delete holdings()[s.id];
+  if (c) { c.status = 'verwundet'; c.woundedDays = 4; c.seat = null; c.hp = Math.max(1, Math.round(c.st.maxHp * 0.2)); }
+  log(text, 'bad');
+  applyHoldings();
+  rebuildUnits();
+}
+
 // Testmodus: eine Burg ohne Belagerung übernehmen
 export function grantHolding(s) {
   if (!s || isHeld(s) || !SHIRES[s.id]) return false;
@@ -353,7 +379,8 @@ export function holdingHolds(s) {
 }
 
 // ---------------------------------------------------------------- Tageswechsel
-export function dailyHoldings() {
+// attacks: false beim Mehrspieler-Gast (Angriffe auf die gemeinsame Welt bestimmt der Gastgeber)
+export function dailyHoldings(attacks = true) {
   for (const s of heldSites()) {
     const h = holdingOf(s), o = ORDERS[h.order], eff = holdingEff(h);
     // Schäden ausbessern, dann weiterbauen
@@ -368,6 +395,7 @@ export function dailyHoldings() {
     if (c) grantXp(c, h.order === 'verteidigung' ? 12 : 8);
   }
   // Höchstens ein Gegenangriff am Tag
+  if (!attacks) return;
   for (const s of heldSites()) {
     const h = holdingOf(s), f = h.from;
     if (!f || G.s.day - (h.lastAttack ?? h.since) < ATTACK_PAUSE) continue;

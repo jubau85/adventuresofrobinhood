@@ -171,22 +171,26 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Steam (Desktop-App in `desktop/`, Lobbys und Verbindungen über Steam).
 - **Lobby (`lobby.js`, Lobby-Teil in `mp.js`):** Vor dem Spiel treffen sich alle in einer Lobby. Der Gastgeber
   eröffnet sie unter einem Namen, Gäste klopfen mit `hallo` an (bis zu zwölfmal, falls das Relais oder der Gastgeber
-  noch nicht so weit ist). Der Gastgeber führt die Liste (`lobby`, alle 1,5 s und bei jeder Änderung): Name, Farbe,
-  gewählte Burg, bereit. Gäste schicken ihre Wahl (`wahl`: Burg, bereit), der Gastgeber vergibt jede Burg nur einmal
-  und stellt die Schwierigkeit ein. „Spiel starten“ geht, wenn alle Gäste bereit sind (allein auch sofort); dann
-  schickt er `start`, erschafft die Welt und begrüßt jeden Gast mit dem Weltstand und der gewählten Burg. Gäste
-  warten so lange mit Ladetafel und einer Schonfrist von drei Minuten. Wer nach dem Start dazukommt, steigt wie
-  bisher direkt ein.
+  noch nicht so weit ist). Jeder stellt dort seinen Ritter ein (Name, Figur, Wappen) und wählt eine Grafschaft; der
+  Gastgeber vergibt Wappenfarben und Grafschaften je nur einmal und führt die Liste (`lobby`, alle 1,5 s und bei jeder
+  Änderung). Gäste schicken ihre Wahl (`wahl`: Grafschaft, Profil, bereit). „Spiel starten“ geht, wenn alle Gäste
+  bereit sind (allein auch sofort); dann schickt er `start`, erschafft die Welt und begrüßt jeden Gast mit dem
+  Weltstand und seiner Grafschaft. Wer nach dem Start dazukommt, bekommt eine freie Grafschaft.
+- **Grafschaften statt Heimburg:** Die Mehrspieler-Welt entsteht ohne Ashcombe (`generateWorld(seed, { mp: true })`,
+  für alle gleich). Jeder Mensch beginnt als Herr seiner Grafschaft: Ihre Burg ist ein Besitz (`grantSeat` in
+  `holdings.js`, 16 Mann, zwei Wochen Ruhe vor den früheren Herren) und zugleich sein Sitz mit Rittersaal, Gefolge,
+  Garnison und Lager (`homeBase()` in `castle.js`). Im gemeinsamen Stand heißen die Grafschaften eines Menschen
+  `p:<seine Grafschaft>`; beim Senden und Empfangen wird übersetzt, so dass jeder die eigenen als `spieler` sieht.
+  Gewinnt oder verliert ein Gast eine Grafschaft, meldet er es als Befehl `grafschaft`; schreibt der Gastgeber eine
+  Grafschaft einem anderen zu, verliert der Gast dort seine Burg (nicht am Tag der Eroberung selbst). Burg, Lager,
+  Abgaben, Sold und Verpflegung rechnet jeder selbst (`dailyCastle`, `dailyHoldings` ohne Angriffe beim Gast).
 - **Gastgeber-Modell:** Ein Spieler ist Gastgeber und rechnet die gemeinsame Welt allein: Uhrzeit und Tage, Märkte,
   Barone, Krieg, Grafschaften, Schäden, Bauten, Wetter, Turniere, Hinrichtungen (`SHARED_KEYS` in `mp.js`). Er schickt
   den ganzen Stand (nicht nur Änderungen), alle 3 s, wenn sich etwas geändert hat, die Märkte alle 8 s, die Uhr zweimal
   je Sekunde. Gäste rechnen täglich nur Persönliches (Sold, Aufträge, eigene Begegnungen; `guestDay` in `sim.js`).
   Dorfleben, Tiere und Gruppen unterwegs rechnet jeder für sich.
-- **Plätze:** Der Gastgeber sitzt auf seiner Burg (`heim`), jeder Gast auf der Burg eines Barons, dessen KI dann ruht
-  (`barons[id].human`); die Burg trägt die Farbe des Menschen. Gäste starten vor dieser Burg mit eigenem Helden, Gefolge
-  und Gold. Die Heimburg gehört dem Gastgeber.
 - **Befehle:** Was ein Gast an der gemeinsamen Welt ändert, geht als Befehl an den Gastgeber (bisher: Markt-Lager nach
-  Kauf und Verkauf, Platzwechsel). Weitere folgen mit 7b.
+  Kauf und Verkauf, gewonnene und verlorene Grafschaften). Weitere folgen mit 7b.
 - **Helden der anderen:** jeder schickt 10-mal je Sekunde Position, Pferd, Ausrüstung und Farbe; die anderen zeigen ihn
   als 3D-Figur mit Namen und Ring in seiner Farbe, weich zwischen den Meldungen.
 - **Gastgeber-Wechsel:** Kommt vom Gastgeber 15 s nichts (oder verabschiedet er sich beim Schließen des Fensters),
@@ -196,9 +200,9 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
 - **Verbindung (`net.js`):** Browser-Kanal (zwei Fenster auf einem Rechner), WebSocket-Relais (`desktop/relay.js`,
   in der Desktop-App beim Eröffnen eingebaut, sonst `node tools/relay.mjs`), später Steam. Chrome verlangt für Seiten
   aus dem Netz eine Freigabe für Verbindungen ins Heimnetz; die Desktop-App ist davon nicht betroffen.
-- **Noch offen (7b/7c):** eigene Burg der Gäste verwalten (Ausbau als Befehle), Belagerungen und Feldschlachten
+- **Noch offen (7b/7c):** Angriffe der KI auf die Burgen der Gäste sichtbar für alle, Belagerungen und Feldschlachten
   zwischen Menschen und deren Anzeige bei allen, Diplomatie zwischen Menschen, Gruppen auf der Karte gemeinsam,
-  Wappenfarbe des Gastgebers auf seiner Burg bei den Gästen, Speichern einer Mehrspieler-Partie für alle, Steam-Lobby.
+  Speichern einer Mehrspieler-Partie für alle, Steam-Lobby.
 
 ## Ausbauplan
 

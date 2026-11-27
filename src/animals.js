@@ -115,6 +115,7 @@ export function spawnAnimals() {
 // Nach dem Ausbau der Schafzucht: die Herde zieht auf die neue Weide
 export function refreshCastleHerd() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
+  if (!s) return;
   const pa = castlePasture(s);
   G.animals = G.animals.filter((a) => !(a.kind === 'schaf' && a.site === s.id));
   if (pa) addHerd('schaf', { x: pa.x, y: pa.y }, pa.n, pa.r, s.id);

@@ -14,7 +14,7 @@ import {
 } from './politics.js';
 import {
   bLevel, levelName, partyCap, cargoCap, buildInfo, startBuild, hire, setCompanionStatus, dismiss,
-  castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, conProgress, villageHouses, foodNeed, foodStock,
+  castleDefense, dailyBalance, storeCargo, loadCargo, castleSite, homeBase, seatSite, isHomeBase, conProgress, villageHouses, foodNeed, foodStock,
   castlePlots, castleLayout, homeBesieged, repairCost, startRepair, demolish, typeChangeCost, typeChangeDays, typeChangeLosses, startTypeChange, castleTypeName,
 } from './castle.js';
 import { CASTLE_TYPES, TYPE_IDS, OUTER_ONLY, STACKABLE, PLOT_BUILDINGS, castleType } from './plots.js';
@@ -288,13 +288,20 @@ function besiegeActions(site) {
 // Eine eroberte Burg: Kastellan, Vorgabe, Besatzung, Ausbau
 function holdingPanel(site) {
   const h = holdingOf(site), sh = SHIRES[site.id];
-  const tabs = [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
+  // Mehrspieler: Die Burg deiner Grafschaft ist dein Sitz, mit Rittersaal, Gefolge und Lager
+  const seat = isHomeBase(site);
+  const tabs = seat ? [['info', 'Burg'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager'], ['markt', 'Markt'], ['waren', 'Ausrüster']]
+    : [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
   if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'info';
   let body = '';
   if (G.ui.tab === 'info') body = holdingInfo(site, h);
+  if (G.ui.tab === 'halle') body = castleHall();
+  if (G.ui.tab === 'gefolge') body = partyView(true);
+  if (G.ui.tab === 'lager') body = castleStore();
   if (G.ui.tab === 'markt') body = marketTable(site);
   if (G.ui.tab === 'waren') body = shopView(site);
-  return { title: site.name, sub: `Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · erobert an Tag ${h.since}`, tabs, body };
+  const since = seat ? 'dein Sitz' : `erobert an Tag ${h.since}`;
+  return { title: site.name, sub: `${seat && G.s.arms ? `<span class="arms-mini">${armsSVG(G.s.arms, 22, 'Dein Wappen')}</span>` : ''}Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · ${since}`, tabs, body };
 }
 function holdingInfo(site, h) {
   const sh = SHIRES[site.id], c = castellanOf(h), eff = holdingEff(h), from = h.from;
@@ -315,7 +322,7 @@ function holdingInfo(site, h) {
   const rc = repairCostHolding(h), wc = workCost(h);
   return `${besieged}<div class="cols">
     <div>
-      <p class="lede">Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}</p>
+      <p class="lede">${h.seat ? `Dein Banner weht über ${esc(site.name)}, dem Sitz deiner Grafschaft. ${from ? `Bisher hielten die ${esc(FACTIONS[from].short)} die Burg; sie hätten sie gern zurück.` : ''}` : `Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}`}</p>
       <dl class="facts">
         <dt>Grafschaft</dt><dd>${esc(sh.name)}: ${esc(sh.text)}</dd>
         <dt>Abgaben</dt><dd>${fmt(shireTax(site.id))} Gold am Tag, davon an dich ${fmt(holdingIncome(site.id))}</dd>
@@ -894,7 +901,7 @@ function partyView(atCastle) {
 }
 
 function partyPanel() {
-  const atCastle = G.nearSite && G.nearSite.type === 'spieler';
+  const atCastle = isHomeBase(G.nearSite);
   const n = trips().length;
   const tabs = [['gefolge', 'Gefolge'], ['reisen', `Reisen & Handel${n ? ` (${n})` : ''}`]];
   if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'gefolge';
@@ -958,14 +965,14 @@ function tradeForm() {
   if (!f.who || !cand.some((u) => String(u.id) === String(f.who))) f.who = cand[0] ? String(cand[0].id) : '';
   if (f.e1 && (f.e1 === f.who || !cand.some((u) => String(u.id) === String(f.e1)))) f.e1 = '';
   const u = cand.find((x) => String(x.id) === String(f.who));
-  const fromStore = !u || u.status === 'garnison' || (G.nearSite && G.nearSite.type === 'spieler');
+  const fromStore = !u || u.status === 'garnison' || isHomeBase(G.nearSite);
   const store = fromStore ? G.s.castle.storage : G.s.cargo;
   const goods = GOOD_IDS.filter((g) => (store[g] || 0) > 0);
   if (f.good && !goods.includes(f.good)) f.good = '';
   const markets = G.world.sites.filter((s) => !['spieler', 'lager', 'einsiedelei'].includes(s.type) && !isHostileFaction(s.faction))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   if (f.to && !markets.some((s) => s.id === f.to)) f.to = '';
-  const home = castleSite();
+  const home = homeBase();
   const dist = (s) => Math.round(Math.hypot(s.x - home.x, s.y - home.y) * 1.25 / 75 * 2) / 2;
   const price = (s, g, buyIt) => (g ? ` · ${GOODS[g].name} ${buyIt ? buyPrice(s, g) : sellPrice(s, g)} G` : '');
   const opt = (s, sel, g, buyIt) => `<option value="${s.id}" ${sel === s.id ? 'selected' : ''}>${esc(s.name)} (${String(dist(s)).replace('.', ',')} T.${price(s, g, buyIt)})</option>`;
@@ -1341,9 +1348,7 @@ function menuPanel() {
 function mpMenu() {
   const mp = G.mp;
   if (!mp) return `<div class="mp-box"><span class="label">Mehrspieler</span>
-      <input id="mpm-room" class="mp-in" value="burg" maxlength="32" aria-label="Name der Partie">
-      <input id="mpm-relay" class="mp-in" placeholder="Relais (leer: dieser Rechner)" aria-label="Relais-Adresse">
-      <button class="btn sm" data-act="mphost">Diese Partie eröffnen</button></div>`;
+      <p class="hint">Eine Partie mit anderen beginnt im Startmenü unter „Mehrspieler …“: Dort wählt jeder Ritter, Wappen und Grafschaft.</p></div>`;
   const rows = mpRoster().map((r) => `<li><span class="dot" style="background:${esc(r.color || '#888')}"></span>${esc(r.name)}${r.you ? ' (du)' : ''}${r.host ? ' · Gastgeber' : ''} <span class="muted">${r.seat ? esc(seatName(r.seat)) : ''}</span></li>`).join('');
   return `<div class="mp-box"><span class="label">Partie „${esc(mp.room)}“ (${mp.kind === 'relais' ? 'Relais' : 'dieser Rechner'})</span>
       <ul class="mp-roster">${rows}</ul>
@@ -1469,7 +1474,6 @@ function questById(id) { return G.s.quests.find((q) => q.id === Number(id)); }
 const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
-  mphost: () => { const room = (byId('mpm-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg'; if (G.mpHostNow) G.mpHostNow(room, byId('mpm-relay').value.trim()); refreshPanel(); },
   mpleave: () => { if (G.mpLeaveNow) G.mpLeaveNow(); refreshPanel(); },
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
@@ -1538,9 +1542,8 @@ const ACTIONS = {
   campbuy: (d) => buyAtCamp(G.ui.arg, d.good, Number(d.n)),
   camphire: (d) => hireAtCamp(G.ui.arg, Number(d.i)),
   mercHire: (d) => hireInTown(G.ui.arg, Number(d.i)),
-  sellstore: (d) => { if (G.mp && G.mp.role === 'guest') return; const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
+  sellstore: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
   sellstoreall: () => {
-    if (G.mp && G.mp.role === 'guest') return;
     const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg;
     let n = 0, gold = 0;
     for (const g of GOOD_IDS) { const r = sellStored(site, g, 9999, storeKeep(g)); n += r.sold; gold += r.earned; }

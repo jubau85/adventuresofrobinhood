@@ -559,7 +559,7 @@ function baronPlanCampaign(id, say) {
 function baronPlanFeud(id, say) {
   const b = baron(id), s = baronSite(id), home = G.world.sites.find((o) => o.type === 'spieler');
   const held = G.world.sites.filter((o) => shireOwner(o.id) === 'spieler' && SHIRES[o.id] && o.land === s.land);
-  const targets = [...(home.land === s.land || Math.random() < 0.4 ? [home] : []), ...held];
+  const targets = [...(home && (home.land === s.land || Math.random() < 0.4) ? [home] : []), ...held];
   if (!targets.length) return;
   const t = pick(targets);
   const days = Math.max(1, Math.min(5, Math.round(Math.hypot(t.x - s.x, t.y - s.y) / (45 * MAP_K))));

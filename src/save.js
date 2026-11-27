@@ -36,7 +36,7 @@ export function deserialize(json) {
   const data = typeof json === 'string' ? JSON.parse(json) : json;
   if (!data || data.v !== SAVE_VERSION) throw new Error('Der Spielstand passt nicht zu dieser Version.');
   const s = data.s;
-  G.world = generateWorld(s.seed);
+  G.world = generateWorld(s.seed, { mp: !!s.mpWorld });
   G.nextId = 1;
   s.player = makeUnit(s.player);
   s.companions = s.companions.map((c) => makeUnit(c));

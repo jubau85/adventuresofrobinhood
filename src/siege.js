@@ -264,7 +264,7 @@ function openGates(sg) {
 // ---------------------------------------------------------------- Burgtor von deiner Burg
 // Ab der Holzburg lässt sich das Tor schließen. Zu bleibt es, bis du es wieder öffnest, auch über das Speichern hinaus.
 export function homeSite() { return G.world.sites.find((x) => x.type === 'spieler'); }
-export function hasHomeGate() { return !!G.s && G.s.castle.level >= 1; }
+export function hasHomeGate() { return !!G.s && G.s.castle.level >= 1 && !!homeSite(); }
 export function homeGateClosed() { return hasHomeGate() && !!G.s.gateClosed; }
 export function homeGateTiles() {
   const W = G.world, N = W.N;
