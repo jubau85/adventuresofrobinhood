@@ -14,6 +14,7 @@ import { cheatOn } from './cheats.js';
 import { SHIRES, ownedShires, shireGoods, shireDef, shireRenown, ownsHomeShire } from './shires.js';
 import { holdingIncome, holdingCosts, holdingGoods } from './holdings.js';
 import { CASTLE_TYPES, OUTER_ONLY, STACKABLE, castleType, ringR, plotLayout } from './plots.js';
+import { artKnown } from './assets.js';
 
 export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
 
@@ -122,8 +123,38 @@ export function castleObstacles() {
 
 // Feste Teile eines Gebäudes auf seinem Platz (wie render.js es zeichnet): [x, y, Breite, Tiefe, Pferch]
 // Innen (Platz 2 × 2) stehen die Gebäude enger und ohne Nebenanlagen.
+// Gemalte Gebäude (Paket 6): Grundfläche der Hauptgebäude je Gebäude, Platz (2 = Hof, 3 = vor der Mauer) und Stufe,
+// relativ zur Platzmitte [x, y, Breite x, Breite y]; Höfe, Äcker und Kleinkram bleiben begehbar, Pferche sind Weiden
+const EIGEN_RECTS = {
+  'halle|3': [[-0.78, -0.64, 1.09, 1.38], [-0.71, -0.56, 1.23, 1.56], [-0.85, -0.38, 1.3, 1.95]],
+  'kaserne|3': [[-0.86, -0.74, 1.44, 1.14], [-0.8, -0.45, 1.2, 1.7], [-0.8, -0.37, 1.22, 1.86]],
+  'schmiede|3': [[-0.7, -0.6, 1.0, 1.0], [-0.75, -0.65, 1.3, 1.2], [-0.63, -0.73, 1.48, 1.38]],
+  'stall|3': [[-0.91, -0.65, 0.92, 1.45], [-0.9, -0.6, 1.1, 1.6], [-1.0, -0.4, 0.9, 2.0]],
+  'holzfaeller|3': [[-0.7, -0.75, 1.1, 1.1], [-0.7, -0.75, 1.1, 1.1], [-0.75, -0.55, 1.2, 1.7]],
+  'steinbruch|3': [[-0.89, -0.86, 1.38, 1.12], [-0.8, -0.85, 1.4, 1.3], [-0.75, -0.75, 1.5, 1.5]],
+  'markt|3': [[-0.55, -0.55, 1.0, 0.7], [-0.5, -0.5, 1.3, 1.3], [-0.6, -0.6, 1.4, 1.4]],
+  'kapelle|3': [[-0.5, -0.5, 0.3, 0.3], [-0.55, -0.5, 1.3, 0.9], [-0.61, -0.7, 1.59, 1.64]],
+  'hospiz|3': [[-0.75, -0.95, 1.0, 0.9], [-0.78, -0.84, 1.09, 1.27], [-0.46, -0.88, 1.9, 1.2]],
+  'schafzucht|3': [[-0.8, -0.9, 1.1, 1.0], [-0.75, -0.85, 1.1, 1.0], [-0.85, -0.75, 1.2, 1.4]],
+  'felder|3': [[-0.7, -0.9, 0.8, 0.8], [-0.75, -0.8, 1.1, 1.1], [-0.7, -0.75, 1.2, 1.5]],
+  'halle|2': [[-0.02, -0.03, 1.09, 1.38], [-0.09, -0.05, 1.25, 1.55], [-0.3, -0.05, 1.3, 1.9]],
+  'kaserne|2': [[-0.22, -0.11, 1.44, 1.34], [-0.1, -0.02, 1.02, 1.86], [-0.23, -0.06, 1.19, 1.91]],
+  'schmiede|2': [[-0.1, 0.0, 1.1, 1.1], [-0.2, 0.03, 1.27, 1.06], [-0.11, -0.18, 1.5, 1.33]],
+  'stall|2': [[-0.04, -0.02, 0.92, 1.45], [-0.11, -0.03, 1.09, 1.56], [-0.2, -0.05, 0.97, 1.9]],
+  'markt|2': [[-0.2, -0.2, 1.0, 0.8], [-0.27, -0.3, 1.44, 1.31], [-0.32, -0.38, 1.48, 1.05]],
+  'kapelle|2': [[0, 0, 0.3, 0.3], [-0.1, -0.1, 1.2, 0.9], [-0.14, -0.15, 1.66, 1.42]],
+  'hospiz|2': [[0, -0.15, 1.2, 0.8], [-0.17, -0.2, 1.09, 1.27], [0, -0.3, 1.8, 1.2]],
+};
+// Weide im gemalten Pferch der Schafzucht (Stufe 1 und 2 rechts, Stufe 3 vor dem Stall)
+const EIGEN_PEN = [null, [0.69, -0.77, 1.6, 1.6], [0.69, -0.77, 1.6, 1.6], [0.45, 0.2, 1.9, 2.4]];
+export const eigenPainted = (id, L, p) => !!EIGEN_RECTS[`${id}|${p.size < 3 ? 2 : 3}`] && artKnown(`eigen_rittersaal_1`);
 export function plotRects(id, L, p) {
   const c = p.size < 3, x = p.x, y = p.y;
+  if (eigenPainted(id, L, p)) {
+    const [dx, dy, wx, wy] = EIGEN_RECTS[`${id}|${c ? 2 : 3}`][L - 1], r = [[x + dx, y + dy, wx, wy]];
+    if (id === 'schafzucht') { const pa = pastureOf(L, p); r.push([pa.x, pa.y, pa.w, pa.h, true]); }
+    return r;
+  }
   switch (id) {
     case 'halle': return [[x, y, 1.2 + L * 0.1, c ? 1.8 : [0, 2.2, 2.4, 2.6][L]]];
     case 'kaserne': return c ? [[x, y, 1.8, 1.0]] : [[x, y - 0.7, [0, 2.0, 2.4, 2.6][L], L === 3 ? 1.2 : 1.0], [x - 0.1, y + 0.75, 2.0, 1.1, true]];
@@ -155,7 +186,10 @@ export function plotRects(id, L, p) {
   }
 }
 // Weide einer Schafzucht auf ihrem Platz
-export function pastureOf(L, p) { return { x: p.x + 0.35, y: p.y + 0.35, w: [0, 1.7, 2.0, 2.2][L], h: [0, 1.6, 1.9, 2.1][L] }; }
+export function pastureOf(L, p) {
+  if (eigenPainted('schafzucht', L, p)) { const [dx, dy, w, h] = EIGEN_PEN[L]; return { x: p.x + dx, y: p.y + dy, w, h }; }
+  return { x: p.x + 0.35, y: p.y + 0.35, w: [0, 1.7, 2.0, 2.2][L], h: [0, 1.6, 1.9, 2.1][L] };
+}
 
 // Mauern und Burggebäude neu eintragen (nach Ausbau, Laden, Schummeln)
 export function refreshCastleBlock() {

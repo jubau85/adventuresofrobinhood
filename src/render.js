@@ -9,7 +9,7 @@ import { groundZ, tileAt, PAL_GATE } from './world.js';
 import { conProgress, villageSpots, castlePlots, castleLayout, pastureOf } from './castle.js';
 import { ringR, CASTLE_TYPES } from './plots.js';
 import { castlePasture } from './animals.js';
-import { ART, onArt, wantArt, wantArtPrefix } from './assets.js';
+import { ART, onArt, wantArt, wantArtPrefix, artKnown } from './assets.js';
 import { HORSE3D } from './pferde.js';
 import { HERO3D, FIG3D } from './figuren.js';
 import { graveSlot, graveCount, funeralProps } from './life.js';
@@ -2467,6 +2467,34 @@ function drawStoneOutcrop(c, x, y, n) {
   }
 }
 
+// Pferde in einer Koppel (Mitte pad, Größe pw × ph)
+function addPaddockHorses(add, pad, pw, ph, n) {
+  const cols = ['#7a5232', '#b8b0a2', '#2e2925', '#9a6a3a'];
+  for (let k = 0; k < n; k++) {
+    add(pad.x, pad.y + (k - n / 2) * 0.3, (c) => {
+      // Koppelpferde: eine Weile im Schritt die Runde, dann grasen sie (jedes zu seiner Zeit)
+      const cyc = 26, walk = 9, tt = G.time + k * 7.3, cyc0 = Math.floor(tt / cyc), inC = tt - cyc0 * cyc;
+      const moving = inC < walk;
+      const t = (cyc0 * walk + Math.min(inC, walk)) * 0.22 + k * 2.1;
+      const ax = pw / 2 - 0.4, ay = ph / 2 - 0.45;
+      const hx2 = pad.x + Math.sin(t) * ax, hy = pad.y + Math.cos(t * 0.8 + k) * ay;
+      const dx = Math.cos(t) * ax, dy = -Math.sin(t * 0.8 + k) * 0.8 * ay;
+      const [px, py] = P(hx2, hy);
+      c.save(); c.translate(px, py);
+      if (horseReady('pferd')) {
+        c.scale(1.14 * FIG, 1.14 * FIG);
+        c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(0, 0, 16, 6, 0, 0, Math.PI * 2); c.fill();
+        drawHorseSprite(c, 'pferd', moving ? 'schritt' : 'grasen', dirIndex(dx, dy), moving ? tt * 0.9 : tt / 3, cols[k % cols.length]);
+      } else {
+        c.scale(dx - dy >= 0 ? 1 : -1, 1);
+        c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(3, 0, 13, 4.5, 0, 0, Math.PI * 2); c.fill();
+        drawHorse(c, cols[k % cols.length], G.time * 0.6, true, null);
+      }
+      c.restore();
+    });
+  }
+}
+
 // Ein Gebäude auf seinem Bauplatz p ({ x, y, size }). Innen (2 × 2) steht es enger und ohne Nebenanlagen;
 // die festen Teile entsprechen plotRects in castle.js.
 function addCastleBuilding(add, id, L, p, s) {
@@ -2537,31 +2565,7 @@ function addCastleBuilding(add, id, L, p, s) {
       // Koppel neben dem Stall
       const pad = { x: p.x + 0.75, y: p.y + 0.1 }, pw = 1.3, ph = 2.6;
       add(pad.x, pad.y - ph / 2, (c) => drawFenceRect(c, pad.x, pad.y, pw, ph));
-      const n = [0, 1, 2, 3][L];
-      const cols = ['#7a5232', '#b8b0a2', '#2e2925', '#9a6a3a'];
-      for (let k = 0; k < n; k++) {
-        add(pad.x, pad.y + (k - n / 2) * 0.3, (c) => {
-          // Koppelpferde: eine Weile im Schritt die Runde, dann grasen sie (jedes zu seiner Zeit)
-          const cyc = 26, walk = 9, tt = G.time + k * 7.3, cyc0 = Math.floor(tt / cyc), inC = tt - cyc0 * cyc;
-          const moving = inC < walk;
-          const t = (cyc0 * walk + Math.min(inC, walk)) * 0.22 + k * 2.1;
-          const ax = pw / 2 - 0.4, ay = ph / 2 - 0.45;
-          const hx2 = pad.x + Math.sin(t) * ax, hy = pad.y + Math.cos(t * 0.8 + k) * ay;
-          const dx = Math.cos(t) * ax, dy = -Math.sin(t * 0.8 + k) * 0.8 * ay;
-          const [px, py] = P(hx2, hy);
-          c.save(); c.translate(px, py);
-          if (horseReady('pferd')) {
-            c.scale(1.14 * FIG, 1.14 * FIG);
-            c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(0, 0, 16, 6, 0, 0, Math.PI * 2); c.fill();
-            drawHorseSprite(c, 'pferd', moving ? 'schritt' : 'grasen', dirIndex(dx, dy), moving ? tt * 0.9 : tt / 3, cols[k % cols.length]);
-          } else {
-            c.scale(dx - dy >= 0 ? 1 : -1, 1);
-            c.fillStyle = 'rgba(25,35,15,0.22)'; c.beginPath(); c.ellipse(3, 0, 13, 4.5, 0, 0, Math.PI * 2); c.fill();
-            drawHorse(c, cols[k % cols.length], G.time * 0.6, true, null);
-          }
-          c.restore();
-        });
-      }
+      addPaddockHorses(add, pad, pw, ph, [0, 1, 2, 3][L]);
       if (L >= 2) add(hx - 0.2, p.y + wy / 2 + 0.25, (c) => drawProp(c, { prop: 'heu', x: hx - 0.2, y: p.y + wy / 2 + 0.25, v: 0.3 }));
       break;
     }
@@ -2854,6 +2858,89 @@ function addBurnt(add, p) {
   });
 }
 
+// ---------------------------------------------------------------- Paket 6: Gebäude der eigenen Burg (tools/eigen.py)
+// Je Bauplatz ein gemaltes Bild mit Hof, Zäunen und Zubehör: <name>_<stufe> vor der Mauer (3 × 3 Felder),
+// <name>_hof_<stufe> im Hof (2 × 2), beschädigt _schaden_1 (wird ausgebessert) oder _schaden_2 (abgebrannt), im Schnee
+// _winter, die Felder im Frühling und Herbst eigens. Magenta (Banner, Markisen, Wimpel) wird zur Wappenfarbe. Fußpunkt
+// in der Platzmitte: der untere Eckpunkt des Platzes liegt mittig 32 px (vierfach) über der Unterkante. Bewegtes
+// (Arbeiter, Pferde, Funken, Licht) zeichnet addCastleActors darüber. Den Wachturm malt das Spiel noch selbst.
+const EIGEN_NAME = { halle: 'rittersaal', kaserne: 'unterkunft', schmiede: 'schmiede', stall: 'stall', holzfaeller: 'holzfaeller', steinbruch: 'steinbruch', markt: 'markt', kapelle: 'kapelle', hospiz: 'hospiz', schafzucht: 'schafzucht', felder: 'felder' };
+// Bildgröße (vierfach) je Gebäude und Platz; alle Stufen und Zustände eines Gebäudes haben dasselbe Format
+const EIGEN_SIZE = {
+  rittersaal: [896, 752], unterkunft: [896, 688], schmiede: [896, 656], stall: [896, 608], holzfaeller: [896, 624], steinbruch: [896, 720],
+  markt: [896, 608], kapelle: [896, 848], hospiz: [896, 656], schafzucht: [896, 656], felder: [896, 640], absteckung: [896, 656], baustelle: [896, 656],
+  rittersaal_hof: [640, 624], unterkunft_hof: [640, 560], schmiede_hof: [640, 528], stall_hof: [640, 464], markt_hof: [640, 464], kapelle_hof: [640, 704],
+  hospiz_hof: [640, 512], absteckung_hof: [640, 528], baustelle_hof: [640, 528],
+};
+// Loses Baumaterial (Fußpunkt unten in der Mitte) und die Feuerstellen auf den Dächern (Weltpixel vom Fußpunkt)
+Object.assign(P5, {"eigen_steinquader_1":[14.88,15.72,0.3333],"eigen_steinquader_1_winter":[15.12,15.72,0.3333],"eigen_steinquader_2":[18.5,25.47,0.3333],"eigen_steinquader_2_winter":[18.38,25.44,0.3333],"eigen_steinquader_3":[23.88,34.8,0.3333],"eigen_steinquader_3_winter":[23.88,34.55,0.3333],"eigen_bauholz_1":[16.25,17.83,0.3333],"eigen_bauholz_1_winter":[16.12,17.8,0.3333],"eigen_bauholz_2":[19.75,22.8,0.3333],"eigen_bauholz_2_winter":[19.75,22.8,0.3333],"eigen_bauholz_3":[23.88,28.8,0.3333],"eigen_bauholz_3_winter":[23.88,29.05,0.3333],"eigen_bauplatz_schild":[15.12,36.53,0.3333],"eigen_bauplatz_schild_winter":[15.12,36.47,0.3333],"eigen_materialhaufen":[22.0,25.44,0.3333],"eigen_materialhaufen_winter":[21.88,25.41,0.3333]});
+const EIGEN_FEUER = {"rittersaal_2":[[-25.5,-64.0],[-3.0,-72.2],[19.5,-81.2]],"rittersaal_2_schaden_1":[[-24.8,-64.5],[-2.2,-72.5],[20.0,-81.8]],"rittersaal_2_schaden_2":[[-25.0,-70.5],[-2.8,-67.0],[19.2,-81.8]],"rittersaal_3":[[-33.2,-74.0],[-7.8,-81.2],[17.8,-88.2]],"rittersaal_3_schaden_1":[[-34.2,-74.2],[-8.2,-81.2],[17.8,-88.2]],"rittersaal_3_schaden_2":[[-35.8,-53.8],[-8.2,-73.8],[19.2,-91.2]],"rittersaal_hof_1":[[-19.2,-30.5],[-0.2,-37.5],[18.8,-48.0]],"rittersaal_hof_1_schaden_1":[[-19.0,-31.2],[-0.2,-37.8],[18.5,-47.5]],"rittersaal_hof_1_schaden_2":[[-17.8,-35.8],[0.8,-35.0],[19.2,-55.0]],"rittersaal_hof_2":[[-22.5,-45.8],[0.0,-54.0],[22.5,-63.0]],"rittersaal_hof_2_schaden_1":[[-21.8,-46.2],[0.8,-54.2],[23.0,-63.5]],"rittersaal_hof_2_schaden_2":[[-22.0,-52.2],[0.2,-48.8],[22.2,-63.5]],"rittersaal_hof_3":[[-25.8,-58.5],[-0.2,-65.8],[25.2,-72.8]],"rittersaal_hof_3_schaden_1":[[-26.8,-58.8],[-0.8,-65.8],[25.2,-72.8]],"rittersaal_hof_3_schaden_2":[[-28.2,-38.2],[-0.8,-58.2],[26.8,-75.8]],"holzfaeller_3_schaden_2":[[-20.0,-80.0],[4.0,-66.2],[28.0,-63.2],[39.5,-34.2],[55.2,-21.0],[71.0,-31.0],[-66.5,-33.0],[-47.8,-37.0],[-29.2,-29.8]],"hospiz_1":[[-7.8,-73.0],[11.5,-62.2],[30.5,-50.8]],"hospiz_1_schaden_1":[[-6.2,-73.0],[13.2,-61.5],[32.5,-47.5]],"hospiz_1_schaden_2":[[-5.2,-77.0],[13.8,-54.8],[32.5,-45.8]],"hospiz_2":[[-21.2,-75.0],[0.8,-78.0],[22.5,-80.2]],"hospiz_2_schaden_1":[[-20.2,-76.5],[2.5,-76.5],[25.0,-69.0]],"hospiz_2_schaden_2":[[-21.5,-73.8],[0.8,-74.5],[23.0,-82.0]],"hospiz_3":[[-21.0,-74.5],[4.2,-58.8],[29.5,-47.8]],"hospiz_3_schaden_1":[[-21.0,-74.2],[4.2,-58.2],[29.2,-48.2]],"hospiz_3_schaden_2":[[-21.2,-76.2],[4.0,-54.2],[29.0,-48.0]],"hospiz_hof_1":[[-19.2,-50.0],[0.0,-39.2],[19.0,-27.8]],"hospiz_hof_1_schaden_1":[[-17.8,-50.0],[1.8,-38.5],[21.0,-24.5]],"hospiz_hof_1_schaden_2":[[-16.8,-54.0],[2.2,-31.8],[21.0,-22.8]],"hospiz_hof_2":[[-22.2,-55.0],[-0.2,-58.0],[21.5,-60.2]],"hospiz_hof_2_schaden_1":[[-21.2,-56.5],[1.5,-56.5],[24.0,-49.0]],"unterkunft_2":[[-33.8,-41.8],[-11.2,-50.2],[11.0,-58.8]],"unterkunft_2_schaden_1":[[-33.8,-42.0],[-11.2,-50.0],[11.0,-58.8]],"unterkunft_2_schaden_2":[[-35.5,-40.0],[-12.5,-50.0],[10.2,-56.0]],"unterkunft_3":[[-29.8,-65.2],[-5.2,-72.0],[19.2,-78.8]],"unterkunft_3_schaden_1":[[-30.0,-65.5],[-5.0,-71.8],[19.8,-83.0]],"unterkunft_3_schaden_2":[[-31.2,-65.5],[-5.2,-69.8],[21.0,-80.5]],"unterkunft_hof_1":[[-20.5,-23.5],[-0.2,-40.0],[20.0,-24.0]],"unterkunft_hof_1_schaden_1":[[-21.0,-26.8],[-0.5,-38.5],[19.8,-25.2]],"unterkunft_hof_1_schaden_2":[[-18.8,-21.5],[1.5,-39.0],[21.5,-24.8]],"unterkunft_hof_2":[[-22.5,-23.2],[0.0,-31.8],[22.2,-40.2]],"unterkunft_hof_2_schaden_1":[[-22.5,-23.5],[0.0,-31.5],[22.2,-40.2]],"unterkunft_hof_2_schaden_2":[[-24.2,-21.5],[-1.2,-31.5],[21.5,-37.5]],"unterkunft_hof_3":[[-24.8,-49.2],[-0.2,-56.0],[24.2,-62.8]],"unterkunft_hof_3_schaden_1":[[-25.0,-49.5],[0.0,-55.8],[24.8,-67.0]],"unterkunft_hof_3_schaden_2":[[-26.2,-49.5],[-0.2,-53.8],[26.0,-64.5]],"kapelle_hof_1_schaden_2":[[-9.8,-45.8],[-2.2,-46.8],[5.0,-40.0]],"kapelle_hof_2":[[-18.5,-73.8],[-0.2,-83.8],[18.0,-58.0]],"kapelle_hof_2_schaden_1":[[-18.2,-73.8],[0.0,-82.0],[18.2,-59.5]],"kapelle_hof_2_schaden_2":[[-21.2,-50.8],[-1.8,-88.0],[17.8,-51.2]],"kapelle_hof_3":[[-24.2,-57.8],[-0.2,-91.8],[23.5,-93.8]],"kapelle_hof_3_schaden_1":[[-25.5,-57.2],[-0.2,-92.0],[25.0,-91.5]],"kapelle_hof_3_schaden_2":[[-25.5,-58.8],[0.0,-89.8],[25.5,-90.0]],"markt_1":[[-5.8,-51.5],[7.8,-48.0],[21.0,-43.2]],"markt_1_schaden_1":[[-6.5,-51.5],[8.2,-48.0],[23.0,-42.2]],"markt_1_schaden_2":[[-6.2,-51.0],[8.2,-48.5],[22.5,-43.0]],"markt_2":[[-24.0,-68.2],[0.0,-55.5],[24.0,-68.2]],"markt_2_schaden_1":[[-23.0,-69.5],[1.5,-55.8],[26.0,-66.5]],"markt_2_schaden_2":[[-24.8,-67.8],[0.0,-57.0],[24.8,-67.8]],"markt_3":[[4.8,-75.2],[23.2,-68.0],[41.5,-60.0]],"markt_3_schaden_1":[[5.2,-75.5],[23.8,-67.5],[42.0,-59.5]],"steinbruch_1":[[-18.0,-65.5],[-1.0,-68.2],[15.8,-57.2]],"steinbruch_1_schaden_1":[[-18.0,-65.2],[-1.0,-68.5],[15.8,-57.2]],"steinbruch_1_schaden_2":[[-17.8,-65.5],[-0.5,-57.8],[16.8,-51.2]],"steinbruch_2":[[-17.8,-76.2],[4.8,-81.8],[27.0,-68.0]],"steinbruch_2_schaden_1":[[-17.5,-76.2],[5.5,-81.8],[28.5,-68.5]],"steinbruch_2_schaden_2":[[-17.2,-78.8],[6.0,-82.0],[29.5,-68.2]],"steinbruch_3":[[-25.2,-86.5],[4.2,-90.5],[33.8,-91.8]],"steinbruch_3_schaden_1":[[-25.2,-86.8],[4.2,-90.8],[33.5,-92.0]],"steinbruch_3_schaden_2":[[-27.8,-85.5],[3.2,-90.8],[34.2,-93.5]],"unterkunft_1":[[-17.2,-45.0],[3.0,-61.5],[23.2,-45.5]],"unterkunft_1_schaden_1":[[-17.8,-48.2],[2.8,-60.0],[23.0,-46.8]],"unterkunft_1_schaden_2":[[-15.5,-43.0],[4.8,-60.5],[24.8,-46.2]],"felder_1":[[-13.2,-77.2],[0.8,-71.5],[14.8,-64.8]],"felder_1_fruehling":[[-13.2,-77.2],[0.8,-71.5],[14.8,-64.8]],"felder_1_herbst":[[-13.2,-77.2],[0.8,-71.5],[14.8,-64.8]],"felder_1_schaden_1":[[-13.0,-77.2],[1.0,-70.8],[15.0,-64.2]],"felder_1_schaden_2":[[-13.0,-68.0],[0.8,-72.8],[14.5,-64.0]],"schafzucht_1":[[-12.0,-68.5],[5.0,-62.2],[21.8,-54.5]],"schafzucht_1_schaden_1":[[-11.8,-68.5],[5.2,-61.8],[22.0,-54.5]],"schafzucht_1_schaden_2":[[-12.5,-73.2],[4.2,-61.0],[20.8,-60.0]],"schafzucht_2":[[-19.5,-81.2],[0.2,-73.5],[20.0,-64.5]],"schafzucht_2_schaden_1":[[-19.2,-81.0],[0.5,-73.0],[20.0,-64.2]],"schafzucht_2_schaden_2":[[-18.8,-73.8],[1.0,-78.5],[20.5,-64.8]],"schafzucht_3":[[-42.5,-40.0],[-17.0,-52.8],[8.2,-66.0]],"schafzucht_3_schaden_1":[[-42.5,-40.5],[-17.2,-53.0],[7.8,-66.2]],"schafzucht_3_schaden_2":[[-41.2,-34.2],[-16.5,-49.2],[8.0,-65.8]],"schmiede_1":[[-18.0,-57.5],[-1.0,-63.2],[15.8,-71.5]],"schmiede_1_schaden_1":[[-17.8,-58.0],[-0.5,-63.8],[16.8,-71.8]],"schmiede_1_schaden_2":[[-17.8,-54.5],[-1.0,-59.2],[15.8,-75.8]],"schmiede_2":[[-17.5,-62.2],[3.0,-69.0],[23.2,-70.5]],"schmiede_2_schaden_1":[[-17.5,-62.8],[2.8,-68.5],[23.0,-70.8]],"schmiede_2_schaden_2":[[-17.8,-64.2],[2.8,-61.8],[23.0,-63.0]],"schmiede_3":[[-23.2,-81.8],[0.8,-67.5],[24.8,-84.5]],"schmiede_3_schaden_1":[[-22.8,-81.2],[1.2,-68.0],[25.0,-84.0]],"schmiede_3_schaden_2":[[-24.8,-83.2],[-0.2,-64.2],[24.0,-85.5]],"schmiede_hof_1":[[-17.0,-33.0],[0.0,-38.8],[16.8,-47.0]],"schmiede_hof_1_schaden_1":[[-16.8,-33.5],[0.5,-39.2],[17.8,-47.2]],"schmiede_hof_1_schaden_2":[[-16.8,-30.0],[0.0,-34.8],[16.8,-51.2]],"schmiede_hof_2":[[-20.8,-41.5],[-0.2,-48.2],[20.0,-49.8]],"schmiede_hof_2_schaden_1":[[-20.8,-42.0],[-0.5,-47.8],[19.8,-50.0]],"schmiede_hof_2_schaden_2":[[-21.0,-43.5],[-0.5,-41.0],[19.8,-42.2]],"schmiede_hof_3":[[-24.2,-64.5],[-0.2,-50.2],[23.8,-67.2]],"schmiede_hof_3_schaden_1":[[-23.8,-64.0],[0.2,-50.8],[24.0,-66.8]],"schmiede_hof_3_schaden_2":[[-25.8,-66.0],[-1.2,-47.0],[23.0,-68.2]],"stall_1":[[-25.8,-49.0],[-8.2,-56.8],[9.0,-66.8]],"stall_1_schaden_1":[[-25.5,-49.5],[-7.8,-57.5],[9.8,-67.0]],"stall_1_schaden_2":[[-26.2,-47.0],[-8.5,-58.2],[9.2,-70.0]],"felder_2":[[-27.0,-79.2],[-6.0,-72.8],[15.0,-62.8]],"felder_2_fruehling":[[-27.0,-79.2],[-6.0,-72.8],[15.0,-62.8]],"felder_2_herbst":[[-27.0,-79.2],[-6.0,-72.8],[15.0,-62.8]],"felder_2_schaden_1":[[-26.5,-79.2],[-5.5,-72.2],[15.5,-62.5]],"felder_2_schaden_2":[[-27.5,-77.2],[-6.5,-71.5],[14.5,-60.8]],"felder_3":[[-27.0,-79.2],[-6.0,-72.8],[15.0,-62.8],[35.8,-60.2],[51.8,-59.0],[67.8,-52.0]],"felder_3_fruehling":[[-27.0,-79.2],[-6.0,-72.8],[15.0,-62.8],[35.8,-60.2],[51.8,-59.0],[67.8,-52.0]],"felder_3_herbst":[[-27.0,-79.2],[-6.0,-72.8],[15.0,-62.8],[35.8,-60.2],[51.8,-59.0],[67.8,-52.0]],"felder_3_schaden_1":[[-26.5,-79.2],[-5.5,-72.2],[15.5,-62.5],[35.8,-60.8],[52.0,-58.8],[68.0,-51.5]],"felder_3_schaden_2":[[-27.5,-77.2],[-6.5,-71.5],[14.5,-60.8],[34.0,-50.5],[50.8,-51.0],[67.2,-53.2]],"holzfaeller_1":[[-14.0,-61.5],[4.5,-64.5],[22.8,-56.2]],"holzfaeller_1_schaden_1":[[-13.8,-61.8],[4.5,-64.8],[22.5,-56.5]],"holzfaeller_1_schaden_2":[[-15.0,-58.8],[3.8,-62.8],[22.2,-55.5]],"holzfaeller_2":[[-14.0,-61.5],[4.5,-64.5],[22.8,-56.2],[35.5,-30.8],[51.0,-23.8],[66.5,-32.0]],"holzfaeller_2_schaden_1":[[-13.8,-61.8],[4.5,-64.8],[22.5,-56.5],[35.2,-30.5],[51.0,-23.5],[66.5,-31.8]],"holzfaeller_2_schaden_2":[[-15.0,-58.8],[3.8,-62.8],[22.2,-55.5],[34.0,-35.5],[49.8,-22.2],[65.5,-32.2]],"holzfaeller_3":[[-20.0,-77.5],[4.0,-77.5],[28.0,-64.2],[41.0,-29.5],[56.5,-22.5],[72.0,-30.8],[-65.5,-35.8],[-47.0,-38.8],[-28.8,-30.5]],"holzfaeller_3_schaden_1":[[-20.0,-77.5],[4.0,-77.8],[27.8,-64.5],[40.8,-29.2],[56.5,-22.2],[72.0,-30.5],[-65.2,-36.0],[-47.0,-39.0],[-29.0,-30.8]],"hospiz_hof_2_schaden_2":[[-22.5,-53.8],[-0.2,-54.5],[22.0,-62.0]],"hospiz_hof_3":[[-25.5,-58.5],[-0.2,-42.8],[25.0,-31.8]],"hospiz_hof_3_schaden_1":[[-25.5,-58.2],[-0.2,-42.2],[24.8,-32.2]],"hospiz_hof_3_schaden_2":[[-25.8,-60.2],[-0.5,-38.2],[24.5,-32.0]],"kapelle_1":[[-5.5,-52.5],[1.5,-51.8],[8.5,-45.2]],"kapelle_1_schaden_1":[[-5.5,-52.8],[1.5,-51.8],[8.2,-45.0]],"kapelle_1_schaden_2":[[-6.5,-50.8],[1.0,-51.8],[8.2,-45.0]],"kapelle_2":[[-22.0,-97.8],[-3.8,-107.8],[14.5,-82.0]],"kapelle_2_schaden_1":[[-21.8,-97.8],[-3.5,-106.0],[14.8,-83.5]],"kapelle_2_schaden_2":[[-24.8,-74.8],[-5.2,-112.0],[14.2,-75.2]],"kapelle_3":[[-18.5,-75.2],[5.5,-109.2],[29.2,-111.2]],"kapelle_3_schaden_1":[[-19.8,-74.8],[5.5,-109.5],[30.8,-109.0]],"kapelle_3_schaden_2":[[-19.8,-76.2],[5.8,-107.2],[31.2,-107.5]],"kapelle_hof_1":[[-8.8,-47.5],[-1.8,-46.8],[5.2,-40.2]],"kapelle_hof_1_schaden_1":[[-8.8,-47.8],[-1.8,-46.8],[5.0,-40.0]],"stall_2":[[-27.8,-54.0],[-6.5,-62.0],[14.5,-70.5]],"stall_2_schaden_1":[[-27.5,-54.2],[-6.8,-62.0],[14.0,-70.2]],"stall_2_schaden_2":[[-29.0,-55.5],[-7.5,-60.0],[13.8,-70.5]],"stall_3":[[-35.8,-45.8],[-12.5,-53.0],[10.5,-60.5]],"stall_3_schaden_1":[[-35.8,-46.0],[-12.5,-53.2],[10.5,-60.5]],"stall_3_schaden_2":[[-35.0,-43.5],[-11.5,-54.8],[11.8,-63.2]],"stall_hof_1":[[-17.8,-25.0],[-0.2,-32.8],[17.0,-42.8]],"stall_hof_1_schaden_1":[[-17.5,-25.5],[0.2,-33.5],[17.8,-43.0]],"stall_hof_1_schaden_2":[[-18.2,-23.0],[-0.5,-34.2],[17.2,-46.0]],"stall_hof_2":[[-21.2,-33.8],[0.0,-41.8],[21.0,-50.2]],"stall_hof_2_schaden_1":[[-21.0,-34.0],[-0.2,-41.8],[20.5,-50.0]],"stall_hof_2_schaden_2":[[-22.5,-35.2],[-1.0,-39.8],[20.2,-50.2]],"stall_hof_3":[[-23.2,-27.8],[0.0,-35.0],[23.0,-42.5]],"stall_hof_3_schaden_1":[[-23.2,-28.0],[0.0,-35.2],[23.0,-42.5]],"stall_hof_3_schaden_2":[[-22.5,-25.5],[1.0,-36.8],[24.2,-45.2]],"markt_3_schaden_2":[[5.0,-75.2],[23.8,-63.0],[42.2,-60.0]],"markt_hof_1":[[-7.2,-36.5],[6.2,-33.0],[19.5,-28.2]],"markt_hof_1_schaden_1":[[-8.0,-36.5],[6.8,-33.0],[21.5,-27.2]],"markt_hof_1_schaden_2":[[-7.8,-36.0],[6.8,-33.5],[21.0,-28.0]],"markt_hof_2":[[-24.2,-51.0],[-0.2,-38.2],[23.8,-51.0]],"markt_hof_2_schaden_1":[[-23.2,-52.2],[1.2,-38.5],[25.8,-49.2]],"markt_hof_2_schaden_2":[[-25.0,-50.5],[-0.2,-39.8],[24.5,-50.5]],"markt_hof_3":[[-18.5,-51.8],[0.0,-44.5],[18.2,-36.5]],"markt_hof_3_schaden_1":[[-18.0,-52.0],[0.5,-44.0],[18.8,-36.0]],"markt_hof_3_schaden_2":[[-18.2,-51.8],[0.5,-39.5],[19.0,-36.5]],"rittersaal_1":[[-24.2,-52.8],[-5.2,-59.8],[13.8,-70.2]],"rittersaal_1_schaden_1":[[-24.0,-53.5],[-5.2,-60.0],[13.5,-69.8]],"rittersaal_1_schaden_2":[[-22.8,-58.0],[-4.2,-57.2],[14.2,-77.2]]};
+const eigenGroup = (n) => n.replace(/_(schaden_\d|winter|fruehling|herbst)/g, '').replace(/_\d$/, '');
+// Bild eines Platzes wählen und anfordern: Schnee, Jahreszeit der Felder, Schaden. Noch nicht geladen: null (der Platz
+// wird gezeichnet wie bisher, bis das Bild da ist; dann baut onArt die Burg neu)
+function eigenPick(base, dmg = 0) {
+  const se = lookSeason(), d = dmg ? `_schaden_${dmg}` : '', cands = [];
+  if (se === 3) cands.push(`${base}${d}_winter`);
+  if (!dmg && base.startsWith('felder')) { if (se === 0) cands.push(`${base}_fruehling`); if (se === 2 || se === 4) cands.push(`${base}_herbst`); }
+  cands.push(`${base}${d}`);
+  const n = cands.find((x) => artKnown(`eigen_${x}`));
+  if (!n) return null;
+  const id = `eigen_${n}`, sz = EIGEN_SIZE[eigenGroup(n)];
+  if (!sz) return null;
+  if (!P5[id]) { const size = sz[0] === 640 ? 2 : 3; P5[id] = [sz[0] / 8, (sz[1] - 32) / 4 - size * 16, 1 / 3]; }
+  return wantArt(id) ? id : null;
+}
+function eigenBase(id, L, p) { const nm = EIGEN_NAME[id]; return nm && L ? `${nm}${p.size < 3 ? '_hof' : ''}_${L}` : null; }
+// Ein Platzbild malen; Abgebranntes raucht noch an den Feuerstellen, nachts brennt Licht in bewohnten Gebäuden
+const EIGEN_LIT = { halle: 1, kaserne: 1, schmiede: 1, hospiz: 1, kapelle: 0.6, markt: 0.5 };
+function drawEigen(c, sid, p, id, dmg) {
+  if (!p5(c, sid, p.x, p.y, 1, false, playerColor())) return;
+  if (dmg === 2) {
+    const fp = EIGEN_FEUER[sid.replace(/^eigen_/, '').replace(/_winter$/, '')];
+    if (fp && Math.random() < 0.05) { const q = fp[Math.floor(Math.random() * fp.length)], g = P(p.x, p.y, 0); smokeEmit(g[0] + q[0], g[1] + q[1], 0.3); }
+  } else if (!dmg && EIGEN_LIT[id] && darkness() > 0.2) addLight(p.x, p.y + 0.3, 12, 28, EIGEN_LIT[id]);
+}
+// Bewegtes auf einem gemalten Platz: Schmied mit Funken, Pferde in der Koppel, Soldaten auf dem Übungsplatz, Holzfäller,
+// Steinhauer, Händler, Mönch, Hirte, Bauer. Die Stellen passen zu den Bildern (Platzmitte p, x nach rechts unten).
+function addCastleActors(add, id, L, p, dmg) {
+  if (dmg) return;
+  const cpt = p.size < 3, wk = (x, y, tool, ph, o) => add(x, y, (c) => drawWorker(c, x, y, tool, ph, o));
+  switch (id) {
+    case 'schmiede': {
+      const a = cpt ? { x: p.x + 0.35, y: p.y + 0.6 } : { x: p.x + 0.4, y: p.y + 0.95 };
+      add(a.x + 0.35, a.y + 0.15, (c) => { const s2 = drawWorker(c, a.x + 0.35, a.y + 0.15, 'hammer', 0, { apron: true, col: '#7a6a55', flip: true, speed: 4 }); drawSparks(c, a.x, a.y, 8, s2); });
+      add(a.x, a.y, () => { if (darkness() > 0.1) addLight(a.x, a.y, 8, 30, 1); });
+      if (L === 3 && !cpt) add(p.x - 0.85, p.y + 1.1, (c) => { const s2 = drawWorker(c, p.x - 0.85, p.y + 1.1, 'hammer', 1.7, { apron: true, col: '#6a5a45', speed: 4.5 }); drawSparks(c, p.x - 0.5, p.y + 1.0, 8, s2); });
+      break;
+    }
+    // Koppel rechts neben dem Stall (gemalt ab Stufe 2)
+    case 'stall': if (!cpt && L >= 2) addPaddockHorses(add, { x: p.x + 0.7, y: p.y - 0.2 }, 1.3, 1.8, L); break;
+    case 'kaserne':
+      if (!cpt && L >= 2) {
+        wk(p.x - 0.5, p.y + 1.05, 'schwert', 0, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, role: 'soldat' });
+        wk(p.x + 0.0, p.y + 1.1, 'schwert', 2.5, { col: '#4d74ad', hat: '#9aa1a6', speed: 6, flip: true, role: 'soldat' });
+      }
+      break;
+    case 'holzfaeller':
+      wk(p.x + 0.15, p.y + 0.95, 'axt', 0.7, { col: '#5f7a3a', flip: true, speed: 3.5 });
+      if (L >= 2) wk(p.x + 1.05, p.y + 1.1, 'axt', 2.2, { col: '#7a5a3a', speed: 3 });
+      break;
+    case 'steinbruch':
+      wk(p.x + 0.3, p.y + 1.05, 'hacke', 0.3, { col: '#8a7a64', speed: 3.6 });
+      if (L >= 2) wk(p.x - 0.7, p.y + 1.05, 'hammer', 1.4, { col: '#6e6458', flip: true, speed: 4 });
+      break;
+    case 'markt': {
+      const spots = cpt ? [[-0.2, 0.55]] : [[-0.65, 0.55], [0.45, 0.8]];
+      spots.slice(0, L >= 2 ? spots.length : 1).forEach(([dx, dy], k) => wk(p.x + dx, p.y + dy, null, k, { col: ['#a33b32', '#3d6fa3'][k], speed: 1, role: 'buerger', act: 'verkaufen' }));
+      break;
+    }
+    case 'hospiz': wk(p.x - 0.4, p.y + (cpt ? 0.75 : 1.15), null, 0.8, { col: '#6a5240', hat: '#e8e0cc', speed: 1.2, role: 'moench', act: 'segnen' }); break;
+    case 'schafzucht': wk(p.x - 1.2, p.y + 1.0, null, 1.7, { col: '#7d6a55', hat: '#5a4a35', speed: 0.8, role: 'hirte', staff: true }); break;
+    case 'felder': if (seasonIndex() < 3) wk(p.x - 0.4, p.y + 0.7, 'hacke', p.x * 1.3, { col: '#8a7a55', hat: '#c9b06a', speed: 2.2 }); break;
+    default: break;
+  }
+}
+
 function buildPlayerCastle() {
   const s = G.world.sites.find((x) => x.type === 'spieler');
   const C = G.s.castle;
@@ -2872,14 +2959,20 @@ function buildPlayerCastle() {
     const where = p.inner ? 'im Hof' : 'vor der Mauer';
     const signAt = { x: p.x - p.size / 2 + 0.1, y: p.y + p.size / 2 - 0.1 };
     if (!b && !building) {
-      add(p.x - 0.5, p.y - 0.5, (c) => drawPlot(c, p.x, p.y, p.size * 0.86, p.size * 0.86));
+      // Abgesteckter Platz: Pflöcke, Schnur und Wimpel (gemalt), sonst gestrichelt
+      const ab = eigenPick(p.size < 3 ? 'absteckung_hof' : 'absteckung');
+      if (ab) add(p.x - 0.5, p.y - 0.5, (c) => p5(c, ab, p.x, p.y, 1, false, playerColor()));
+      else add(p.x - 0.5, p.y - 0.5, (c) => drawPlot(c, p.x, p.y, p.size * 0.86, p.size * 0.86));
       add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, 'hacke', true));
       castleAnchors.push({ id: 'plot', plot: i, castle: true, x: p.x, y: p.y, h: 18, label: `Freier Bauplatz ${where}` });
       return;
     }
     const id = b ? b.id : con.id, L = b ? b.lv : 0;
-    if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
-    if (b && b.dmg) addBurnt(add, p);
+    // Gemalt (Paket 6): Stufe, Schaden (wird ausgebessert: halb, sonst abgebrannt), Winter, Jahreszeit der Felder
+    const dmg = b && b.dmg ? (building && con.repair ? 1 : 2) : 0, base = eigenBase(id, L, p), sid = base && eigenPick(base, dmg);
+    if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, id, dmg)); addCastleActors(add, id, L, p, dmg); }
+    else if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
+    if (b && b.dmg && !sid) addBurnt(add, p);
     if (building) addConstruction(add, id, p, L);
     if (id !== 'wehr') add(signAt.x, signAt.y, (c) => drawSign(c, signAt.x, signAt.y, BUILD_ICON[id], false));
     const state = building ? (con.repair ? ' (wird ausgebessert)' : ` (Ausbau auf Stufe ${con.level} läuft)`) : b && b.dmg ? ' (abgebrannt)' : '';
@@ -2938,6 +3031,14 @@ function buildPlayerCastle() {
 
 function addConstruction(add, id, p, L) {
   const pw = id === 'wehr' ? 1.0 : (p.size || 2) * 0.8, ph = pw;
+  // Neubau gemalt: erst Absteckung und Fundament, ab der Hälfte der Rohbau im Gerüst
+  const hof = (p.size || 2) < 3 ? '_hof' : '', b1 = !L && id !== 'wehr' && eigenPick(`baustelle${hof}_1`), b2 = b1 && eigenPick(`baustelle${hof}_2`);
+  if (b1 && b2) {
+    add(p.x, p.y, (c) => p5(c, conProgress() < 0.5 ? b1 : b2, p.x, p.y, 1, false, playerColor()));
+    add(p.x + pw / 2 + 0.5, p.y + ph / 2 + 0.2, (c) => { const s2 = drawWorker(c, p.x + pw / 2 + 0.5, p.y + ph / 2 + 0.2, 'hammer', 0.5, { col: '#8a6e4b', flip: true, speed: 4.5 }); if (s2 > 0.95) { const d = P(p.x + pw / 2 + 0.2, p.y + ph / 2, 4); smokeEmit(d[0], d[1], 0.5); } });
+    add(p.x - 0.2, p.y + ph / 2 + 0.45, (c) => drawWorker(c, p.x - 0.2, p.y + ph / 2 + 0.45, 'hammer', 2.1, { col: '#6f7a55', speed: 4 }));
+    return;
+  }
   const full = id === 'wehr' ? 46 : 24;
   const tex = STONE_BUILDINGS[id] ? 'stone' : 'plank';
   add(p.x, p.y, (c) => {
@@ -4996,7 +5097,7 @@ onArt((id) => {
   if (/^(wiese|heide|waldboden|acker|weg|wasser|schnee|fels|sand|kies|klippe|pflaster|schlamm)/.test(id)) { chunkCache.clear(); minimapBase = null; }
   // Burgteile: die festen Teile neu zusammenstellen (Tore und Hallen fragen beim Aufbau, ob es ein Bild gibt)
   if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
-  if (id.startsWith('burg_')) { G.staticDirty = true; G.castleDirty = true; }
+  if (id.startsWith('burg_') || id.startsWith('eigen_')) { G.staticDirty = true; G.castleDirty = true; }
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
   if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_')) { partCache.clear(); G.staticDirty = true; }
   if (id.startsWith('york_bruecke') || id.startsWith('fl_steinbruecke') || id.startsWith('fl_kaimauer')) chunkCache.clear();
