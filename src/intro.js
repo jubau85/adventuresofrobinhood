@@ -9,7 +9,8 @@ import { G } from './state.js';
 import { byId } from './ui.js';
 import { PIXFONT } from './pixelfont.js';
 import { drawTitleArt, drawCastle, drawKnight } from './titleart.js';
-import { startAudio, setHush, introOut, audioRunning, musicEnabled } from './audio.js';
+import { startAudio, setHush, introOut, audioRunning, musicEnabled, audioBuffer } from './audio.js';
+import { ART } from './assets.js';
 
 const IV_STORY = [
   { bild: 'kerker', text: 'Im Jahre des Herrn 1194. Auf der Heimkehr vom Kreuzzug fiel König Richard Löwenherz in die Hand seiner Feinde. Über ein Jahr lag er in fremden Kerkern, fern von England.' },
@@ -20,6 +21,10 @@ const IV_STORY = [
   { bild: 'burgstall', text: 'Von deinem Erbe ist nur ein verfallener Burgstall geblieben. Sammle Gefolge, baue deine Burg, gewinne Ruhm und Land. England wartet auf seinen Ritter.' },
 ];
 const IV_HINT = 'Leertaste: weiter · Esc: überspringen';
+// Zeitplan des Studio-Vorspanns (Sekunden): zur erzeugten Fanfare und zur Aufnahme von Oakgen (assets/intro/studio.mp3,
+// Marken aus ihrem Lautstärkeverlauf: Schlag 1,5, Stempel 3,7, Höhepunkt ab 4,5, Schlusshit 8,4)
+const IV_T_SYNTH = { hit: 1.4, prod: 2.4, stamp: 3.6, write: 4.8, climax: 4.8, shine: [2.6, 5.4, 7.1], final: 0, fade: 8.2, fadeLen: 1.0, end: 9.4 };
+const IV_T_FILE = { hit: 1.5, prod: 2.35, stamp: 3.52, write: 4.5, climax: 4.5, shine: [2.7, 5.3, 8.4], final: 8.4, fade: 8.75, fadeLen: 1.05, end: 10.0 };
 let IV = null;   // der laufende Vorspann
 
 // Nicht in automatischen Tests (außer mit ?intro) und nicht mit ?ohneintro
@@ -67,7 +72,12 @@ function ivKey(e) {
 
 function ivBegin(I, phase) {
   I.phase = phase; I.pt = 0;
-  if (phase === 'studio') { I.hint.textContent = IV_HINT; const A = introOut(); I.sting = A ? ivStudioSound(A) : null; I.parts = []; }
+  if (phase === 'studio') {
+    I.hint.textContent = IV_HINT; I.parts = [];
+    const A = introOut(), buf = audioBuffer('intro_studio');
+    I.T = buf && A ? IV_T_FILE : IV_T_SYNTH;
+    I.sting = A ? (buf ? ivStudioFile(A, buf) : ivStudioSound(A)) : null;
+  }
   if (phase === 'story') { I.hint.textContent = IV_HINT; ivStartStory(I); }
 }
 
@@ -116,9 +126,11 @@ function ivLoop(now) {
     if (I.phase === 'warte') {
       const c = I.ctx; c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, I.cv.width, I.cv.height);
       const can = audioRunning() || !musicEnabled();
-      if (I.fonts && (can || I.pt > 0.4)) ivBegin(I, can ? (I.storyOnly ? 'story' : 'studio') : 'tor');
+      // Die Fanfare von Oakgen ist gleich geladen; länger als zweieinhalb Sekunden wird nicht gewartet
+      const ready = !can || !musicEnabled() || I.storyOnly || audioBuffer('intro_studio') || I.pt > 2.5;
+      if (I.fonts && ((can && ready) || (!can && I.pt > 0.4))) ivBegin(I, can ? (I.storyOnly ? 'story' : 'studio') : 'tor');
     } else if (I.phase === 'tor') ivGate(I);
-    else if (I.phase === 'studio') { ivStudio(I, dt); if (I.pt > 9.4 && !I.ending) ivBegin(I, 'story'); }
+    else if (I.phase === 'studio') { ivStudio(I, dt); if (I.pt > I.T.end && !I.ending) ivBegin(I, 'story'); }
     else if (I.phase === 'story') ivStory(I, dt);
     else if (I.phase === 'finale') ivFinale(I, dt);
   } catch (e) {
@@ -219,7 +231,7 @@ function ivSmokeTile() {
 function ivSpawn(I, n, f) { for (let k = 0; k < n; k++) I.parts.push(f(k)); if (I.parts.length > 520) I.parts.splice(0, I.parts.length - 520); }
 
 function ivStudio(I, dt) {
-  const c = I.ctx, W = I.w, H = I.h, t = I.pt;
+  const c = I.ctx, W = I.w, H = I.h, t = I.pt, T = I.T || IV_T_SYNTH;
   if (!I.lay || I.lay.W !== W || I.lay.H !== H) { I.lay = ivStudioLayout(I); I.lay.W = W; I.lay.H = H; }
   if (!I.smoke) I.smoke = ivSmokeTile();
   const L = I.lay, size = L.size;
@@ -231,10 +243,11 @@ function ivStudio(I, dt) {
     I.vig = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
     I.vig.addColorStop(0, 'rgba(0,0,0,0)'); I.vig.addColorStop(1, 'rgba(0,0,0,0.85)');
   }
-  const fadeOut = 1 - ivClamp((t - 8.2) / 1.0);
+  const fadeOut = 1 - ivClamp((t - T.fade) / T.fadeLen);
   // Erschütterung beim Stempel
   let sx = 0, sy = 0;
-  if (!I.reduce && t > 3.78 && t < 4.15) { const k = (1 - (t - 3.78) / 0.37) * size * 0.035; sx = Math.sin(t * 93) * k; sy = Math.cos(t * 71) * k; }
+  const imp = T.stamp + 0.18;
+  if (!I.reduce && t > imp && t < imp + 0.37) { const k = (1 - (t - imp) / 0.37) * size * 0.035; sx = Math.sin(t * 93) * k; sy = Math.cos(t * 71) * k; }
   c.setTransform(I.dpr, 0, 0, I.dpr, 0, 0);
   c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
@@ -250,7 +263,7 @@ function ivStudio(I, dt) {
   // Lichtstreif vor dem Schlag
   const cy = L.cy - size * 0.3;
   if (t > 0.2) {
-    const p = ivClamp((t - 0.25) / 1.15), after = t > 1.4 ? 0.16 + 0.05 * Math.sin(t * 1.7) : 1;
+    const p = ivClamp((t - 0.25) / (T.hit - 0.25)), after = t > T.hit ? 0.16 + 0.05 * Math.sin(t * 1.7) : 1;
     const len = W * (0.15 + 0.85 * ivEaseOut(p)), th = 1.5 + 5 * p;
     c.globalCompositeOperation = 'lighter';
     for (const [k, a] of [[1, 0.95], [7, 0.16], [22, 0.06]]) {
@@ -260,9 +273,12 @@ function ivStudio(I, dt) {
     }
     c.globalCompositeOperation = 'source-over';
   }
-  if (t > 1.4) {
-    const beat = 60 / 110, ph = ((t - 4.8) % beat + beat) % beat, pulse = t > 4.8 && t < 7.8 ? 1 + 0.9 * Math.exp(-ph * 9) : 1 + 0.5 * Math.exp(-Math.max(0, t - 1.4) * 4);
-    const a = ivClamp((t - 1.4) / 1.2) * fadeOut * pulse, R = Math.max(W, H);
+  if (t > T.hit) {
+    // Puls: bei der Aufnahme nach ihrer Lautstärke, sonst im Takt der Kriegstrommeln
+    const beat = 60 / 110, ph = ((t - T.climax) % beat + beat) % beat;
+    const pulse = I.sting && I.sting.level ? 1 + Math.min(1.6, I.sting.level() * 4.5)
+      : t > T.climax && t < T.climax + 3 ? 1 + 0.9 * Math.exp(-ph * 9) : 1 + 0.5 * Math.exp(-Math.max(0, t - T.hit) * 4);
+    const a = ivClamp((t - T.hit) / 1.2) * fadeOut * pulse, R = Math.max(W, H);
     c.save(); c.translate(W / 2, cy); c.rotate(t * 0.035); c.globalCompositeOperation = 'lighter';
     for (let k = 0; k < 16; k++) {
       c.rotate(Math.PI / 8);
@@ -279,7 +295,7 @@ function ivStudio(I, dt) {
   tc.textAlign = 'center'; tc.textBaseline = 'alphabetic'; tc.lineJoin = 'round';
   L.letters.forEach((l, k) => {
     if (l.ch === ' ') return;
-    const p = ivClamp((t - 1.4 - k * 0.045) / 0.5);
+    const p = ivClamp((t - T.hit - k * 0.045) / 0.5);
     if (p <= 0) return;
     const e = ivEaseOut(p), sc = 1.35 - 0.35 * e;
     tc.save(); tc.globalAlpha = p; tc.translate(l.x, L.cy); tc.scale(sc, sc);
@@ -290,7 +306,7 @@ function ivStudio(I, dt) {
     tc.restore();
   });
   // PRODUCTIONS mit Zierlinien
-  const p2 = ivClamp((t - 2.4) / 0.9);
+  const p2 = ivClamp((t - T.prod) / 0.9);
   if (p2 > 0) {
     const e = ivEaseOut(p2), fs = size * 0.25, sp = fs * (0.95 - 0.35 * e);
     tc.font = `500 ${fs}px "Alegreya Sans", sans-serif`;
@@ -312,7 +328,7 @@ function ivStudio(I, dt) {
     tc.globalAlpha = 1;
   }
   // Siegel „100% AI“, fällt wie ein Stempel
-  const p3 = ivClamp((t - 3.6) / 0.18);
+  const p3 = ivClamp((t - T.stamp) / 0.18);
   if (p3 > 0) {
     if (!I.stamped) { I.stamped = true; ivSpawn(I, 46, (k) => { const a = (k / 46) * Math.PI * 2; return { x: W / 2 + Math.cos(a) * size * 1.15, y: L.y3 + Math.sin(a) * size * 0.34, vx: Math.cos(a) * size * 1.4, vy: Math.sin(a) * size * 0.7, life: 0.9, max: 0.9, r: 1.6, dust: true }; }); }
     const sc = 2.6 - 1.6 * p3 * p3, bw = size * 2.35, bh = size * 0.66;
@@ -333,7 +349,7 @@ function ivStudio(I, dt) {
     tc.restore(); tc.textBaseline = 'alphabetic';
   }
   // „Made by Jakob“ wird wie mit der Feder geschrieben
-  const p4 = ivClamp((t - 4.8) / 1.6);
+  const p4 = ivClamp((t - T.write) / 1.6);
   if (p4 > 0) {
     const fs = size * 0.46;
     tc.font = `italic 400 ${fs}px "Alegreya", Georgia, serif`;
@@ -351,7 +367,7 @@ function ivStudio(I, dt) {
     }
   }
   // Glanzstreifen über alles Gold
-  for (const t0 of [2.6, 5.4, 7.1]) {
+  for (const t0 of T.shine) {
     const p = (t - t0) / 1.0;
     if (p <= 0 || p >= 1) continue;
     const x = -W * 0.2 + W * 1.4 * p, d = size * 0.9;
@@ -372,8 +388,8 @@ function ivStudio(I, dt) {
   c.globalAlpha = 1;
   c.setTransform(I.dpr, 0, 0, I.dpr, 0, 0);
   // Glut: steigt von unten auf, beim Schlag fliegt sie aus der Schrift
-  if (t < 8.6) ivSpawn(I, Math.random() < dt * 26 ? 1 : 0, () => ({ x: Math.random() * W, y: H + 6, vx: (Math.random() - 0.5) * 14, vy: -(30 + Math.random() * 60), life: 4 + Math.random() * 3, max: 7, r: 1 + Math.random() * 1.6 }));
-  if (t >= 1.4 && !I.burst) {
+  if (t < T.fade + 0.4) ivSpawn(I, Math.random() < dt * 26 ? 1 : 0, () => ({ x: Math.random() * W, y: H + 6, vx: (Math.random() - 0.5) * 14, vy: -(30 + Math.random() * 60), life: 4 + Math.random() * 3, max: 7, r: 1 + Math.random() * 1.6 }));
+  if (t >= T.hit && !I.burst) {
     I.burst = true;
     ivSpawn(I, I.reduce ? 30 : 110, () => { const a = Math.random() * Math.PI * 2, v = size * (0.6 + Math.random() * 2.6); return { x: L.left + Math.random() * (L.right - L.left), y: L.cy - size * 0.35 + (Math.random() - 0.5) * size * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - size * 0.3, life: 1 + Math.random() * 1.6, max: 2.6, r: 1 + Math.random() * 2 }; });
   }
@@ -391,7 +407,11 @@ function ivStudio(I, dt) {
   }
   c.globalCompositeOperation = 'source-over';
   // Blitz beim Schlag, Vignette, Abblende
-  if (t > 1.4 && !I.reduce) { const f = 0.42 * Math.exp(-(t - 1.4) * 5.5); if (f > 0.01) { c.fillStyle = `rgba(255,236,200,${f})`; c.fillRect(0, 0, W, H); } }
+  if (t > T.hit && !I.reduce) {
+    let f = 0.42 * Math.exp(-(t - T.hit) * 5.5);
+    if (T.final && t > T.final) f += 0.22 * Math.exp(-(t - T.final) * 6);
+    if (f > 0.01) { c.fillStyle = `rgba(255,236,200,${f})`; c.fillRect(0, 0, W, H); }
+  }
   c.fillStyle = I.vig; c.fillRect(0, 0, W, H);
   if (fadeOut < 1) { c.fillStyle = `rgba(0,0,0,${1 - fadeOut})`; c.fillRect(0, 0, W, H); }
 }
@@ -405,6 +425,26 @@ function ivNoise(ac) {
   return b;
 }
 const ivHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+// Die Fanfare als Aufnahme; level() ist ihre Lautstärke gerade jetzt (für das Pulsieren der Lichtstrahlen)
+function ivStudioFile(A, buf) {
+  const { ac } = A, t0 = ac.currentTime + 0.05;
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const g = ac.createGain(); g.gain.value = 1.7;
+  const an = ac.createAnalyser(); an.fftSize = 1024;
+  const data = new Float32Array(an.fftSize);
+  src.connect(g); g.connect(an); an.connect(A.dry);
+  src.start(t0);
+  let lvl = 0;
+  return {
+    level() { an.getFloatTimeDomainData(data); let q = 0; for (let i = 0; i < data.length; i++) q += data[i] * data[i]; lvl = Math.max(Math.sqrt(q / data.length), lvl * 0.88); return lvl; },
+    stop() {
+      const now = ac.currentTime;
+      g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(g.gain.value, now); g.gain.setTargetAtTime(0, now, 0.15);
+      setTimeout(() => { try { src.stop(); } catch (e) { /* schon aus */ } g.disconnect(); }, 1500);
+    },
+  };
+}
 
 function ivStudioSound(A) {
   const { ac } = A, t0 = ac.currentTime + 0.05;
@@ -547,7 +587,8 @@ function ivQuantize(id, n = 32, spread = 26) {
     out[p] = packed[k];
   }
   const nearCache = new Map();
-  return { w, h: id.height, px: out, pal, near: (hex) => { let v = nearCache.get(hex); if (v === undefined) { const [r, g, b] = ivHex(hex); v = packed[nearest(r, g, b)]; nearCache.set(hex, v); } return v; } };
+  const nearRGB = (r, g, b) => { const key = ((ivClamp(r, 0, 255) >> 3) << 10) | ((ivClamp(g, 0, 255) >> 3) << 5) | (ivClamp(b, 0, 255) >> 3); let k = cache[key]; if (k < 0) { k = nearest(r, g, b); cache[key] = k; } return packed[k]; };
+  return { w, h: id.height, px: out, pal, nearRGB, near: (hex) => { let v = nearCache.get(hex); if (v === undefined) { const [r, g, b] = ivHex(hex); v = packed[nearest(r, g, b)]; nearCache.set(hex, v); } return v; } };
 }
 
 const ivGlyph = (ch) => PIXFONT.g[ch] || PIXFONT.g['?'];
@@ -881,6 +922,134 @@ const IV_SCENES = {
   },
 };
 
+// ---------------------------------------------------------------- Bilder von Oakgen (600 × 248, doppelt so fein)
+// Farbzyklen in Bildkoordinaten: twinkle (Sterne), shimmer (Glitzer auf Wasser), flicker (Flammen, Feuerschein,
+// slow: ruhiger Schein), sparkle (Lichtblitze), wave (Fahnen wehen, Mast links), smoke (Rauch aus Kaminen), sparks
+// (Funken), gulls (Möwen ziehen vorbei), crows (Krähen kreisen)
+const IV_FX = {
+  kerker: [
+    { fx: 'twinkle', r: [0, 0, 600, 95], lum: 140, n: 48, ex: [[362, 0, 458, 72]] },
+    { fx: 'shimmer', r: [392, 168, 432, 246], lum: 115 },
+    { fx: 'flicker', r: [209, 53, 219, 67], amp: 0.4 },
+    { fx: 'flicker', r: [187, 115, 199, 129], amp: 0.3 },
+  ],
+  krone: [
+    { fx: 'flicker', r: [148, 28, 168, 64], amp: 0.45 },
+    { fx: 'flicker', r: [432, 30, 452, 64], amp: 0.45 },
+    { fx: 'sparkle', pts: [[300, 96], [245, 114], [354, 114], [268, 134], [300, 131], [331, 134], [277, 121], [334, 121]] },
+  ],
+  banner: [
+    { fx: 'wave', r: [417, 7, 473, 35], amp: 1.6 },
+    { fx: 'wave', r: [348, 40, 374, 51], amp: 1 },
+    { fx: 'wave', r: [459, 43, 489, 60], amp: 1 },
+    { fx: 'wave', r: [507, 60, 532, 75], amp: 1 },
+    { fx: 'wave', r: [295, 77, 315, 89], amp: 0.8 },
+    { fx: 'smoke', pts: [[93, 174], [241, 197], [324, 180], [427, 177], [492, 167]] },
+    { fx: 'shimmer', r: [110, 140, 142, 172], lum: 150 },
+  ],
+  wald: [
+    { fx: 'flicker', r: [254, 128, 296, 198], amp: 0.5 },
+    { fx: 'flicker', r: [130, 8, 180, 140], amp: 0.14, slow: true },
+    { fx: 'flicker', r: [518, 8, 566, 160], amp: 0.12, slow: true },
+    { fx: 'sparks', at: [272, 168], h: 140 },
+  ],
+  heimkehr: [
+    { fx: 'shimmer', r: [254, 172, 296, 246], lum: 150 },
+    { fx: 'wave', r: [188, 60, 228, 82], amp: 1.3 },
+    { fx: 'gulls', list: [[40, 44, 8], [300, 22, 6]] },
+  ],
+  burgstall: [
+    { fx: 'crows', c: [420, 50], rx: 72, ry: 22, n: 3 },
+  ],
+};
+
+const ivLum = (d, i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+const ivHash = (a, b) => { let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35); h ^= h >>> 13; return ((Math.imul(h, 0x27d4eb2d) >>> 0) % 1000) / 1000; };
+
+// Ein Bild von Oakgen als Bild der Vorgeschichte: 64 Farben (wie ein Amiga mit AGA), leichtes Raster, Farbzyklen vorbereitet
+function ivFromImage(img, name) {
+  const cv = document.createElement('canvas'); cv.width = 600; cv.height = 248;
+  const c = cv.getContext('2d', { willReadFrequently: true });
+  c.drawImage(img, 0, 0, 600, 248);
+  const id = c.getImageData(0, 0, 600, 248), d = id.data, W = 600;
+  const pic = ivQuantize(id, 64, 8);
+  pic.name = name; pic.k = 2; pic.fx = [];
+  const inR = (x, y, r) => x >= r[0] && y >= r[1] && x < r[2] && y < r[3];
+  for (const f of IV_FX[name] || []) {
+    const e = { ...f };
+    if (f.r && (f.fx === 'twinkle' || f.fx === 'shimmer' || f.fx === 'flicker')) {
+      const pts = [];
+      for (let y = f.r[1]; y < f.r[3]; y++) for (let x = f.r[0]; x < f.r[2]; x++) {
+        const i = (y * W + x) * 4, l = ivLum(d, i);
+        if (f.ex && f.ex.some((r) => inR(x, y, r))) continue;
+        if (f.fx === 'flicker' ? d[i] > 100 && d[i] >= d[i + 1] && d[i + 1] >= d[i + 2] * 0.85 : l > f.lum) pts.push([x, y, d[i], d[i + 1], d[i + 2]]);
+      }
+      // Sterne: nur die hellsten, über den Himmel verteilt
+      if (f.fx === 'twinkle') { pts.sort((a, b) => (b[2] + b[3] + b[4]) - (a[2] + a[3] + a[4])); e.pts = pts.slice(0, f.n || 40); } else e.pts = pts;
+    }
+    pic.fx.push(e);
+  }
+  return pic;
+}
+
+function ivFxRun(put, pic, t) {
+  const P = pic, src = pic.px, W = pic.w;
+  const scale = (r, g, b, k) => P.nearRGB(r * k, g * k, b * k);
+  const bird = (x, y, up, col, span) => {
+    put(x, y, col); put(x + 1, y, col);
+    for (let i = 1; i <= span; i++) { const dy = up ? -Math.ceil(i / 2) : Math.floor(i / 3); put(x - i, y + dy, col); put(x + 1 + i, y + dy, col); }
+  };
+  for (const f of pic.fx) {
+    if (f.fx === 'twinkle') f.pts.forEach(([x, y, r, g, b], k) => { const v = Math.sin(t * 2.7 + k * 1.93); if (v > 0.55) { put(x, y, P.nearRGB(255, 255, 250)); if (v > 0.9) { put(x + 1, y, scale(r, g, b, 1)); put(x - 1, y, scale(r, g, b, 1)); put(x, y - 1, scale(r, g, b, 1)); put(x, y + 1, scale(r, g, b, 1)); } } else if (v < -0.7) put(x, y, scale(r, g, b, 0.45)); });
+    else if (f.fx === 'shimmer') { const st = Math.floor(t * 8); f.pts.forEach(([x, y, r, g, b], k) => { const h = ivHash(st, k); if (h < 0.28) put(x, y, scale(r, g, b, 0.6)); else if (h > 0.9) put(x, y, P.nearRGB(255, 252, 235)); }); }
+    else if (f.fx === 'flicker') {
+      const glow = f.slow ? 1 + f.amp * (Math.sin(t * 6.1) * 0.6 + Math.sin(t * 9.7 + 1) * 0.4) : 0;
+      for (const [x, y, r, g, b] of f.pts) {
+        const k = f.slow ? glow : 1 + f.amp * (0.5 * Math.sin(t * 13 + x * 0.9 + y * 0.45) + 0.5 * Math.sin(t * 7.3 - y * 0.6 + x * 0.3));
+        put(x, y, scale(r, g, b, k));
+      }
+    } else if (f.fx === 'sparkle') {
+      const cyc = Math.floor(t / 0.5), life = (t / 0.5) % 1;
+      if (life < 0.55) {
+        const [sx, sy] = f.pts[Math.floor(ivHash(cyc, 7) * f.pts.length)], arm = life < 0.25 ? 3 : 2, w = P.nearRGB(255, 255, 255), g = P.nearRGB(255, 240, 170);
+        put(sx, sy, w);
+        for (let i = 1; i <= arm; i++) { const c2 = i === 1 ? w : g; put(sx + i, sy, c2); put(sx - i, sy, c2); put(sx, sy + i, c2); put(sx, sy - i, c2); }
+      }
+    } else if (f.fx === 'wave') {
+      const [x0, y0, x1, y1] = f.r, col = [];
+      for (let x = x0 + 1; x < x1; x++) {
+        const dy = Math.round(Math.sin(t * 5.5 + x * 0.35) * f.amp * (x - x0) / (x1 - x0));
+        if (!dy) continue;
+        col.length = 0;
+        for (let y = y0; y < y1; y++) col.push(src[y * W + x]);
+        for (let y = y0; y < y1; y++) { const sy = y - dy; if (sy >= y0 && sy < y1) put(x, y, col[sy - y0]); }
+      }
+    } else if (f.fx === 'smoke') {
+      f.pts.forEach(([px, py], k) => {
+        for (let i = 0; i < 9; i++) {
+          const age = (t * 0.3 + i / 9 + k * 0.21) % 1, y = py - age * 46, x = px + Math.sin(age * 5 + k) * 3 + age * 12, sz = 1 + Math.floor(age * 3);
+          const v = 150 - age * 50, col = P.nearRGB(v, v * 0.92, v * 0.95);
+          for (let a = 0; a < sz; a++) for (let b = 0; b < sz; b++) if ((a + b + i) % 2 === 0 && age < 0.9) put(x + a, y + b, col);
+        }
+      });
+    } else if (f.fx === 'sparks') {
+      for (let i = 0; i < 14; i++) {
+        const age = (t * 0.55 + i / 14) % 1, n = Math.floor(t * 0.55 + i / 14), r = ivHash(n, i);
+        const x = f.at[0] + (r - 0.5) * 24 + Math.sin(age * 6 + i) * 4, y = f.at[1] - age * f.h;
+        put(x, y, P.nearRGB(255, 220 - age * 120, 90 - age * 60));
+        if (age < 0.4) put(x, y + 1, P.nearRGB(255, 150, 40));
+      }
+    } else if (f.fx === 'gulls') {
+      f.list.forEach(([x0, y0, v], k) => { const x = ((x0 + t * v) % 640) - 20, y = y0 + Math.sin(t * 0.7 + k) * 5; bird(x, y, Math.sin(t * 6 + k * 2) > 0, P.nearRGB(248, 246, 240), 4); });
+    } else if (f.fx === 'crows') {
+      for (let k = 0; k < f.n; k++) {
+        const a = t * (0.5 + k * 0.13) + k * 2.1, x = f.c[0] + Math.cos(a) * (f.rx - k * 14), y = f.c[1] + Math.sin(a) * (f.ry - k * 4);
+        bird(x, y, Math.sin(t * 8 + k * 2) > 0, P.nearRGB(18, 10, 20), 4);
+      }
+    }
+  }
+}
+
 function ivPaint(name, seed) {
   const cv = document.createElement('canvas'); cv.width = IV_PW; cv.height = IV_PH;
   const c = cv.getContext('2d', { willReadFrequently: true }), A = {};
@@ -903,7 +1072,10 @@ function ivStartStory(I) {
 
 function ivSlide(I, i) {
   const s = IV_STORY[i];
-  if (!I.pics[i]) I.pics[i] = ivPaint(s.bild, 1194 + i * 77);
+  if (!I.pics[i]) {
+    const img = ART[`intro_g${i + 1}`];
+    I.pics[i] = img && img.complete !== false && (img.naturalWidth || img.width) ? ivFromImage(img, s.bild) : ivPaint(s.bild, 1194 + i * 77);
+  }
   I.slide = { i, phase: 'ein', t: 0, chars: 0, lines: ivWrap(s.text, IV_LW - IV_TX * 2), total: s.text.length };
   if (I.sr) I.sr.textContent = s.text;
 }
@@ -929,10 +1101,21 @@ function ivStory(I, dt) {
   }
   const pic = I.pics[S.i];
   F.px.fill(ivPack(0, 0, 0));
-  for (let y = 0; y < IV_PH; y++) F.px.set(pic.px.subarray(y * IV_PW, (y + 1) * IV_PW), (IV_PY + y) * IV_LW + IV_PX);
+  let hi = null;
+  if (pic.k === 2) {
+    // Bild von Oakgen: doppelt so fein auf eigener Fläche, Rahmen und Schrift bleiben grob
+    if (!I.PF) { I.PF = ivFrame(600, 248); I.pcv = document.createElement('canvas'); I.pcv.width = 600; I.pcv.height = 248; I.pcc = I.pcv.getContext('2d'); }
+    const PF = I.PF;
+    PF.px.set(pic.px);
+    const put = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < 600 && y < 248) PF.px[y * 600 + x] = col; };
+    ivFxRun(put, pic, I.t);
+    hi = PF;
+  } else {
+    for (let y = 0; y < IV_PH; y++) F.px.set(pic.px.subarray(y * IV_PW, (y + 1) * IV_PW), (IV_PY + y) * IV_LW + IV_PX);
+    const put = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < IV_PW && y < IV_PH) F.px[(IV_PY + y) * IV_LW + IV_PX + x] = col; };
+    IV_SCENES[pic.name].anim(put, pic, pic.A, I.t);
+  }
   ivBorder(F);
-  const put = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < IV_PW && y < IV_PH) F.px[(IV_PY + y) * IV_LW + IV_PX + x] = col; };
-  IV_SCENES[pic.name].anim(put, pic, pic.A, I.t);
   // Text
   let left = Math.floor(S.chars), cx = 0, cy = 0;
   S.lines.forEach((ln, k) => {
@@ -948,12 +1131,14 @@ function ivStory(I, dt) {
   }
   // Ein- und Ausblenden in Schritten, wie mit der Farbpalette
   const k = S.phase === 'ein' ? S.t / 0.7 : S.phase === 'aus' ? 1 - S.t / 0.7 : 1;
-  ivShade(F, Math.round(ivClamp(k) * 8) / 8);
-  ivShow(I, F, I.lo, I.loc, false);
+  const shade = Math.round(ivClamp(k) * 8) / 8;
+  ivShade(F, shade);
+  if (hi) { ivShade(hi, shade); I.pcc.putImageData(hi.img, 0, 0); }
+  ivShow(I, F, I.lo, I.loc, false, hi ? I.pcv : null);
 }
 
 // Bildspeicher auf den Schirm: groß, scharfe Kanten, leichte Rasterzeilen wie am Monitor
-function ivShow(I, F, lo, loc, cover) {
+function ivShow(I, F, lo, loc, cover, overlay = null) {
   loc.putImageData(F.img, 0, 0);
   const c = I.ctx, W = I.cv.width, H = I.cv.height;
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -963,6 +1148,7 @@ function ivShow(I, F, lo, loc, cover) {
   const dw = F.w * s, dh = F.h * s, dx = (W - dw) / 2, dy = (H - dh) / 2;
   c.imageSmoothingEnabled = false;
   c.drawImage(lo, dx, dy, dw, dh);
+  if (overlay) c.drawImage(overlay, dx + IV_PX * s, dy + IV_PY * s, IV_PW * s, IV_PH * s);
   if (s >= 3) {
     if (!I.scan || I.scanS !== s) {
       const p = document.createElement('canvas'); p.width = 1; p.height = Math.max(2, Math.round(s));

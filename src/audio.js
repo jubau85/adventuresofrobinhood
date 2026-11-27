@@ -281,6 +281,7 @@ function schedWorld(t0, kind) {
 const FILES = {
   welt_sommer: 'assets/musik/welt_sommer.mp3',
   wiese_tag: 'assets/sound/ambiente/wiese_tag.mp3',
+  intro_studio: 'assets/intro/studio.mp3',
 };
 const buffers = {};
 let fileBus = null, want = { music: null, amb: null }, track = null, ambTrack = null, restUntil = 0;
@@ -566,6 +567,9 @@ export function playWork(list) {
     if (Math.floor(b / (Math.PI * 2)) > Math.floor(a / (Math.PI * 2))) { sfxAt(e.kind, e.x, e.y, e.kind === 'amboss' ? 0.7 : 0.95, 20); if (++n >= 6) break; }
   }
 }
+
+// Für den Vorspann: eine geladene Aufnahme (oder null, solange sie noch lädt oder fehlt)
+export function audioBuffer(id) { return buffers[id] || null; }
 
 // Für Tests: was geladen ist und was gerade läuft
 export function audioDebug() {

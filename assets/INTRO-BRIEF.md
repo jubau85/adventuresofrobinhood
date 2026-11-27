@@ -15,6 +15,12 @@ Das Spiel hat den Vorspann schon jetzt vollständig, im Code gemalt und vertont:
    - Dazu Tracker-Musik aus 8-Bit-Samples.
 3. **Schluss:** Das Titelbild erscheint erst als Pixelbild und wird dann zum gemalten Titelbild.
 
+**Stand (27.11.2026):**
+- Paket 1 (Bilder) und Paket 3, Fanfare, sind geliefert und eingebaut: `assets/intro/geschichte_1.webp` bis `geschichte_6.webp` (aufbereitet mit `tools/intro_bilder.py`) und `assets/intro/studio.mp3`.
+- Die Zeitmarken der Fanfare sind gemessen: Schlag 1,5 s, Stempel 3,7 s, Höhepunkt ab 4,5 s, Schlusshit 8,4 s. Die Schrift liegt darauf.
+- Offen ist noch `geschichte.mp3` (Paket 2). Bis dahin spielt die Tracker-Musik aus dem Code.
+- Das Hintergrundvideo ist bewusst weggelassen.
+
 Alles aus diesem Brief ist **freiwillig**. Jede Datei, die kommt, ersetzt den passenden Teil, und der Rest bleibt, wie er ist.
 
 **Eigenständig bleiben:** keine Logos, Figuren, Bilder oder Melodien aus bestehenden Spielen nachbauen. Der Stil der Zeit ist gewollt, eine Kopie nicht.

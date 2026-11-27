@@ -4,6 +4,13 @@
 const ART_FILES = {
   titel_quer: 'assets/titel/titel_quer.jpg',
   titel_hoch: 'assets/titel/titel_hoch.jpg',
+  // Bilder der Vorgeschichte (Oakgen, tools/intro_bilder.py)
+  intro_g1: 'assets/intro/geschichte_1.webp',
+  intro_g2: 'assets/intro/geschichte_2.webp',
+  intro_g3: 'assets/intro/geschichte_3.webp',
+  intro_g4: 'assets/intro/geschichte_4.webp',
+  intro_g5: 'assets/intro/geschichte_5.webp',
+  intro_g6: 'assets/intro/geschichte_6.webp',
   wiese_sommer: 'assets/boden/wiese_sommer.jpg',
   // Böden für Herbst und Winter (je Bild 4 × 4 Felder)
   wiese_herbst: 'assets/boden/wiese_herbst.jpg',
