@@ -829,22 +829,30 @@ const ZELLEN = {};
 for (const [pre, sheet, cells] of [['eigen_', 'eigenbogen_', EIGEN_ZELLEN], ['fl_', 'flbogen_', FL_ZELLEN], ['th_', 'thbogen_', TH_ZELLEN]])
   for (const [n, z] of Object.entries(cells)) ZELLEN[pre + n] = [sheet + z[0], z[1], z[2], z[3], z[4]];
 const requested = new Set();
+// Wann eine Datei oder ein Bogen angefordert wurde, was schon da ist und was nicht geladen werden konnte
+const reqAt = new Map(), loaded = new Set(), failed = new Set();
+const PENDING_MS = 7000;
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+function markRequested(k) { requested.add(k); reqAt.set(k, nowMs()); }
 function loadOne(id) {
   if (!ART_FILES[id] && ZELLEN[id]) { loadSheet(ZELLEN[id][0]); return; }
   if (requested.has(id) || !ART_FILES[id]) return;
-  requested.add(id);
+  markRequested(id);
   const im = new Image();
   im.decoding = 'async';
-  im.onload = () => { ART[id] = im; for (const f of artListeners) f(id); };
+  im.onload = () => { ART[id] = im; loaded.add(id); for (const f of artListeners) f(id); };
+  im.onerror = () => { failed.add(id); };
   im.src = ART_FILES[id];
 }
 // Einen Bildbogen laden und in seine Bilder zerschneiden (je Bild eine Leinwand unter seinem Namen)
 function loadSheet(sid) {
   if (requested.has(sid) || !ART_FILES[sid]) return;
-  requested.add(sid);
+  markRequested(sid);
   const im = new Image();
   im.decoding = 'async';
   im.onload = () => {
+    if (!requested.has(sid)) return;   // inzwischen wieder freigegeben
+    loaded.add(sid);
     for (const [id, z] of Object.entries(ZELLEN)) {
       if (z[0] !== sid) continue;
       const cv = document.createElement('canvas'); cv.width = z[3]; cv.height = z[4];
@@ -853,6 +861,7 @@ function loadSheet(sid) {
       for (const f of artListeners) f(id);
     }
   };
+  im.onerror = () => { failed.add(sid); };
   im.src = ART_FILES[sid];
 }
 export function loadArt() {
@@ -866,6 +875,31 @@ export function wantArt(id) {
   if (im) return im;
   loadOne(id);
   return null;
+}
+// Ist das Bild angefordert und noch unterwegs (höchstens ein paar Sekunden)? Dann zeichnet man besser nichts als
+// einen Platzhalter, der gleich wieder verschwindet.
+function keyOf(id) { return !ART_FILES[id] && ZELLEN[id] ? ZELLEN[id][0] : id; }
+export function artPending(id) {
+  if (ART[id] || !artKnown(id)) return false;
+  const k = keyOf(id);
+  return requested.has(k) && !failed.has(k) && nowMs() - (reqAt.get(k) || 0) < PENDING_MS;
+}
+export const ART_PENDING_MS = PENDING_MS;
+// Ladestand aller angeforderten Dateien und Bögen (für den Ladebildschirm)
+export function artProgress() {
+  let total = 0, done = 0;
+  for (const k of requested) { if (k[0] === '#') continue; total++; if (loaded.has(k) || failed.has(k)) done++; }
+  return { done, total };
+}
+// Bogen eines Bildes; geladene Bögen mit einem Anfang; einen Bogen freigeben (er wird bei Bedarf neu geladen)
+export function sheetOf(id) { return ZELLEN[id] ? ZELLEN[id][0] : null; }
+export function loadedSheets(prefix) { return [...loaded].filter((k) => k.startsWith(prefix)); }
+export function releaseSheet(sid) {
+  if (!loaded.has(sid)) return [];
+  const ids = [];
+  for (const [id, z] of Object.entries(ZELLEN)) if (z[0] === sid && ART[id]) { delete ART[id]; ids.push(id); }
+  loaded.delete(sid); requested.delete(sid); reqAt.delete(sid);
+  return ids;
 }
 // Alle Bilder mit diesem Anfang anfordern (z. B. alle Bewegungen eines Modells)
 export function wantArtPrefix(prefix) {

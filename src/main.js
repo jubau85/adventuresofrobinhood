@@ -4,7 +4,7 @@ import { G, log, homeName } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { CHARGES, CHARGE_IDS, chargeSVG, preloadChargeArt, PLATE_W, PLATE_H } from './heraldry.js';
 import { drawTitleArt } from './titleart.js';
-import { loadArt } from './assets.js';
+import { loadArt, artProgress } from './assets.js';
 import { startAudio, setMood, setScene, musicEnabled, setMusicEnabled, sfxEnabled, setSfxEnabled, loadMusicPref, audioDebug, sfx, sfxAt, playWork } from './audio.js';
 import { generateWorld, groundZ, worldSig } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
@@ -26,7 +26,7 @@ import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, fi
 import { initWeather, updateWeather, precip } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
-import { initRender, resetRender, releaseRender, render, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen, fieldSpots, birdsNow } from './render.js';
+import { initRender, resetRender, releaseRender, render, prefetchArt, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen, fieldSpots, birdsNow } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog, castleFocusTab,
 } from './ui.js';
@@ -102,6 +102,7 @@ function startWorld() {
   G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.7 : 2.4) : (G.view.w < 720 ? 1.7 : 2.0);
   G.started = true;
   G.fast = false;
+  waitForArt();
   G.ui.sel = null;
   G.pendingSite = null; G.pendingBuild = null;
   closePanel();
@@ -171,7 +172,9 @@ function buildSetupForm() {
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
-    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' });
+    // Erst die Ladetafel zeigen, dann die Welt erzeugen (das dauert einige Sekunden)
+    showLoading('Die Welt wird erschaffen …');
+    setTimeout(() => newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' }), 50);
   });
 }
 
@@ -665,7 +668,7 @@ function bindInput() {
     if (inCombat()) attackNearest(); else interactHere();
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
-  byId('btn-continue').addEventListener('click', () => { startAudio(); loadGame(); });
+  byId('btn-continue').addEventListener('click', () => { startAudio(); showLoading('Die Welt wird erschaffen …'); setTimeout(() => { if (!loadGame()) byId('loading').hidden = true; }, 50); });
   byId('btn-music-title').addEventListener('click', () => { toggleMusic(); startAudio(); });
   // Browser erlauben Ton erst nach der ersten Eingabe
   const firstGesture = () => { startAudio(); window.removeEventListener('pointerdown', firstGesture); window.removeEventListener('keydown', firstGesture); };
@@ -755,7 +758,9 @@ function frameBody(now) {
   G.time += dt;
   if (G.started) {
     readInput();
-    const running = !panelOpen() && !dialogOpen();
+    const running = !panelOpen() && !dialogOpen() && !G.loadingArt;
+    if (G.loadingArt) G.loadFrames = (G.loadFrames || 0) + 1;
+    prefetchArt(dt);
     if (running) {
       if (G.fast && inCombat()) { G.fast = false; log('Der Zeitraffer endet. Kampf!', 'bad'); }
       const steps = G.fast ? 4 : 1;
@@ -843,6 +848,29 @@ function drawTitleBackground() {
   if (titleCv.width !== Math.round(w * dpr) || titleCv.height !== Math.round(h * dpr)) { titleCv.width = Math.round(w * dpr); titleCv.height = Math.round(h * dpr); }
   titleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawTitleArt(titleCtx, w, h, G.time, titleColor);
+}
+
+// Erst zeigen, wenn die Bilder der Umgebung geladen sind: Hinter der Tafel zeichnet das Spiel schon und fordert dabei an,
+// was es braucht (Burgbögen, Figuren). Freigegeben wird, wenn alles Angeforderte da ist, spätestens nach 12 Sekunden.
+function showLoading(text) {
+  const el = byId('loading');
+  el.querySelector('p').textContent = text;
+  el.querySelector('.loading-bar span').style.width = '0%';
+  el.hidden = false;
+}
+function waitForArt() {
+  const el = byId('loading'), bar = el.querySelector('.loading-bar span'), t0 = performance.now();
+  G.loadingArt = true; G.loadFrames = 0;
+  showLoading('Die Welt wird gemalt …');
+  const tick = () => {
+    if (window.__aktBoot !== BOOT_ID) return;
+    const { done, total } = artProgress();
+    bar.style.width = `${Math.round((total ? done / total : 1) * 100)}%`;
+    const waited = performance.now() - t0;
+    if ((done >= total && G.loadFrames >= 4) || waited > 12000) { G.loadingArt = false; el.hidden = true; return; }
+    setTimeout(tick, 80);
+  };
+  setTimeout(tick, 60);
 }
 
 // ---------------------------------------------------------------- Boot

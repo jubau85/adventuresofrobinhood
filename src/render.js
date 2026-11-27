@@ -9,7 +9,7 @@ import { groundZ, tileAt, PAL_GATE } from './world.js';
 import { conProgress, villageSpots, castlePlots, castleLayout, pastureOf } from './castle.js';
 import { ringR, CASTLE_TYPES } from './plots.js';
 import { castlePasture } from './animals.js';
-import { ART, onArt, wantArt, wantArtPrefix, artKnown } from './assets.js';
+import { ART, onArt, wantArt, wantArtPrefix, artKnown, artPending, ART_PENDING_MS, sheetOf, loadedSheets, releaseSheet } from './assets.js';
 import { HORSE3D } from './pferde.js';
 import { HERO3D, FIG3D } from './figuren.js';
 import { graveSlot, graveCount, funeralProps } from './life.js';
@@ -2973,17 +2973,32 @@ const EIGEN_FEUER = {"rittersaal_2":[[-25.5,-64.0],[-3.0,-72.2],[19.5,-81.2]],"r
 const eigenGroup = (n) => n.replace(/_(schaden_\d|winter|fruehling|herbst)/g, '').replace(/_\d$/, '');
 // Bild eines Platzes wählen und anfordern: Schnee, Jahreszeit der Felder, Schaden. Noch nicht geladen: null (der Platz
 // wird gezeichnet wie bisher, bis das Bild da ist; dann baut onArt die Burg neu)
-function eigenPick(base, dmg = 0) {
+function eigenCands(base, dmg = 0) {
   const se = lookSeason(), d = dmg ? `_schaden_${dmg}` : '', cands = [];
   if (se === 3) cands.push(`${base}${d}_winter`);
   if (!dmg && base.startsWith('felder')) { if (se === 0) cands.push(`${base}_fruehling`); if (se === 2 || se === 4) cands.push(`${base}_herbst`); }
   cands.push(`${base}${d}`);
-  const n = cands.find((x) => artKnown(`eigen_${x}`));
+  return cands;
+}
+// request = false: nur nachsehen, ob das Bild schon da ist, ohne es anzufordern (Burgen weit weg)
+function eigenPick(base, dmg = 0, request = true) {
+  const n = eigenCands(base, dmg).find((x) => artKnown(`eigen_${x}`));
   if (!n) return null;
   const id = `eigen_${n}`, sz = EIGEN_SIZE[eigenGroup(n)];
   if (!sz) return null;
   if (!P5[id]) { const size = sz[0] === 640 ? 2 : 3; P5[id] = [sz[0] / 8, (sz[1] - 32) / 4 - size * 16, 1 / 3]; }
-  return wantArt(id) ? id : null;
+  return (request ? wantArt(id) : ART[id]) ? id : null;
+}
+// Lädt das gemalte Bild noch? Dann bleibt der Platz kurz leer, statt erst den Platzhalter und dann das Bild zu zeigen.
+function eigenWaiting(base, dmg = 0) {
+  const n = base && eigenCands(base, dmg).find((x) => artKnown(`eigen_${x}`));
+  return !!n && artPending(`eigen_${n}`);
+}
+// Kommt das Bild nicht rechtzeitig, die Teile noch einmal aufbauen (dann mit Platzhalter)
+let rebuildTimer = null;
+function rebuildLater() {
+  if (rebuildTimer) return;
+  rebuildTimer = setTimeout(() => { rebuildTimer = null; G.castleDirty = true; G.staticDirty = true; }, ART_PENDING_MS + 300);
 }
 function eigenBase(id, L, p) { const nm = EIGEN_NAME[id]; return nm && L ? `${nm}${p.size < 3 ? '_hof' : ''}_${L}` : null; }
 // Ein Platzbild malen; Abgebranntes raucht noch an den Feuerstellen, nachts brennt Licht in bewohnten Gebäuden
@@ -3045,15 +3060,18 @@ function baronCastleParts(s) {
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
   const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
   const plots = baronPlots(id), lay = baronLayout(id), con = b.con;
+  // Bildbögen nur für Burgen in deiner Nähe anfordern (sie brauchen entpackt viel Speicher), siehe prefetchArt
+  const near = Math.hypot(s.x - G.s.player.x, s.y - G.s.player.y) < NEAR_BOGEN;
   lay.forEach((p, i) => {
     const pl = plots[i], building = con && con.kind === 'bau' && con.plot === i;
     if (!pl && !building) return;
     const bid = pl ? pl.id : con.id, L = pl ? pl.lv : 0;
-    const base = eigenBase(bid, L, p), sid = base && eigenPick(base);
+    const base = eigenBase(bid, L, p), sid = base && eigenPick(base, 0, near);
     if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, bid, 0, col)); addCastleActors(add, bid, L, p, 0); }
+    else if (L && eigenWaiting(base)) rebuildLater();
     else if (L) { addCastleBuilding(add, bid, L, p, s); addNewCastleBuilding(add, addFlat, bid, L, p, s); }
     if (building) {
-      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`), b2 = b1 && eigenPick(`baustelle${hof}_2`);
+      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`, 0, near), b2 = b1 && eigenPick(`baustelle${hof}_2`, 0, near);
       const prog = () => Math.max(0, Math.min(1, (G.s.day - (con.done - (con.days || 1)) + G.s.time / DAY_LEN) / (con.days || 1)));
       if (b1 && b2) add(p.x, p.y, (c) => p5(c, prog() < 0.5 ? b1 : b2, p.x, p.y, 1, false, col));
       else add(p.x, p.y, (c) => drawScaffold(c, p.x, p.y, p.size * 0.7, p.size * 0.7, 30));
@@ -3065,6 +3083,47 @@ function baronCastleParts(s) {
   // Ein Banner in seiner Farbe am Tor
   add(s.x + 1.4, s.y + 4.6, (c) => banner(c, s.x + 1.4, s.y + 4.6, 30, col));
   return parts;
+}
+
+// ---------------------------------------------------------------- Bildbögen vorausladen und freigeben
+// Die Bögen aus Paket 6 brauchen entpackt viel Speicher (alle zusammen rund 500 MB). Geladen werden die der eigenen
+// Burg (auch das Gebäude, das gerade gebaut wird) und die der Baronsburgen in deiner Nähe, bevor du ankommst.
+// Burgen weit weg geben ihre Bögen wieder frei; kommst du zurück, werden sie neu geladen.
+const NEAR_BOGEN = 90, FAR_BOGEN = 170;
+let prefetchT = 0;
+export function prefetchArt(dt) {
+  prefetchT -= dt;
+  if (prefetchT > 0 || !G.world || !G.s) return;
+  prefetchT = 1.5;
+  const W = G.world, pl = G.s.player, keep = new Set(['eigenbogen_absteckung', 'eigenbogen_absteckung_hof', 'eigenbogen_baustelle_1', 'eigenbogen_baustelle_2', 'eigenbogen_baustelle_hof_1', 'eigenbogen_baustelle_hof_2']);
+  const take = (base, dmg, request) => {
+    if (!base) return;
+    const n = eigenCands(base, dmg).find((x) => artKnown(`eigen_${x}`));
+    if (!n) return;
+    const id = `eigen_${n}`, sh = sheetOf(id);
+    if (sh) keep.add(sh);
+    if (request) eigenPick(base, dmg, true);
+  };
+  // Eigene Burg: alles, was steht, und das Gebäude, das gerade entsteht
+  const plots = castlePlots(), lay = castleLayout(), con = G.s.castle.construction;
+  plots.forEach((b, i) => { if (b && lay[i]) take(eigenBase(b.id, b.lv, lay[i]), b.dmg ? 2 : 0, true); });
+  if (con && con.plot !== undefined && lay[con.plot] && BUILDINGS[con.id]) take(eigenBase(con.id, con.level, lay[con.plot]), 0, true);
+  // Baronsburgen: in der Nähe laden, in mittlerer Entfernung behalten
+  for (const s of W.sites) {
+    if (!s.baron) continue;
+    const b = baron(s.baron), d = Math.hypot(s.x - pl.x, s.y - pl.y);
+    if (!b || d > FAR_BOGEN) continue;
+    const bl = baronLayout(s.baron);
+    baronPlots(s.baron).forEach((q, i) => { if (q && bl[i]) take(eigenBase(q.id, q.lv, bl[i]), 0, d < NEAR_BOGEN); });
+    if (b.con && b.con.kind === 'bau' && bl[b.con.plot]) take(eigenBase(b.con.id, b.con.level, bl[b.con.plot]), 0, d < NEAR_BOGEN);
+  }
+  let freed = false;
+  for (const sh of loadedSheets('eigenbogen_')) {
+    if (keep.has(sh)) continue;
+    for (const id of releaseSheet(sh)) for (const k of [...spriteCache.keys()]) if (k.startsWith(`${id}|`)) spriteCache.delete(k);
+    freed = true;
+  }
+  if (freed) G.staticDirty = true;
 }
 
 function buildPlayerCastle() {
@@ -3097,6 +3156,7 @@ function buildPlayerCastle() {
     // Gemalt (Paket 6): Stufe, Schaden (wird ausgebessert: halb, sonst abgebrannt), Winter, Jahreszeit der Felder
     const dmg = b && b.dmg ? (building && con.repair ? 1 : 2) : 0, base = eigenBase(id, L, p), sid = base && eigenPick(base, dmg);
     if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, id, dmg)); addCastleActors(add, id, L, p, dmg); }
+    else if (L && eigenWaiting(base, dmg)) rebuildLater();
     else if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
     if (b && b.dmg && !sid) addBurnt(add, p);
     if (building) addConstruction(add, id, p, L);
@@ -4290,7 +4350,7 @@ const ROLLE3D = {
   bauer: 'bauer', fischer: 'bauer', hirte: 'bauer', knecht: 'bauer', baeuerin: 'frau', magd: 'frau', kind: 'kind',
   buerger: 'buerger', haendler: 'buerger', reisender: 'buerger', vogt: 'buerger', wirt: 'handwerker', handwerker: 'handwerker',
   bergmann: 'handwerker', schmied: 'handwerker', moench: 'geistlicher', priester: 'geistlicher', einsiedler: 'geistlicher',
-  wache: 'soldat', bettler: 'bettler', jaeger: 'jaeger',
+  wache: 'soldat', bettler: 'bettler', jaeger: 'jaeger', baron: 'held_edel',
 };
 function modelFor(u, m) {
   if (u.hidden) return null;

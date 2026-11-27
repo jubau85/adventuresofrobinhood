@@ -15,6 +15,7 @@ import { takeAnimal } from './animals.js';
 import { watchSpot } from './tournament.js';
 import { hangWatch } from './justice.js';
 import { precip } from './weather.js';
+import { baron } from './barons.js';
 
 // Rollen je Ortstyp (der Rest der Bewohner ergibt sich daraus)
 const ROLES = {
@@ -52,6 +53,7 @@ function dress(role, site) {
     case 'wirt': o.apron = '#e8e0cc'; o.tunic = '#7a4a3a'; break;
     case 'kind': o.small = true; o.female = Math.random() < 0.5; break;
     case 'wache': o.tunic = siteColor(site) || '#556b7d'; o.helm = true; o.tool = 'speer'; break;
+    case 'baron': o.name = site.baronName || 'Der Baron'; o.tunic = siteColor(site) || '#2c4f86'; o.baron = site.baron; break;
     case 'waldmann': case 'holzer': o.look = 'wald'; o.tunic = null; break;
     case 'jaeger': o.tunic = pick(['#4a5a2a', '#5a5a32', '#4e4a2c']); o.cap = '#3e4a22'; o.bow = true; break;
     case 'fischer': o.tunic = pick(['#5a6a7a', '#6a6a5a', '#4a5a6a']); o.hat = '#8a7a5a'; break;
@@ -174,6 +176,8 @@ function rolesFor(site) {
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
     if (site.type === 'hof' && Math.random() < 0.25) roles = roles.concat('jaeger');
     if (site.type === 'lagerfeuer') roles = site.roles.slice(0, 1 + Math.floor(Math.random() * site.roles.length));
+    // In der Burg eines Barons lebt er selbst (barons.js), solange er dort Herr ist
+    if (site.baron) roles = ['baron', ...roles];
     // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
     if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
       const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
@@ -218,7 +222,7 @@ export function repopulate(site) {
 export function makeVillager(site, role, stall = 0) {
   const o = dress(role, site);
   const v = makeUnit(o);
-  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch', 'beard', 'staff']) if (o[k]) v[k] = o[k];
+  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch', 'beard', 'staff', 'baron']) if (o[k]) v[k] = o[k];
   v.role = role; v.home = site; v.task = null;
   v.hair = pick(HAIR);
   v.stall = stall;
@@ -435,6 +439,9 @@ function chooseTask(v) {
       goTo(v, wander(v, s, 4), 'stehen', rand(8, 16)); return;
     case 'holzer':
       goTo(v, wander(v, s, 3.5), 'axt', rand(12, 22), 'holz'); return;
+    case 'baron':
+      // Der Baron bleibt in seinem Hof, mal am Bergfried, mal am Tor
+      goTo(v, Math.random() < 0.3 && sp.gate ? sp.gate[1] : wander(v, s, 2.6), Math.random() < 0.3 ? 'reden' : 'stehen', rand(10, 22), null, 0.7); return;
     default:
       goTo(v, wander(v, s, r), 'stehen', rand(5, 10));
   }
@@ -574,6 +581,15 @@ function sayFor(v) {
   if (v.act === 'trinken') return pick(['Noch ein Bier, Wirt!', '♪ Hey ho, der Krug ist leer ♪', 'Prost!', 'Habt Ihr von der Schlacht gehört?', 'Der Wirt panscht das Bier, sag ich euch.', '♪ Als König Richard übers Meer ... ♪']);
   if (v.role === 'wirt') return pick(['Herein, herein! Warmes Essen und weiche Betten!', 'Frisches Bier aus dem Fass!', 'Ein Bett für die Nacht, Herr?']);
   if (v.role === 'priester') return pick(['Der Herr sei mit Euch.', 'Vergesst die Messe am Sonntag nicht.', 'Betet für die Toten.']);
+  if (v.role === 'baron') {
+    const b = baron(v.baron);
+    if (!b) return 'Willkommen auf meiner Burg.';
+    if (b.feud) return pick(['Ihr wagt es, Euch hier zu zeigen?', 'Meine Männer sind schon unterwegs zu Eurer Burg.', 'Zahlt Sühne, oder wir sehen uns vor Euren Mauern.']);
+    if (b.vassal) return pick(['Mein Tribut ist unterwegs, Herr.', 'Ich halte mein Wort, Herr.', 'Was befehlt Ihr?']);
+    if (b.ally) return pick(['Mein Freund! Wein für unseren Gast!', 'Gegen wen ziehen wir als Nächstes?', 'Meine Männer stehen bereit, wenn Ihr sie braucht.']);
+    if (b.rel < -10) return pick(['Was wollt Ihr hier?', 'Ich habe nicht vergessen, was Ihr getan habt.', 'Fasst Euch kurz.']);
+    return pick(['Willkommen auf meiner Burg.', 'Habt Ihr Neuigkeiten aus dem Süden?', 'Die Mauern wachsen, Stein um Stein.', 'Der Krieg wird uns alle reich oder arm machen.', 'Setzt Euch, trinkt einen Becher mit mir.']);
+  }
   if (v.task && v.task.repair) return pick(['Das Dach muss bis zum Winter dicht sein.', 'Noch ein Balken, dann steht die Wand.', 'Verfluchte Belagerer!']);
   if (v.role === 'haendler') {
     const goods = (s.produces || []).map((g) => GOODS[g].name);

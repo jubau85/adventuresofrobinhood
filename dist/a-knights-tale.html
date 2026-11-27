@@ -493,6 +493,13 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .baron-audience { display: flex; gap: 10px; align-items: flex-start; }
 .baron-audience p { margin: 0; }
 @media (max-width: 560px) { .baron { flex-wrap: wrap; } .baron .score { min-width: 0; } }
+/* Ladetafel beim Spielstart: bis die Bilder der Umgebung da sind */
+#loading { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(40,30,20,0.86), rgba(18,13,9,0.96)); }
+#loading[hidden] { display: none; }
+.loading-card { padding: 18px 26px 22px; border-radius: 6px; background: var(--parchment, #efe3c4); box-shadow: 0 10px 40px rgba(0,0,0,0.5); min-width: 260px; text-align: center; }
+.loading-card p { margin: 0 0 12px; font-family: var(--font-head, serif); font-size: 20px; color: var(--ink, #3a2a1c); }
+.loading-bar { height: 10px; border-radius: 5px; background: rgba(90,67,48,0.2); overflow: hidden; }
+.loading-bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #a8791f, #e3b843); transition: width 0.15s; }
 </style>
 </head>
 <body>
@@ -614,6 +621,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
     <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
   </section>
 </div>
+<div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
 <script>
 (function () {
 'use strict';
@@ -2552,22 +2560,30 @@ const ZELLEN = {};
 for (const [pre, sheet, cells] of [['eigen_', 'eigenbogen_', EIGEN_ZELLEN], ['fl_', 'flbogen_', FL_ZELLEN], ['th_', 'thbogen_', TH_ZELLEN]])
   for (const [n, z] of Object.entries(cells)) ZELLEN[pre + n] = [sheet + z[0], z[1], z[2], z[3], z[4]];
 const requested = new Set();
+// Wann eine Datei oder ein Bogen angefordert wurde, was schon da ist und was nicht geladen werden konnte
+const reqAt = new Map(), loaded = new Set(), failed = new Set();
+const PENDING_MS = 7000;
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+function markRequested(k) { requested.add(k); reqAt.set(k, nowMs()); }
 function loadOne(id) {
   if (!ART_FILES[id] && ZELLEN[id]) { loadSheet(ZELLEN[id][0]); return; }
   if (requested.has(id) || !ART_FILES[id]) return;
-  requested.add(id);
+  markRequested(id);
   const im = new Image();
   im.decoding = 'async';
-  im.onload = () => { ART[id] = im; for (const f of artListeners) f(id); };
+  im.onload = () => { ART[id] = im; loaded.add(id); for (const f of artListeners) f(id); };
+  im.onerror = () => { failed.add(id); };
   im.src = ART_FILES[id];
 }
 // Einen Bildbogen laden und in seine Bilder zerschneiden (je Bild eine Leinwand unter seinem Namen)
 function loadSheet(sid) {
   if (requested.has(sid) || !ART_FILES[sid]) return;
-  requested.add(sid);
+  markRequested(sid);
   const im = new Image();
   im.decoding = 'async';
   im.onload = () => {
+    if (!requested.has(sid)) return;   // inzwischen wieder freigegeben
+    loaded.add(sid);
     for (const [id, z] of Object.entries(ZELLEN)) {
       if (z[0] !== sid) continue;
       const cv = document.createElement('canvas'); cv.width = z[3]; cv.height = z[4];
@@ -2576,6 +2592,7 @@ function loadSheet(sid) {
       for (const f of artListeners) f(id);
     }
   };
+  im.onerror = () => { failed.add(sid); };
   im.src = ART_FILES[sid];
 }
 function loadArt() {
@@ -2589,6 +2606,31 @@ function wantArt(id) {
   if (im) return im;
   loadOne(id);
   return null;
+}
+// Ist das Bild angefordert und noch unterwegs (höchstens ein paar Sekunden)? Dann zeichnet man besser nichts als
+// einen Platzhalter, der gleich wieder verschwindet.
+function keyOf(id) { return !ART_FILES[id] && ZELLEN[id] ? ZELLEN[id][0] : id; }
+function artPending(id) {
+  if (ART[id] || !artKnown(id)) return false;
+  const k = keyOf(id);
+  return requested.has(k) && !failed.has(k) && nowMs() - (reqAt.get(k) || 0) < PENDING_MS;
+}
+const ART_PENDING_MS = PENDING_MS;
+// Ladestand aller angeforderten Dateien und Bögen (für den Ladebildschirm)
+function artProgress() {
+  let total = 0, done = 0;
+  for (const k of requested) { if (k[0] === '#') continue; total++; if (loaded.has(k) || failed.has(k)) done++; }
+  return { done, total };
+}
+// Bogen eines Bildes; geladene Bögen mit einem Anfang; einen Bogen freigeben (er wird bei Bedarf neu geladen)
+function sheetOf(id) { return ZELLEN[id] ? ZELLEN[id][0] : null; }
+function loadedSheets(prefix) { return [...loaded].filter((k) => k.startsWith(prefix)); }
+function releaseSheet(sid) {
+  if (!loaded.has(sid)) return [];
+  const ids = [];
+  for (const [id, z] of Object.entries(ZELLEN)) if (z[0] === sid && ART[id]) { delete ART[id]; ids.push(id); }
+  loaded.delete(sid); requested.delete(sid); reqAt.delete(sid);
+  return ids;
 }
 // Alle Bilder mit diesem Anfang anfordern (z. B. alle Bewegungen eines Modells)
 function wantArtPrefix(prefix) {
@@ -6853,6 +6895,7 @@ function updateAnimals(dt) {
 
 
 
+
 // Rollen je Ortstyp (der Rest der Bewohner ergibt sich daraus)
 const ROLES = {
   stadt: ['haendler', 'haendler', 'haendler', 'haendler', 'magd', 'magd', 'handwerker', 'handwerker', 'buerger', 'buerger', 'buerger', 'buerger', 'kind', 'kind', 'moench', 'wache', 'priester', 'wirt', 'fischer'],
@@ -6889,6 +6932,7 @@ function dress(role, site) {
     case 'wirt': o.apron = '#e8e0cc'; o.tunic = '#7a4a3a'; break;
     case 'kind': o.small = true; o.female = Math.random() < 0.5; break;
     case 'wache': o.tunic = siteColor(site) || '#556b7d'; o.helm = true; o.tool = 'speer'; break;
+    case 'baron': o.name = site.baronName || 'Der Baron'; o.tunic = siteColor(site) || '#2c4f86'; o.baron = site.baron; break;
     case 'waldmann': case 'holzer': o.look = 'wald'; o.tunic = null; break;
     case 'jaeger': o.tunic = pick(['#4a5a2a', '#5a5a32', '#4e4a2c']); o.cap = '#3e4a22'; o.bow = true; break;
     case 'fischer': o.tunic = pick(['#5a6a7a', '#6a6a5a', '#4a5a6a']); o.hat = '#8a7a5a'; break;
@@ -7011,6 +7055,8 @@ function rolesFor(site) {
     if (site.type === 'hof' && Math.random() < 0.4) roles = ['bauer'];
     if (site.type === 'hof' && Math.random() < 0.25) roles = roles.concat('jaeger');
     if (site.type === 'lagerfeuer') roles = site.roles.slice(0, 1 + Math.floor(Math.random() * site.roles.length));
+    // In der Burg eines Barons lebt er selbst (barons.js), solange er dort Herr ist
+    if (site.baron) roles = ['baron', ...roles];
     // Große Orte: je fünf Häuser ein weiterer Bewohner (London und Paris haben ein eigenes Gewimmel)
     if (site.type === 'stadt' || site.type === 'markt' || site.type === 'burg') {
       const nh = G.world.buildings.filter((b) => b.site === site.id && b.kind === 'house').length;
@@ -7055,7 +7101,7 @@ function repopulate(site) {
 function makeVillager(site, role, stall = 0) {
   const o = dress(role, site);
   const v = makeUnit(o);
-  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch', 'beard', 'staff']) if (o[k]) v[k] = o[k];
+  for (const k of ['scarf', 'cap', 'apron', 'hat', 'small', 'helm', 'tool', 'bow', 'patches', 'crutch', 'beard', 'staff', 'baron']) if (o[k]) v[k] = o[k];
   v.role = role; v.home = site; v.task = null;
   v.hair = pick(HAIR);
   v.stall = stall;
@@ -7272,6 +7318,9 @@ function chooseTask(v) {
       goTo(v, wander(v, s, 4), 'stehen', rand(8, 16)); return;
     case 'holzer':
       goTo(v, wander(v, s, 3.5), 'axt', rand(12, 22), 'holz'); return;
+    case 'baron':
+      // Der Baron bleibt in seinem Hof, mal am Bergfried, mal am Tor
+      goTo(v, Math.random() < 0.3 && sp.gate ? sp.gate[1] : wander(v, s, 2.6), Math.random() < 0.3 ? 'reden' : 'stehen', rand(10, 22), null, 0.7); return;
     default:
       goTo(v, wander(v, s, r), 'stehen', rand(5, 10));
   }
@@ -7411,6 +7460,15 @@ function sayFor(v) {
   if (v.act === 'trinken') return pick(['Noch ein Bier, Wirt!', '♪ Hey ho, der Krug ist leer ♪', 'Prost!', 'Habt Ihr von der Schlacht gehört?', 'Der Wirt panscht das Bier, sag ich euch.', '♪ Als König Richard übers Meer ... ♪']);
   if (v.role === 'wirt') return pick(['Herein, herein! Warmes Essen und weiche Betten!', 'Frisches Bier aus dem Fass!', 'Ein Bett für die Nacht, Herr?']);
   if (v.role === 'priester') return pick(['Der Herr sei mit Euch.', 'Vergesst die Messe am Sonntag nicht.', 'Betet für die Toten.']);
+  if (v.role === 'baron') {
+    const b = baron(v.baron);
+    if (!b) return 'Willkommen auf meiner Burg.';
+    if (b.feud) return pick(['Ihr wagt es, Euch hier zu zeigen?', 'Meine Männer sind schon unterwegs zu Eurer Burg.', 'Zahlt Sühne, oder wir sehen uns vor Euren Mauern.']);
+    if (b.vassal) return pick(['Mein Tribut ist unterwegs, Herr.', 'Ich halte mein Wort, Herr.', 'Was befehlt Ihr?']);
+    if (b.ally) return pick(['Mein Freund! Wein für unseren Gast!', 'Gegen wen ziehen wir als Nächstes?', 'Meine Männer stehen bereit, wenn Ihr sie braucht.']);
+    if (b.rel < -10) return pick(['Was wollt Ihr hier?', 'Ich habe nicht vergessen, was Ihr getan habt.', 'Fasst Euch kurz.']);
+    return pick(['Willkommen auf meiner Burg.', 'Habt Ihr Neuigkeiten aus dem Süden?', 'Die Mauern wachsen, Stein um Stein.', 'Der Krieg wird uns alle reich oder arm machen.', 'Setzt Euch, trinkt einen Becher mit mir.']);
+  }
   if (v.task && v.task.repair) return pick(['Das Dach muss bis zum Winter dicht sein.', 'Noch ein Balken, dann steht die Wand.', 'Verfluchte Belagerer!']);
   if (v.role === 'haendler') {
     const goods = (s.produces || []).map((g) => GOODS[g].name);
@@ -16452,17 +16510,32 @@ const EIGEN_FEUER = {"rittersaal_2":[[-25.5,-64.0],[-3.0,-72.2],[19.5,-81.2]],"r
 const eigenGroup = (n) => n.replace(/_(schaden_\d|winter|fruehling|herbst)/g, '').replace(/_\d$/, '');
 // Bild eines Platzes wählen und anfordern: Schnee, Jahreszeit der Felder, Schaden. Noch nicht geladen: null (der Platz
 // wird gezeichnet wie bisher, bis das Bild da ist; dann baut onArt die Burg neu)
-function eigenPick(base, dmg = 0) {
+function eigenCands(base, dmg = 0) {
   const se = lookSeason(), d = dmg ? `_schaden_${dmg}` : '', cands = [];
   if (se === 3) cands.push(`${base}${d}_winter`);
   if (!dmg && base.startsWith('felder')) { if (se === 0) cands.push(`${base}_fruehling`); if (se === 2 || se === 4) cands.push(`${base}_herbst`); }
   cands.push(`${base}${d}`);
-  const n = cands.find((x) => artKnown(`eigen_${x}`));
+  return cands;
+}
+// request = false: nur nachsehen, ob das Bild schon da ist, ohne es anzufordern (Burgen weit weg)
+function eigenPick(base, dmg = 0, request = true) {
+  const n = eigenCands(base, dmg).find((x) => artKnown(`eigen_${x}`));
   if (!n) return null;
   const id = `eigen_${n}`, sz = EIGEN_SIZE[eigenGroup(n)];
   if (!sz) return null;
   if (!P5[id]) { const size = sz[0] === 640 ? 2 : 3; P5[id] = [sz[0] / 8, (sz[1] - 32) / 4 - size * 16, 1 / 3]; }
-  return wantArt(id) ? id : null;
+  return (request ? wantArt(id) : ART[id]) ? id : null;
+}
+// Lädt das gemalte Bild noch? Dann bleibt der Platz kurz leer, statt erst den Platzhalter und dann das Bild zu zeigen.
+function eigenWaiting(base, dmg = 0) {
+  const n = base && eigenCands(base, dmg).find((x) => artKnown(`eigen_${x}`));
+  return !!n && artPending(`eigen_${n}`);
+}
+// Kommt das Bild nicht rechtzeitig, die Teile noch einmal aufbauen (dann mit Platzhalter)
+let rebuildTimer = null;
+function rebuildLater() {
+  if (rebuildTimer) return;
+  rebuildTimer = setTimeout(() => { rebuildTimer = null; G.castleDirty = true; G.staticDirty = true; }, ART_PENDING_MS + 300);
 }
 function eigenBase(id, L, p) { const nm = EIGEN_NAME[id]; return nm && L ? `${nm}${p.size < 3 ? '_hof' : ''}_${L}` : null; }
 // Ein Platzbild malen; Abgebranntes raucht noch an den Feuerstellen, nachts brennt Licht in bewohnten Gebäuden
@@ -16524,15 +16597,18 @@ function baronCastleParts(s) {
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
   const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
   const plots = baronPlots(id), lay = baronLayout(id), con = b.con;
+  // Bildbögen nur für Burgen in deiner Nähe anfordern (sie brauchen entpackt viel Speicher), siehe prefetchArt
+  const near = Math.hypot(s.x - G.s.player.x, s.y - G.s.player.y) < NEAR_BOGEN;
   lay.forEach((p, i) => {
     const pl = plots[i], building = con && con.kind === 'bau' && con.plot === i;
     if (!pl && !building) return;
     const bid = pl ? pl.id : con.id, L = pl ? pl.lv : 0;
-    const base = eigenBase(bid, L, p), sid = base && eigenPick(base);
+    const base = eigenBase(bid, L, p), sid = base && eigenPick(base, 0, near);
     if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, bid, 0, col)); addCastleActors(add, bid, L, p, 0); }
+    else if (L && eigenWaiting(base)) rebuildLater();
     else if (L) { addCastleBuilding(add, bid, L, p, s); addNewCastleBuilding(add, addFlat, bid, L, p, s); }
     if (building) {
-      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`), b2 = b1 && eigenPick(`baustelle${hof}_2`);
+      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`, 0, near), b2 = b1 && eigenPick(`baustelle${hof}_2`, 0, near);
       const prog = () => Math.max(0, Math.min(1, (G.s.day - (con.done - (con.days || 1)) + G.s.time / DAY_LEN) / (con.days || 1)));
       if (b1 && b2) add(p.x, p.y, (c) => p5(c, prog() < 0.5 ? b1 : b2, p.x, p.y, 1, false, col));
       else add(p.x, p.y, (c) => drawScaffold(c, p.x, p.y, p.size * 0.7, p.size * 0.7, 30));
@@ -16544,6 +16620,47 @@ function baronCastleParts(s) {
   // Ein Banner in seiner Farbe am Tor
   add(s.x + 1.4, s.y + 4.6, (c) => banner(c, s.x + 1.4, s.y + 4.6, 30, col));
   return parts;
+}
+
+// ---------------------------------------------------------------- Bildbögen vorausladen und freigeben
+// Die Bögen aus Paket 6 brauchen entpackt viel Speicher (alle zusammen rund 500 MB). Geladen werden die der eigenen
+// Burg (auch das Gebäude, das gerade gebaut wird) und die der Baronsburgen in deiner Nähe, bevor du ankommst.
+// Burgen weit weg geben ihre Bögen wieder frei; kommst du zurück, werden sie neu geladen.
+const NEAR_BOGEN = 90, FAR_BOGEN = 170;
+let prefetchT = 0;
+function prefetchArt(dt) {
+  prefetchT -= dt;
+  if (prefetchT > 0 || !G.world || !G.s) return;
+  prefetchT = 1.5;
+  const W = G.world, pl = G.s.player, keep = new Set(['eigenbogen_absteckung', 'eigenbogen_absteckung_hof', 'eigenbogen_baustelle_1', 'eigenbogen_baustelle_2', 'eigenbogen_baustelle_hof_1', 'eigenbogen_baustelle_hof_2']);
+  const take = (base, dmg, request) => {
+    if (!base) return;
+    const n = eigenCands(base, dmg).find((x) => artKnown(`eigen_${x}`));
+    if (!n) return;
+    const id = `eigen_${n}`, sh = sheetOf(id);
+    if (sh) keep.add(sh);
+    if (request) eigenPick(base, dmg, true);
+  };
+  // Eigene Burg: alles, was steht, und das Gebäude, das gerade entsteht
+  const plots = castlePlots(), lay = castleLayout(), con = G.s.castle.construction;
+  plots.forEach((b, i) => { if (b && lay[i]) take(eigenBase(b.id, b.lv, lay[i]), b.dmg ? 2 : 0, true); });
+  if (con && con.plot !== undefined && lay[con.plot] && BUILDINGS[con.id]) take(eigenBase(con.id, con.level, lay[con.plot]), 0, true);
+  // Baronsburgen: in der Nähe laden, in mittlerer Entfernung behalten
+  for (const s of W.sites) {
+    if (!s.baron) continue;
+    const b = baron(s.baron), d = Math.hypot(s.x - pl.x, s.y - pl.y);
+    if (!b || d > FAR_BOGEN) continue;
+    const bl = baronLayout(s.baron);
+    baronPlots(s.baron).forEach((q, i) => { if (q && bl[i]) take(eigenBase(q.id, q.lv, bl[i]), 0, d < NEAR_BOGEN); });
+    if (b.con && b.con.kind === 'bau' && bl[b.con.plot]) take(eigenBase(b.con.id, b.con.level, bl[b.con.plot]), 0, d < NEAR_BOGEN);
+  }
+  let freed = false;
+  for (const sh of loadedSheets('eigenbogen_')) {
+    if (keep.has(sh)) continue;
+    for (const id of releaseSheet(sh)) for (const k of [...spriteCache.keys()]) if (k.startsWith(`${id}|`)) spriteCache.delete(k);
+    freed = true;
+  }
+  if (freed) G.staticDirty = true;
 }
 
 function buildPlayerCastle() {
@@ -16576,6 +16693,7 @@ function buildPlayerCastle() {
     // Gemalt (Paket 6): Stufe, Schaden (wird ausgebessert: halb, sonst abgebrannt), Winter, Jahreszeit der Felder
     const dmg = b && b.dmg ? (building && con.repair ? 1 : 2) : 0, base = eigenBase(id, L, p), sid = base && eigenPick(base, dmg);
     if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, id, dmg)); addCastleActors(add, id, L, p, dmg); }
+    else if (L && eigenWaiting(base, dmg)) rebuildLater();
     else if (L) { addCastleBuilding(add, id, L, p, s); addNewCastleBuilding(add, addFlat, id, L, p, s); }
     if (b && b.dmg && !sid) addBurnt(add, p);
     if (building) addConstruction(add, id, p, L);
@@ -17769,7 +17887,7 @@ const ROLLE3D = {
   bauer: 'bauer', fischer: 'bauer', hirte: 'bauer', knecht: 'bauer', baeuerin: 'frau', magd: 'frau', kind: 'kind',
   buerger: 'buerger', haendler: 'buerger', reisender: 'buerger', vogt: 'buerger', wirt: 'handwerker', handwerker: 'handwerker',
   bergmann: 'handwerker', schmied: 'handwerker', moench: 'geistlicher', priester: 'geistlicher', einsiedler: 'geistlicher',
-  wache: 'soldat', bettler: 'bettler', jaeger: 'jaeger',
+  wache: 'soldat', bettler: 'bettler', jaeger: 'jaeger', baron: 'held_edel',
 };
 function modelFor(u, m) {
   if (u.hidden) return null;
@@ -21958,6 +22076,7 @@ function startWorld() {
   G.cam.zoom = G.gfx === 'klar' ? (G.view.w < 720 ? 1.7 : 2.4) : (G.view.w < 720 ? 1.7 : 2.0);
   G.started = true;
   G.fast = false;
+  waitForArt();
   G.ui.sel = null;
   G.pendingSite = null; G.pendingBuild = null;
   closePanel();
@@ -22027,7 +22146,9 @@ function buildSetupForm() {
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
-    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' });
+    // Erst die Ladetafel zeigen, dann die Welt erzeugen (das dauert einige Sekunden)
+    showLoading('Die Welt wird erschaffen …');
+    setTimeout(() => newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' }), 50);
   });
 }
 
@@ -22521,7 +22642,7 @@ function bindInput() {
     if (inCombat()) attackNearest(); else interactHere();
   });
   for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => tool(b.dataset.tool));
-  byId('btn-continue').addEventListener('click', () => { startAudio(); loadGame(); });
+  byId('btn-continue').addEventListener('click', () => { startAudio(); showLoading('Die Welt wird erschaffen …'); setTimeout(() => { if (!loadGame()) byId('loading').hidden = true; }, 50); });
   byId('btn-music-title').addEventListener('click', () => { toggleMusic(); startAudio(); });
   // Browser erlauben Ton erst nach der ersten Eingabe
   const firstGesture = () => { startAudio(); window.removeEventListener('pointerdown', firstGesture); window.removeEventListener('keydown', firstGesture); };
@@ -22611,7 +22732,9 @@ function frameBody(now) {
   G.time += dt;
   if (G.started) {
     readInput();
-    const running = !panelOpen() && !dialogOpen();
+    const running = !panelOpen() && !dialogOpen() && !G.loadingArt;
+    if (G.loadingArt) G.loadFrames = (G.loadFrames || 0) + 1;
+    prefetchArt(dt);
     if (running) {
       if (G.fast && inCombat()) { G.fast = false; log('Der Zeitraffer endet. Kampf!', 'bad'); }
       const steps = G.fast ? 4 : 1;
@@ -22699,6 +22822,29 @@ function drawTitleBackground() {
   if (titleCv.width !== Math.round(w * dpr) || titleCv.height !== Math.round(h * dpr)) { titleCv.width = Math.round(w * dpr); titleCv.height = Math.round(h * dpr); }
   titleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawTitleArt(titleCtx, w, h, G.time, titleColor);
+}
+
+// Erst zeigen, wenn die Bilder der Umgebung geladen sind: Hinter der Tafel zeichnet das Spiel schon und fordert dabei an,
+// was es braucht (Burgbögen, Figuren). Freigegeben wird, wenn alles Angeforderte da ist, spätestens nach 12 Sekunden.
+function showLoading(text) {
+  const el = byId('loading');
+  el.querySelector('p').textContent = text;
+  el.querySelector('.loading-bar span').style.width = '0%';
+  el.hidden = false;
+}
+function waitForArt() {
+  const el = byId('loading'), bar = el.querySelector('.loading-bar span'), t0 = performance.now();
+  G.loadingArt = true; G.loadFrames = 0;
+  showLoading('Die Welt wird gemalt …');
+  const tick = () => {
+    if (window.__aktBoot !== BOOT_ID) return;
+    const { done, total } = artProgress();
+    bar.style.width = `${Math.round((total ? done / total : 1) * 100)}%`;
+    const waited = performance.now() - t0;
+    if ((done >= total && G.loadFrames >= 4) || waited > 12000) { G.loadingArt = false; el.hidden = true; return; }
+    setTimeout(tick, 80);
+  };
+  setTimeout(tick, 60);
 }
 
 // ---------------------------------------------------------------- Boot
