@@ -24,6 +24,7 @@ import { homeGateClosed, homeSite } from './siege.js';
 import { drawCharge, drawKnightPlate } from './heraldry.js';
 import { drawShires } from './shires.js';
 import { siteColor } from './holdings.js';
+import { tripPos } from './travels.js';
 
 // Farbe eines Heeres: dein Aufgebot in deinen Farben, sonst die der Partei
 function armyColor(g) { return g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
@@ -5042,6 +5043,17 @@ export function drawMap(c, w, h, opts = {}) {
     const q = miniPos(g.x, g.y, v);
     c.fillStyle = g.engaged || g.provoked ? '#ff4a3a' : g.faction ? FACTIONS[g.faction].color : '#3a2a1a';
     c.beginPath(); c.arc(q.x, q.y, big ? 3 : 2.4, 0, Math.PI * 2); c.fill();
+  }
+  // Gefährten auf Reisen: Punkt in deiner Farbe, auf der großen Karte mit gestrichelter Strecke
+  for (const t of G.s.trips || []) {
+    const pos = tripPos(t), q = miniPos(pos.x, pos.y, v);
+    if (big) {
+      const a = miniPos(t.from.x, t.from.y, v), b = miniPos(pos.to.x, pos.to.y, v);
+      c.save(); c.setLineDash([4, 3]); c.strokeStyle = 'rgba(40,28,18,0.65)'; c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); c.restore();
+    }
+    c.fillStyle = playerColor(); c.strokeStyle = '#f3ead2'; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(q.x, q.y, big ? 4.5 : 3.2, 0, Math.PI * 2); c.fill(); c.stroke();
   }
   for (const qq of G.s.quests) {
     const t = questTarget(qq);

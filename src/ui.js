@@ -1,9 +1,9 @@
 // Oberfläche: Kopfleiste, Meldungen, Tafeln (Siedlung, Burg, Gefolge, Aufträge, Politik, Karte, Menü).
 
-import { G, log, homeName } from './state.js';
+import { G, log, homeName, playerColor } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
-  TYPE_NAME, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, FOOD_GOODS, GROUP_TYPES,
+  TYPE_NAME, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, FOOD_GOODS, GROUP_TYPES, DAY_LEN,
 } from './data.js';
 import {
   buy, sell, sellStored, storedSellPrice, buyPrice, sellPrice, cargoUsed, shopItems, itemBuyPrice, itemSellPrice, buyItem, sellItem, siteById,
@@ -33,6 +33,9 @@ import {
   setHoldingOrder, appointCastellan, recallCastellan, repairCostHolding, repairHolding, RECRUIT, recruitHolding, workCost, payWork,
   LEVIES, levyCost, SIEGE_GEAR, MERC_COST, siegeHelpers, besiegeBlock, startOwnSiege, counterStrength, holdingLine,
 } from './holdings.js';
+import {
+  trips, planTrip, startTrip, stopRoute, recallTrip, travelCandidates, travelerTrip, tripPos, fmtDays, DELEGABLE, WAGON, nowDay, towardText,
+} from './travels.js';
 import { MINE_YIELD, leaseCost, ownsShare, leaseMine, hermitState, visitHermit, hermitAdvice, canBless, hermitBless, hermitGift } from './mines.js';
 import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
@@ -824,7 +827,8 @@ function selectedUnit() {
 function rosterButton(u) {
   const sel = selectedUnit() === u;
   const hp = Math.round((u.hp / u.st.maxHp) * 100);
-  const where = u.status === 'kastellan' ? ` · Kastellan in ${esc((siteById(u.seat) || {}).name || '?')}` : u.status === 'verwundet' ? ` · verwundet (${u.woundedDays} T.)` : ` · ${hp} %`;
+  const tr = u.status === 'reise' ? travelerTrip(u) : null;
+  const where = tr ? ` · unterwegs ${esc(towardText(tripPos(tr).to))}` : u.status === 'kastellan' ? ` · Kastellan in ${esc((siteById(u.seat) || {}).name || '?')}` : u.status === 'verwundet' ? ` · verwundet (${u.woundedDays} T.)` : ` · ${hp} %`;
   return `<button class="ros${sel ? ' sel' : ''}" data-act="sel" data-u="${u.id}"><b>${esc(u.name)}</b><span>${CLASSES[u.cls].name} · St. ${u.level}${where}</span></button>`;
 }
 
@@ -833,6 +837,7 @@ function partyView(atCastle) {
   const gar = G.s.companions.filter((c) => c.status === 'garnison');
   const wnd = G.s.companions.filter((c) => c.status === 'verwundet');
   const cas = G.s.companions.filter((c) => c.status === 'kastellan');
+  const away = G.s.companions.filter((c) => c.status === 'reise');
   const u = selectedUnit();
   const isPlayer = u.kind === 'player';
   const slots = SLOTS.map((s) => {
@@ -852,7 +857,8 @@ function partyView(atCastle) {
     if (u.status === 'party') moves = '<button class="btn" data-act="status" data-s="garnison">In die Garnison schicken</button>';
     if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : `<span class="muted">Ins Gefolge holen kannst du sie nur in ${esc(homeName())}.</span>`;
     if (u.status === 'kastellan') moves = `<span class="muted">Abberufen kannst du den Kastellan in seiner Burg ${esc((siteById(u.seat) || {}).name || '')}.</span>`;
-    moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
+    if (u.status === 'reise') moves = `<span class="muted">${esc(u.name)} ist auf Reisen (Reiter „Reisen &amp; Handel“).</span>`;
+    else moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
   }
   const xp = `${u.xp}/${xpNeeded(u.level)} EP`;
   return `<div class="party">
@@ -862,6 +868,7 @@ function partyView(atCastle) {
       ${gar.length ? `<h4>Garnison</h4>${gar.map(rosterButton).join('')}` : ''}
       ${wnd.length ? `<h4>Verwundet</h4>${wnd.map(rosterButton).join('')}` : ''}
       ${cas.length ? `<h4>Kastellane</h4>${cas.map(rosterButton).join('')}` : ''}
+      ${away.length ? `<h4>Unterwegs</h4>${away.map(rosterButton).join('')}` : ''}
     </aside>
     <div class="detail">
       <header><h3>${esc(u.name)}</h3><span class="muted">${CLASSES[u.cls].name} · Stufe ${u.level} · ${xp}${u.wage ? ` · Sold ${u.wage}/Tag` : ''}</span></header>
@@ -876,7 +883,115 @@ function partyView(atCastle) {
 
 function partyPanel() {
   const atCastle = G.nearSite && G.nearSite.type === 'spieler';
-  return { title: 'Gefolge & Ausrüstung', sub: `Gold ${fmt(G.s.gold)} · Befehl: ${{ folgen: 'Folgen', halten: 'Stellung halten', angriff: 'Angriff' }[G.s.order]}`, tabs: [], body: partyView(atCastle) };
+  const n = trips().length;
+  const tabs = [['gefolge', 'Gefolge'], ['reisen', `Reisen & Handel${n ? ` (${n})` : ''}`]];
+  if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'gefolge';
+  return {
+    title: G.ui.tab === 'reisen' ? 'Reisen & Handel' : 'Gefolge & Ausrüstung',
+    sub: `Gold ${fmt(G.s.gold)} · Befehl: ${{ folgen: 'Folgen', halten: 'Stellung halten', angriff: 'Angriff' }[G.s.order]}`,
+    tabs, body: G.ui.tab === 'reisen' ? travelView() : partyView(atCastle),
+  };
+}
+
+// ---------------------------------------------------------------- Reisen & Handel (travels.js)
+function dayClock(t) { const d = Math.floor(t); return `Tag ${d}, ${clockText((t - d) * DAY_LEN)}`; }
+function pct(x) { return `${Math.round(x * 100)} %`; }
+function whoOptions(sel, allowNone = false, exclude = []) {
+  const list = travelCandidates().filter((u) => !exclude.includes(String(u.id)));
+  return `${allowNone ? '<option value="">niemand</option>' : ''}${list.map((u) => `<option value="${u.id}" ${String(sel) === String(u.id) ? 'selected' : ''}>${esc(u.name)} (${esc(CLASSES[u.cls].name)}, St. ${u.level}, ${u.status === 'party' ? 'im Gefolge' : 'Garnison'})</option>`).join('')}`;
+}
+function planNote(pl, kind) {
+  if (!pl.legs) return pl.why ? `<p class="muted">${esc(pl.why)}</p>` : '';
+  const parts = [`Zurück in etwa ${fmtDays(pl.days)} (${pl.legs.map((l) => esc(l.to)).join(' → ')})`, `Zehrgeld ${fmt(pl.cost)} Gold`];
+  parts.push(`Überfall unterwegs ${pct(pl.risk.p)}, dann Sieg ${pct(pl.risk.win)}`);
+  let more = '';
+  if (pl.fight) more = `<p>Kampf: deine Leute ${pl.fight.us} gegen ${pl.fight.them}, Aussicht auf Sieg etwa ${pct(pl.fight.win)}.</p>`;
+  if (pl.preview) {
+    const pv = pl.preview, home = Object.entries(pv.home).map(([g, k]) => `${k} ${GOODS[g].name}`).join(', ');
+    more = `<p>Nach heutigen Preisen: ${pv.sold ? `Verkauf ${fmt(pv.sold)} Gold` : 'nichts zu verkaufen'}${pv.bought ? `, Einkauf ${pv.bought} Stück` : ''}. Zurück kämen ${fmt(pv.gold)} Gold${home ? ` und ${home}` : ''}${pl.plan.budget ? ` (mitgegeben ${fmt(pl.plan.budget)})` : ''}.</p>`;
+  }
+  return `<p class="muted">${parts.join(' · ')}.</p>${more}${pl.why ? `<p class="muted">${esc(pl.why)}</p>` : ''}`;
+}
+function tripRow(t) {
+  const pos = tripPos(t), us = t.who.map((id) => G.s.companions.find((c) => c.id === id)).filter(Boolean);
+  const carry = [...Object.entries(t.cargo).filter(([, n]) => n > 0).map(([g, n]) => `${n} ${GOODS[g].name}`), ...(t.gold > 0 ? [`${fmt(t.gold)} Gold`] : [])];
+  const heading = pos.to.act === 'heim' ? `auf dem Heimweg nach ${esc(homeName())}` : `unterwegs ${esc(towardText(pos.to))}`;
+  return `<div class="action"><div><b>${esc(us.map((u) => u.name).join(', '))}</b><p>${esc(t.label)}${t.repeat ? ' · <b>feste Route</b>' : ''}</p>
+    <p class="muted">${heading}, Ankunft ${dayClock(t.t1)}${carry.length ? ` · dabei: ${carry.join(', ')}` : ''}</p>
+    <div class="progress"><span style="width:${Math.round(pos.k * 100)}%"></span></div></div>
+    <div class="row">${t.repeat ? `<button class="btn sm" data-act="tstop" data-t="${t.id}">Route beenden</button>` : ''}${pos.to.act !== 'heim' ? `<button class="btn sm" data-act="trecall" data-t="${t.id}">Zurückrufen</button>` : ''}</div></div>`;
+}
+function questForm(q) {
+  const f = (G.ui.qf = G.ui.qf || {})[q.id] || (G.ui.qf[q.id] = {});
+  const cand = travelCandidates();
+  if (f.who === undefined || !cand.some((u) => String(u.id) === String(f.who))) f.who = cand[0] ? String(cand[0].id) : '';
+  // Wer inzwischen verwundet oder fort ist, fällt aus der Auswahl
+  for (const k of ['e1', 'e2']) if (f[k] && (f[k] === f.who || !cand.some((u) => String(u.id) === String(f[k])))) f[k] = '';
+  if (f.e2 && f.e2 === f.e1) f.e2 = '';
+  const fightQ = q.type !== 'bote' && q.type !== 'lieferung';
+  const who = [f.who, f.e1, fightQ ? f.e2 : ''].filter(Boolean);
+  const pl = planTrip({ kind: 'auftrag', quest: q.id, who });
+  const sel = (field, val, none, ex) => `<select data-field="q.${q.id}.${field}">${whoOptions(val, none, ex)}</select>`;
+  return `<div class="trip-form">
+    <label>Wer geht? ${sel('who', f.who, false, [])}</label>
+    <label>Begleiter ${sel('e1', f.e1, true, [f.who])}</label>
+    ${fightQ ? `<label>Zweiter Begleiter ${sel('e2', f.e2, true, [f.who, f.e1])}</label>` : ''}
+    ${planNote(pl)}
+    <button class="btn primary" data-act="tquest" data-q="${q.id}" ${pl.ok ? '' : 'disabled'}>Losschicken</button>
+  </div>`;
+}
+function tradeForm() {
+  const f = (G.ui.form = G.ui.form || { qty: '20', budget: '0', repeat: false });
+  const cand = travelCandidates();
+  if (!f.who || !cand.some((u) => String(u.id) === String(f.who))) f.who = cand[0] ? String(cand[0].id) : '';
+  if (f.e1 && (f.e1 === f.who || !cand.some((u) => String(u.id) === String(f.e1)))) f.e1 = '';
+  const u = cand.find((x) => String(x.id) === String(f.who));
+  const fromStore = !u || u.status === 'garnison' || (G.nearSite && G.nearSite.type === 'spieler');
+  const store = fromStore ? G.s.castle.storage : G.s.cargo;
+  const goods = GOOD_IDS.filter((g) => (store[g] || 0) > 0);
+  if (f.good && !goods.includes(f.good)) f.good = '';
+  const markets = G.world.sites.filter((s) => !['spieler', 'lager', 'einsiedelei'].includes(s.type) && !isHostileFaction(s.faction))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  if (f.to && !markets.some((s) => s.id === f.to)) f.to = '';
+  const home = castleSite();
+  const dist = (s) => Math.round(Math.hypot(s.x - home.x, s.y - home.y) * 1.25 / 75 * 2) / 2;
+  const price = (s, g, buyIt) => (g ? ` · ${GOODS[g].name} ${buyIt ? buyPrice(s, g) : sellPrice(s, g)} G` : '');
+  const opt = (s, sel, g, buyIt) => `<option value="${s.id}" ${sel === s.id ? 'selected' : ''}>${esc(s.name)} (${String(dist(s)).replace('.', ',')} T.${price(s, g, buyIt)})</option>`;
+  const toSel = siteById(f.to);
+  const who = [f.who, f.e1].filter(Boolean);
+  const pl = planTrip({ kind: 'handel', who, good: f.good, qty: f.qty === 'alle' ? 9999 : f.qty, budget: f.budget, to: f.to, buy: f.buy, to2: f.to2, repeat: f.repeat });
+  return `<div class="trip-form">
+    <label>Wer fährt? <select data-field="f.who">${whoOptions(f.who)}</select></label>
+    <label>Begleiter (zweiter Wagen, mehr Schutz) <select data-field="f.e1">${whoOptions(f.e1, true, [f.who])}</select></label>
+    <label>Fracht aus ${fromStore ? 'dem Burglager' : 'deiner Ladung'} <select data-field="f.good"><option value="">keine</option>${goods.map((g) => `<option value="${g}" ${f.good === g ? 'selected' : ''}>${esc(GOODS[g].name)} (${store[g]})</option>`).join('')}</select></label>
+    <label>Menge <select data-field="f.qty">${['10', '20', '40', 'alle'].map((k) => `<option ${f.qty === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
+    <label>Geld für Einkäufe <select data-field="f.budget">${['0', '100', '250', '500', '1000'].map((k) => `<option value="${k}" ${f.budget === k ? 'selected' : ''}>${k} Gold</option>`).join('')}</select></label>
+    <label>Ziel <select data-field="f.to"><option value="">wählen …</option>${markets.map((s) => opt(s, f.to, f.good, false)).join('')}</select></label>
+    <label>Dort einkaufen <select data-field="f.buy"><option value="">nichts</option>${GOOD_IDS.map((g) => `<option value="${g}" ${f.buy === g ? 'selected' : ''}>${esc(GOODS[g].name)}${toSel ? ` (${buyPrice(toSel, g)} G)` : ''}</option>`).join('')}</select></label>
+    <label>Danach verkaufen in <select data-field="f.to2"><option value="">nirgends, heimbringen</option>${markets.filter((s) => s.id !== f.to).map((s) => opt(s, f.to2, f.buy, false)).join('')}</select></label>
+    <label class="check"><input type="checkbox" data-field="f.repeat" ${f.repeat ? 'checked' : ''}> Wiederholen: feste Route, solange Fracht und Geld reichen</label>
+    ${planNote(pl)}
+    <button class="btn primary" data-act="ttrade" ${pl.ok ? '' : 'disabled'}>Losschicken</button>
+  </div>`;
+}
+function travelView() {
+  const list = trips();
+  const qs = G.s.quests.filter((q) => DELEGABLE[q.type] && q.state === 'aktiv');
+  const cand = travelCandidates();
+  const quests = qs.map((q) => {
+    const t = q.agent && list.find((x) => x.id === q.agent);
+    return `<article class="quest"><header><b>${esc(q.title)}</b>${swatch(q.faction)}<span class="muted">${esc(siteById(q.from).name)} · Frist Tag ${q.deadline}</span></header>
+      ${t ? `<p class="muted">Unterwegs: ${esc(t.label)}.</p>` : cand.length ? questForm(q) : ''}</article>`;
+  }).join('');
+  return `<p class="hint">Gefährten aus dem Gefolge oder der Garnison reisen für dich: Sie bringen Briefe und Lieferungen, stellen mit Begleitern eine Bande oder fahren als Händler über Land. Wer aus der Garnison aufbricht, nimmt Ware aus dem Burglager, wer bei dir ist, aus deiner Ladung. Unterwegs lauern Wegelagerer. Zurück kommen alle in die Garnison von ${esc(homeName())}. Für Aufträge, die andere erledigen, gibt es den halben Ruhm.</p>
+    <h3>Unterwegs</h3>
+    ${list.length ? list.map(tripRow).join('') : '<p class="muted">Niemand ist unterwegs.</p>'}
+    <h3>Aufträge abgeben</h3>
+    ${!cand.length ? '<p class="muted">Niemand ist frei, alle sind unterwegs, verwundet oder Kastellane.</p>' : ''}
+    ${qs.length ? `<div class="quests">${quests}</div>` : '<p class="muted">Keine Aufträge, die jemand für dich übernehmen könnte (Botengänge, Lieferungen und Banden).</p>'}
+    <h3>Handelsfahrt</h3>
+    ${cand.length ? tradeForm() : '<p class="muted">Niemand ist frei für eine Handelsfahrt.</p>'}
+    <p class="muted">Ein Wagen lädt ${WAGON} Stück. Am ersten Ziel wird die Fracht verkauft und mit allem Geld eingekauft; ein zweites Ziel verkauft das Eingekaufte, sonst kommt es ins Burglager.</p>`;
 }
 
 // ---------------------------------------------------------------- Aufträge
@@ -890,7 +1005,9 @@ function questsPanel() {
   const list = G.s.quests.map((q) => {
     const t = questTarget(q);
     const state = q.state === 'erfuellt' ? `<span class="pill ally">Erledigt, Belohnung in ${esc(siteById(q.from).name)} abholen</span>` : '<span class="pill neutral">Aktiv</span>';
-    return questCard(q, `${state}<span class="muted">Ziel: ${esc(t.label)}, ${dirText(p, t)}</span><button class="btn" data-act="goto" data-q="${q.id}">Hinreisen</button><button class="btn danger sm" data-act="abandon" data-q="${q.id}">Aufgeben</button>`);
+    const tr = q.agent && trips().find((x) => x.id === q.agent);
+    const send = tr ? '<span class="pill friend">Ein Gefährte ist unterwegs</span>' : DELEGABLE[q.type] && q.state === 'aktiv' ? `<button class="btn" data-act="tsend" data-q="${q.id}">Jemanden schicken</button>` : '';
+    return questCard(q, `${state}<span class="muted">Ziel: ${esc(t.label)}, ${dirText(p, t)}</span><button class="btn" data-act="goto" data-q="${q.id}">Hinreisen</button>${send}<button class="btn danger sm" data-act="abandon" data-q="${q.id}">Aufgeben</button>`);
   }).join('');
   return {
     title: 'Aufträge', sub: `${G.s.quests.length} von 6 möglichen`, tabs: [],
@@ -982,7 +1099,7 @@ function mapPanel() {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']],
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span><span><span class="dash"></span>Fähre</span></p>${eventList()}`,
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.closest('.mapwrap');
@@ -1166,6 +1283,7 @@ function helpPanel() {
         <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (durch die Pforte hinein, gemeinsam die Bresche halten, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li><b>Burgen erobern:</b> Vor jeder Grafschaftsburg kannst du ein <b>Aufgebot</b> zusammenrufen (ab Ruhm 15): 12, 20 oder 30 Söldner mit Trebuchet, dazu dein Gefolge und Männer deiner Verbündeten, wenn sie mit den Herren der Burg verfeindet sind. Im Feldlager gibst du das Zeichen zum Sturm. Fällt die Burg, gehören dir Burg und Grafschaft, und die überlebenden Söldner bleiben als Besatzung. Zuerst wohl <b>Pontefract</b>: Dann gehört dir das West Riding, und der Vogt verlangt nichts mehr.</li>
         <li><b>Eroberte Burgen halten:</b> Setz einen Gefolgsmann als <b>Kastellan</b> ein (sonst führt ein gedungener Burgvogt die Burg, schlechter und gegen Lohn) und gib ihm eine Vorgabe: <i>Ausgewogen</i>, <i>Burg ausbauen</i> (Graben, Wehrgang, Torhaus, zuletzt ein Donjon, der die Burg zur Festung macht), <i>Holz erzeugen</i> (Fuhren nach Hause) oder <i>Verteidigung</i> (bis 30 Mann). Die früheren Herren greifen von Zeit zu Zeit an, und ihre Heere werden stärker. Bist du in der Nähe, kommt es zur Belagerung, bei der du hilfst; sonst entscheiden Mauern, Besatzung und Kastellan. Fällt die Burg, ist die Grafschaft fort, und der Kastellan schlägt sich verwundet heim.</li>
+        <li><b>Gefährten auf Reisen</b> (Gefolge, Reiter „Reisen &amp; Handel“, oder „Jemanden schicken“ bei einem Auftrag): Gefährten aus Gefolge oder Garnison bringen Briefe und Lieferungen, stellen mit bis zu zwei Begleitern eine Bande oder fahren als <b>Händler</b>: Fracht aus dem Burglager an einem Ort verkaufen, dort mit allem Geld einkaufen, das Eingekaufte heimbringen oder an einem zweiten Ort verkaufen. Mit „Wiederholen“ wird daraus eine <b>feste Route</b>. Unterwegs lauern Wegelagerer; die Tafel nennt Dauer, Zehrgeld, Gefahr und Aussicht. Erledigte Aufträge bringen Gold und Ansehen, aber nur den halben Ruhm. Alle kehren in die Garnison zurück; auf der Karte siehst du, wo sie gerade sind.</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
@@ -1303,6 +1421,11 @@ const ACTIONS = {
     confirmDialog(`${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
   },
   sabort: () => confirmDialog('Die Belagerung aufgeben? Die Söldner ziehen ab, das Handgeld ist fort.', 'Aufgeben', () => { abortOwnSiege(); closePanel(); }),
+  tquest: (d) => { const f = (G.ui.qf || {})[d.q] || {}; startTrip({ kind: 'auftrag', quest: Number(d.q), who: [f.who, f.e1, f.e2].filter(Boolean) }); },
+  ttrade: () => { const f = G.ui.form || {}; if (startTrip({ kind: 'handel', who: [f.who, f.e1].filter(Boolean), good: f.good, qty: f.qty === 'alle' ? 9999 : f.qty, budget: f.budget, to: f.to, buy: f.buy, to2: f.to2, repeat: f.repeat })) { G.ui.form = { qty: f.qty, budget: f.budget, repeat: false }; } },
+  tsend: () => { openPanel('party', null, 'reisen'); },
+  tstop: (d) => stopRoute(d.t),
+  trecall: (d) => recallTrip(d.t),
   hcast: (d) => { const u = G.s.companions.find((c) => c.id === Number(d.u)); if (u) appointCastellan(G.ui.arg, u); },
   hrecall: () => recallCastellan(G.ui.arg),
   horder: (d) => setHoldingOrder(G.ui.arg, d.o),
@@ -1345,6 +1468,16 @@ export function initUI() {
     if (!f) return;
     f(b.dataset);
     if (b.dataset.act !== 'close' && G.ui.panel) refreshPanel();
+  });
+  // Formulare in Tafeln (Reisen & Handel): Auswahl merken und die Schätzung neu rechnen
+  byId('panel').addEventListener('change', (e) => {
+    const el = e.target.closest('[data-field]');
+    if (!el) return;
+    const parts = el.dataset.field.split('.');
+    const val = el.type === 'checkbox' ? el.checked : el.value;
+    if (parts[0] === 'f') (G.ui.form = G.ui.form || {})[parts[1]] = val;
+    else if (parts[0] === 'q') { const qf = (G.ui.qf = G.ui.qf || {}); (qf[parts[1]] = qf[parts[1]] || {})[parts[2]] = val; }
+    refreshPanel();
   });
   byId('dialog-yes').addEventListener('click', () => closeDialog(true));
   byId('dialog-no').addEventListener('click', () => closeDialog(false));

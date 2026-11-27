@@ -15,6 +15,7 @@ import { dailyJustice } from './justice.js';
 import { passWeather } from './weather.js';
 import { dailyMines } from './mines.js';
 import { dailyHoldings } from './holdings.js';
+import { updateTrips } from './travels.js';
 
 export function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
@@ -51,12 +52,14 @@ export function updateTime(dt) {
     G.s.time -= DAY_LEN;
     newDay();
   }
+  updateTrips();
 }
 
 export function passHours(h) {
   passWeather(Math.round(h));
   G.s.time += (h / 24) * DAY_LEN;
-  while (G.s.time >= DAY_LEN) { G.s.time -= DAY_LEN; newDay(); }
+  while (G.s.time >= DAY_LEN) { G.s.time -= DAY_LEN; newDay(); updateTrips(); }
+  updateTrips();
 }
 
 function newDay() {

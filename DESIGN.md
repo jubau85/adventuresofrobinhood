@@ -108,9 +108,18 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   hassen). In deiner Nähe eine echte Belagerung mit deiner Besatzung in deinen Farben, sonst Verteidigung gegen
   45 + 2 je Tag. Fällt die Burg, geht die Grafschaft zurück, der Kastellan kommt verwundet heim. Der Ausbau bleibt.
 
-### Phase 4: Gefolgsleute auf Reisen
-- Aufträge an Gefolgsleute abgeben: Botengänge, Geleit, Lieferungen.
-- Gefolgsleute als Händler zwischen den Städten, später feste Handelsrouten mit Wagenzügen (Gefahr durch Banden).
+### Phase 4: Gefolgsleute auf Reisen (umgesetzt)
+- Aufträge an Gefährten abgeben: Botengänge, Lieferungen (aus Burglager oder Ladung, je nachdem, wo sie aufbrechen)
+  und Kampfaufträge (Bande, Wilderer, Steuerkasse) mit bis zu zwei Begleitern als Geleit. Gold und Ansehen voll,
+  Ruhm halb; Kampf nach Stärke (Angriff × 2 + Abwehr + Lebenskraft / 8) mit Zufall.
+- Handelsfahrten: ein Wagen je Gefährte (40 Stück), Fracht am ersten Ziel verkaufen, dort mit allem Geld einkaufen,
+  heimbringen oder am zweiten Ziel verkaufen (Zwischenhandel). Preise wie am Markt, jedes Stück verschiebt sie.
+  „Wiederholen“ macht eine feste Route daraus.
+- Reisen laufen in Spielzeit: zu Pferd 120, zu Fuß 90, mit dem Wagen 75 Felder am Tag, Umweg ein Viertel, übers Meer
+  1,5 Tage mehr. Zehrgeld 3 Gold je Kopf und Tag, Fähre 12 Gold je Kopf. Wegelagerer: 5 % am Tag (Waldleute
+  verbündet ×0,35, feindlich ×1,6, reiche Fracht ×1,3), Stärke 20 + 0,8 je Tag. Wer unterliegt, verliert die Hälfte
+  von Ladung und Geld und kehrt verwundet heim. Zurückrufen jederzeit.
+- Noch offen: Wagenzüge sichtbar in der Welt, die du begleiten kannst.
 
 ### Phase 5: Kriegskarte
 - Die Parteien erobern Grafschaften auch untereinander: Richards Getreue gegen Prinz Johns Barone, Frankreich gegen

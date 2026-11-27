@@ -150,15 +150,17 @@ export function questTarget(q) {
   return { x: s.x, y: s.y, label: s.name };
 }
 
-function reward(q) {
+// Belohnung auszahlen. by: Name der Gefährten, die den Auftrag für dich erledigt haben (dann halber Ruhm)
+export function rewardQuest(q, by = null) {
   const r = q.reward;
   G.s.gold += r.gold;
-  log(`Auftrag erfüllt: ${q.title}. Belohnung: ${r.gold} Gold.`, 'gold');
+  log(by ? `${by}: Auftrag „${q.title}“ erfüllt. Belohnung: ${r.gold} Gold.` : `Auftrag erfüllt: ${q.title}. Belohnung: ${r.gold} Gold.`, 'gold');
   changeRep(q.faction, r.rep, true);
-  addRenown(r.renown);
+  addRenown(by ? Math.ceil(r.renown / 2) : r.renown);
   G.s.quests = G.s.quests.filter((x) => x !== q);
   G.s.stats.quests++;
 }
+function reward(q) { rewardQuest(q); }
 
 export function canDeliver(q) { return q.type === 'lieferung' && (G.s.cargo[q.good] || 0) >= q.qty; }
 

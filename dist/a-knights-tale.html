@@ -217,6 +217,14 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .action { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); }
 .action p { margin: 2px 0 0; font-size: 14px; color: var(--ink-soft); }
 .action .btn { flex: none; }
+/* Reisen & Handel: kleine Formulare */
+.trip-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 14px; align-items: end; padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); margin-bottom: 10px; }
+.trip-form label { display: flex; flex-direction: column; gap: 3px; font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); }
+.trip-form label.check { flex-direction: row; align-items: center; gap: 8px; grid-column: 1 / -1; }
+.trip-form select { font: inherit; font-size: 14px; color: var(--ink); background: var(--parchment-2); border: 1px solid var(--parchment-3); border-radius: 4px; padding: 5px 6px; min-width: 0; }
+.trip-form > p { grid-column: 1 / -1; margin: 0; font-size: 14px; }
+.trip-form > .btn { grid-column: 1 / -1; justify-self: start; }
+.action > div:first-child { min-width: 0; flex: 1; }
 
 .table-wrap { overflow-x: auto; }
 .market { width: 100%; border-collapse: collapse; font-family: var(--font-ui); font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -9400,15 +9408,17 @@ function questTarget(q) {
   return { x: s.x, y: s.y, label: s.name };
 }
 
-function reward(q) {
+// Belohnung auszahlen. by: Name der Gefährten, die den Auftrag für dich erledigt haben (dann halber Ruhm)
+function rewardQuest(q, by = null) {
   const r = q.reward;
   G.s.gold += r.gold;
-  log(`Auftrag erfüllt: ${q.title}. Belohnung: ${r.gold} Gold.`, 'gold');
+  log(by ? `${by}: Auftrag „${q.title}“ erfüllt. Belohnung: ${r.gold} Gold.` : `Auftrag erfüllt: ${q.title}. Belohnung: ${r.gold} Gold.`, 'gold');
   changeRep(q.faction, r.rep, true);
-  addRenown(r.renown);
+  addRenown(by ? Math.ceil(r.renown / 2) : r.renown);
   G.s.quests = G.s.quests.filter((x) => x !== q);
   G.s.stats.quests++;
 }
+function reward(q) { rewardQuest(q); }
 
 function canDeliver(q) { return q.type === 'lieferung' && (G.s.cargo[q.good] || 0) >= q.qty; }
 
@@ -10450,6 +10460,396 @@ function holdingLine(s) {
   return `${c ? `Kastellan ${c.name}` : 'Burgvogt'} · ${ORDERS[h.order].name} · Besatzung ${h.garrison} · Verteidigung ${holdingDefense(h)}${h.dmg > 0 ? ` · Schäden ${Math.round(h.dmg * 100)} %` : ''}`;
 }
 
+// ===== travels.js =====
+// Gefolgsleute auf Reisen (Phase 4). Du schickst Gefährten los, statt alles selbst zu erledigen: Sie bringen Briefe,
+// liefern Ware, stellen mit ein, zwei Begleitern eine Bande oder fahren als Händler mit einem Wagen über Land.
+// Eine Handelsfahrt verkauft Fracht aus dem Burglager, kauft woanders ein und kann ein zweites Ziel anfahren;
+// wiederholt man sie, wird daraus eine feste Route. Unterwegs lauern Wegelagerer: Wer stark genug ist, schlägt sie
+// zurück, sonst ist ein Teil der Ladung fort und die Reisenden kehren verwundet heim.
+// Die Reise läuft in Spielzeit ab (Tag plus Tageszeit), auch während du schläfst oder rastest.
+
+
+
+
+
+
+
+
+
+
+function trips() { return G.s.trips || (G.s.trips = []); }
+function nowDay() { return G.s.day + G.s.time / DAY_LEN; }
+
+// Felder am Tag: zu Pferd, zu Fuß, mit dem Wagen. Straßen machen Umwege, daher ein Viertel mehr als die Luftlinie.
+const SPEED = { reiter: 120, fuss: 90, wagen: 75 };
+const DETOUR = 1.25;
+const WAGON = 40;          // so viel lädt ein Wagen
+const FOOD_PER_DAY = 3;           // Zehrgeld je Kopf und Tag
+const FERRY = 12;                 // Fährgeld je Kopf und Überfahrt
+const SEA_DAYS = 1.5;             // eine Überfahrt kostet so viel Zeit
+const DELEGABLE = { bote: 1, lieferung: 1, banditen: 1, jagd: 1, ueberfall: 1 };
+const KIND_OF = { bote: 'bote', lieferung: 'lieferung', banditen: 'kampf', jagd: 'kampf', ueberfall: 'kampf' };
+
+// ---------------------------------------------------------------- Wer reist
+function companion(id) { return G.s.companions.find((c) => c.id === Number(id)) || null; }
+// Wer losgeschickt werden kann: im Gefolge oder in der Garnison, gesund
+function canTravel(u) { return !!u && (u.status === 'party' || u.status === 'garnison'); }
+function travelCandidates() { return G.s.companions.filter(canTravel); }
+function travelers(t) { return t.who.map(companion).filter((u) => u && u.status === 'reise'); }
+function names(us) {
+  const n = us.map((u) => u.name);
+  return n.length <= 1 ? n.join('') : `${n.slice(0, -1).join(', ')} und ${n[n.length - 1]}`;
+}
+function partyStrength(us) { return us.reduce((a, u) => a + u.st.atk * 2 + u.st.def + u.st.maxHp / 8, 0); }
+function groupStrength(g) { return g.members.reduce((a, m) => a + m.st.atk * 2 + m.st.def + m.hp / 8, 0); }
+
+// ---------------------------------------------------------------- Strecken
+function homePt() { const s = castleSite(); return { x: s.x, y: s.y + 4, land: s.land, name: homeName() }; }
+function sitePt(s) { return { x: s.x, y: s.y + 1, land: s.land, name: s.name, site: s.id }; }
+function playerPt() { const p = G.s.player; return { x: p.x, y: p.y, land: landAt(G.world, p.x, p.y), name: 'deinem Lager' }; }
+function legDays(a, b, mode) {
+  const d = Math.hypot(a.x - b.x, a.y - b.y) * DETOUR;
+  return Math.max(0.2, d / SPEED[mode] + (a.land !== b.land ? SEA_DAYS : 0));
+}
+function modeOf(us, cargo) {
+  if (Object.values(cargo || {}).some((n) => n > 0)) return 'wagen';
+  return us.length && us.every((u) => u.eq.pferd) ? 'reiter' : 'fuss';
+}
+const MODE_NAME = { reiter: 'zu Pferd', fuss: 'zu Fuß', wagen: 'mit dem Wagen' };
+
+// Gefahr: Wegelagerer je Tag unterwegs. Mit den Waldleuten verbündet, meiden dich die Banden; sind sie dir feind,
+// lauern sie öfter. Eine reiche Fracht lockt sie an.
+function dangerPerDay(value) {
+  let p = 0.05;
+  if (isAlly('waldleute')) p *= 0.35;
+  else if (isHostileFaction('waldleute')) p *= 1.6;
+  if (value > 300) p *= 1.3;
+  return p;
+}
+function robberStrength() { return (20 + G.s.day * 0.8) * rand(0.6, 1.4); }
+function cargoValue(cargo, gold = 0) { return gold + Object.entries(cargo || {}).reduce((a, [g, n]) => a + GOODS[g].base * n, 0); }
+// Chance, auf einer Strecke von days Tagen überfallen zu werden, und wie gut die Reisenden dann dastehen
+function riskOf(days, us, value) {
+  const p = 1 - Math.pow(1 - dangerPerDay(value), days);
+  const win = chanceAtLeast(partyStrength(us), 0.8, 1.2, 20 + G.s.day * 0.8, 0.6, 1.4);
+  return { p, win };
+}
+
+// ---------------------------------------------------------------- Planen
+// spec: { kind: 'auftrag'|'handel', who: [ids], quest, good, qty, budget, to, buy, to2, repeat }
+// Ergebnis: { ok, why, stops, days, cost, from, source, mode, cargo, note }
+function planTrip(spec) {
+  const out = { ok: false, why: null, stops: [], days: 0, cost: 0, cargo: {}, budget: 0 };
+  const ids = [...new Set((spec.who || []).map(Number).filter(Boolean))];
+  const us = ids.map(companion);
+  if (!us.length || us.some((u) => !u)) { out.why = 'Wähle, wer reisen soll.'; return out; }
+  const bad = us.find((u) => !canTravel(u));
+  if (bad) { out.why = `${bad.name} kann gerade nicht reisen.`; return out; }
+  // Abreise: aus der Garnison von der Burg, aus dem Gefolge von dir aus
+  const home = homePt(), p = G.s.player, atHome = Math.hypot(home.x - p.x, home.y - 4 - p.y) < 15;
+  const fromParty = us.some((u) => u.status === 'party'), fromGar = us.some((u) => u.status === 'garnison');
+  if (fromParty && fromGar && !atHome) { out.why = 'Gefolge und Garnison sind nicht am selben Ort. Schick sie getrennt oder reite heim.'; return out; }
+  const from = fromParty && !atHome ? playerPt() : home;
+  out.from = from;
+  out.source = from === home ? 'lager' : 'ladung';
+  const store = out.source === 'lager' ? G.s.castle.storage : G.s.cargo;
+  out.us = us;
+  if (spec.kind === 'auftrag') {
+    const q = G.s.quests.find((x) => x.id === Number(spec.quest));
+    if (!q || q.state !== 'aktiv' || !DELEGABLE[q.type]) { out.why = 'Diesen Auftrag kann niemand mehr übernehmen.'; return out; }
+    if (q.agent && trips().some((t) => t.id === q.agent)) { out.why = 'Für diesen Auftrag ist schon jemand unterwegs.'; return out; }
+    out.quest = q; out.kind = KIND_OF[q.type];
+    if (q.type === 'bote') out.stops = [{ pt: sitePt(siteById(q.target)), act: 'bote' }];
+    else if (q.type === 'lieferung') {
+      if ((store[q.good] || 0) < q.qty) { out.why = `Dafür fehlen ${q.qty - (store[q.good] || 0)} ${GOODS[q.good].name} ${out.source === 'lager' ? 'im Burglager' : 'in deiner Ladung'}.`; return out; }
+      out.cargo = { [q.good]: q.qty };
+      out.stops = [{ pt: sitePt(siteById(q.from)), act: 'lieferung' }];
+    } else {
+      const g = G.groups.find((x) => x.id === q.groupId);
+      if (!g) { out.why = 'Die Gesuchten sind nicht mehr aufzufinden.'; return out; }
+      out.stops = [{ pt: { x: g.x, y: g.y, land: landAt(G.world, g.x, g.y), name: `Umgebung von ${siteById(q.from).name}` }, act: 'kampf' }];
+      out.foe = g;
+    }
+  } else {
+    out.kind = 'handel';
+    const to = siteById(spec.to), to2 = spec.to2 ? siteById(spec.to2) : null;
+    if (!to) { out.why = 'Wähle ein Ziel.'; return out; }
+    if (isHostileFaction(to.faction) || (to2 && isHostileFaction(to2.faction))) { out.why = `In ${isHostileFaction(to.faction) ? to.name : to2.name} lassen die Wachen niemanden von dir herein.`; return out; }
+    if (to2 === to) { out.why = 'Das zweite Ziel ist dasselbe wie das erste.'; return out; }
+    const cap = WAGON * us.length;
+    const qty = spec.good ? Math.min(Number(spec.qty) || 0, store[spec.good] || 0, cap) : 0;
+    if (spec.good && qty <= 0) { out.why = `${out.source === 'lager' ? 'Im Burglager' : 'In deiner Ladung'} ist kein ${GOODS[spec.good].name}.`; return out; }
+    if (qty) out.cargo = { [spec.good]: qty };
+    out.budget = Math.max(0, Math.min(Number(spec.budget) || 0, G.s.gold));
+    if (!qty && !out.budget) { out.why = 'Gib Fracht oder Geld für Einkäufe mit.'; return out; }
+    if (spec.buy && !out.budget && !qty) { out.why = 'Zum Einkaufen braucht es Geld oder Fracht, die sich verkaufen lässt.'; return out; }
+    out.stops = [{ pt: sitePt(to), act: 'markt1' }];
+    if (to2) out.stops.push({ pt: sitePt(to2), act: 'markt2' });
+    out.plan = { good: spec.good || null, qty, budget: out.budget, to: to.id, buy: spec.buy || null, to2: to2 ? to2.id : null };
+    out.preview = tradePreview(out.plan, cap);
+  }
+  out.stops.push({ pt: home, act: 'heim' });
+  // Dauer und Kosten: hin mit Fracht im Wagen, sonst zu Pferd oder zu Fuß
+  let at = from, days = 0, crossings = 0;
+  const legs = [];
+  for (const st of out.stops) {
+    // Händler fahren immer mit dem Wagen, Lieferungen bis zum Ziel, alle anderen reiten oder gehen
+    const mode = out.kind === 'handel' || st.act === 'lieferung' ? 'wagen' : modeOf(us, {});
+    const d = legDays(at, st.pt, mode);
+    if (at.land !== st.pt.land) crossings++;
+    legs.push({ to: st.pt.name, days: d, mode });
+    days += d; at = st.pt;
+  }
+  out.legs = legs;
+  out.days = days;
+  out.cost = Math.ceil(days * FOOD_PER_DAY * us.length + crossings * FERRY * us.length);
+  out.mode = legs[0].mode;
+  out.risk = riskOf(days, us, cargoValue(out.cargo, out.budget));
+  if (out.kind === 'kampf') {
+    const S = groupStrength(out.foe);
+    out.fight = { us: Math.round(partyStrength(us)), them: Math.round(S), win: chanceAtLeast(partyStrength(us) * 1.1, 0.8, 1.2, S, 0.75, 1.25) };
+  }
+  if (G.s.gold < out.cost + out.budget) { out.why = `Für Zehrgeld${crossings ? ' und Fähre' : ''} fehlt dir Gold (${out.cost + out.budget}).`; return out; }
+  out.ok = true;
+  return out;
+}
+
+// Was eine Handelsfahrt nach heutigen Preisen ungefähr bringt (Preise ändern sich, wenn viel verkauft wird)
+function tradePreview(plan, cap) {
+  const to = siteById(plan.to), to2 = plan.to2 ? siteById(plan.to2) : null;
+  let gold = plan.budget, sold = 0, bought = 0, home = {};
+  if (plan.good && plan.qty) { sold = sellRun(to, plan.good, plan.qty, true); gold += sold; }
+  if (plan.buy) {
+    const k = buyRun(to, plan.buy, gold, cap, true);
+    bought = k.n; gold -= k.spent;
+    if (to2 && k.n) { const s2 = sellRun(to2, plan.buy, k.n, true); gold += s2; } else if (k.n) home[plan.buy] = k.n;
+  }
+  return { sold, bought, gold, home, net: gold - plan.budget };
+}
+// Verkaufen und Kaufen am Markt: Jedes Stück verschiebt den Preis ein wenig (wie bei dir selbst)
+function sellRun(site, good, n, dry = false) {
+  const st = G.s.towns[site.id].stock, keep = st[good];
+  let earned = 0;
+  for (let k = 0; k < n; k++) { earned += sellPrice(site, good); st[good]++; }
+  if (dry) st[good] = keep;
+  return earned;
+}
+function buyRun(site, good, money, cap, dry = false) {
+  const st = G.s.towns[site.id].stock, keep = st[good];
+  let n = 0, spent = 0;
+  while (n < cap && st[good] > 0) {
+    const p = buyPrice(site, good);
+    if (spent + p > money) break;
+    spent += p; st[good]--; n++;
+  }
+  if (dry) st[good] = keep;
+  return { n, spent };
+}
+
+// ---------------------------------------------------------------- Losschicken
+function startTrip(spec, quiet = false) {
+  const plan = planTrip(spec);
+  if (!plan.ok) { if (!quiet) log(plan.why, 'bad'); return null; }
+  const us = plan.us;
+  G.s.gold -= plan.cost + plan.budget;
+  const store = plan.source === 'lager' ? G.s.castle.storage : G.s.cargo;
+  for (const [g, n] of Object.entries(plan.cargo)) store[g] -= n;
+  for (const u of us) { u.status = 'reise'; u.attackTarget = null; u.path = null; }
+  const id = (G.s.tripSeq = (G.s.tripSeq || 0) + 1);
+  const t = {
+    id, kind: plan.kind, who: us.map((u) => u.id), quest: plan.quest ? plan.quest.id : null,
+    stops: plan.stops.map((s) => ({ ...s.pt, act: s.act })), i: 0, from: plan.from, t1: nowDay(),
+    cargo: { ...plan.cargo }, gold: plan.budget, plan: plan.plan || null, repeat: !!spec.repeat, spec: { ...spec },
+    label: tripLabel(plan), started: G.s.day, foe: plan.foe ? plan.foe.id : null,
+  };
+  if (plan.quest) plan.quest.agent = id;
+  startLeg(t, plan.from);
+  trips().push(t);
+  rebuildUnits();
+  if (!quiet) log(`${names(us)} ${us.length > 1 ? 'brechen' : 'bricht'} auf: ${t.label}. Zurück in etwa ${fmtDays(plan.days)} (Zehrgeld${plan.cost ? ` ${plan.cost} Gold` : ''}).`, 'good');
+  return t;
+}
+function tripLabel(plan) {
+  const q = plan.quest;
+  if (q) return q.type === 'bote' ? `Brief nach ${siteById(q.target).name}` : q.type === 'lieferung' ? `${q.qty} ${GOODS[q.good].name} nach ${siteById(q.from).name}` : `${q.title} bei ${siteById(q.from).name}`;
+  const pl = plan.plan, to = siteById(pl.to).name;
+  const parts = [];
+  if (pl.good) parts.push(`${pl.qty} ${GOODS[pl.good].name} nach ${to}`);
+  else parts.push(`nach ${to}`);
+  if (pl.buy) parts.push(`dort ${GOODS[pl.buy].name} kaufen`);
+  if (pl.to2) parts.push(`weiter nach ${siteById(pl.to2).name}`);
+  return `Handelsfahrt: ${parts.join(', ')}`;
+}
+function fmtDays(d) { const r = Math.round(d * 2) / 2; return r <= 0.5 ? 'einem halben Tag' : r === 1 ? 'einem Tag' : `${String(r).replace('.', ',')} Tagen`; }
+
+// Eine Strecke beginnt: Dauer nach Fracht und Reittieren, Überfall auswürfeln
+function startLeg(t, from) {
+  const to = t.stops[t.i], us = travelers(t);
+  const loaded = Object.values(t.cargo).some((n) => n > 0) || t.kind === 'handel';
+  const days = legDays(from, to, loaded ? 'wagen' : modeOf(us, {}));
+  t.from = { x: from.x, y: from.y, land: from.land, name: from.name };
+  t.t0 = t.t1; t.t1 = t.t0 + days;
+  const r = riskOf(days, us, cargoValue(t.cargo, t.gold));
+  t.ambushAt = Math.random() < r.p ? t.t0 + days * rand(0.2, 0.8) : null;
+}
+// „nach York“, „in die Umgebung von York“
+function towardText(st) { return st.act === 'kampf' ? `in die ${st.name}` : `nach ${st.name}`; }
+// Wahrscheinlichkeit, dass a·[aLo, aHi] mindestens b·[bLo, bHi] erreicht (beide Zufallsfaktoren gleichverteilt)
+function chanceAtLeast(a, aLo, aHi, b, bLo, bHi) {
+  let win = 0;
+  const n = 24;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (a * (aLo + (aHi - aLo) * (i + 0.5) / n) >= b * (bLo + (bHi - bLo) * (j + 0.5) / n)) win++;
+  return win / (n * n);
+}
+// Wo die Reisenden gerade sind (für die Karte)
+function tripPos(t) {
+  const to = t.stops[t.i], k = Math.max(0, Math.min(1, (nowDay() - t.t0) / Math.max(0.01, t.t1 - t.t0)));
+  return { x: t.from.x + (to.x - t.from.x) * k, y: t.from.y + (to.y - t.from.y) * k, k, to };
+}
+
+// ---------------------------------------------------------------- Unterwegs
+function updateTrips() {
+  if (!G.s || !G.s.trips || !G.s.trips.length) return;
+  const now = nowDay();
+  for (const t of [...G.s.trips]) {
+    for (let guard = 0; guard < 8 && !t.done; guard++) {
+      if (!travelers(t).length) { t.done = true; log(`Von der Reise „${t.label}“ kommt niemand mehr zurück.`, 'bad'); break; }
+      if (t.ambushAt && now >= t.ambushAt && t.ambushAt < t.t1) { ambush(t); continue; }
+      if (now < t.t1) break;
+      arrive(t);
+    }
+  }
+  G.s.trips = G.s.trips.filter((t) => !t.done);
+}
+
+function ambush(t) {
+  const us = travelers(t), pos = tripPos(t);
+  t.ambushAt = null;
+  const P = partyStrength(us) * rand(0.8, 1.2), R = robberStrength();
+  const who = names(us), pl = us.length > 1;
+  if (P >= R) {
+    const loot = randInt(8, 35);
+    t.gold += loot;
+    for (const u of us) { grantXp(u, 25); u.hp = Math.max(1, Math.round(u.hp - u.st.maxHp * rand(0.1, 0.3))); }
+    log(`Unterwegs ${towardText(pos.to)} ${pl ? 'werden' : 'wird'} ${who} von Wegelagerern überfallen und ${pl ? 'schlagen' : 'schlägt'} sie in die Flucht (${loot} Gold Beute).`, 'good');
+    return;
+  }
+  // Niederlage: Die Hälfte der Ladung und des Geldes ist fort, alle sind verwundet und kehren heim
+  const lost = [];
+  for (const [g, n] of Object.entries(t.cargo)) { const k = Math.ceil(n / 2); if (k > 0) { t.cargo[g] -= k; lost.push(`${k} ${GOODS[g].name}`); } }
+  const lg = Math.ceil(t.gold / 2);
+  if (lg > 0) { t.gold -= lg; lost.push(`${lg} Gold`); }
+  for (const u of us) u.hp = Math.max(1, Math.round(u.st.maxHp * 0.15));
+  t.wounded = true;
+  log(`Wegelagerer haben ${who} auf dem Weg ${towardText(pos.to)} überfallen${lost.length ? ` und ${lost.join(', ')} geraubt` : ''}. Verwundet ${pl ? 'kehren sie' : 'kehrt er'} heim.`, 'bad');
+  turnHome(t, pos);
+}
+function turnHome(t, pos) {
+  const home = t.stops[t.stops.length - 1];
+  t.stops = [home]; t.i = 0;
+  t.t1 = nowDay();
+  startLeg(t, { x: pos.x, y: pos.y, land: landAt(G.world, pos.x, pos.y), name: 'unterwegs' });
+  t.ambushAt = null;
+}
+
+function arrive(t) {
+  const st = t.stops[t.i], us = travelers(t), who = names(us), pl = us.length > 1;
+  const q = t.quest ? G.s.quests.find((x) => x.id === t.quest) : null;
+  if (st.act === 'heim') return finish(t);
+  if (st.act === 'bote' || st.act === 'lieferung') {
+    if (!q || q.state !== 'aktiv') log(`${who} ${pl ? 'kommen' : 'kommt'} in ${st.name} an, aber der Auftrag gilt nicht mehr.`);
+    else {
+      if (st.act === 'lieferung') { G.s.towns[q.from].stock[q.good] += t.cargo[q.good] || 0; t.cargo[q.good] = 0; }
+      rewardQuest(q, who);
+      for (const u of us) grantXp(u, 30);
+    }
+  } else if (st.act === 'kampf') tripFight(t, us, q);
+  else if (st.act === 'markt1' || st.act === 'markt2') market(t, siteById(st.site), st.act === 'markt1', us);
+  t.i++;
+  startLeg(t, st);
+}
+
+function tripFight(t, us, q) {
+  const g = G.groups.find((x) => x.id === t.foe);
+  const who = names(us), pl = us.length > 1;
+  if (!g || !g.members.length) { log(`${who} ${pl ? 'finden' : 'findet'} ${q ? `für „${q.title}“` : ''} niemanden mehr vor und ${pl ? 'kehren' : 'kehrt'} heim.`); return; }
+  const gt = GROUP_TYPES[g.type];
+  const P = partyStrength(us) * 1.1 * rand(0.8, 1.2), S = groupStrength(g) * rand(0.75, 1.25);
+  if (P >= S) {
+    const loot = randInt(gt.gold[0], gt.gold[1]);
+    t.gold += loot;
+    if (gt.kill) for (const [f, v] of Object.entries(gt.kill)) changeRep(f, v);
+    g.questId = null;
+    removeGroup(g);
+    rebuildUnits();
+    for (const u of us) { grantXp(u, 45); u.hp = Math.max(1, Math.round(u.hp - u.st.maxHp * rand(0.2, 0.45))); }
+    log(`${who} ${pl ? 'haben' : 'hat'} ${gt.acc} gestellt und besiegt (Beute ${loot} Gold).`, 'good');
+    if (q && q.state === 'aktiv') rewardQuest(q, who);
+  } else {
+    for (const u of us) u.hp = Math.max(1, Math.round(u.st.maxHp * 0.15));
+    t.wounded = true;
+    log(`${who} ${pl ? 'haben' : 'hat'} gegen ${gt.acc} verloren und ${pl ? 'schleppen sich' : 'schleppt sich'} verwundet heim. Schick mehr Leute oder geh selbst.`, 'bad');
+  }
+}
+
+function market(t, s, first, us) {
+  const who = names(us), parts = [];
+  if (!s || isHostileFaction(s.faction)) { log(`In ${s ? s.name : 'der Stadt'} lassen die Wachen ${who} nicht auf den Markt. Die Fracht kommt wieder mit heim.`, 'bad'); return; }
+  for (const [g, n] of Object.entries(t.cargo)) {
+    if (n <= 0 || (first && t.plan && t.plan.buy === g && t.plan.to2)) continue;
+    const e = sellRun(s, g, n);
+    t.gold += e; t.cargo[g] = 0;
+    parts.push(`${n} ${GOODS[g].name} für ${e} Gold verkauft`);
+  }
+  if (first && t.plan && t.plan.buy) {
+    const cap = WAGON * us.length - Object.values(t.cargo).reduce((a, n) => a + n, 0);
+    const k = buyRun(s, t.plan.buy, t.gold, cap);
+    if (k.n) { t.gold -= k.spent; t.cargo[t.plan.buy] = (t.cargo[t.plan.buy] || 0) + k.n; parts.push(`${k.n} ${GOODS[t.plan.buy].name} für ${k.spent} Gold gekauft`); }
+    else parts.push(`kein ${GOODS[t.plan.buy].name} zu bekommen`);
+  }
+  for (const u of us) grantXp(u, 10);
+  if (parts.length) log(`${who} in ${s.name}: ${parts.join(', ')}.`);
+}
+
+function finish(t) {
+  const us = travelers(t), who = names(us), pl = us.length > 1;
+  t.done = true;
+  for (const u of us) {
+    if (t.wounded) { u.status = 'verwundet'; u.woundedDays = 3; u.hp = Math.max(1, u.hp); }
+    else u.status = 'garnison';
+    grantXp(u, 10);
+  }
+  const brought = [];
+  if (t.gold > 0) { G.s.gold += t.gold; brought.push(`${t.gold} Gold`); }
+  for (const [g, n] of Object.entries(t.cargo)) if (n > 0) { G.s.castle.storage[g] = (G.s.castle.storage[g] || 0) + n; brought.push(`${n} ${GOODS[g].name}`); }
+  const q = t.quest ? G.s.quests.find((x) => x.id === t.quest) : null;
+  if (q && q.agent === t.id) q.agent = null;
+  log(`${who} ${pl ? 'sind' : 'ist'} zurück in ${homeName()}${t.wounded ? ', verwundet' : ''}${brought.length ? ` und ${pl ? 'bringen' : 'bringt'} ${brought.join(', ')}` : ''}.`, t.wounded ? 'bad' : 'good');
+  rebuildUnits();
+  // Feste Route: gleich wieder los, solange Fracht und Geld reichen
+  if (t.repeat && t.kind === 'handel' && !t.wounded) {
+    const again = startTrip({ ...t.spec, who: t.who }, true);
+    if (again) log(`${who} ${pl ? 'fahren' : 'fährt'} die Route erneut: ${again.label}.`);
+    else log(`Die Route „${t.label}“ ruht: ${planTrip({ ...t.spec, who: t.who }).why || 'es fehlt an Fracht oder Geld'}`, 'bad');
+  }
+}
+
+// Route beenden: Die laufende Fahrt geht noch zu Ende, dann bleiben sie daheim
+function stopRoute(id) { const t = trips().find((x) => x.id === Number(id)); if (t) { t.repeat = false; log(`Nach dieser Fahrt bleibt die Route „${t.label}“ ruhen.`); } }
+// Zurückrufen: sofort umkehren (Aufträge bleiben unerledigt)
+function recallTrip(id) {
+  const t = trips().find((x) => x.id === Number(id));
+  if (!t || t.stops[t.i].act === 'heim') return;
+  t.repeat = false;
+  const pos = tripPos(t);
+  turnHome(t, pos);
+  log(`Ein Bote holt ${names(travelers(t))} zurück. Sie kehren um und sind in etwa ${fmtDays(t.t1 - nowDay())} daheim.`);
+}
+
+function travelerTrip(u) { return trips().find((t) => t.who.includes(u.id)) || null; }
+function tripEta(t) { return t.stops.length ? t.stops[t.stops.length - 1] : null; }
+function className(u) { return CLASSES[u.cls].name; }
+
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
 // an der Quelle (billiger als in der Stadt, aber nur, was sie gerade haben). Im Waldlager heuern Söldner an, und wer
@@ -10600,6 +11000,7 @@ function mercFaction(site) { return FACTIONS[site.faction] ? FACTIONS[site.facti
 
 
 
+
 function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
@@ -10635,12 +11036,14 @@ function updateTime(dt) {
     G.s.time -= DAY_LEN;
     newDay();
   }
+  updateTrips();
 }
 
 function passHours(h) {
   passWeather(Math.round(h));
   G.s.time += (h / 24) * DAY_LEN;
-  while (G.s.time >= DAY_LEN) { G.s.time -= DAY_LEN; newDay(); }
+  while (G.s.time >= DAY_LEN) { G.s.time -= DAY_LEN; newDay(); updateTrips(); }
+  updateTrips();
 }
 
 function newDay() {
@@ -11371,6 +11774,7 @@ function drawKnightPlate(c, w, h, arms, t = 0, opt = {}) {
 // ===== render.js =====
 // Isometrischer Renderer: Gelände mit Höhenrelief in Chunks, Objekte tiefensortiert,
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
+
 
 
 
@@ -16414,6 +16818,17 @@ function drawMap(c, w, h, opts = {}) {
     c.fillStyle = g.engaged || g.provoked ? '#ff4a3a' : g.faction ? FACTIONS[g.faction].color : '#3a2a1a';
     c.beginPath(); c.arc(q.x, q.y, big ? 3 : 2.4, 0, Math.PI * 2); c.fill();
   }
+  // Gefährten auf Reisen: Punkt in deiner Farbe, auf der großen Karte mit gestrichelter Strecke
+  for (const t of G.s.trips || []) {
+    const pos = tripPos(t), q = miniPos(pos.x, pos.y, v);
+    if (big) {
+      const a = miniPos(t.from.x, t.from.y, v), b = miniPos(pos.to.x, pos.to.y, v);
+      c.save(); c.setLineDash([4, 3]); c.strokeStyle = 'rgba(40,28,18,0.65)'; c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); c.restore();
+    }
+    c.fillStyle = playerColor(); c.strokeStyle = '#f3ead2'; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(q.x, q.y, big ? 4.5 : 3.2, 0, Math.PI * 2); c.fill(); c.stroke();
+  }
   for (const qq of G.s.quests) {
     const t = questTarget(qq);
     const q = miniPos(t.x, t.y, v);
@@ -17512,6 +17927,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -18296,7 +18712,8 @@ function selectedUnit() {
 function rosterButton(u) {
   const sel = selectedUnit() === u;
   const hp = Math.round((u.hp / u.st.maxHp) * 100);
-  const where = u.status === 'kastellan' ? ` · Kastellan in ${esc((siteById(u.seat) || {}).name || '?')}` : u.status === 'verwundet' ? ` · verwundet (${u.woundedDays} T.)` : ` · ${hp} %`;
+  const tr = u.status === 'reise' ? travelerTrip(u) : null;
+  const where = tr ? ` · unterwegs ${esc(towardText(tripPos(tr).to))}` : u.status === 'kastellan' ? ` · Kastellan in ${esc((siteById(u.seat) || {}).name || '?')}` : u.status === 'verwundet' ? ` · verwundet (${u.woundedDays} T.)` : ` · ${hp} %`;
   return `<button class="ros${sel ? ' sel' : ''}" data-act="sel" data-u="${u.id}"><b>${esc(u.name)}</b><span>${CLASSES[u.cls].name} · St. ${u.level}${where}</span></button>`;
 }
 
@@ -18305,6 +18722,7 @@ function partyView(atCastle) {
   const gar = G.s.companions.filter((c) => c.status === 'garnison');
   const wnd = G.s.companions.filter((c) => c.status === 'verwundet');
   const cas = G.s.companions.filter((c) => c.status === 'kastellan');
+  const away = G.s.companions.filter((c) => c.status === 'reise');
   const u = selectedUnit();
   const isPlayer = u.kind === 'player';
   const slots = SLOTS.map((s) => {
@@ -18324,7 +18742,8 @@ function partyView(atCastle) {
     if (u.status === 'party') moves = '<button class="btn" data-act="status" data-s="garnison">In die Garnison schicken</button>';
     if (u.status === 'garnison') moves = atCastle ? '<button class="btn primary" data-act="status" data-s="party">Ins Gefolge holen</button>' : `<span class="muted">Ins Gefolge holen kannst du sie nur in ${esc(homeName())}.</span>`;
     if (u.status === 'kastellan') moves = `<span class="muted">Abberufen kannst du den Kastellan in seiner Burg ${esc((siteById(u.seat) || {}).name || '')}.</span>`;
-    moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
+    if (u.status === 'reise') moves = `<span class="muted">${esc(u.name)} ist auf Reisen (Reiter „Reisen &amp; Handel“).</span>`;
+    else moves += ` <button class="btn danger" data-act="dismiss">Entlassen</button>`;
   }
   const xp = `${u.xp}/${xpNeeded(u.level)} EP`;
   return `<div class="party">
@@ -18334,6 +18753,7 @@ function partyView(atCastle) {
       ${gar.length ? `<h4>Garnison</h4>${gar.map(rosterButton).join('')}` : ''}
       ${wnd.length ? `<h4>Verwundet</h4>${wnd.map(rosterButton).join('')}` : ''}
       ${cas.length ? `<h4>Kastellane</h4>${cas.map(rosterButton).join('')}` : ''}
+      ${away.length ? `<h4>Unterwegs</h4>${away.map(rosterButton).join('')}` : ''}
     </aside>
     <div class="detail">
       <header><h3>${esc(u.name)}</h3><span class="muted">${CLASSES[u.cls].name} · Stufe ${u.level} · ${xp}${u.wage ? ` · Sold ${u.wage}/Tag` : ''}</span></header>
@@ -18348,7 +18768,115 @@ function partyView(atCastle) {
 
 function partyPanel() {
   const atCastle = G.nearSite && G.nearSite.type === 'spieler';
-  return { title: 'Gefolge & Ausrüstung', sub: `Gold ${fmt(G.s.gold)} · Befehl: ${{ folgen: 'Folgen', halten: 'Stellung halten', angriff: 'Angriff' }[G.s.order]}`, tabs: [], body: partyView(atCastle) };
+  const n = trips().length;
+  const tabs = [['gefolge', 'Gefolge'], ['reisen', `Reisen & Handel${n ? ` (${n})` : ''}`]];
+  if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'gefolge';
+  return {
+    title: G.ui.tab === 'reisen' ? 'Reisen & Handel' : 'Gefolge & Ausrüstung',
+    sub: `Gold ${fmt(G.s.gold)} · Befehl: ${{ folgen: 'Folgen', halten: 'Stellung halten', angriff: 'Angriff' }[G.s.order]}`,
+    tabs, body: G.ui.tab === 'reisen' ? travelView() : partyView(atCastle),
+  };
+}
+
+// ---------------------------------------------------------------- Reisen & Handel (travels.js)
+function dayClock(t) { const d = Math.floor(t); return `Tag ${d}, ${clockText((t - d) * DAY_LEN)}`; }
+function pct(x) { return `${Math.round(x * 100)} %`; }
+function whoOptions(sel, allowNone = false, exclude = []) {
+  const list = travelCandidates().filter((u) => !exclude.includes(String(u.id)));
+  return `${allowNone ? '<option value="">niemand</option>' : ''}${list.map((u) => `<option value="${u.id}" ${String(sel) === String(u.id) ? 'selected' : ''}>${esc(u.name)} (${esc(CLASSES[u.cls].name)}, St. ${u.level}, ${u.status === 'party' ? 'im Gefolge' : 'Garnison'})</option>`).join('')}`;
+}
+function planNote(pl, kind) {
+  if (!pl.legs) return pl.why ? `<p class="muted">${esc(pl.why)}</p>` : '';
+  const parts = [`Zurück in etwa ${fmtDays(pl.days)} (${pl.legs.map((l) => esc(l.to)).join(' → ')})`, `Zehrgeld ${fmt(pl.cost)} Gold`];
+  parts.push(`Überfall unterwegs ${pct(pl.risk.p)}, dann Sieg ${pct(pl.risk.win)}`);
+  let more = '';
+  if (pl.fight) more = `<p>Kampf: deine Leute ${pl.fight.us} gegen ${pl.fight.them}, Aussicht auf Sieg etwa ${pct(pl.fight.win)}.</p>`;
+  if (pl.preview) {
+    const pv = pl.preview, home = Object.entries(pv.home).map(([g, k]) => `${k} ${GOODS[g].name}`).join(', ');
+    more = `<p>Nach heutigen Preisen: ${pv.sold ? `Verkauf ${fmt(pv.sold)} Gold` : 'nichts zu verkaufen'}${pv.bought ? `, Einkauf ${pv.bought} Stück` : ''}. Zurück kämen ${fmt(pv.gold)} Gold${home ? ` und ${home}` : ''}${pl.plan.budget ? ` (mitgegeben ${fmt(pl.plan.budget)})` : ''}.</p>`;
+  }
+  return `<p class="muted">${parts.join(' · ')}.</p>${more}${pl.why ? `<p class="muted">${esc(pl.why)}</p>` : ''}`;
+}
+function tripRow(t) {
+  const pos = tripPos(t), us = t.who.map((id) => G.s.companions.find((c) => c.id === id)).filter(Boolean);
+  const carry = [...Object.entries(t.cargo).filter(([, n]) => n > 0).map(([g, n]) => `${n} ${GOODS[g].name}`), ...(t.gold > 0 ? [`${fmt(t.gold)} Gold`] : [])];
+  const heading = pos.to.act === 'heim' ? `auf dem Heimweg nach ${esc(homeName())}` : `unterwegs ${esc(towardText(pos.to))}`;
+  return `<div class="action"><div><b>${esc(us.map((u) => u.name).join(', '))}</b><p>${esc(t.label)}${t.repeat ? ' · <b>feste Route</b>' : ''}</p>
+    <p class="muted">${heading}, Ankunft ${dayClock(t.t1)}${carry.length ? ` · dabei: ${carry.join(', ')}` : ''}</p>
+    <div class="progress"><span style="width:${Math.round(pos.k * 100)}%"></span></div></div>
+    <div class="row">${t.repeat ? `<button class="btn sm" data-act="tstop" data-t="${t.id}">Route beenden</button>` : ''}${pos.to.act !== 'heim' ? `<button class="btn sm" data-act="trecall" data-t="${t.id}">Zurückrufen</button>` : ''}</div></div>`;
+}
+function questForm(q) {
+  const f = (G.ui.qf = G.ui.qf || {})[q.id] || (G.ui.qf[q.id] = {});
+  const cand = travelCandidates();
+  if (f.who === undefined || !cand.some((u) => String(u.id) === String(f.who))) f.who = cand[0] ? String(cand[0].id) : '';
+  // Wer inzwischen verwundet oder fort ist, fällt aus der Auswahl
+  for (const k of ['e1', 'e2']) if (f[k] && (f[k] === f.who || !cand.some((u) => String(u.id) === String(f[k])))) f[k] = '';
+  if (f.e2 && f.e2 === f.e1) f.e2 = '';
+  const fightQ = q.type !== 'bote' && q.type !== 'lieferung';
+  const who = [f.who, f.e1, fightQ ? f.e2 : ''].filter(Boolean);
+  const pl = planTrip({ kind: 'auftrag', quest: q.id, who });
+  const sel = (field, val, none, ex) => `<select data-field="q.${q.id}.${field}">${whoOptions(val, none, ex)}</select>`;
+  return `<div class="trip-form">
+    <label>Wer geht? ${sel('who', f.who, false, [])}</label>
+    <label>Begleiter ${sel('e1', f.e1, true, [f.who])}</label>
+    ${fightQ ? `<label>Zweiter Begleiter ${sel('e2', f.e2, true, [f.who, f.e1])}</label>` : ''}
+    ${planNote(pl)}
+    <button class="btn primary" data-act="tquest" data-q="${q.id}" ${pl.ok ? '' : 'disabled'}>Losschicken</button>
+  </div>`;
+}
+function tradeForm() {
+  const f = (G.ui.form = G.ui.form || { qty: '20', budget: '0', repeat: false });
+  const cand = travelCandidates();
+  if (!f.who || !cand.some((u) => String(u.id) === String(f.who))) f.who = cand[0] ? String(cand[0].id) : '';
+  if (f.e1 && (f.e1 === f.who || !cand.some((u) => String(u.id) === String(f.e1)))) f.e1 = '';
+  const u = cand.find((x) => String(x.id) === String(f.who));
+  const fromStore = !u || u.status === 'garnison' || (G.nearSite && G.nearSite.type === 'spieler');
+  const store = fromStore ? G.s.castle.storage : G.s.cargo;
+  const goods = GOOD_IDS.filter((g) => (store[g] || 0) > 0);
+  if (f.good && !goods.includes(f.good)) f.good = '';
+  const markets = G.world.sites.filter((s) => !['spieler', 'lager', 'einsiedelei'].includes(s.type) && !isHostileFaction(s.faction))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  if (f.to && !markets.some((s) => s.id === f.to)) f.to = '';
+  const home = castleSite();
+  const dist = (s) => Math.round(Math.hypot(s.x - home.x, s.y - home.y) * 1.25 / 75 * 2) / 2;
+  const price = (s, g, buyIt) => (g ? ` · ${GOODS[g].name} ${buyIt ? buyPrice(s, g) : sellPrice(s, g)} G` : '');
+  const opt = (s, sel, g, buyIt) => `<option value="${s.id}" ${sel === s.id ? 'selected' : ''}>${esc(s.name)} (${String(dist(s)).replace('.', ',')} T.${price(s, g, buyIt)})</option>`;
+  const toSel = siteById(f.to);
+  const who = [f.who, f.e1].filter(Boolean);
+  const pl = planTrip({ kind: 'handel', who, good: f.good, qty: f.qty === 'alle' ? 9999 : f.qty, budget: f.budget, to: f.to, buy: f.buy, to2: f.to2, repeat: f.repeat });
+  return `<div class="trip-form">
+    <label>Wer fährt? <select data-field="f.who">${whoOptions(f.who)}</select></label>
+    <label>Begleiter (zweiter Wagen, mehr Schutz) <select data-field="f.e1">${whoOptions(f.e1, true, [f.who])}</select></label>
+    <label>Fracht aus ${fromStore ? 'dem Burglager' : 'deiner Ladung'} <select data-field="f.good"><option value="">keine</option>${goods.map((g) => `<option value="${g}" ${f.good === g ? 'selected' : ''}>${esc(GOODS[g].name)} (${store[g]})</option>`).join('')}</select></label>
+    <label>Menge <select data-field="f.qty">${['10', '20', '40', 'alle'].map((k) => `<option ${f.qty === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
+    <label>Geld für Einkäufe <select data-field="f.budget">${['0', '100', '250', '500', '1000'].map((k) => `<option value="${k}" ${f.budget === k ? 'selected' : ''}>${k} Gold</option>`).join('')}</select></label>
+    <label>Ziel <select data-field="f.to"><option value="">wählen …</option>${markets.map((s) => opt(s, f.to, f.good, false)).join('')}</select></label>
+    <label>Dort einkaufen <select data-field="f.buy"><option value="">nichts</option>${GOOD_IDS.map((g) => `<option value="${g}" ${f.buy === g ? 'selected' : ''}>${esc(GOODS[g].name)}${toSel ? ` (${buyPrice(toSel, g)} G)` : ''}</option>`).join('')}</select></label>
+    <label>Danach verkaufen in <select data-field="f.to2"><option value="">nirgends, heimbringen</option>${markets.filter((s) => s.id !== f.to).map((s) => opt(s, f.to2, f.buy, false)).join('')}</select></label>
+    <label class="check"><input type="checkbox" data-field="f.repeat" ${f.repeat ? 'checked' : ''}> Wiederholen: feste Route, solange Fracht und Geld reichen</label>
+    ${planNote(pl)}
+    <button class="btn primary" data-act="ttrade" ${pl.ok ? '' : 'disabled'}>Losschicken</button>
+  </div>`;
+}
+function travelView() {
+  const list = trips();
+  const qs = G.s.quests.filter((q) => DELEGABLE[q.type] && q.state === 'aktiv');
+  const cand = travelCandidates();
+  const quests = qs.map((q) => {
+    const t = q.agent && list.find((x) => x.id === q.agent);
+    return `<article class="quest"><header><b>${esc(q.title)}</b>${swatch(q.faction)}<span class="muted">${esc(siteById(q.from).name)} · Frist Tag ${q.deadline}</span></header>
+      ${t ? `<p class="muted">Unterwegs: ${esc(t.label)}.</p>` : cand.length ? questForm(q) : ''}</article>`;
+  }).join('');
+  return `<p class="hint">Gefährten aus dem Gefolge oder der Garnison reisen für dich: Sie bringen Briefe und Lieferungen, stellen mit Begleitern eine Bande oder fahren als Händler über Land. Wer aus der Garnison aufbricht, nimmt Ware aus dem Burglager, wer bei dir ist, aus deiner Ladung. Unterwegs lauern Wegelagerer. Zurück kommen alle in die Garnison von ${esc(homeName())}. Für Aufträge, die andere erledigen, gibt es den halben Ruhm.</p>
+    <h3>Unterwegs</h3>
+    ${list.length ? list.map(tripRow).join('') : '<p class="muted">Niemand ist unterwegs.</p>'}
+    <h3>Aufträge abgeben</h3>
+    ${!cand.length ? '<p class="muted">Niemand ist frei, alle sind unterwegs, verwundet oder Kastellane.</p>' : ''}
+    ${qs.length ? `<div class="quests">${quests}</div>` : '<p class="muted">Keine Aufträge, die jemand für dich übernehmen könnte (Botengänge, Lieferungen und Banden).</p>'}
+    <h3>Handelsfahrt</h3>
+    ${cand.length ? tradeForm() : '<p class="muted">Niemand ist frei für eine Handelsfahrt.</p>'}
+    <p class="muted">Ein Wagen lädt ${WAGON} Stück. Am ersten Ziel wird die Fracht verkauft und mit allem Geld eingekauft; ein zweites Ziel verkauft das Eingekaufte, sonst kommt es ins Burglager.</p>`;
 }
 
 // ---------------------------------------------------------------- Aufträge
@@ -18362,7 +18890,9 @@ function questsPanel() {
   const list = G.s.quests.map((q) => {
     const t = questTarget(q);
     const state = q.state === 'erfuellt' ? `<span class="pill ally">Erledigt, Belohnung in ${esc(siteById(q.from).name)} abholen</span>` : '<span class="pill neutral">Aktiv</span>';
-    return questCard(q, `${state}<span class="muted">Ziel: ${esc(t.label)}, ${dirText(p, t)}</span><button class="btn" data-act="goto" data-q="${q.id}">Hinreisen</button><button class="btn danger sm" data-act="abandon" data-q="${q.id}">Aufgeben</button>`);
+    const tr = q.agent && trips().find((x) => x.id === q.agent);
+    const send = tr ? '<span class="pill friend">Ein Gefährte ist unterwegs</span>' : DELEGABLE[q.type] && q.state === 'aktiv' ? `<button class="btn" data-act="tsend" data-q="${q.id}">Jemanden schicken</button>` : '';
+    return questCard(q, `${state}<span class="muted">Ziel: ${esc(t.label)}, ${dirText(p, t)}</span><button class="btn" data-act="goto" data-q="${q.id}">Hinreisen</button>${send}<button class="btn danger sm" data-act="abandon" data-q="${q.id}">Aufgeben</button>`);
   }).join('');
   return {
     title: 'Aufträge', sub: `${G.s.quests.length} von 6 möglichen`, tabs: [],
@@ -18454,7 +18984,7 @@ function mapPanel() {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn.', tabs: [['map', 'Karte'], ['grafschaften', 'Grafschaften']],
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span><span><span class="dash"></span>Fähre</span></p>${eventList()}`,
+      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.closest('.mapwrap');
@@ -18638,6 +19168,7 @@ function helpPanel() {
         <li>Belagerungen, Schlachten und Turniere sind auf der Karte <b>markiert</b>, ein Pfeil am Bildrand zeigt die Richtung. Im <b>Feldlager</b> der Belagerer (<kbd>E</kbd>) oder in der belagerten Stadt wählst du deine Seite: den Verteidigern beistehen (durch die Pforte hinein, gemeinsam die Bresche halten, die Stadt dankt dir) oder den Belagerern dienen (du gibst das Zeichen zum Sturm und bekommst einen Beuteanteil).</li>
         <li><b>Burgen erobern:</b> Vor jeder Grafschaftsburg kannst du ein <b>Aufgebot</b> zusammenrufen (ab Ruhm 15): 12, 20 oder 30 Söldner mit Trebuchet, dazu dein Gefolge und Männer deiner Verbündeten, wenn sie mit den Herren der Burg verfeindet sind. Im Feldlager gibst du das Zeichen zum Sturm. Fällt die Burg, gehören dir Burg und Grafschaft, und die überlebenden Söldner bleiben als Besatzung. Zuerst wohl <b>Pontefract</b>: Dann gehört dir das West Riding, und der Vogt verlangt nichts mehr.</li>
         <li><b>Eroberte Burgen halten:</b> Setz einen Gefolgsmann als <b>Kastellan</b> ein (sonst führt ein gedungener Burgvogt die Burg, schlechter und gegen Lohn) und gib ihm eine Vorgabe: <i>Ausgewogen</i>, <i>Burg ausbauen</i> (Graben, Wehrgang, Torhaus, zuletzt ein Donjon, der die Burg zur Festung macht), <i>Holz erzeugen</i> (Fuhren nach Hause) oder <i>Verteidigung</i> (bis 30 Mann). Die früheren Herren greifen von Zeit zu Zeit an, und ihre Heere werden stärker. Bist du in der Nähe, kommt es zur Belagerung, bei der du hilfst; sonst entscheiden Mauern, Besatzung und Kastellan. Fällt die Burg, ist die Grafschaft fort, und der Kastellan schlägt sich verwundet heim.</li>
+        <li><b>Gefährten auf Reisen</b> (Gefolge, Reiter „Reisen &amp; Handel“, oder „Jemanden schicken“ bei einem Auftrag): Gefährten aus Gefolge oder Garnison bringen Briefe und Lieferungen, stellen mit bis zu zwei Begleitern eine Bande oder fahren als <b>Händler</b>: Fracht aus dem Burglager an einem Ort verkaufen, dort mit allem Geld einkaufen, das Eingekaufte heimbringen oder an einem zweiten Ort verkaufen. Mit „Wiederholen“ wird daraus eine <b>feste Route</b>. Unterwegs lauern Wegelagerer; die Tafel nennt Dauer, Zehrgeld, Gefahr und Aussicht. Erledigte Aufträge bringen Gold und Ansehen, aber nur den halben Ruhm. Alle kehren in die Garnison zurück; auf der Karte siehst du, wo sie gerade sind.</li>
         <li>Die Welt baut ständig: Auf Bauplätzen wachsen neue Häuser, anderswo brennt eines ab oder wird abgerissen und neu errichtet. Bricht in deiner Nähe ein <b>Feuer</b> aus, laufen alle mit Eimern herbei. Du kannst den <b>Wiederaufbau stiften</b>.</li>
         <li>Wer einen Ort <b>überfällt</b>, plündert Gold und Waren, doch danach liegt der Ort darnieder: Lange wird dort nichts gebaut, die Leute haben Angst, und wer Bewohner erschlägt, macht es schlimmer. Mit <b>Sühne</b> lässt sich das wiedergutmachen.</li>
         <li>Herolde kündigen <b>Turniere</b> an. Mit Pferd und Startgeld reitest du mit: Senke die Lanze (Leertaste oder Klick), wenn die Marke im goldenen Feld steht. Der Sieger gewinnt Gold und viel Ruhm.</li>
@@ -18775,6 +19306,11 @@ const ACTIONS = {
     confirmDialog(`${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
   },
   sabort: () => confirmDialog('Die Belagerung aufgeben? Die Söldner ziehen ab, das Handgeld ist fort.', 'Aufgeben', () => { abortOwnSiege(); closePanel(); }),
+  tquest: (d) => { const f = (G.ui.qf || {})[d.q] || {}; startTrip({ kind: 'auftrag', quest: Number(d.q), who: [f.who, f.e1, f.e2].filter(Boolean) }); },
+  ttrade: () => { const f = G.ui.form || {}; if (startTrip({ kind: 'handel', who: [f.who, f.e1].filter(Boolean), good: f.good, qty: f.qty === 'alle' ? 9999 : f.qty, budget: f.budget, to: f.to, buy: f.buy, to2: f.to2, repeat: f.repeat })) { G.ui.form = { qty: f.qty, budget: f.budget, repeat: false }; } },
+  tsend: () => { openPanel('party', null, 'reisen'); },
+  tstop: (d) => stopRoute(d.t),
+  trecall: (d) => recallTrip(d.t),
   hcast: (d) => { const u = G.s.companions.find((c) => c.id === Number(d.u)); if (u) appointCastellan(G.ui.arg, u); },
   hrecall: () => recallCastellan(G.ui.arg),
   horder: (d) => setHoldingOrder(G.ui.arg, d.o),
@@ -18817,6 +19353,16 @@ function initUI() {
     if (!f) return;
     f(b.dataset);
     if (b.dataset.act !== 'close' && G.ui.panel) refreshPanel();
+  });
+  // Formulare in Tafeln (Reisen & Handel): Auswahl merken und die Schätzung neu rechnen
+  byId('panel').addEventListener('change', (e) => {
+    const el = e.target.closest('[data-field]');
+    if (!el) return;
+    const parts = el.dataset.field.split('.');
+    const val = el.type === 'checkbox' ? el.checked : el.value;
+    if (parts[0] === 'f') (G.ui.form = G.ui.form || {})[parts[1]] = val;
+    else if (parts[0] === 'q') { const qf = (G.ui.qf = G.ui.qf || {}); (qf[parts[1]] = qf[parts[1]] || {})[parts[2]] = val; }
+    refreshPanel();
   });
   byId('dialog-yes').addEventListener('click', () => closeDialog(true));
   byId('dialog-no').addEventListener('click', () => closeDialog(false));
@@ -18918,6 +19464,7 @@ function saveSummary(data = readSave()) {
 
 // ===== main.js =====
 // Einstieg: Spielstart, Hauptschleife, Eingabe, Kamera.
+
 
 
 
@@ -19786,7 +20333,7 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, step: (dt) => { G.time += dt; step(dt); } };
 
 })();
 </script>

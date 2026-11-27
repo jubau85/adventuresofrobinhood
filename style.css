@@ -209,6 +209,14 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .action { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); }
 .action p { margin: 2px 0 0; font-size: 14px; color: var(--ink-soft); }
 .action .btn { flex: none; }
+/* Reisen & Handel: kleine Formulare */
+.trip-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 14px; align-items: end; padding: 10px 12px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); margin-bottom: 10px; }
+.trip-form label { display: flex; flex-direction: column; gap: 3px; font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); }
+.trip-form label.check { flex-direction: row; align-items: center; gap: 8px; grid-column: 1 / -1; }
+.trip-form select { font: inherit; font-size: 14px; color: var(--ink); background: var(--parchment-2); border: 1px solid var(--parchment-3); border-radius: 4px; padding: 5px 6px; min-width: 0; }
+.trip-form > p { grid-column: 1 / -1; margin: 0; font-size: 14px; }
+.trip-form > .btn { grid-column: 1 / -1; justify-self: start; }
+.action > div:first-child { min-width: 0; flex: 1; }
 
 .table-wrap { overflow-x: auto; }
 .market { width: 100%; border-collapse: collapse; font-family: var(--font-ui); font-size: 14px; font-variant-numeric: tabular-nums; }
