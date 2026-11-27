@@ -25,6 +25,7 @@
       "main.js",
       "preload.js",
       "relay.js",
+      "lan.js",
       "package.json",
       "build/icon.png"
     ],

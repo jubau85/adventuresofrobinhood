@@ -8,6 +8,7 @@
 //            Dateien daneben (kopiert), die Schriften lokal aus assets/schriften/ statt von Google Fonts.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, copyFileSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,7 +80,9 @@ function page(extern = []) {
   });
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   html = html.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}</style>`);
-  html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\n(function () {\n'use strict';\n${code}\n})();\n</script>`);
+  // Spielversion (aus dem Code): Partien im Heimnetz mit anderer Version lassen sich nicht betreten
+  const build = createHash('sha1').update(js).digest('hex').slice(0, 10);
+  html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\nwindow.__aktBuild = '${build}';\n(function () {\n'use strict';\n${code}\n})();\n</script>`);
   return { html, artBytes, kept };
 }
 const { html, artBytes } = page();

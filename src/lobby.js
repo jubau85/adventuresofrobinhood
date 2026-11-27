@@ -10,7 +10,7 @@ import { CHARGES, CHARGE_IDS, armsSVG, chargeSVG } from './heraldry.js';
 import { mpLobbyHost, mpLobbyJoin, mpLobbyChoose, mpLobbyStart, mpLobbyLeave, mpChat, lobbyView } from './mp.js';
 import { drawLobbyMap, lobbyMapPick, lobbyMapSeatPos } from './shiremap.js';
 
-let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null, lbHover = null, lbMapReq = 0;
+let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null, lbHover = null, lbMapReq = 0, lbLanOn = false, lbLanGames = [];
 const LOBBY_DIFF = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']];
 const isDesktop = () => !!(window.ritterDesktop && window.ritterDesktop.relay);
 
@@ -25,6 +25,39 @@ export function initLobby(h) {
   box.addEventListener('pointermove', onMapMove);
   box.addEventListener('pointerleave', () => { if (lbHover) { lbHover = null; mapSoon(); } }, true);
   window.addEventListener('resize', () => { if (!byId('lobby').hidden) mapSoon(); });
+  setInterval(lanTick, 1000);
+}
+
+// Heimnetz (nur Desktop-App): Wer mit eigenem Relais Gastgeber ist, ruft seine Partie aus; wer die Auswahl offen hat,
+// sieht die Partien der anderen und tritt mit einem Klick bei
+const desktopLan = () => (window.ritterDesktop && window.ritterDesktop.lan) || null;
+function lanTick() {
+  const L = desktopLan();
+  if (!L) return;
+  const mp = G.mp;
+  if (mp && mp.role === 'host' && G.mpLan && (mp.phase === 'lobby' || mp.phase === 'game')) {
+    const v = mp.phase === 'lobby' ? lobbyView() : null;
+    const players = v && v.players ? v.players.length : 1 + mp.peers.size;
+    const host = G.s && G.started ? G.s.player.name : (mp.profile && mp.profile.name) || '';
+    L.announce({ room: mp.room, host, players, phase: mp.phase, port: 8765, build: window.__aktBuild || 'dev' });
+    lbLanOn = true;
+  } else if (lbLanOn) { L.stop(); lbLanOn = false; }
+  if (lbStep === 'wahl' && !byId('lobby').hidden) {
+    const err = L.search();
+    lbLanGames = L.list();
+    renderLan(err);
+  }
+}
+function renderLan(err) {
+  const el = byId('lb-lan');
+  if (!el) return;
+  const build = window.__aktBuild || 'dev';
+  const html = lbLanGames.length ? lbLanGames.map((g, i) => {
+    const same = !g.build || g.build === build;
+    return `<div class="lb-lanrow"><div><b>„${esc(g.room)}“</b> bei ${esc(g.host || '?')}<span class="lb-sub">${g.players} Spieler · ${g.phase === 'game' ? 'läuft schon' : 'in der Lobby'} · ${g.local ? 'auf diesem PC' : esc(g.from)}${same ? '' : ' · andere Spielversion'}</span></div>
+      <button type="button" class="btn sm primary" data-lb="lanjoin" data-i="${i}" ${same ? '' : 'disabled'}>Beitreten</button></div>`;
+  }).join('') : `<p class="lb-sub">${err ? `Die Suche im Heimnetz geht gerade nicht (${esc(err)}).` : 'Suche nach Partien im Heimnetz …'}</p>`;
+  if (el.innerHTML !== html) el.innerHTML = html;
 }
 
 export function openLobby() {
@@ -63,7 +96,7 @@ function renderLobby() {
   lbSig = ''; lbSigArms = '';
   if (lbStep === 'wahl') {
     const hint = isDesktop()
-      ? 'Wer eröffnet, ist Gastgeber. Seine Mitspieler im Heimnetz tragen die Adresse ein, die ihm hier gleich angezeigt wird. Auf demselben PC (zweites Fenster) bleibt das Adressfeld leer.'
+      ? 'Wer eröffnet, ist Gastgeber. Partien im Heimnetz erscheinen von selbst in der Liste: ein Klick auf „Beitreten“ genügt. Von Hand geht es mit dem Namen der Partie und der Adresse, die der Gastgeber in seiner Lobby sieht; auf demselben PC (zweites Fenster) bleibt das Adressfeld leer.'
       : 'In dieser Browser-Fassung spielen zwei Fenster im selben Browser miteinander; das Adressfeld bleibt dann leer. Mit Freunden im Netz spielt ihr über die Desktop-App.';
     card.innerHTML = `
       <h2>Mehrspieler</h2>
@@ -76,6 +109,7 @@ function renderLobby() {
         </div>
         <div class="lb-col">
           <h3>Partie beitreten</h3>
+          ${isDesktop() ? '<div class="lb-field">Im Heimnetz gefunden<div class="lb-lan" id="lb-lan" aria-live="polite"><p class="lb-sub">Suche nach Partien im Heimnetz …</p></div></div><p class="lb-sub">Oder von Hand:</p>' : ''}
           <label class="lb-field">Name der Partie<input id="lb-room-join" value="burg" maxlength="32" autocomplete="off"></label>
           <label class="lb-field">Adresse des Gastgebers<input id="lb-addr" placeholder="${isDesktop() ? 'z. B. 192.168.1.20 – leer: dieser PC' : 'leer lassen'}" autocomplete="off"></label>
           <button type="button" class="btn primary" data-lb="join">Beitreten</button>
@@ -222,11 +256,18 @@ function onLobbyClick(e) {
     const url = isDesktop() ? lbHooks.desktopRelay() : '';
     mpLobbyHost({ room: roomName(byId('lb-room-host').value), kind: url ? 'relais' : 'kanal', url, lan: G.mpLan || null }, lbProfile, lobbyEvents);
     lbStep = 'lobby'; lbStatus = ''; renderLobby();
+    lanTick();
   } else if (act === 'join') {
     lbProfile = lbHooks.profile();
     let url = normAddr(byId('lb-addr').value);
     if (!url && isDesktop()) url = 'ws://127.0.0.1:8765';
     mpLobbyJoin({ room: roomName(byId('lb-room-join').value), kind: url ? 'relais' : 'kanal', url }, lbProfile, lobbyEvents);
+    lbStep = 'lobby'; lbStatus = ''; renderLobby();
+  } else if (act === 'lanjoin') {
+    const g = lbLanGames[Number(b.dataset.i)];
+    if (!g) return;
+    lbProfile = lbHooks.profile();
+    mpLobbyJoin({ room: g.room, kind: 'relais', url: `ws://${g.local ? '127.0.0.1' : g.from}:${g.port}` }, lbProfile, lobbyEvents);
     lbStep = 'lobby'; lbStatus = ''; renderLobby();
   } else if (act === 'ready') { const v = lobbyView(); mpLobbyChoose({ ready: !(v && v.me && v.me.ready) }); }
   else if (act === 'fig') mpLobbyChoose({ profile: { female: b.dataset.v === 'f' } });

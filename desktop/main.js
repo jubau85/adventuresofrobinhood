@@ -6,6 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { startRelay, lanAddresses } = require('./relay.js');
+const lan = require('./lan.js');
 
 // Im fertigen Paket liegt das Spiel neben der App unter resources/game (electron-builder extraResources)
 const GAME = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, 'game');
@@ -52,6 +53,11 @@ ipcMain.on('relay:start', (e, port) => {
     e.returnValue = { port: relay ? relay.port : null, addresses: lanAddresses(), error: relayErr };
   } catch (err) { e.returnValue = { error: err.message }; }
 });
+// Partien im Heimnetz ausrufen und finden (lan.js)
+ipcMain.on('lan:announce', (e, info) => { try { lan.announce(info || {}); } catch (err) { /* ohne Netz */ } });
+ipcMain.on('lan:stop', () => lan.stopAnnounce());
+ipcMain.on('lan:search', (e) => { try { e.returnValue = lan.search(); } catch (err) { e.returnValue = err.message; } });
+ipcMain.on('lan:list', (e) => { e.returnValue = lan.list(); });
 ipcMain.on('app:quit', () => app.quit());
 
 function createWindow() {
@@ -88,3 +94,4 @@ app.whenReady().then(() => {
   app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } });
 });
 app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => lan.stopAnnounce());

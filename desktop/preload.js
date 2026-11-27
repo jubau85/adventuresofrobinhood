@@ -10,5 +10,11 @@ contextBridge.exposeInMainWorld('ritterDesktop', {
   },
   info: () => ipcRenderer.sendSync('app:info'),
   relay: { start: (port) => ipcRenderer.sendSync('relay:start', port) },
+  lan: {
+    announce: (info) => ipcRenderer.send('lan:announce', info),
+    stop: () => ipcRenderer.send('lan:stop'),
+    search: () => ipcRenderer.sendSync('lan:search'),
+    list: () => ipcRenderer.sendSync('lan:list'),
+  },
   quit: () => ipcRenderer.send('app:quit'),
 });

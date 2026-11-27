@@ -41,9 +41,13 @@ Das Programmsymbol (`build/icon.png`) erzeugt `python3 -I ../tools/symbol.py bui
 ## Mehrspieler im Heimnetz (vor Steam)
 
 Im Startmenü öffnet **Mehrspieler …** die Lobby. Wer **eröffnet**, startet in der App ein kleines Relais (Port 8765)
-und ist Gastgeber; die Lobby nennt ihm die Adresse im Heimnetz, etwa `192.168.1.20`. Mitspieler wählen
-**Partie beitreten**, tragen denselben Namen der Partie und diese Adresse ein. In der Lobby stellt jeder seinen Ritter
+und ist Gastgeber. Seine Partie ruft die App jede Sekunde ins Heimnetz (UDP-Broadcast auf Port 8766, `lan.js`): Bei den
+Mitspielern erscheint sie unter **Partie beitreten → Im Heimnetz gefunden** mit Name, Gastgeber, Spielerzahl und Stand,
+und ein Klick auf **Beitreten** genügt. Partien einer anderen Spielversion sind gesperrt (die Welt würde nicht passen).
+Von Hand geht es weiterhin: denselben Namen der Partie und die Adresse eintragen, die die Lobby dem Gastgeber nennt,
+etwa `192.168.1.20`. In der Lobby stellt jeder seinen Ritter
 und sein Wappen ein, wählt die Grafschaft, über die er herrscht, und meldet sich bereit; der Gastgeber stellt die
 Schwierigkeit ein und klickt **Spiel starten**. Die
-Windows-Firewall fragt beim ersten Eröffnen, ob die App im Netz erreichbar sein darf. Auf einem Rechner zum
+Windows-Firewall fragt beim ersten Eröffnen und beim ersten Suchen, ob die App im Netz erreichbar sein darf: für
+private Netzwerke zulassen, sonst finden sich die Rechner nicht. Auf einem Rechner zum
 Ausprobieren: `npm start` und `npm run start:zweite`, im zweiten Fenster bleibt das Adressfeld leer.
