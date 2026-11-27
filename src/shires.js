@@ -7,6 +7,7 @@
 import { G, log, homeName, playerColor } from './state.js';
 import { FACTIONS, GEO } from './data.js';
 import { landAt } from './world.js';
+import { BARONS, isBaronOwner, ownerBaron, baronColor } from './barons.js';
 
 // Sitz (Burg) → Name der Grafschaft, Vorzug für ihren Herrn und Erklärung
 // goods: Waren täglich ins Burglager, gold: Gold täglich, def: Verteidigung der Burg, ruhm: Ruhm täglich,
@@ -151,9 +152,9 @@ export function shireState() {
 }
 export function shireOwner(id) { return (shireState()[id] || {}).owner || null; }
 export function ownedShires() { const st = shireState(); return Object.keys(SHIRES).filter((id) => st[id].owner === 'spieler'); }
-export function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
-export function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
-export function ownerColor(o) { return o === 'spieler' ? playerColor() : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
+export function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
+export function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+export function ownerColor(o) { return o === 'spieler' ? playerColor() : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
 
 // Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)
 export function shireTax(id) {

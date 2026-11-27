@@ -19,6 +19,7 @@ import { applyHoldings, isHeld, grantHolding, holdingOf, startOwnSiege, dailyHol
 import { callStorm } from './siege.js';
 import { startTrip, planTrip, updateTrips } from './travels.js';
 import { initWar, dailyWar, swearTo, takeSeat, war } from './war.js';
+import { initBarons, applyBarons, dailyBarons, DIFFICULTY, barons, declareFeud, changeBaronRel, baronConquered } from './barons.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, findLists, tourneyRects } from './tournament.js';
@@ -40,7 +41,7 @@ let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
 function newGame(opts) {
-  const { name, castleName, color, female, arms } = opts;
+  const { name, castleName, color, female, arms, difficulty } = opts;
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed);
   G.nextId = 1;
@@ -51,7 +52,7 @@ function newGame(opts) {
     x: site.x + 0.3, y: site.y + 2.6,
   });
   G.s = {
-    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
+    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
@@ -88,6 +89,8 @@ function startWorld() {
     G.s.worldSig = sig;
   }
   refreshCastleBlock();
+  // Die Barone: im neuen Spiel (oder einem Spielstand ohne sie) ihre Burgen anlegen, sonst Burgstufen übertragen
+  if (!G.s.barons) initBarons(); else applyBarons();
   applyDamage();
   applyHoldings();
   initWar();
@@ -159,12 +162,16 @@ function buildSetupForm() {
       if (!titleFemale && ni.value === 'Aelfgifu') ni.value = 'Aldric';
     });
   }
+  for (const r of document.querySelectorAll('input[name="schwierigkeit"]')) {
+    r.addEventListener('change', () => { if (r.checked && DIFFICULTY[r.value]) byId('diff-text').textContent = DIFFICULTY[r.value].text; });
+  }
   byId('setup-form').addEventListener('submit', (e) => {
     e.preventDefault();
     startAudio();
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
-    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms() });
+    const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
+    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' });
   });
 }
 
@@ -877,4 +884,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };

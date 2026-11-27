@@ -136,14 +136,43 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
 - Ende: Eine Seite hält alle Burgen ihres Ziels (der Stand zu Spielbeginn zählt nicht). Die Siegtafel gibt es, wenn
   es deine Seite ist; für Johann musst du selbst mindestens zwei Grafschaften halten.
 
-### Phase 6: Mehrspieler (2 bis 6)
+### Phase 6a: Schottland und ganz Irland (umgesetzt)
+- Karte 1536 × 1536 Felder bei gleichem Maßstab (rund 800 m je Feld): Nordrand 59° (Orkney), Westrand 11,2° West
+  (Kerry), alles um 416 Felder nach Osten und 512 nach Süden verschoben. MAP_K bleibt 2, MAP_AREA = 4 × 1,5.
+- Zwei neue Parteien: Schottische Krone (Grenzer, Heer König Wilhelms, +15 Verteidigung und bessere Preise in
+  Schottland als Verbündete) und Gälische Könige (Kerne, Aufgebot der Könige, kein Fährlohn nach Irland, +10
+  Verteidigung). In Irland halten Prinz Johns Barone Dublin, Meath, Ulster und Leinster.
+- Schottische Grafschaften sind von den englischen durch die Grenze getrennt (Solway bis Tweed).
+
+### Phase 6b: Computer-Barone (umgesetzt, barons.js)
+- Sechs Barone mit eigener Burg: Gwilym ap Rhys (Wales, Kriegsherr, für Richard), Malcolm von Glenarden (Schottland,
+  Kaufmann, für sich), Raoul de Montcabré (Normandie, Wendehals, für Philipp), Hugh de Ravensmere (Hampshire,
+  Baumeister, für Johann), Geoffrey von Kirkwold (bei Leicester, frommer Ritter, für Richard), Fergal Ó Duibhne
+  (Irland, Rebell, für sich). Mit dir sind es sieben Herren.
+- Ihre Burgen sind Burgen auf der Karte (Ort type 'burg' mit baron), mit derselben Turmburg-Anlage und denselben
+  gemalten Gebäuden auf denselben Bauplätzen wie deine. Burgstufe und Gebäude wachsen im Spiel.
+- Tageslauf je Baron: Einkommen (Grund 22 + 18 je Burgstufe, Markt, Felder, Werkstätten, Grafschaften, mal
+  Schwierigkeit) minus Sold (0,8 je Mann); dann ein bis zwei Vorhaben nach Gewichten seines Charakterzugs: bauen (auf die
+  Burg sparen, höchstens 3 + 3 × Burgstufe Gebäude), anwerben (14 Gold je Mann bis zur Obergrenze), Aufträge (Gold,
+  Ruhm), Handel (Gold; in deiner Nähe ziehen echte Handelszüge), Krieg (ab 30 Mann, alle 10 Tage: eine Grafschaft der
+  Gegenseite; Verteidigung 60/80 plus ein Viertel der Stärke ihrer Seite). Überschuss geht in Söldner oder Stiftungen.
+- Krieg: Barone mit Treueid stärken ihre Seite (12 % ihrer Kampfkraft, höchstens +25), ihre Grafschaften zählen für
+  sie. Der Wendehals wechselt zur stärkeren Seite.
+- Du und die Barone: Verhältnis −100 bis 100. Geschenk 120 Gold (+10), Bündnis ab 40 (Männer bei deinen Belagerungen,
+  Hilfe bei Angriffen), Fehde (du darfst seine Burg belagern, er zieht gegen deine Burgen; echte Belagerung, wenn du in
+  der Nähe bist), Frieden gegen Sühne. Fällt seine Burg, zahlt er Lösegeld, gibt dir seine Grafschaften und wird
+  Vasall (ein Viertel seines Einkommens als Tribut). Überfälle auf seine Handelszüge kosten 30, auf sein Heer 12.
+- Schwierigkeit beim neuen Spiel: Leicht (Einkommen ×0,62, Bauzeit ×1,5, Holzburg mit 2 Gebäuden, Fehde erst ab
+  Verhältnis −60 und Tag 30), Mittel (×0,9, ×1,15, 3 Gebäude, −45, Tag 18), Schwer (×1,25, ×0,85, Steinburg mit 4
+  Gebäuden, −25, Tag 10). Dazu „klug“: wie oft ein Baron das Vernünftigste tut (35 %, 60 %, 85 %).
+
+### Phase 7: Mehrspieler (2 bis 6)
 - Jeder beginnt in einer anderen Grafschaft mit einer Burgruine, wächst, schließt Bündnisse, handelt und führt
   Feldschlachten.
 - Technisch der größte Schritt: Es braucht einen Server (eine Artifact-Seite allein kann keine Echtzeitspiele
   verbinden), entweder mit maßgeblicher Simulation auf dem Server oder als Gleichschritt, bei dem alle Rechner
   dieselbe Simulation aus denselben Befehlen rechnen.
-- Vorbereitung schon im Einzelspiel: „Herren“ als eigene Einheiten im Spielstand (Gold, Burgen, Gefolge je Herr),
-  mit KI-Herren in anderen Grafschaften als Rivalen und Verbündete; alle Handlungen als Befehle; ein Zufallsgenerator
+- Vorbereitung: Die Barone (Phase 6b) sind schon „Herren“ im Spielstand; noch fehlen alle Handlungen als Befehle; ein Zufallsgenerator
   mit Startwert statt Math.random in der Simulation. Später übernehmen Menschen die KI-Herren.
 
 ## Ausbauplan

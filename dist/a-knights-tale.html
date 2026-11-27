@@ -478,6 +478,21 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 /* Kleines Wappen in Kopfzeilen */
 .arms-mini { display: inline-block; vertical-align: -6px; margin-right: 8px; }
 .arms-mini svg { display: block; }
+/* Barone: Rangliste und Audienz */
+.barons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.baron { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--parchment-3); border-radius: 4px; background: rgba(255,255,255,0.22); }
+.baron.mine { background: rgba(216,181,74,0.18); border-color: rgba(168,121,31,0.5); }
+.baron .rank { font-family: var(--font-ui); font-weight: 700; min-width: 1.6em; text-align: right; color: var(--ink-soft); }
+.baron-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.baron-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.baron-facts { font-size: 13px; color: var(--ink-soft); }
+.baron .score { font-family: var(--font-ui); font-weight: 700; font-size: 15px; min-width: 3em; text-align: right; }
+.baronrel { font-size: 13px; padding: 0 6px; border-radius: 8px; background: rgba(90,67,48,0.12); }
+.baronrel.good { background: rgba(63,107,47,0.22); }
+.baronrel.bad { background: rgba(154,47,42,0.22); }
+.baron-audience { display: flex; gap: 10px; align-items: flex-start; }
+.baron-audience p { margin: 0; }
+@media (max-width: 560px) { .baron { flex-wrap: wrap; } .baron .score { min-width: 0; } }
 </style>
 </head>
 <body>
@@ -538,9 +553,9 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
     <canvas id="title-art" aria-hidden="true"></canvas>
     <div class="title-wrap">
       <header class="title-head">
-        <p class="eyebrow">England und Frankreich, im Jahre des Herrn 1194</p>
+        <p class="eyebrow">England, Schottland, Irland und Frankreich, im Jahre des Herrn 1194</p>
         <h1>A Knight's Tale</h1>
-        <p class="intro">König Richard ist aus der Gefangenschaft frei, doch Prinz Johns Barone halten noch die Burgen. Jenseits des Kanals greift König Philipp nach der Normandie, die sächsischen Familien murren, in den Wäldern sammeln sich die Geächteten. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben.</p>
+        <p class="intro">König Richard ist aus der Gefangenschaft frei, doch Prinz Johns Barone halten noch die Burgen. Jenseits des Kanals greift König Philipp nach der Normandie, die sächsischen Familien murren, in den Wäldern sammeln sich die Geächteten. Sechs Barone von Wales bis Irland greifen nach Macht und Land. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben.</p>
       </header>
       <form class="title-card" id="setup-form" autocomplete="off" novalidate>
         <h2>Wer kehrt heim?</h2>
@@ -581,6 +596,14 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
           </div>
           <div class="preview"><canvas id="hero-preview" width="240" height="340" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         </div>
+        <fieldset class="field">
+          <legend>Schwierigkeit der Barone <span id="diff-text" class="muted">Die Barone wirtschaften gemächlich und lassen dich lange in Ruhe.</span></legend>
+          <div class="seg" id="diff-pick">
+            <label><input type="radio" name="schwierigkeit" value="leicht" checked><span>Leicht</span></label>
+            <label><input type="radio" name="schwierigkeit" value="mittel"><span>Mittel</span></label>
+            <label><input type="radio" name="schwierigkeit" value="schwer"><span>Schwer</span></label>
+          </div>
+        </fieldset>
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
@@ -600,21 +623,25 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 
 const TW = 64;            // Kachelbreite in Pixeln (isometrisch)
 const TH = 32;            // Kachelhöhe
-const MAP = 1024;         // Kartengröße in Kacheln (eine Kachel gut 800 m)
-// Maßstab gegenüber der Karte mit 512 Kacheln: Reichweiten zwischen Orten wachsen mit MAP_K, Anzahlen mit der Fläche
-const MAP_K = MAP / 512, MAP_AREA = MAP_K * MAP_K;
+const MAP = 1536;         // Kartengröße in Kacheln (eine Kachel gut 800 m)
+// Maßstab gegenüber der Karte mit 512 Kacheln: Reichweiten zwischen Orten wachsen mit MAP_K, Anzahlen mit der Fläche.
+// Seit Schottland und Irland dazugekommen sind, ist die Karte größer, der Maßstab der Kacheln aber derselbe: MAP_K bleibt 2,
+// die Landfläche ist um rund die Hälfte gewachsen.
+const MAP_K = 2, MAP_AREA = MAP_K * MAP_K * 1.5;
 const CHUNK = 8;          // Kacheln pro Render-Chunk
 const HMAX = 52;          // größte Geländehöhe in Pixeln
 const DAY_LEN = 240;      // Sekunden Echtzeit pro Spieltag
 const DAYS_PER_SEASON = 6;
 const SEASONS = ['Frühling', 'Sommer', 'Herbst', 'Winter'];
 const SAVE_KEY = 'a-knights-tale-v4';
-const SAVE_VERSION = 5;   // 5: Karte mit 1024 Kacheln
+const SAVE_VERSION = 6;   // 5: Karte mit 1024 Kacheln, 6: mit Schottland und Irland (1536 Kacheln)
 
-// Die Karte bildet England, Wales und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
-// Eine Kachel entspricht gut 800 m (bei MAP 1024). Längengrade sind mit cos(51,5°) gestaucht.
-const LAT_N = 55.3, LAT_S = 47.9;
-const GEO = { lonW: -6.4, latN: LAT_N, dLat: (LAT_N - LAT_S) / MAP, dLon: (LAT_N - LAT_S) / MAP / 0.6225 };
+// Die Karte bildet England, Wales, Schottland, Irland und Nordfrankreich ab. Kachel x zeigt nach Osten, y nach Süden.
+// Eine Kachel entspricht gut 800 m. Längengrade sind mit cos(51,5°) gestaucht. Gegenüber der Karte mit 1024 Kacheln liegt
+// alles um 416 Kacheln weiter östlich und 512 weiter südlich (westlicher und nördlicher Rand für Irland und Schottland).
+const LAT_N = 59.0, LAT_S = 47.9;
+const D_LAT = (LAT_N - LAT_S) / MAP, D_LON = D_LAT / 0.6225;
+const GEO = { lonW: -6.4 - 416 * D_LON, latN: LAT_N, dLat: D_LAT, dLon: D_LON };
 const KM_PER_TILE = GEO.dLat * 111.2;
 
 // Richtung nach der echten Himmelsrichtung (Kachel x = Osten, y = Süden), Entfernung in Meilen
@@ -627,8 +654,8 @@ function dirText(from, to) {
   const name = names[(Math.round(((a + 360) % 360) / 45)) % 8];
   return `${Math.round((d * KM_PER_TILE) / 1.609)} Meilen Richtung ${name}`;
 }
-// Maßstab gegenüber der ersten Fassung (320 Kacheln): Reichweiten in geo.js sind darauf bezogen
-const GEO_SCALE = MAP / 320;
+// Maßstab gegenüber der ersten Fassung (320 Kacheln für England): Reichweiten in geo.js sind darauf bezogen
+const GEO_SCALE = 3.2;
 function geoToTile(lon, lat) { return { x: (lon - GEO.lonW) / GEO.dLon, y: (GEO.latN - lat) / GEO.dLat }; }
 
 const T = { WATER: 0, GRASS: 1, FOREST: 2, HILLS: 3, ROAD: 4, FIELD: 5, BRIDGE: 6, SAND: 7 };
@@ -644,7 +671,7 @@ const FACTIONS = {
     ally: 'Sächsische Freisassen verstärken deine Burg (+20 Verteidigung), Anwerben kostet 20 % weniger.',
   },
   normannen: {
-    name: 'Normannische Barone', short: 'Normannen', color: '#a33b32', rivals: ['sachsen', 'waldleute'],
+    name: 'Normannische Barone', short: 'Normannen', color: '#a33b32', rivals: ['sachsen', 'waldleute', 'schotten', 'iren'],
     desc: 'Prinz Johns Gefolgsleute. Sie halten die Burgen, die Gerichte und die Steuerkassen.',
     ally: 'Der Vogt verlangt keine Abgaben mehr, Patrouillen lassen dich in Ruhe.',
   },
@@ -667,6 +694,16 @@ const FACTIONS = {
     name: 'Krone Frankreichs', short: 'Franzosen', color: '#3a56a8', rivals: ['normannen'],
     desc: 'König Philipp und seine Barone. Sie wollen die Normandie, solange Richard fern ist.',
     ally: 'Französische Häfen verlangen keinen Fährlohn, im Rittersaal melden sich Armbrustschützen.',
+  },
+  schotten: {
+    name: 'Schottische Krone', short: 'Schotten', color: '#2f8291', rivals: ['normannen'],
+    desc: 'König Wilhelm der Löwe, seine Earls und die Clans. Richard hat ihnen die Freiheit verkauft, aber Northumberland wollen sie noch immer.',
+    ally: 'Schottische Grenzer stärken deine Burg (+15 Verteidigung), auf schottischen Märkten kaufst und verkaufst du besser.',
+  },
+  iren: {
+    name: 'Gälische Könige', short: 'Iren', color: '#b8682c', rivals: ['normannen'],
+    desc: 'Die Ó Néill, Ó Conchobair, Ó Briain und Mac Cárthaigh. Sie halten den Westen Irlands gegen Prinz Johns Barone.',
+    ally: 'Irische Häfen verlangen keinen Fährlohn, irische Speerträger stärken deine Burg (+10 Verteidigung).',
   },
 };
 const FACTION_IDS = Object.keys(FACTIONS);
@@ -781,7 +818,7 @@ const GROUP_TYPES = {
   },
   patrouille: {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
-    gold: [25, 50], itemChance: 0.3, renown: 2, count: 9, spawn: 'patrol', realms: ['en', 'nd', 'wa'], speed: 1.24,
+    gold: [25, 50], itemChance: 0.3, renown: 2, count: 10, spawn: 'patrol', realms: ['en', 'nd', 'wa', 'ir'], realmFaction: { ir: 'normannen' }, speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
   },
   steuer: {
@@ -803,6 +840,16 @@ const GROUP_TYPES = {
     name: 'Sächsische Freisassen', nom: 'Sächsische Freisassen', acc: 'die sächsischen Freisassen', pl: true, faction: 'sachsen', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
     gold: [20, 50], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.24, realms: ['en', 'wa'], siteFaction: 'sachsen',
     kill: { sachsen: -14, normannen: 5 },
+  },
+  schotten: {
+    name: 'Schottische Grenzer', nom: 'Schottische Grenzer', acc: 'die schottischen Grenzer', pl: true, faction: 'schotten', members: [['freisasse', 2, 3], ['sachs_bogen', 0, 1]],
+    gold: [20, 55], itemChance: 0.3, renown: 2, count: 6, spawn: 'patrol', speed: 1.26, realms: ['sc'], siteFaction: 'schotten',
+    kill: { schotten: -14, normannen: 4 },
+  },
+  iren: {
+    name: 'Irische Kerne', nom: 'Irische Kerne', acc: 'die irischen Kerne', pl: true, faction: 'iren', members: [['waldmann', 1, 2], ['freisasse', 1, 2]],
+    gold: [15, 45], itemChance: 0.25, renown: 2, count: 5, spawn: 'patrol', speed: 1.3, realms: ['ir'], siteFaction: 'iren',
+    kill: { iren: -14, normannen: 4 },
   },
   // Heere für Schlacht-Ereignisse (je 50 Mann, bei wenig Leistung kleiner)
   heer_john: {
@@ -829,6 +876,18 @@ const GROUP_TYPES = {
     members: [['ritter_n', 6, 6], ['soldat', 20, 20], ['armbrust', 12, 12], ['soeldner', 12, 12]],
     gold: [300, 520], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['fr', 'fl', 'nd'],
     kill: { normannen: -14, franken: 12 },
+  },
+  heer_schotten: {
+    name: 'Das Heer König Wilhelms', nom: 'Das Heer König Wilhelms', acc: 'das Heer König Wilhelms', pl: false, faction: 'schotten', army: true,
+    members: [['thane', 5, 5], ['huskarl', 8, 8], ['freisasse', 20, 20], ['sachs_bogen', 12, 12], ['waldmann', 5, 5]],
+    gold: [260, 480], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['sc'],
+    kill: { schotten: -14, normannen: 10 },
+  },
+  heer_iren: {
+    name: 'Das Aufgebot der gälischen Könige', nom: 'Das Aufgebot der gälischen Könige', acc: 'das Aufgebot der gälischen Könige', pl: false, faction: 'iren', army: true,
+    members: [['thane', 4, 4], ['huskarl', 6, 6], ['freisasse', 18, 18], ['waldmann', 14, 14], ['sachs_bogen', 8, 8]],
+    gold: [220, 420], itemChance: 1, renown: 12, count: 0, spawn: 'army', speed: 1.05, realms: ['ir'],
+    kill: { iren: -14, normannen: 10 },
   },
   // Dein eigenes Aufgebot vor einer Grafschaftsburg (holdings.js); die Männer stellt startOwnSiege zusammen
   heer_spieler: {
@@ -1074,7 +1133,7 @@ const SETTLEMENTS = [
     desc: 'Die Insel in den Fens. Mönche, Aale und Schilf, so weit das Auge reicht.' },
   { id: 'oxford', name: 'Oxford', type: 'markt', faction: 'gilde', clear: 8, realm: 'en', lon: -1.26, lat: 51.75, produces: ['bier', 'wolle'], demands: ['wein', 'salz', 'fleisch', 'holz'],
     desc: 'Marktstadt an der Themse, wo neuerdings Magister Latein und Logik lehren.' },
-  { id: 'bristol', name: 'Bristol', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -2.59, lat: 51.45, produces: ['wein', 'felle', 'eisen'], demands: ['getreide', 'wolle', 'bier'],
+  { id: 'bristol', name: 'Bristol', type: 'stadt', faction: 'gilde', clear: 8, realm: 'en', lon: -2.59, lat: 51.45, port: true, produces: ['wein', 'felle', 'eisen'], demands: ['getreide', 'wolle', 'bier'],
     desc: 'Hafenstadt am Avon. Wein aus der Gascogne, Felle aus Irland.' },
   { id: 'winchester', name: 'Winchester', type: 'stadt', faction: 'normannen', clear: 8, realm: 'en', lon: -1.31, lat: 51.06, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Winchester', len: 4.8, central: 'stumpf' }], produces: ['wein', 'eisen'], demands: ['getreide', 'fleisch', 'wolle', 'holz'],
     desc: 'Die alte Königsstadt mit dem Schatz der Krone. Hier wird Richard ein zweites Mal gekrönt.' },
@@ -1113,7 +1172,7 @@ const SETTLEMENTS = [
     desc: 'Die Kathedrale am Ende der Welt. Zwei Pilgerfahrten hierher wiegen eine nach Rom auf.' },
   { id: 'brecon', name: 'Brecon', type: 'halle', faction: 'sachsen', clear: 6, realm: 'wa', lon: -3.39, lat: 51.95, produces: ['wolle', 'fleisch', 'felle'], demands: ['salz', 'eisen', 'wein'],
     desc: 'Halle eines walisischen Fürsten in den Bergen. Man spricht hier nicht gern Französisch.' },
-  { id: 'pembroke', name: 'Pembroke', type: 'burg', faction: 'normannen', clear: 7, realm: 'wa', lon: -4.92, lat: 51.67, produces: ['wolle', 'fleisch'], demands: ['wein', 'getreide', 'eisen'],
+  { id: 'pembroke', name: 'Pembroke', type: 'burg', faction: 'normannen', clear: 7, realm: 'wa', lon: -4.92, lat: 51.67, port: true, produces: ['wolle', 'fleisch'], demands: ['wein', 'getreide', 'eisen'],
     desc: 'Die Burg des Marschalls am Ende von Wales. Von hier segeln die Normannen nach Irland.' },
   { id: 'cardiff', name: 'Cardiff', type: 'burg', faction: 'normannen', clear: 7, realm: 'wa', lon: -3.18, lat: 51.48, produces: ['eisen', 'stein'], demands: ['getreide', 'wein', 'bier'],
     desc: 'Eine normannische Burg über dem Taff. Die walisischen Fürsten in den Bergen warten auf ihre Gelegenheit.' },
@@ -1165,6 +1224,115 @@ const SETTLEMENTS = [
     desc: 'Königspfalz am großen Forst. König Philipp jagt hier, wenn er nicht gerade Krieg führt.' },
   { id: 'provins', name: 'Provins', type: 'markt', faction: 'gilde', clear: 7, realm: 'fr', lon: 3.30, lat: 48.56, landmarks: [{ kind: 'tuchhalle', name: 'Messehalle von Provins' }], produces: ['wolle', 'wein', 'salz'], demands: ['felle', 'fleisch', 'eisen'],
     desc: 'Eine der Messestädte der Champagne. Kaufleute aus Italien und Flandern treffen sich hier unter dem Schutz des Grafen.' },
+  // ---------------- Schottland (König Wilhelm der Löwe; Richard hat den Schotten ihre Freiheit für Silber zurückverkauft)
+  { id: 'edinburgh', name: 'Edinburgh', type: 'stadt', cityR: 13, faction: 'schotten', clear: 8, realm: 'sc', lon: -3.19, lat: 55.95, landmarks: [{ kind: 'tower', name: 'Burg auf dem Felsen', grey: true }], produces: ['wolle', 'felle', 'salz'], demands: ['wein', 'getreide', 'eisen', 'holz'],
+    desc: 'Die Burg auf dem schwarzen Felsen und darunter die Häuser bis hinab nach Holyrood. Englische Truppen sind erst vor ein paar Jahren abgezogen.' },
+  { id: 'stirling', name: 'Stirling', type: 'burg', faction: 'schotten', clear: 7, realm: 'sc', lon: -3.95, lat: 56.125, castleLevel: 3, produces: ['stein', 'fleisch'], demands: ['wein', 'getreide', 'eisen'],
+    desc: 'Die Brücke über den Forth und die Burg darüber: Wer Stirling hält, hält den Schlüssel zu den Highlands.' },
+  { id: 'roxburgh', name: 'Roxburgh', type: 'burg', faction: 'schotten', clear: 7, realm: 'sc', lon: -2.45, lat: 55.59, produces: ['wolle', 'felle'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Königsburg zwischen Tweed und Teviot an der Grenze. Hier treffen schottische und englische Viehdiebe aufeinander.' },
+  { id: 'berwick', name: 'Berwick', type: 'markt', faction: 'gilde', clear: 7, realm: 'sc', lon: -2.02, lat: 55.78, port: true, produces: ['wolle', 'salz', 'fleisch'], demands: ['wein', 'eisen', 'holz'],
+    desc: 'Der reichste Hafen Schottlands an der Mündung des Tweed. Flämische Schiffe holen hier die Wolle der Abteien ab.' },
+  { id: 'melrose', name: 'Melrose', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -2.74, lat: 55.6, produces: ['wolle', 'bier'], demands: ['salz', 'wein', 'eisen'],
+    desc: 'Die große Zisterzienserabtei im Tweedtal. Ihre Schafherden sind die größten des ganzen Königreichs.' },
+  { id: 'glasgow', name: 'Glasgow', type: 'abtei', faction: 'kirche', clear: 7, realm: 'sc', lon: -4.24, lat: 55.865, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale des heiligen Mungo', len: 3.8, central: 'turm' }], produces: ['fleisch', 'bier'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Ein Bischofssitz am Clyde mit einem jungen Markt. Der Bischof baut eine neue Kathedrale über dem Grab des heiligen Mungo.' },
+  { id: 'ayr', name: 'Ayr', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -4.62, lat: 55.46, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'eisen', 'bier'],
+    desc: 'Ein junger Königsflecken an der Westküste, mit einer neuen Burg gegen die Herren von Galloway.' },
+  { id: 'dumfries', name: 'Dumfries', type: 'markt', faction: 'gilde', clear: 6, realm: 'sc', lon: -3.61, lat: 55.07, produces: ['wolle', 'felle'], demands: ['wein', 'salz', 'getreide'],
+    desc: 'Markt am Nith, wo die Leute aus Galloway ihr Vieh verkaufen. Man hört hier noch Gälisch.' },
+  { id: 'dunfermline', name: 'Dunfermline', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -3.46, lat: 56.07, landmarks: [{ kind: 'kathedrale', name: 'Abteikirche der Königin Margarete', len: 3.6, westTowers: 2 }], produces: ['bier', 'getreide'], demands: ['wein', 'salz', 'stein'],
+    desc: 'Die Benediktiner hüten hier die Gräber der schottischen Könige und der heiligen Königin Margarete.' },
+  { id: 'standrews', name: 'St Andrews', type: 'abtei', faction: 'kirche', clear: 7, realm: 'sc', lon: -2.8, lat: 56.335, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale des heiligen Andreas (im Bau)', len: 4.6, westTowers: 2, scaffold: true }], produces: ['wolle', 'fleisch'], demands: ['stein', 'wein', 'eisen'],
+    desc: 'Pilger kommen über das Meer zu den Gebeinen des Apostels. Die Bischöfe bauen die größte Kirche Schottlands.' },
+  { id: 'perth', name: 'Perth', type: 'markt', faction: 'gilde', clear: 7, realm: 'sc', lon: -3.44, lat: 56.395, produces: ['wolle', 'felle', 'getreide'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Die Stadt am Tay, bis wohin die Schiffe fahren. Nebenan in Scone werden die Könige auf dem Schicksalsstein gekrönt.' },
+  { id: 'dundee', name: 'Dundee', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -2.97, lat: 56.465, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'holz', 'bier'],
+    desc: 'Fischer und Kaufleute an der Mündung des Tay. Der Bruder des Königs hat hier eine Kirche gestiftet.' },
+  { id: 'dunkeld', name: 'Dunkeld', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -3.59, lat: 56.565, produces: ['holz', 'felle'], demands: ['getreide', 'salz', 'wein'],
+    desc: 'Ein alter Bischofssitz am Tor zu den Highlands, wo der Tay aus den Bergen kommt.' },
+  { id: 'aberdeen', name: 'Aberdeen', type: 'markt', faction: 'gilde', clear: 7, realm: 'sc', lon: -2.1, lat: 57.15, port: true, produces: ['fleisch', 'felle', 'salz'], demands: ['getreide', 'wein', 'eisen', 'bier'],
+    desc: 'Hafen zwischen Dee und Don. Kaufleute aus Norwegen und Flandern handeln hier Lachs und Felle.' },
+  { id: 'kinloss', name: 'Kinloss', type: 'abtei', faction: 'kirche', clear: 6, realm: 'sc', lon: -3.56, lat: 57.63, produces: ['getreide', 'bier'], demands: ['salz', 'eisen', 'wein'],
+    desc: 'Eine Zisterzienserabtei an der Küste von Moray, gestiftet von König David, mit Gärten und Obstbäumen.' },
+  { id: 'inverness', name: 'Inverness', type: 'burg', faction: 'schotten', clear: 7, realm: 'sc', lon: -4.23, lat: 57.475, produces: ['felle', 'holz'], demands: ['getreide', 'wein', 'eisen', 'salz'],
+    desc: 'Die Königsburg an der Mündung der Ness, der letzte feste Platz des Königs. Dahinter beginnen die Länder der Clans.' },
+  { id: 'dornoch', name: 'Dornoch', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -4.03, lat: 57.88, produces: ['fleisch', 'felle'], demands: ['getreide', 'salz', 'eisen'],
+    desc: 'Ein Dorf am Firth im Land Sutherland. Nördlich davon herrschen die Jarle von Orkney.' },
+  { id: 'thurso', name: 'Thurso', type: 'dorf', faction: 'schotten', clear: 6, realm: 'sc', lon: -3.53, lat: 58.585, produces: ['fleisch', 'salz'], demands: ['getreide', 'holz', 'eisen'],
+    desc: 'Am Rand der Welt: ein nordischer Fischerort in Caithness. Hier spricht man mehr Norwegisch als Gälisch.' },
+  { id: 'inverlochy', name: 'Inverlochy', type: 'halle', faction: 'schotten', clear: 6, realm: 'sc', lon: -5.08, lat: 56.83, produces: ['felle', 'fleisch', 'holz'], demands: ['salz', 'getreide', 'wein'],
+    desc: 'Die Halle eines Clanherrn am Fuß des Ben Nevis. Hier gilt das Wort des Clans mehr als das des Königs.' },
+  { id: 'dunstaffnage', name: 'Dunstaffnage', type: 'halle', faction: 'schotten', clear: 6, realm: 'sc', lon: -5.42, lat: 56.45, produces: ['fleisch', 'felle'], demands: ['eisen', 'wein', 'getreide'],
+    desc: 'Die Seefeste der Herren von Lorn, Nachkommen des großen Somerled. Ihre Galeeren beherrschen die Inseln.' },
+  { id: 'leadhills', name: 'Bleigruben von Leadhills', type: 'mine', ore: 'blei', faction: 'schotten', clear: 4, realm: 'sc', lon: -3.76, lat: 55.43, produces: ['blei', 'silber'], demands: ['getreide', 'bier', 'fleisch'],
+    desc: 'Gruben hoch in den Lowther Hills. Die Mönche von Newbattle waschen hier Blei und ein wenig Silber.' },
+  { id: 'ettrick', name: 'Lager im Ettrick Forest', type: 'lager', faction: 'waldleute', clear: 3, realm: 'sc', lon: -3.12, lat: 55.43, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
+    desc: 'Im königlichen Jagdforst zwischen den Grenzhügeln verstecken sich Geächtete beider Reiche.' },
+  { id: 'whithorn', name: 'Höhle des heiligen Ninian', type: 'einsiedelei', feature: 'hoehle', faction: 'kirche', clear: 3, realm: 'sc', lon: -4.48, lat: 54.71, produces: [], demands: [],
+    desc: 'Eine Höhle an der Küste von Galloway, in der der heilige Ninian betete. Pilger ritzen Kreuze in den Fels.' },
+  { id: 'clava', name: 'Steingräber von Clava', type: 'einsiedelei', feature: 'grab', faction: 'kirche', clear: 3, realm: 'sc', lon: -4.07, lat: 57.46, produces: [], demands: [],
+    desc: 'Runde Steinhügel im Kreis aufrechter Steine. Die Alten sagen, darunter schlafen die Feen.' },
+  // ---------------- Irland (Prinz John ist Herr von Irland; die gälischen Könige halten den Westen)
+  { id: 'dublin', name: 'Dublin', type: 'stadt', cityR: 14, faction: 'normannen', clear: 8, realm: 'ir', lon: -6.27, lat: 53.345, port: true, landmarks: [{ kind: 'kathedrale', name: 'Christ Church', len: 4.0, central: 'turm' }], produces: ['felle', 'fleisch', 'salz'], demands: ['wein', 'eisen', 'getreide', 'wolle'],
+    desc: 'Die alte Stadt der Nordmänner an der Liffey, heute in normannischer Hand. Prinz John hat sie den Bürgern von Bristol gegeben.' },
+  { id: 'drogheda', name: 'Drogheda', type: 'dorf', faction: 'normannen', clear: 6, realm: 'ir', lon: -6.36, lat: 53.71, produces: ['getreide', 'fleisch'], demands: ['salz', 'eisen', 'wein'],
+    desc: 'Ein normannischer Brückenort an der Mündung der Boyne. Getreide aus Meath geht hier aufs Schiff.' },
+  { id: 'trim', name: 'Trim', type: 'burg', faction: 'normannen', clear: 7, realm: 'ir', lon: -6.79, lat: 53.553, castleLevel: 3, produces: ['getreide', 'stein'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Der gewaltige Bergfried der de Lacys an der Boyne: die größte Burg Irlands, mitten im fruchtbaren Meath.' },
+  { id: 'carrickfergus', name: 'Carrickfergus', type: 'burg', faction: 'normannen', clear: 7, realm: 'ir', lon: -5.81, lat: 54.715, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'wein', 'eisen'],
+    desc: 'Die Burg des John de Courcy auf dem Felsen am Belfast Lough. Er hat Ulster auf eigene Faust erobert.' },
+  { id: 'downpatrick', name: 'Downpatrick', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -5.72, lat: 54.33, landmarks: [{ kind: 'kathedrale', name: 'Kathedrale von Down', len: 3.4, central: 'turm' }], produces: ['bier', 'fleisch'], demands: ['salz', 'wein', 'eisen'],
+    desc: 'Hier sollen der heilige Patrick, Brigid und Columba begraben liegen. De Courcy hat die Gebeine feierlich erhoben.' },
+  { id: 'armagh', name: 'Armagh', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -6.65, lat: 54.35, landmarks: [{ kind: 'rundturm_ir', name: 'Rundturm von Armagh' }], produces: ['wolle', 'bier'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Der Sitz des Nachfolgers des heiligen Patrick, Haupt aller Kirchen Irlands. Gelehrte kommen von weit her.' },
+  { id: 'dungannon', name: 'Tullyhogue', type: 'halle', faction: 'iren', clear: 6, realm: 'ir', lon: -6.77, lat: 54.58, produces: ['fleisch', 'felle', 'wolle'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Die Halle der Ó Néill beim Krönungshügel von Tír Eoghain. Ihre Könige weichen keinem Normannen.' },
+  { id: 'donegal', name: 'Donegal', type: 'halle', faction: 'iren', clear: 6, realm: 'ir', lon: -8.1, lat: 54.655, produces: ['fleisch', 'felle'], demands: ['wein', 'salz', 'getreide'],
+    desc: 'Die Festung der Fremden an der Mündung des Eske, heute Halle der Ó Domhnaill von Tír Chonaill.' },
+  { id: 'galway', name: 'Galway', type: 'burg', faction: 'iren', clear: 7, realm: 'ir', lon: -9.05, lat: 53.28, produces: ['fleisch', 'felle', 'salz'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Burg der Ó Conchobair an der Mündung der Corrib, Bollwerk der Könige von Connacht gegen die Normannen.' },
+  { id: 'clonmacnoise', name: 'Clonmacnoise', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -7.99, lat: 53.325, landmarks: [{ kind: 'rundturm_ir', name: 'Rundturm von Clonmacnoise' }], produces: ['bier', 'wolle'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Die Klosterstadt am Shannon mit ihren Hochkreuzen und Rundtürmen. Hier liegen die Könige von Connacht begraben.' },
+  { id: 'kilkenny', name: 'Kilkenny', type: 'burg', faction: 'normannen', clear: 7, realm: 'ir', lon: -7.25, lat: 52.655, produces: ['getreide', 'wolle'], demands: ['wein', 'eisen', 'salz'],
+    desc: 'Die Burg des Marschalls über der Nore, Herz der Herrschaft Leinster. Um sie herum wächst eine Stadt.' },
+  { id: 'wexford', name: 'Wexford', type: 'dorf', faction: 'normannen', clear: 6, realm: 'ir', lon: -6.47, lat: 52.34, port: true, produces: ['fleisch', 'salz'], demands: ['getreide', 'eisen', 'bier'],
+    desc: 'Hier landeten die ersten Normannen. Der Hafen der Nordmänner liegt im Schutz der Sandbänke.' },
+  { id: 'waterford', name: 'Waterford', type: 'markt', faction: 'gilde', clear: 7, realm: 'ir', lon: -7.11, lat: 52.258, port: true, landmarks: [{ kind: 'rundturm', name: 'Reginalds Turm' }], produces: ['wein', 'salz', 'felle'], demands: ['wolle', 'getreide', 'eisen'],
+    desc: 'Die Hafenstadt am Suir mit dem runden Turm der Nordmänner. Hier hat Strongbow die Königstochter Aoife geheiratet.' },
+  { id: 'cashel', name: 'Cashel', type: 'abtei', faction: 'kirche', clear: 6, realm: 'ir', lon: -7.885, lat: 52.52, landmarks: [{ kind: 'rundturm_ir', name: 'Fels von Cashel' }], produces: ['wolle', 'getreide'], demands: ['wein', 'salz', 'eisen'],
+    desc: 'Auf dem Felsen der alten Könige von Munster stehen heute die Kapelle des Cormac und der Sitz eines Erzbischofs.' },
+  { id: 'cork', name: 'Cork', type: 'markt', faction: 'gilde', clear: 7, realm: 'ir', lon: -8.47, lat: 51.895, port: true, produces: ['fleisch', 'felle', 'salz'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Stadt auf den Inseln im Sumpf des Lee. Normannische Ritter halten sie gegen die Könige von Desmond.' },
+  { id: 'killarney', name: 'Lough Léin', type: 'halle', faction: 'iren', clear: 6, realm: 'ir', lon: -9.5, lat: 52.06, produces: ['fleisch', 'felle', 'holz'], demands: ['salz', 'wein', 'eisen'],
+    desc: 'Am See unter den höchsten Bergen Irlands hält der Mac Cárthaigh Mór von Desmond Hof.' },
+  { id: 'limerick', name: 'Limerick', type: 'burg', faction: 'iren', clear: 7, realm: 'ir', lon: -8.625, lat: 52.67, produces: ['fleisch', 'salz', 'felle'], demands: ['wein', 'eisen', 'getreide'],
+    desc: 'Die Königsstadt der Ó Briain am Shannon. Der alte König Domnall hat sie lieber angezündet, als sie den Normannen zu lassen.' },
+  { id: 'silvermines', name: 'Silbergruben von Ormond', type: 'mine', ore: 'silber', faction: 'iren', clear: 4, realm: 'ir', lon: -8.24, lat: 52.8, produces: ['silber', 'blei'], demands: ['getreide', 'bier', 'fleisch'],
+    desc: 'Alte Gruben in den Bergen über dem Lough Derg. Wer hier gräbt, zahlt dem König von Thomond seinen Teil.' },
+  { id: 'wicklow', name: 'Lager in den Wicklow-Bergen', type: 'lager', faction: 'waldleute', clear: 3, realm: 'ir', lon: -6.55, lat: 52.88, produces: ['holz', 'fleisch', 'felle'], demands: ['getreide', 'salz', 'bier'],
+    desc: 'In den Tälern der Berge sitzen Vertriebene, die von hier aus die Höfe um Dublin heimsuchen.' },
+  { id: 'newgrange', name: 'Hügel von Brú na Bóinne', type: 'einsiedelei', feature: 'grab', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.48, lat: 53.695, produces: [], demands: [],
+    desc: 'Ein riesiger Grabhügel mit weißen Steinen an der Boyne. Die Iren sagen, hier wohnt der Gott Aengus.' },
+  { id: 'glendalough', name: 'Klause des heiligen Kevin', type: 'einsiedelei', feature: 'hoehle', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.33, lat: 53.01, produces: [], demands: [],
+    desc: 'Im Tal der zwei Seen lebte der heilige Kevin in einer Felsenhöhle. Noch immer kommen Einsiedler hierher.' },
+  { id: 'tara', name: 'Hügel von Tara', type: 'einsiedelei', feature: 'steine', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.61, lat: 53.58, produces: [], demands: [],
+    desc: 'Der Sitz der alten Hochkönige. Auf dem Hügel steht der Stein des Schicksals, der aufschreit, wenn der wahre König ihn berührt.' },
+  { id: 'kildare', name: 'Quelle der heiligen Brigid', type: 'einsiedelei', feature: 'quelle', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.93, lat: 53.15, produces: [], demands: [],
+    desc: 'Bei Kildare entspringt die Quelle der heiligen Brigid. Die Nonnen hüten dort ein Feuer, das nie erlischt.' },
+  // ---------------- Die Burgen der sechs Barone (barons.js): Ihre Burgstufe und Gebäude wachsen im Spiel
+  { id: 'garw', name: 'Castell Garw', type: 'burg', baron: 'gwilym', faction: 'sachsen', clear: 9, realm: 'wa', lon: -3.45, lat: 52.55, produces: ['wolle', 'fleisch', 'felle'], demands: ['wein', 'eisen', 'salz', 'getreide'],
+    desc: 'Die Burg des Gwilym ap Rhys in den Bergen von Powys. Von hier sieht man die Täler, in denen die Marcher-Barone ihre Leute verloren haben.' },
+  { id: 'glenarden', name: 'Glenarden', type: 'burg', baron: 'malcolm', faction: 'schotten', clear: 9, realm: 'sc', lon: -3.95, lat: 56.45, produces: ['felle', 'wolle', 'holz'], demands: ['wein', 'getreide', 'eisen', 'salz'],
+    desc: 'Die Burg Malcolms am Rand der Highlands, wo die Händler aus Perth die Felle der Clans kaufen.' },
+  { id: 'montcabre', name: 'Montcabré', type: 'burg', baron: 'raoul', faction: 'normannen', clear: 9, realm: 'nd', lon: 0.45, lat: 49.15, produces: ['getreide', 'wein', 'stein'], demands: ['eisen', 'wolle', 'salz', 'fleisch'],
+    desc: 'Die Burg des Raoul de Montcabré im Lieuvin. Französische Boten gehen hier ein und aus, sagt man.' },
+  { id: 'ravensmere', name: 'Ravensmere', type: 'burg', baron: 'hugh', faction: 'normannen', clear: 9, realm: 'en', lon: -1.45, lat: 51.3, produces: ['stein', 'wolle', 'getreide'], demands: ['wein', 'eisen', 'salz', 'holz'],
+    desc: 'Die Burg des Hugh de Ravensmere in Hampshire, umgeben von Steinbrüchen und Gerüsten. Er baut immer an irgendetwas.' },
+  { id: 'kirkwold', name: 'Kirkwold', type: 'burg', baron: 'geoffrey', faction: 'sachsen', clear: 9, realm: 'en', lon: -1.1, lat: 52.6, produces: ['getreide', 'bier', 'wolle'], demands: ['wein', 'eisen', 'salz', 'stein'],
+    desc: 'Die Burg Geoffreys von Kirkwold zwischen Charnwood und den Kornfeldern von Leicester. Hier wird mehr gebetet als gezecht.' },
+  { id: 'rathcarraig', name: 'Rathcarraig', type: 'burg', baron: 'fergal', faction: 'iren', clear: 9, realm: 'ir', lon: -7.5, lat: 53.2, produces: ['fleisch', 'felle', 'holz'], demands: ['wein', 'eisen', 'salz', 'getreide'],
+    desc: 'Die Burg des Fergal Ó Duibhne in den Mittellanden, auf einem alten Ringwall gebaut. Normannen sind hier nicht willkommen.' },
 ];
 
 // Fähren zwischen den Häfen: Kosten in Gold je Person, Dauer in Stunden
@@ -1172,6 +1340,9 @@ const FERRIES = [
   { a: 'dover', b: 'calais', cost: 4, hours: 5, ship: 'Fährschiff' },
   { a: 'portsmouth', b: 'barfleur', cost: 7, hours: 12, ship: 'Kogge' },
   { a: 'london', b: 'brugge', cost: 9, hours: 20, ship: 'Wollschiff' },
+  { a: 'pembroke', b: 'waterford', cost: 7, hours: 14, ship: 'Kogge' },
+  { a: 'bristol', b: 'dublin', cost: 10, hours: 30, ship: 'Weinschiff' },
+  { a: 'carrickfergus', b: 'ayr', cost: 5, hours: 9, ship: 'Galeere' },
 ];
 
 // Sehenswürdigkeiten: Wer sie zum ersten Mal besucht, gewinnt Ruhm
@@ -1187,11 +1358,17 @@ const REGIONS = [
   { name: 'ENGLAND', lon: -1.2, lat: 52.3, size: 1.3 }, { name: 'WALES', lon: -3.7, lat: 52.35, size: 1 },
   { name: 'NORMANDIE', lon: 0.2, lat: 49.0, size: 1 }, { name: 'FRANKREICH', lon: 2.9, lat: 48.6, size: 1.3 },
   { name: 'FLANDERN', lon: 3.2, lat: 50.75, size: 0.9 }, { name: 'BRETAGNE', lon: -3.1, lat: 48.25, size: 0.9 },
-  { name: 'IRLAND', lon: -6.36, lat: 53.15, size: 0.8, align: 'left' }, { name: 'SCHOTTLAND', lon: -3.9, lat: 55.18, size: 0.8 },
+  { name: 'IRLAND', lon: -8.1, lat: 53.05, size: 1.3 }, { name: 'SCHOTTLAND', lon: -4.3, lat: 57.0, size: 1.3 },
+  { name: 'HIGHLANDS', lon: -5.0, lat: 57.75, size: 0.8 }, { name: 'ULSTER', lon: -6.9, lat: 54.7, size: 0.8 }, { name: 'CONNACHT', lon: -9.0, lat: 53.75, size: 0.8 },
+  { name: 'MUNSTER', lon: -8.9, lat: 52.3, size: 0.8 }, { name: 'LEINSTER', lon: -6.95, lat: 52.95, size: 0.8 },
+  { name: 'Atlantik', lon: -10.2, lat: 55.6, size: 1.1, sea: true }, { name: 'Nordsee', lon: -0.8, lat: 57.2, size: 1.1, sea: true },
   { name: 'Ärmelkanal', lon: -2.3, lat: 50.05, size: 0.9, sea: true }, { name: 'Nordsee', lon: 2.6, lat: 53.6, size: 1.1, sea: true },
-  { name: 'Irische See', lon: -4.6, lat: 53.7, size: 0.8, sea: true }, { name: 'Atlantik', lon: -5.6, lat: 49.2, size: 0.9, sea: true },
+  { name: 'Irische See', lon: -5.0, lat: 53.75, size: 0.9, sea: true }, { name: 'Atlantik', lon: -5.6, lat: 49.2, size: 0.9, sea: true },
 ];
 
+// Hallen heißen je nach Land anders
+const HALL_NAME = { en: 'Sächsische Halle', wa: 'Walisische Fürstenhalle', sc: 'Halle eines Clanherrn', ir: 'Halle eines irischen Königs' };
+function siteTypeName(s) { return s.baron ? 'Burg eines Barons' : s.type === 'halle' && HALL_NAME[s.realm] ? HALL_NAME[s.realm] : TYPE_NAME[s.type]; }
 const TYPE_NAME = {
   spieler: 'Dein Burgstall', stadt: 'Stadt', markt: 'Marktflecken', halle: 'Sächsische Halle', burg: 'Burg',
   abtei: 'Abtei', lager: 'Lager', dorf: 'Dorf', mine: 'Erzgrube', einsiedelei: 'Mystischer Ort',
@@ -1214,7 +1391,7 @@ const LOOKS = {
   moench: { tunic: '#6a5240', trim: '#3a2c22', hood: '#5c4636' },
 };
 // Livree der Bewaffneten je Partei: kräftig, damit man die Seiten im Gewühl unterscheidet (Waffenrock und Ring am Boden)
-const LIVERY = { normannen: '#d2382a', sachsen: '#3f9e32', franken: '#2c62d6', waldleute: '#8a9a2a', gilde: '#a052d0', kirche: '#e0c25a' };
+const LIVERY = { normannen: '#d2382a', sachsen: '#3f9e32', franken: '#2c62d6', waldleute: '#8a9a2a', gilde: '#a052d0', kirche: '#e0c25a', schotten: '#1fa2b4', iren: '#e8822c' };
 // Wappenfarben zur Wahl im Startmenü
 const HERALDRY = [
   { id: 'blau', name: 'Königsblau', color: '#2c4f86' },
@@ -1240,7 +1417,7 @@ const EPITHETS = ['Langbein', 'Eisenhand', 'vom Moor', 'aus Wetherby', 'von der 
 // Geografie der Karte: Küsten, Flüsse, Bergland und Wälder als Längen- und Breitengrade.
 // Die Umrisse sind von Hand vereinfacht. Der Generator rastert sie und verwirbelt die Küste etwas.
 
-// Großbritannien (mit Anglesey), im Uhrzeigersinn ab der schottischen Westküste am Nordrand
+// Großbritannien (mit Anglesey und ganz Schottland), im Uhrzeigersinn ab der Küste von Ayrshire
 const COAST_GB = [
   [-4.75, 55.6], [-4.62, 55.45], [-4.86, 55.24], [-5.01, 55.1], [-5.05, 54.98], [-5.16, 55.0], [-5.12, 54.84],
   [-4.98, 54.7], [-4.86, 54.63], [-4.84, 54.8], [-4.82, 54.87], [-4.62, 54.78], [-4.4, 54.68], [-4.4, 54.86],
@@ -1272,14 +1449,51 @@ const COAST_GB = [
   [-0.45, 53.69], [-0.62, 53.7], [-0.55, 53.735], [-0.33, 53.745], [-0.1, 53.68], [0.12, 53.58], [0.03, 53.73],
   [-0.16, 53.91], [-0.19, 54.08], [-0.07, 54.12], [-0.4, 54.28], [-0.61, 54.49], [-0.97, 54.59], [-1.15, 54.64],
   [-1.3, 54.78], [-1.37, 54.91], [-1.42, 55.02], [-1.51, 55.18], [-1.57, 55.33], [-1.62, 55.6],
+  // Schottland: Ostküste mit Forth, Tay und Moray Firth, Nordküste, Westküste mit Loch Linnhe, Kintyre und dem Firth of Clyde
+  [-1.78, 55.67], [-1.98, 55.76], [-2.13, 55.92], [-2.42, 55.99], [-2.55, 56.01], [-2.72, 56.06], [-2.86, 56.02],
+  [-3.02, 55.95], [-3.2, 55.985], [-3.4, 55.99], [-3.6, 56.01], [-3.75, 56.04], [-3.83, 56.08], [-3.7, 56.075],
+  [-3.45, 56.03], [-3.3, 56.06], [-3.15, 56.11], [-3.0, 56.18], [-2.83, 56.19], [-2.6, 56.26], [-2.78, 56.34],
+  [-2.83, 56.43], [-2.95, 56.44], [-3.12, 56.39], [-3.3, 56.36], [-3.25, 56.395], [-3.05, 56.45], [-2.92, 56.46],
+  [-2.75, 56.49], [-2.58, 56.56], [-2.47, 56.7], [-2.32, 56.85], [-2.2, 56.96], [-2.07, 57.12], [-2.0, 57.3],
+  [-1.82, 57.45], [-1.83, 57.6], [-2.0, 57.7], [-2.3, 57.69], [-2.52, 57.67], [-2.85, 57.7], [-3.1, 57.68],
+  [-3.3, 57.72], [-3.5, 57.71], [-3.65, 57.66], [-3.88, 57.59], [-4.05, 57.57], [-4.2, 57.5], [-4.35, 57.49],
+  [-4.25, 57.53], [-4.1, 57.58], [-4.0, 57.67], [-3.85, 57.75], [-3.77, 57.86], [-3.95, 57.83], [-4.05, 57.81],
+  [-4.3, 57.86], [-4.05, 57.89], [-3.98, 57.97], [-3.85, 58.02], [-3.65, 58.12], [-3.43, 58.25], [-3.27, 58.33],
+  [-3.08, 58.44], [-3.05, 58.55], [-3.02, 58.64], [-3.12, 58.64], [-3.37, 58.67], [-3.52, 58.6], [-3.8, 58.58],
+  [-4.02, 58.58], [-4.25, 58.55], [-4.42, 58.53], [-4.6, 58.57], [-4.7, 58.5], [-4.78, 58.57], [-5.0, 58.62],
+  [-5.08, 58.5], [-5.12, 58.42], [-5.2, 58.35], [-5.37, 58.25], [-5.27, 58.15], [-5.42, 58.08], [-5.25, 57.97],
+  [-5.17, 57.9], [-5.4, 57.88], [-5.62, 57.92], [-5.6, 57.82], [-5.82, 57.86], [-5.72, 57.72], [-5.82, 57.6],
+  [-5.7, 57.56], [-5.85, 57.45], [-5.72, 57.3], [-5.62, 57.22], [-5.72, 57.1], [-5.83, 57.0], [-5.87, 56.9],
+  [-5.85, 56.78], [-6.22, 56.72], [-6.0, 56.67], [-5.85, 56.6], [-5.6, 56.62], [-5.35, 56.72], [-5.38, 56.66],
+  [-5.43, 56.55], [-5.47, 56.45], [-5.48, 56.41], [-5.6, 56.3], [-5.55, 56.15], [-5.65, 56.0], [-5.68, 55.82],
+  [-5.7, 55.62], [-5.75, 55.42], [-5.8, 55.3], [-5.62, 55.31], [-5.58, 55.42], [-5.47, 55.6], [-5.38, 55.76],
+  [-5.4, 55.88], [-5.25, 56.05], [-5.07, 56.23], [-5.0, 56.2], [-5.17, 56.0], [-5.25, 55.88], [-5.2, 55.83],
+  [-5.05, 55.82], [-4.98, 55.87], [-4.92, 55.96], [-4.88, 56.02], [-4.82, 55.98], [-4.72, 56.0], [-4.58, 55.95],
+  [-4.47, 55.93], [-4.6, 55.93], [-4.76, 55.95], [-4.83, 55.96], [-4.89, 55.87], [-4.87, 55.8], [-4.86, 55.7],
+  [-4.82, 55.64],
 ];
 
+// Irland, im Uhrzeigersinn ab Malin Head: Nordküste, Ostküste, Südküste, Shannon-Mündung, Westküste, Donegal
 const COAST_IRELAND = [
-  [-7.0, 55.6], [-6.25, 55.22], [-6.1, 55.21], [-6.03, 55.13], [-5.98, 55.03], [-5.83, 54.88], [-5.7, 54.8],
-  [-5.92, 54.64], [-5.67, 54.66], [-5.53, 54.64], [-5.43, 54.5], [-5.45, 54.38], [-5.66, 54.23], [-5.85, 54.26],
-  [-5.97, 54.08], [-6.15, 53.99], [-6.36, 53.97], [-6.22, 53.8], [-6.18, 53.61], [-6.15, 53.45], [-6.05, 53.38],
-  [-6.2, 53.34], [-6.1, 53.27], [-6.05, 53.12], [-6.0, 52.98], [-6.14, 52.8], [-6.21, 52.55], [-6.4, 52.34],
-  [-6.37, 52.17], [-7.0, 52.1],
+  [-7.37, 55.38], [-7.15, 55.28], [-6.93, 55.24], [-7.05, 55.16], [-7.22, 55.06], [-7.08, 55.07], [-6.95, 55.19],
+  [-6.73, 55.18], [-6.6, 55.21], [-6.25, 55.21], [-6.1, 55.21], [-6.03, 55.13], [-5.98, 55.03], [-5.83, 54.88],
+  [-5.7, 54.8], [-5.92, 54.64], [-5.67, 54.66], [-5.53, 54.64], [-5.43, 54.5], [-5.45, 54.38], [-5.66, 54.23],
+  [-5.85, 54.26], [-5.97, 54.08], [-6.15, 53.99], [-6.36, 53.97], [-6.22, 53.8], [-6.18, 53.61], [-6.15, 53.45],
+  [-6.05, 53.38], [-6.2, 53.34], [-6.1, 53.27], [-6.05, 53.12], [-6.0, 52.98], [-6.14, 52.8], [-6.21, 52.55],
+  [-6.4, 52.34], [-6.37, 52.17], [-6.6, 52.17], [-6.8, 52.2], [-6.93, 52.12], [-6.95, 52.22], [-7.0, 52.27],
+  [-7.02, 52.2], [-6.98, 52.14], [-7.15, 52.15], [-7.4, 52.13], [-7.6, 52.07], [-7.55, 52.02], [-7.72, 51.94],
+  [-7.87, 51.94], [-8.0, 51.83], [-8.2, 51.8], [-8.3, 51.84], [-8.35, 51.78], [-8.52, 51.7], [-8.53, 51.6],
+  [-8.88, 51.58], [-8.95, 51.53], [-9.2, 51.52], [-9.4, 51.47], [-9.6, 51.48], [-9.82, 51.45], [-9.6, 51.56],
+  [-9.85, 51.56], [-9.45, 51.67], [-9.7, 51.67], [-10.18, 51.6], [-9.95, 51.75], [-9.6, 51.86], [-9.9, 51.78],
+  [-10.2, 51.78], [-10.35, 51.92], [-10.1, 52.0], [-9.8, 52.1], [-10.05, 52.1], [-10.47, 52.1], [-10.35, 52.2],
+  [-10.2, 52.27], [-9.9, 52.25], [-9.75, 52.28], [-9.87, 52.35], [-9.93, 52.42], [-9.67, 52.51], [-9.37, 52.58],
+  [-9.1, 52.61], [-8.85, 52.64], [-8.9, 52.68], [-9.2, 52.65], [-9.48, 52.62], [-9.93, 52.56], [-9.65, 52.68],
+  [-9.45, 52.85], [-9.43, 52.97], [-9.27, 53.15], [-8.95, 53.14], [-9.05, 53.26], [-9.3, 53.24], [-9.6, 53.25],
+  [-9.85, 53.33], [-10.2, 53.4], [-10.05, 53.5], [-9.95, 53.62], [-9.85, 53.78], [-9.55, 53.8], [-9.75, 53.88],
+  [-10.2, 53.97], [-9.95, 54.08], [-10.1, 54.2], [-9.98, 54.3], [-9.82, 54.33], [-9.35, 54.32], [-9.2, 54.2],
+  [-8.95, 54.27], [-8.6, 54.28], [-8.48, 54.27], [-8.55, 54.36], [-8.45, 54.47], [-8.28, 54.48], [-8.15, 54.63],
+  [-8.45, 54.62], [-8.7, 54.62], [-8.8, 54.7], [-8.55, 54.82], [-8.48, 54.95], [-8.32, 55.15], [-8.0, 55.21],
+  [-7.85, 55.18], [-7.63, 55.27], [-7.55, 55.1], [-7.65, 54.97], [-7.47, 55.08], [-7.5, 55.27],
 ];
 
 // Festland von der Bretagne über die Normandie und Flandern bis Holland, unten und rechts außerhalb geschlossen
@@ -1292,7 +1506,7 @@ const COAST_CONTINENT = [
   [0.1, 49.49], [0.2, 49.71], [0.71, 49.87], [1.38, 50.06], [1.63, 50.19], [1.56, 50.4], [1.6, 50.73],
   [1.58, 50.87], [1.86, 50.97], [2.37, 51.05], [2.92, 51.23], [3.38, 51.38], [3.85, 51.35], [4.25, 51.37],
   [4.2, 51.42], [3.7, 51.45], [3.45, 51.52], [3.85, 51.62], [3.9, 51.83], [4.05, 51.98], [4.45, 52.3],
-  [4.62, 52.65], [4.75, 52.96], [5.0, 52.92], [5.8, 53.0], [5.8, 47.5],
+  [4.62, 52.65], [4.75, 52.96], [5.0, 52.92], [5.4, 53.17], [5.9, 53.38], [6.5, 53.45], [7.3, 53.35], [7.3, 47.5],
 ];
 
 const ISLANDS = [
@@ -1302,6 +1516,21 @@ const ISLANDS = [
   [[-2.67, 49.5], [-2.51, 49.51], [-2.53, 49.42], [-2.66, 49.42]], // Guernsey
   [[-2.25, 49.735], [-2.14, 49.725], [-2.16, 49.7], [-2.24, 49.7]], // Alderney
   [[-6.37, 49.96], [-6.25, 49.98], [-6.26, 49.89], [-6.36, 49.9]], // Scilly
+  // Schottische Inseln
+  [[-5.35, 55.7], [-5.17, 55.71], [-5.1, 55.6], [-5.12, 55.48], [-5.28, 55.43], [-5.4, 55.5], [-5.4, 55.62]], // Arran
+  [[-5.1, 55.9], [-5.0, 55.85], [-5.02, 55.73], [-5.1, 55.77]], // Bute
+  [[-6.45, 55.92], [-6.12, 55.93], [-6.05, 55.78], [-6.12, 55.63], [-6.3, 55.58], [-6.5, 55.68], [-6.48, 55.78]], // Islay
+  [[-5.85, 56.15], [-5.68, 56.05], [-5.85, 55.85], [-5.98, 55.85], [-6.1, 55.95], [-5.95, 56.1]], // Jura
+  [[-6.35, 56.32], [-6.0, 56.3], [-5.7, 56.38], [-5.65, 56.47], [-5.95, 56.62], [-6.2, 56.6], [-6.3, 56.5], [-6.15, 56.43]], // Mull
+  [[-6.97, 56.53], [-6.75, 56.5], [-6.8, 56.45], [-6.98, 56.47]], // Tiree
+  [[-6.65, 56.68], [-6.45, 56.6], [-6.5, 56.56], [-6.67, 56.6]], // Coll
+  [[-6.4, 57.03], [-6.25, 57.0], [-6.27, 56.93], [-6.38, 56.93]], // Rum
+  [[-6.3, 57.7], [-6.1, 57.62], [-5.9, 57.42], [-5.68, 57.27], [-5.85, 57.22], [-5.95, 57.05], [-6.2, 57.12], [-6.4, 57.25], [-6.6, 57.33], [-6.8, 57.45], [-6.6, 57.55], [-6.45, 57.55]], // Skye
+  [[-6.25, 58.52], [-6.1, 58.4], [-6.2, 58.2], [-6.4, 58.05], [-6.62, 57.92], [-6.95, 57.73], [-7.12, 57.82], [-7.0, 57.98], [-7.08, 58.12], [-6.9, 58.25], [-6.6, 58.35], [-6.4, 58.48]], // Lewis und Harris
+  [[-7.15, 57.68], [-7.17, 57.55], [-7.25, 57.4], [-7.25, 57.12], [-7.4, 57.1], [-7.45, 57.4], [-7.55, 57.6], [-7.35, 57.68]], // Uist
+  [[-3.43, 58.93], [-3.2, 58.93], [-3.17, 58.78], [-3.3, 58.78], [-3.42, 58.85]], // Hoy
+  [[-3.37, 59.15], [-2.75, 59.15], [-2.7, 58.98], [-2.93, 58.9], [-3.2, 58.95], [-3.35, 59.0]], // Orkney
+  [[-2.97, 58.84], [-2.87, 58.84], [-2.9, 58.73], [-2.98, 58.75]], // South Ronaldsay
 ];
 
 // Flüsse von der Quelle zur Mündung, Breite als Radius in Kacheln (Quelle, Mündung)
@@ -1323,6 +1552,43 @@ const RIVERS = [
   // Seen im Lake District
   { name: 'Windermere', w: [0.75, 0.75], lake: true, pts: [[-2.95, 54.43], [-2.94, 54.35], [-2.96, 54.27]] },
   { name: 'Ullswater', w: [0.7, 0.7], lake: true, pts: [[-2.85, 54.62], [-2.92, 54.57], [-2.97, 54.54]] },
+  // Schottland
+  { name: 'Tweed', w: [0.8, 1.05], pts: [[-3.4, 55.47], [-3.2, 55.6], [-3.0, 55.62], [-2.75, 55.61], [-2.5, 55.6], [-2.25, 55.65], [-2.12, 55.72], [-2.0, 55.77]] },
+  { name: 'Nith', w: [0.8, 0.95], pts: [[-4.1, 55.4], [-3.85, 55.25], [-3.65, 55.1], [-3.58, 54.97]] },
+  { name: 'Clyde', w: [0.8, 1.15], pts: [[-3.65, 55.4], [-3.75, 55.6], [-3.88, 55.7], [-4.0, 55.77], [-4.15, 55.83], [-4.25, 55.855], [-4.38, 55.88], [-4.5, 55.93]] },
+  { name: 'Forth', w: [0.8, 1.1], pts: [[-4.4, 56.18], [-4.2, 56.16], [-4.05, 56.13], [-3.93, 56.12], [-3.8, 56.09]] },
+  { name: 'Tay', w: [0.85, 1.25], pts: [[-4.0, 56.6], [-3.85, 56.62], [-3.6, 56.57], [-3.45, 56.5], [-3.42, 56.42], [-3.32, 56.37]] },
+  { name: 'Dee', w: [0.8, 1.0], pts: [[-3.65, 57.0], [-3.4, 57.0], [-3.05, 57.05], [-2.75, 57.06], [-2.5, 57.05], [-2.25, 57.1], [-2.07, 57.14]] },
+  { name: 'Don', w: [0.8, 0.9], pts: [[-3.1, 57.2], [-2.75, 57.23], [-2.4, 57.25], [-2.2, 57.2], [-2.06, 57.17]] },
+  { name: 'Spey', w: [0.8, 1.05], pts: [[-4.45, 57.02], [-4.1, 57.07], [-3.83, 57.19], [-3.6, 57.33], [-3.3, 57.45], [-3.15, 57.55], [-3.1, 57.68]] },
+  { name: 'Ness', w: [0.8, 0.95], pts: [[-4.29, 57.42], [-4.25, 57.46], [-4.21, 57.5]] },
+  { name: 'Loch Lomond', w: [0.55, 1.1], lake: true, pts: [[-4.7, 56.28], [-4.65, 56.15], [-4.58, 56.05]] },
+  { name: 'Loch Ness', w: [0.5, 0.5], lake: true, pts: [[-4.68, 57.15], [-4.5, 57.27], [-4.3, 57.41]] },
+  { name: 'Loch Tay', w: [0.45, 0.45], lake: true, pts: [[-4.32, 56.5], [-4.05, 56.6]] },
+  { name: 'Loch Rannoch', w: [0.4, 0.4], lake: true, pts: [[-4.5, 56.67], [-4.2, 56.69]] },
+  { name: 'Loch Awe', w: [0.4, 0.4], lake: true, pts: [[-5.1, 56.42], [-5.35, 56.2]] },
+  { name: 'Loch Maree', w: [0.4, 0.4], lake: true, pts: [[-5.6, 57.67], [-5.4, 57.6]] },
+  { name: 'Loch Leven', w: [0.6, 0.6], lake: true, pts: [[-3.41, 56.2], [-3.36, 56.2]] },
+  // Irland
+  { name: 'Shannon', w: [0.8, 1.4], pts: [[-8.05, 54.12], [-8.1, 53.95], [-8.0, 53.78], [-7.92, 53.65], [-7.97, 53.5], [-7.94, 53.42], [-7.98, 53.33], [-7.98, 53.19], [-8.1, 53.12], [-8.22, 53.05], [-8.3, 52.95], [-8.4, 52.85], [-8.44, 52.8], [-8.55, 52.72], [-8.63, 52.67], [-8.75, 52.65], [-8.87, 52.64]] },
+  { name: 'Liffey', w: [0.8, 0.95], pts: [[-6.45, 53.13], [-6.62, 53.2], [-6.6, 53.3], [-6.5, 53.36], [-6.35, 53.35], [-6.24, 53.345], [-6.18, 53.34]] },
+  { name: 'Boyne', w: [0.8, 0.95], pts: [[-7.05, 53.38], [-6.9, 53.5], [-6.79, 53.56], [-6.68, 53.65], [-6.54, 53.71], [-6.35, 53.715], [-6.22, 53.72]] },
+  { name: 'Barrow', w: [0.8, 1.05], pts: [[-7.3, 53.1], [-7.0, 53.02], [-6.93, 52.85], [-6.95, 52.65], [-6.94, 52.45], [-6.95, 52.3], [-6.97, 52.24]] },
+  { name: 'Nore', w: [0.8, 0.9], pts: [[-7.55, 52.85], [-7.35, 52.72], [-7.27, 52.66], [-7.12, 52.52], [-6.95, 52.42]] },
+  { name: 'Suir', w: [0.8, 1.05], pts: [[-7.85, 52.82], [-7.82, 52.68], [-7.86, 52.5], [-7.92, 52.37], [-7.7, 52.35], [-7.41, 52.35], [-7.2, 52.27], [-7.1, 52.265], [-7.0, 52.26]] },
+  { name: 'Blackwater', w: [0.8, 1.0], pts: [[-9.2, 52.15], [-8.9, 52.12], [-8.64, 52.13], [-8.27, 52.14], [-7.93, 52.13], [-7.85, 52.0], [-7.86, 51.94]] },
+  { name: 'Lee', w: [0.8, 0.95], pts: [[-9.2, 51.88], [-8.95, 51.9], [-8.7, 51.89], [-8.47, 51.9], [-8.3, 51.86]] },
+  { name: 'Bann', w: [0.8, 1.0], pts: [[-6.48, 54.75], [-6.55, 54.9], [-6.65, 55.05], [-6.67, 55.13], [-6.75, 55.18]] },
+  { name: 'Erne', w: [0.8, 0.9], pts: [[-7.92, 54.5], [-8.05, 54.5], [-8.24, 54.49]] },
+  { name: 'Foyle', w: [0.8, 1.0], pts: [[-7.46, 54.82], [-7.4, 54.92], [-7.32, 55.0], [-7.22, 55.06]] },
+  { name: 'Lough Neagh', w: [3.0, 3.0], lake: true, pts: [[-6.5, 54.68], [-6.42, 54.58], [-6.45, 54.5]] },
+  { name: 'Lough Ree', w: [0.9, 0.9], lake: true, pts: [[-7.92, 53.63], [-7.98, 53.5], [-7.95, 53.45]] },
+  { name: 'Lough Derg', w: [0.9, 0.9], lake: true, pts: [[-8.2, 53.05], [-8.3, 52.95], [-8.42, 52.84]] },
+  { name: 'Lough Allen', w: [0.6, 0.6], lake: true, pts: [[-8.03, 54.17], [-8.06, 54.07]] },
+  { name: 'Lough Erne', w: [0.5, 0.85], lake: true, pts: [[-7.45, 54.2], [-7.6, 54.3], [-7.68, 54.38], [-7.8, 54.45], [-7.9, 54.5]] },
+  { name: 'Lough Corrib', w: [0.9, 0.9], lake: true, pts: [[-9.4, 53.55], [-9.25, 53.45], [-9.12, 53.33]] },
+  { name: 'Lough Mask', w: [0.8, 0.8], lake: true, pts: [[-9.4, 53.68], [-9.35, 53.56]] },
+  { name: 'Lough Conn', w: [0.6, 0.6], lake: true, pts: [[-9.25, 54.07], [-9.3, 53.98]] },
 ];
 
 // Bergland: Linienzüge mit Reichweite r (Kacheln) und Höhe a
@@ -1354,6 +1620,46 @@ const UPLANDS = [
   { r: 7, a: 0.16, pts: [[-1.0, 48.75], [-0.3, 48.6]] }, // Bocage normand
   { r: 5, a: 0.1, pts: [[0.7, 48.4]] }, // Perche
   { r: 9, a: 0.32, pts: [[4.6, 50.0], [5.3, 50.2], [5.3, 49.8]] }, // Ardennen
+  // Schottland
+  { r: 6, a: 0.26, pts: [[-3.9, 55.45], [-3.5, 55.45]] }, // Lowther Hills
+  { r: 6, a: 0.22, pts: [[-3.1, 55.72], [-2.6, 55.84]] }, // Moorfoot und Lammermuir
+  { r: 3, a: 0.2, pts: [[-3.33, 55.82]] }, // Pentlands
+  { r: 4, a: 0.2, pts: [[-3.9, 56.24], [-3.5, 56.25]] }, // Ochils
+  { r: 4, a: 0.14, pts: [[-3.3, 56.5], [-2.95, 56.56]] }, // Sidlaws
+  { r: 12, a: 0.46, pts: [[-4.75, 56.25], [-4.2, 56.55], [-3.8, 56.85], [-3.25, 56.95], [-2.75, 57.0]] }, // Grampians
+  { r: 9, a: 0.6, pts: [[-3.75, 57.08], [-3.45, 57.05]] }, // Cairngorms
+  { r: 8, a: 0.55, pts: [[-5.1, 56.65], [-4.95, 56.8]] }, // Glencoe und Ben Nevis
+  { r: 10, a: 0.4, pts: [[-4.3, 57.1], [-3.9, 57.2]] }, // Monadhliath
+  { r: 12, a: 0.5, pts: [[-5.5, 56.95], [-5.25, 57.2], [-5.3, 57.5], [-5.05, 57.8], [-4.85, 58.1], [-4.6, 58.35]] }, // Nordwestliche Highlands
+  { r: 9, a: 0.34, pts: [[-4.55, 57.6], [-4.25, 57.9], [-4.0, 58.2]] }, // Ross und Sutherland
+  { r: 6, a: 0.36, pts: [[-5.5, 56.2], [-5.2, 56.0]] }, // Argyll und Cowal
+  { r: 4, a: 0.26, pts: [[-5.55, 55.55]] }, // Kintyre
+  { r: 4, a: 0.45, pts: [[-5.25, 55.62]] }, // Arran
+  { r: 5, a: 0.5, pts: [[-6.2, 57.22]] }, // Cuillin
+  { r: 5, a: 0.38, pts: [[-5.95, 56.42]] }, // Mull
+  { r: 3, a: 0.3, pts: [[-5.95, 55.95]] }, // Jura
+  { r: 5, a: 0.3, pts: [[-6.8, 58.0]] }, // Harris
+  { r: 3, a: 0.4, pts: [[-3.3, 58.86]] }, // Hoy
+  // Irland
+  { r: 6, a: 0.25, pts: [[-7.2, 54.8], [-6.9, 54.8]] }, // Sperrins
+  { r: 8, a: 0.36, pts: [[-8.1, 55.0], [-7.9, 54.85]] }, // Derryveagh
+  { r: 4, a: 0.3, pts: [[-8.1, 54.72]] }, // Blue Stack
+  { r: 4, a: 0.2, pts: [[-7.85, 54.22]] }, // Cuilcagh
+  { r: 4, a: 0.18, pts: [[-8.8, 54.1]] }, // Ox Mountains
+  { r: 6, a: 0.32, pts: [[-9.6, 54.0], [-9.4, 54.05]] }, // Nephin
+  { r: 6, a: 0.38, pts: [[-9.85, 53.52], [-9.6, 53.55]] }, // Twelve Bens
+  { r: 3, a: 0.32, pts: [[-9.66, 53.76]] }, // Croagh Patrick
+  { r: 4, a: 0.14, pts: [[-9.1, 53.05]] }, // Burren
+  { r: 4, a: 0.2, pts: [[-7.6, 53.08]] }, // Slieve Bloom
+  { r: 4, a: 0.22, pts: [[-8.35, 52.82]] }, // Arra und Silvermines
+  { r: 4, a: 0.38, pts: [[-8.2, 52.37]] }, // Galtees
+  { r: 3, a: 0.26, pts: [[-7.9, 52.24]] }, // Knockmealdown
+  { r: 3, a: 0.28, pts: [[-7.55, 52.25]] }, // Comeragh
+  { r: 3, a: 0.22, pts: [[-6.8, 52.55]] }, // Blackstairs
+  { r: 6, a: 0.5, pts: [[-9.85, 52.0], [-9.6, 51.98]] }, // MacGillycuddy's Reeks
+  { r: 4, a: 0.38, pts: [[-10.15, 52.2]] }, // Brandon
+  { r: 4, a: 0.3, pts: [[-9.75, 51.7]] }, // Caha
+  { r: 4, a: 0.24, pts: [[-9.2, 51.95]] }, // Derrynasaggart
 ];
 
 // Wälder: dieselbe Form, a erhöht die Waldwahrscheinlichkeit
@@ -1394,6 +1700,24 @@ const FORESTS = [
   { r: 3, a: 0.2, pts: [[-0.05, 48.55]] }, // Écouves
   { r: 2, a: 0.18, pts: [[-0.88, 49.2]] }, // Cerisy
   { r: 3, a: 0.2, pts: [[-3.75, 48.36]] }, // Huelgoat
+  // Schottland
+  { r: 6, a: 0.3, pts: [[-3.15, 55.5]] }, // Ettrick
+  { r: 4, a: 0.22, pts: [[-2.7, 55.45]] }, // Jedforest
+  { r: 8, a: 0.3, pts: [[-4.4, 56.65], [-4.0, 56.7]] }, // Rannoch
+  { r: 7, a: 0.34, pts: [[-3.9, 57.15], [-3.6, 57.25]] }, // Rothiemurchus und Abernethy
+  { r: 5, a: 0.25, pts: [[-4.8, 57.2]] }, // Glen Affric
+  { r: 4, a: 0.2, pts: [[-4.5, 56.2]] }, // Trossachs
+  { r: 4, a: 0.2, pts: [[-3.55, 56.55]] }, // Birnam
+  { r: 3, a: 0.2, pts: [[-4.2, 55.0]] }, // Galloway
+  // Irland
+  { r: 6, a: 0.32, pts: [[-6.75, 54.8]] }, // Glenconkeyne
+  { r: 5, a: 0.22, pts: [[-7.4, 54.4]] }, // Fermanagh
+  { r: 6, a: 0.25, pts: [[-7.4, 53.25], [-7.0, 53.25]] }, // Offaly
+  { r: 4, a: 0.28, pts: [[-6.55, 52.75]] }, // Shillelagh
+  { r: 4, a: 0.28, pts: [[-9.5, 52.0]] }, // Killarney
+  { r: 4, a: 0.2, pts: [[-8.7, 52.9]] }, // Cratloe
+  { r: 4, a: 0.2, pts: [[-8.3, 53.7]] }, // Connacht
+  { r: 3, a: 0.2, pts: [[-8.1, 52.15]] }, // Avondhu
 ];
 
 // ===== assets.js =====
@@ -2771,10 +3095,13 @@ function setPlayerWalls(W, on, rects, R) {
   const N = W.N;
   W.playerWalls = on;
   if (R) W.playerR = R;
-  if (rects) {
-    W.castleObs = rects.map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
+  if (rects) W.playerRects = rects;
+  // Gebäude deiner Burg und der Burgen der Barone (barons.js) zusammen
+  if (rects || W.baronDirty) {
+    W.castleObs = [...(W.playerRects || []), ...(W.baronRects || [])].map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
     W.cgrid = new Map();
     for (const o of W.castleObs) gridAdd(W.cgrid, N, o);
+    W.baronDirty = false;
   }
   W.block = new Uint8Array(W.blockStatic);
   W.penTile = new Uint8Array(N * N);
@@ -2790,6 +3117,13 @@ function setPlayerWalls(W, on, rects, R) {
   for (const list of Object.values(W.tempObs || {})) for (const o of list) for (const [x, y] of obstacleTiles(W, o, false)) W.block[y * N + x] = 1;
   // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
   if (W.afterBlock) W.afterBlock();
+}
+
+// Gebäude auf den Bauplätzen der Barone als Hindernis (Rechtecke {x, y, wx, wy, pen})
+function setBaronRects(W, rects) {
+  W.baronRects = rects;
+  W.baronDirty = true;
+  if (W.blockStatic) setPlayerWalls(W, !!W.playerWalls);
 }
 
 // Hindernisse auf Zeit (z. B. der Turnierplatz): unter einem Schlüssel Rechtecke {x, y, wx, wy}; ohne rects wieder fort
@@ -3291,7 +3625,8 @@ function waterDist(W, cx, cy, r) {
 // Mindestabstand zweier Orte: die eigene Burg braucht Platz, Lager kommen mit wenig aus
 function siteGap(a, b) {
   const lager = a.type === 'lager' || b.type === 'lager';
-  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 18 : 26;
+  // Die eigene Burg und die Burgen der Barone brauchen Platz für ihre Bauplätze
+  if (a.type === 'spieler' || b.type === 'spieler' || a.baron || b.baron) return lager ? 18 : 26;
   if (lager) return 16;
   return a.clear + b.clear + 2;
 }
@@ -3577,7 +3912,7 @@ function addFields(W, s, rng) {
   const keepR = s.type === 'halle' ? PALISADE_R + 1.4 : 0;
   for (let k = 0; k < n; k++) {
     const a = rng() * Math.PI * 2;
-    const r = (s.type === 'spieler' ? 11 : 5.5) + rng() * 3;
+    const r = (s.type === 'spieler' || s.baron ? 11 : 5.5) + rng() * 3;
     const cx = Math.floor(s.x + Math.cos(a) * r), cy = Math.floor(s.y + Math.sin(a) * r);
     const w = 2 + Math.floor(rng() * 3), h = 2 + Math.floor(rng() * 2);
     for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) {
@@ -3649,7 +3984,7 @@ const TAVERN_NAMES = ['Zum Goldenen Krug', 'Zur Krone', 'Zum Weißen Hirsch', 'Z
 
 // Friedhof neben der Kirche (oder am Ortsrand), umzäunt, mit Steinkreuz
 function placeCemetery(W, s) {
-  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei') return;
+  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei' || s.baron) return;
   const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
   const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
   const wx = 2.6, wy = 2.0, N = W.N;
@@ -3799,7 +4134,7 @@ function genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral) {
 }
 
 // Grundfläche so groß, wie das Wahrzeichen gezeichnet wird (Ringmauer, Querhaus, Baukran)
-const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [3.7, 3.4], motte: [3.2, 3.2], rundturm: [2.6, 2.6], tuchhalle: [3.4, 1.8], tor: [5.5, 5.5] };
+const LANDMARK_SIZE = { kathedrale: [4, 2.6], tower: [3.7, 3.4], motte: [3.2, 3.2], rundturm: [2.6, 2.6], rundturm_ir: [2.4, 1.6], tuchhalle: [3.4, 1.8], tor: [5.5, 5.5] };
 
 // Freie Stelle für eine Grundfläche in der Nähe eines Wunschortes suchen
 function freeArea(W, px, py, wx, wy, margin, maxR) {
@@ -3834,7 +4169,7 @@ function placeLandmark(W, s, lm) {
     const abbey = s.type === 'abtei';
     pref = {
       kathedrale: abbey ? { x: s.x - 0.3, y: s.y - 2.8 } : { x: s.x - 3.8, y: s.y - 4.0 },
-      tower: { x: s.x + 4.2, y: s.y + 1.6 }, motte: { x: s.x + 5, y: s.y - 4 }, rundturm: { x: s.x + 4.4, y: s.y + 2.4 },
+      tower: { x: s.x + 4.2, y: s.y + 1.6 }, motte: { x: s.x + 5, y: s.y - 4 }, rundturm: { x: s.x + 4.4, y: s.y + 2.4 }, rundturm_ir: { x: s.x + 3.2, y: s.y - 3.0 },
       tuchhalle: { x: s.x - 2.8, y: s.y - 3.2 }, tor: { x: s.x - 10, y: s.y + 7 },
     }[lm.kind];
   }
@@ -3927,7 +4262,7 @@ function genBuildings(W, s, rng) {
       return;
     }
   };
-  if (s.type !== 'stadt' && s.type !== 'halle') tavern();
+  if (s.type !== 'stadt' && s.type !== 'halle' && !s.baron) tavern();
   switch (s.type) {
     case 'stadt':
       genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral);
@@ -3935,16 +4270,18 @@ function genBuildings(W, s, rng) {
     case 'markt': {
       // Marktzelte, Pferch und Stände zuerst, damit die Häuser sich darum herum ordnen
       let tents = 0;
+      // Zelte und Stände nur auf trockenem Land (in Hafenorten reicht das Wasser bis an den Markt)
+      const dry = (x, y, wx, wy) => { for (const [px, py] of [[x - wx / 2, y - wy / 2], [x + wx / 2, y - wy / 2], [x - wx / 2, y + wy / 2 + 0.7], [x + wx / 2, y + wy / 2 + 0.7]]) if (W.tiles[Math.floor(py) * W.N + Math.floor(px)] === T.WATER) return false; return true; };
       for (let k = 0; k < 5; k++) {
         const col = rpick(rng, ['#a33b32', '#3d6fa3', '#d6ad4c', '#e8e0cc', '#5b8a3c']);
         const x = s.x + 3 + k * 1.15, y = s.y - 3.6;
-        if (!clearOfBuildings(W, x, y, 0.9, 0.9, 0.15)) continue;
+        if (!clearOfBuildings(W, x, y, 0.9, 0.9, 0.15) || !dry(x, y, 0.9, 0.9)) continue;
         add({ kind: 'tent', x, y, wx: 0.9, wy: 0.9, color: col, noCost: true });
         tents++;
       }
-      if (tents >= 3 && clearOfBuildings(W, s.x + 5.3, s.y - 2.2, 5.8, 0.4, 0.1)) add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, wx: 5.8, wy: 0.3, noCost: true });
+      if (tents >= 3 && clearOfBuildings(W, s.x + 5.3, s.y - 2.2, 5.8, 0.4, 0.1) && dry(s.x + 5.3, s.y - 2.2, 5.8, 0.4)) add({ kind: 'fence', x: s.x + 5.3, y: s.y - 2.2, x1: s.x + 2.4, x2: s.x + 8.2, wx: 5.8, wy: 0.3, noCost: true });
       for (const [dx, dy, col] of [[1.2, 1.1, '#a33b32'], [-1.3, 0.9, '#d6ad4c']]) {
-        if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
+        if (clearOfBuildings(W, s.x + dx, s.y + dy, 0.8, 0.6, 0.1) && dry(s.x + dx, s.y + dy, 0.8, 0.6)) add({ kind: 'stall', x: s.x + dx, y: s.y + dy, color: col, noCost: true, wx: 0.8, wy: 0.6 });
       }
       smithy();
       ring(9, 7, s.clear - 0.5, (x, y) => house(x, y, { roof: rng() < 0.3 ? 'tile' : 'thatch' }));
@@ -3967,6 +4304,8 @@ function genBuildings(W, s, rng) {
     }
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
+      // Burgen der Barone: Die Gebäude stehen auf Bauplätzen wie bei dir (barons.js), dazu nur ein paar Katen weiter draußen
+      if (s.baron) { ring(5, s.clear + 9, s.clear + 11, (x, y) => house(x, y)); break; }
       ring(12, 6.4, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;
@@ -4234,6 +4573,7 @@ function placeTrees(W, rng) {
 
 // ===== units.js =====
 // Einheiten, Gefolge, KI-Gruppen und Kampf.
+
 
 
 
@@ -4762,6 +5102,7 @@ function groupDestroyed(g) {
   }
   log(`Sieg über ${g.questId ? 'die gesuchte Bande' : gt.acc}! Beute: ${loot.join(', ')}.`, 'good');
   if (gt.kill) for (const [f, v] of Object.entries(gt.kill)) changeRep(f, v);
+  if (g.baron) changeBaronRel(g.baron, gt.army ? -12 : -30, gt.army ? 'Du hast sein Heer geschlagen' : 'Du hast seinen Handelszug überfallen');
   if (gt.renown) addRenown(gt.renown);
   onQuestGroupDestroyed(g);
   const i = G.groups.indexOf(g);
@@ -5053,9 +5394,11 @@ function settledLand(x, y) {
 function sitesFor(type) {
   const S = G.world.sites;
   const gt = GROUP_TYPES[type];
-  if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && (s.faction === 'normannen' || s.type === 'dorf' || s.type === 'halle'));
+  // Prinz Johns Steuereintreiber: in England, Wales, der Normandie und im normannischen Irland
+  if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && s.realm !== 'sc' && (s.faction === 'normannen' || (s.realm !== 'ir' && (s.type === 'dorf' || s.type === 'halle'))));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction));
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction)
+    && (!gt.realmFaction || !gt.realmFaction[s.realm] || s.faction === gt.realmFaction[s.realm]));
   return S.filter((s) => s.type !== 'einsiedelei');
 }
 
@@ -5144,8 +5487,10 @@ function spawnGroup(type, opts = {}) {
   }
   if (!g.members.length) return null;
   // Bewaffnete einer Partei tragen deren Livree (Heere, Wachen, Streifen); Wegelagerer und Zivile bleiben, wie sie sind
-  const liv = LIVERY[g.faction];
-  if (liv) for (const m of g.members) if (m.cls === 'soldat' || m.cls === 'ritter') { m.tunic = liv; m.livery = liv; }
+  // Heere und Handelszüge der Barone tragen deren Farbe (barons.js)
+  if (gt.baron) g.baron = gt.baron;
+  const liv = LIVERY[g.faction] || gt.livery;
+  if (liv) for (const m of g.members) if (m.cls === 'soldat' || m.cls === 'ritter' || (gt.livery && m.cls !== 'haendler')) { m.tunic = liv; m.livery = liv; }
   G.groups.push(g);
   for (const m of g.members) G.units.push(m);
   return g;
@@ -5269,7 +5614,7 @@ function maintainGroups(initial = false) {
     if (gt.minDay && G.s.day < gt.minDay && !initial) continue;
     if (gt.minDay && initial) continue;
     // Auf der größeren Karte gibt es mehr Gruppen, aber nicht im Verhältnis der Fläche: es bleibt mehr Platz zwischen ihnen
-    const want = Math.round((gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0)) * MAP_K);
+    const want = Math.round((gt.count + (type === 'banditen' ? Math.min(8, Math.floor(G.s.day / 4)) : 0)) * MAP_K * 1.2);
     const have = G.groups.filter((g) => g.type === type && !g.questId).length;
     const n = initial ? want : Math.min(3, want - have);
     for (let k = 0; k < n; k++) spawnGroup(type, { initial });
@@ -5290,6 +5635,8 @@ function ferryCost(route) {
   const from = siteById(route.a), to = siteById(route.b);
   const french = (s) => s && (s.realm === 'fr' || s.realm === 'fl');
   if (isAlly('franken') && (french(from) || french(to))) return 0;
+  const irish = (s) => s && s.realm === 'ir';
+  if (isAlly('iren') && (irish(from) || irish(to))) return 0;
   const riders = [G.s.player, ...partyMembers()];
   const horses = riders.filter((u) => u.eq && u.eq.pferd).length;
   return Math.round((route.cost * riders.length + horses * Math.ceil(route.cost / 2)) * shireFerryFactor());
@@ -5491,6 +5838,8 @@ function startBattle(force = null) {
   if (G.battle) return false;
   const land = landAt(W, p.x, p.y);
   const site = W.sites.reduce((a, s) => (s.land === land && (!a || Math.hypot(s.x - p.x, s.y - p.y) < Math.hypot(a.x - p.x, a.y - p.y)) ? s : a), null);
+  // In Schottland und Irland ziehen Richards und Johanns Heere nicht gegeneinander
+  if (site && (site.realm === 'sc' || site.realm === 'ir')) return false;
   const french = site && (site.realm === 'fr' || site.realm === 'fl' || site.realm === 'nd');
   const [ta, tb] = french ? ['heer_normandie', 'heer_philipp'] : ['heer_john', 'heer_richard'];
   // Schlachtfeld: offenes Land 16 bis 26 Felder vom Spieler, nicht in einem Ort
@@ -5923,6 +6272,7 @@ function updateTacMember(m, g, dt) {
 
 
 
+
 // Sitz (Burg) → Name der Grafschaft, Vorzug für ihren Herrn und Erklärung
 // goods: Waren täglich ins Burglager, gold: Gold täglich, def: Verteidigung der Burg, ruhm: Ruhm täglich,
 // faehre: Fährlohn (Anteil)
@@ -5946,6 +6296,16 @@ const SHIRES = {
   evreux: { name: 'Grafschaft Évreux', goods: { getreide: 8 }, text: 'Die Kornkammer an der Eure: täglich 8 Getreide.' },
   gisors: { name: 'Vexin', def: 25, text: 'Die umkämpfte Grenzfeste zwischen Normandie und Frankreich (+25 Verteidigung).' },
   compiegne: { name: 'Île-de-France', weight: 0.72, goods: { holz: 8 }, text: 'Die Krondomäne um Paris mit dem königlichen Forst von Compiègne: täglich 8 Holz.' },
+  // Schottland
+  roxburgh: { name: 'Teviotdale', goods: { wolle: 6 }, text: 'Die Schafweiden der Grenzabteien: täglich 6 Wolle.' },
+  stirling: { name: 'Stirlingshire', weight: 0.85, def: 20, text: 'Die Brücke über den Forth: Wer sie hält, hält das Reich zusammen (+20 Verteidigung).' },
+  inverness: { name: 'Moray', weight: 0.8, goods: { felle: 4, holz: 4 }, text: 'Der Zugang zu den Highlands: täglich Felle und Holz aus den Wäldern der Clans.' },
+  // Irland
+  carrickfergus: { name: 'Ulster', weight: 0.85, goods: { fleisch: 5 }, text: 'Die Rinderweiden von Antrim und Down: täglich 5 Fleisch.' },
+  trim: { name: 'Meath', goods: { getreide: 8 }, text: 'Das fruchtbarste Land Irlands: täglich 8 Getreide.' },
+  kilkenny: { name: 'Leinster', gold: 15, text: 'Das Erbe Strongbows mit seinen Märkten und Häfen: täglich 15 Gold.' },
+  limerick: { name: 'Thomond', goods: { fleisch: 3, salz: 2 }, text: 'Das Königreich der Ó Briain am Shannon: täglich Fleisch und Salz.' },
+  galway: { name: 'Connacht', weight: 0.8, goods: { felle: 3, wolle: 3 }, text: 'Das weite Land jenseits des Shannon: täglich Felle und Wolle.' },
 };
 const HOME_SHIRE = 'pontefract';
 // Abgaben je Ort in einer eigenen Grafschaft (Gold am Tag)
@@ -5954,14 +6314,14 @@ const TAX = { stadt: 15, markt: 8, abtei: 6, halle: 6, dorf: 3, burg: 10 };
 const K = 4;                 // Rastergröße in Kacheln
 // Reichweite in Rastern: in England und Wales bis rund 160 km (auch Devon und Cornwall), auf dem Festland rund
 // 115 km (Flandern und die Bretagne bleiben eigene Herrschaften)
-const SHIRE_REACH = { en: 50 * 10, wa: 50 * 10, nd: 36 * 10, fr: 36 * 10 };
+const SHIRE_REACH = { en: 50 * 10, wa: 50 * 10, nd: 36 * 10, fr: 36 * 10, sc: 50 * 10, ir: 50 * 10 };
 
-// Schottland gehört zu keiner Grafschaft (grob: nördlich von Solway und Tweed)
+// Schottland (grob: nördlich von Solway und Tweed) hat eigene Grafschaften: Die Grenze trennt sie von den englischen
 function scotland(lon, lat) {
   if (lon < -3.3) return lat > 54.6;
   if (lon < -3.05) return lat > 54.95;
-  if (lon < -2.0) return lat > 54.98 + (lon + 3.05) * 0.78;
-  return lat > 55.8;
+  if (lon < -2.0) return lat > 54.98 + (lon + 3.05) * 0.7;
+  return lat > 55.74;
 }
 
 // Raster der Grafschaften: Flutung über Land von allen Sitzen zugleich (Kosten 10 gerade, 14 schräg)
@@ -5971,18 +6331,20 @@ function buildShires(W) {
   const seats = W.sites.filter((s) => s.type === 'burg' && SHIRES[s.id]);
   const grid = new Uint8Array(S * S), cost = new Int32Array(S * S).fill(1 << 30), orig = new Uint8Array(S * S);
   const land = new Int32Array(S * S);
+  const york = W.sites.find((s) => s.id === 'york'), gbLand = york ? landAt(W, york.x, york.y) : 0;
   for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
     const x = i * K + K / 2, y = j * K + K / 2;
     const l = landAt(W, x, y);
     if (!l) continue;
     const lon = GEO.lonW + x * GEO.dLon, lat = GEO.latN - y * GEO.dLat;
-    if (scotland(lon, lat)) continue;
-    land[j * S + i] = l;
+    // Schottische Felder bekommen eine eigene Nummer: Englische Sitze greifen nicht über die Grenze und umgekehrt
+    land[j * S + i] = l === gbLand && scotland(lon, lat) ? -l : l;
   }
   const buckets = [];
   const push = (c, v, k) => { (buckets[c] || (buckets[c] = [])).push(v, k); };
   seats.forEach((s, n) => {
     s.landSeat = landAt(W, s.x, s.y);
+    if (s.realm === 'sc') s.landSeat = -s.landSeat;
     // Weitere Ausgangspunkte: Das Umland von York (das Ainsty) gehört zum West Riding
     const from = [s, ...(SHIRES[s.id].also || []).map((id) => W.sites.find((o) => o.id === id)).filter(Boolean)];
     from.forEach((o, q) => {
@@ -6054,9 +6416,9 @@ function shireState() {
 }
 function shireOwner(id) { return (shireState()[id] || {}).owner || null; }
 function ownedShires() { const st = shireState(); return Object.keys(SHIRES).filter((id) => st[id].owner === 'spieler'); }
-function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
-function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
-function ownerColor(o) { return o === 'spieler' ? playerColor() : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
+function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
+function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+function ownerColor(o) { return o === 'spieler' ? playerColor() : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
 
 // Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)
 function shireTax(id) {
@@ -7225,13 +7587,16 @@ function updateFunerals(dt) {
 
 
 
+
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
-  normannen: { en: 'heer_richard', wa: 'heer_richard', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp' },
+  normannen: { en: 'heer_richard', wa: 'heer_richard', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp', ir: 'heer_iren' },
   sachsen: { en: 'heer_john', wa: 'heer_john' },
   franken: { fr: 'heer_normandie', fl: 'heer_normandie', nd: 'heer_normandie' },
+  // Die Barone in Irland greifen nach den Ländern der gälischen Könige
+  iren: { ir: 'heer_john' },
 };
-const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'] };
+const DEFENDER_NPC = { normannen: ['soldat', 'armbrust'], sachsen: ['freisasse', 'sachs_bogen'], franken: ['sergent', 'arbaletrier'], schotten: ['freisasse', 'sachs_bogen'], iren: ['freisasse', 'waldmann'] };
 
 // ---------------------------------------------------------------- Schäden und Reparatur
 function siteBuildings(siteId) { return G.world.buildings.filter((b) => b.site === siteId && b.kind === 'house' && !(b.cons < 1)); }
@@ -7327,7 +7692,7 @@ function startSiege(target = null, armyType = null, scale = null, opts = {}) {
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
     // Grafschaftsburgen belagern die Heere im Krieg (war.js); hier geht es um Städte, Hallen und Märkte
-    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && !SHIRES[s.id] && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
+    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && !SHIRES[s.id] && !s.baron && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
       && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85 * MAP_K);
     if (!cand.length) return false;
     target = pick(cand);
@@ -7771,11 +8136,13 @@ function endSiege(sg, how, quiet = false) {
   const mine = isHeld(s);
   if (sg.lead) {
     // Deine eigene Belagerung: Fällt die Burg, gehört sie dir
-    if (how === 'gefallen') { for (const b of siteBuildings(s.id)) if (Math.random() < 0.3) damageBuilding(b, rand(0.15, 0.35)); conquer(sg); }
+    if (how === 'gefallen') { for (const b of siteBuildings(s.id)) if (Math.random() < 0.3) damageBuilding(b, rand(0.15, 0.35)); if (s.baron) baronConquered(s.baron); else conquer(sg); }
     else if (how === 'abgewehrt') log(`Dein Sturm auf ${name} ist gescheitert. Die Überlebenden deines Aufgebots zerstreuen sich.`, 'bad');
     else log(`Dein Aufgebot zieht von ${name} ab, ohne die Burg genommen zu haben. Die Söldner gehen ihrer Wege.`, 'bad');
   } else if (mine) {
     holdingSiegeOver(s, how, sg.def && G.groups.includes(sg.def) ? sg.def.members.length : 0, sg.army && sg.army.faction);
+    // Ein Baron in Fehde nimmt die Grafschaft für sich
+    if (how === 'gefallen' && sg.army && sg.army.baron && !isHeld(s)) { claimShire(s.id, `b:${sg.army.baron}`); G.shireTint = null; }
     if (how === 'abgewehrt') log(`Die Belagerung deiner Burg ${name} ist abgeschlagen!`, 'good');
   } else if (how === 'gefallen') {
     for (const b of siteBuildings(s.id)) if (Math.random() < 0.4) damageBuilding(b, rand(0.2, 0.45));
@@ -7784,6 +8151,7 @@ function endSiege(sg, how, quiet = false) {
       G.s.gold -= lost;
       for (const g of Object.keys(G.s.castle.storage)) G.s.castle.storage[g] = Math.floor(G.s.castle.storage[g] * 0.6);
       log(`${name} wurde gestürmt und geplündert! Verloren: ${lost} Gold und ein Teil der Vorräte.`, 'bad');
+      if (sg.army && sg.army.baron && baron(sg.army.baron)) baron(sg.army.baron).gold += lost;
     } else {
       const town = G.s.towns[s.id];
       if (town) for (const g of Object.keys(town.stock)) town.stock[g] = Math.floor(town.stock[g] * 0.5);
@@ -9433,11 +9801,11 @@ function price(site, good) {
 }
 
 function buyPrice(site, good) {
-  return Math.max(1, Math.ceil(price(site, good) * 1.08 * (isAlly('gilde') ? 0.95 : 1)));
+  return Math.max(1, Math.ceil(price(site, good) * 1.08 * (isAlly('gilde') ? 0.95 : 1) * (site.realm === 'sc' && isAlly('schotten') ? 0.95 : 1)));
 }
 
 function sellPrice(site, good) {
-  return Math.max(1, Math.floor(price(site, good) * 0.9 * (isAlly('gilde') ? 1.04 : 1)));
+  return Math.max(1, Math.floor(price(site, good) * 0.9 * (isAlly('gilde') ? 1.04 : 1) * (site.realm === 'sc' && isAlly('schotten') ? 1.04 : 1)));
 }
 
 function cargoUsed() {
@@ -10236,6 +10604,8 @@ function castleDefense() {
   let d = [5, 25, 55, 90][G.s.castle.level] + (G.s.castle.level ? CASTLE_TYPES[castleType()].def : 0) + bSum('wehr', [0, 15, 35, 60]) + shireDef();
   for (const c of G.s.companions) if (c.status === 'garnison') d += (c.st.atk + c.st.def) * 1.5;
   if (isAlly('sachsen')) d += 20;
+  if (isAlly('schotten')) d += 15;
+  if (isAlly('iren')) d += 10;
   if (homeGateClosed()) d += 10;
   return Math.round(d);
 }
@@ -10435,6 +10805,7 @@ function loadCargo(good, n) {
 
 
 
+
 // ---------------------------------------------------------------- Besitz
 function holdings() { return G.s.holdings || (G.s.holdings = {}); }
 function holdingOf(s) { const id = typeof s === 'string' ? s : s && s.id; return id ? holdings()[id] || null : null; }
@@ -10442,7 +10813,7 @@ function isHeld(s) { return !!holdingOf(s); }
 // Deine Burg Ashcombe oder eine eroberte
 function isOwnSite(s) { return !!s && (s.type === 'spieler' || isHeld(s)); }
 // Farbe der Herrschaft eines Ortes (Banner, Wachen, Kartenzeichen)
-function siteColor(s) { return isHeld(s) ? playerColor() : s && s.faction ? FACTIONS[s.faction].color : null; }
+function siteColor(s) { return isHeld(s) ? playerColor() : s && s.baron ? baronColor(s.baron) : s && s.faction ? FACTIONS[s.faction].color : null; }
 function heldSites() { return Object.keys(holdings()).map(siteById).filter(Boolean); }
 
 // Ausbau der Burgen bleibt, auch wenn sie den Herrn wechseln (die Welt wird beim Laden neu erzeugt)
@@ -10623,7 +10994,8 @@ function siegeHelpers(s) {
 
 // Was eine Belagerung verhindert (ohne Angabe der Größe: was jede verhindert)
 function besiegeBlock(s, n = null) {
-  if (!s || s.type !== 'burg' || !SHIRES[s.id]) return 'Belagern kannst du nur die Burgen, die eine Grafschaft beherrschen.';
+  if (!s || s.type !== 'burg' || (!SHIRES[s.id] && !s.baron)) return 'Belagern kannst du nur die Burgen, die eine Grafschaft beherrschen, und die Burgen der Barone.';
+  if (s.baron) { const why = baronSiegeBlock(s); if (why) return why; }
   if (isHeld(s)) return `${s.name} gehört dir schon.`;
   if (G.siege) return G.siege.site === s ? `${s.name} wird gerade belagert.` : `Gerade wird ${G.siege.site.type === 'spieler' ? 'deine Burg' : G.siege.site.name} belagert. Zwei Belagerungen zugleich gibt das Land nicht her.`;
   if (G.battle || inCombat()) return 'Erst muss der Kampf hier vorbei sein.';
@@ -10650,6 +11022,12 @@ function levyUnits(s, n) {
         out.push(m);
       }
     }
+    // Verbündete Barone und Vasallen schicken Männer in ihren Farben
+    for (const { id, n: k } of baronHelpers(s)) for (let j = 0; j < k; j++) {
+      const m = makeNpc(j % 3 === 2 ? 'armbrust' : 'soldat', pos.x + rand(-1, 1), pos.y + rand(-1, 1), bonus);
+      m.tunic = baronColor(id); m.livery = baronColor(id); m.ally = `b:${id}`;
+      out.push(m);
+    }
     return out;
   };
 }
@@ -10665,8 +11043,11 @@ function startOwnSiege(s, n) {
   G.s.gold -= levyCost(n);
   const sg = G.siege;
   sg.lead = true; sg.side = 'att'; sg.levy = n;
-  changeRep(s.faction, -25);
-  for (const f of Object.keys(FACTIONS)) if (rivalsOf(f, s.faction)) changeRep(f, 4);
+  // Eine Fehde mit einem Baron ist seine Sache, nicht die seiner Partei
+  if (!s.baron) {
+    changeRep(s.faction, -25);
+    for (const f of Object.keys(FACTIONS)) if (rivalsOf(f, s.faction)) changeRep(f, 4);
+  }
   const help = helpers.map((h) => `${h.n} ${FACTIONS[h.f].short}`).join(', ');
   log(`Du rufst dein Aufgebot zusammen: ${n} Söldner mit Trebuchet${help ? `, dazu schicken deine Verbündeten Männer (${help})` : ''}. Sie ziehen vor ${s.name} und schlagen ein Feldlager auf. Im Lager (E) gibst du das Zeichen zum Sturm.`, 'gold');
   return true;
@@ -10719,9 +11100,11 @@ function grantHolding(s) {
 // ---------------------------------------------------------------- Gegenangriffe
 // Welches Heer die früheren Herren schicken
 const COUNTER = {
-  normannen: { en: 'heer_john', wa: 'heer_john', nd: 'heer_normandie', fr: 'heer_normandie', fl: 'heer_normandie' },
+  normannen: { en: 'heer_john', wa: 'heer_john', nd: 'heer_normandie', fr: 'heer_normandie', fl: 'heer_normandie', ir: 'heer_john', sc: 'heer_john' },
   franken: { en: 'heer_philipp', wa: 'heer_philipp', nd: 'heer_philipp', fr: 'heer_philipp', fl: 'heer_philipp' },
   sachsen: { en: 'heer_richard', wa: 'heer_richard' },
+  schotten: { sc: 'heer_schotten', en: 'heer_schotten' },
+  iren: { ir: 'heer_iren' },
 };
 // Angriffsstärke der früheren Herren: wächst mit der Zeit, also muss die Burg mitwachsen
 function counterStrength() { return 45 + G.s.day * 2; }
@@ -11202,6 +11585,7 @@ function className(u) { return CLASSES[u.cls].name; }
 
 
 
+
 const THEATERS = {
   england: {
     name: 'England', realms: ['en', 'wa'], goal: null,
@@ -11250,6 +11634,8 @@ function theaterSeats(th) { return G.world.sites.filter((s) => SHIRES[s.id] && T
 // Wem eine Grafschaft im Krieg zählt: der Partei ihres Herrn; deine nur der Seite, der du die Treue geschworen hast
 function sideOfOwner(th, owner) {
   if (owner === 'spieler') { const a = allegiance(); return a && THEATERS[th].sides[a] ? a : null; }
+  // Grafschaften eines Barons zählen für die Seite, der er die Treue geschworen hat
+  if (isBaronOwner(owner)) { const b = baron(ownerBaron(owner)); return b && b.side && THEATERS[th].sides[b.side] ? b.side : null; }
   return Object.keys(THEATERS[th].sides).find((k) => THEATERS[th].sides[k] === owner) || null;
 }
 function sideOfSeat(th, s) { return sideOfOwner(th, shireOwner(s.id)); }
@@ -11266,6 +11652,7 @@ function sideStrength(th, side) {
   let st = T.base[side] + seats * 3 + (w.morale[side] || 0);
   if (w.support && w.support.side === side && w.support.until >= G.s.day) st += w.support.add;
   if (allegiance() === side) st += Math.min(30, Math.round(G.s.renown / 8));
+  st += sideStrengthBonus(th, side);
   return Math.max(10, Math.round(st));
 }
 
@@ -11477,6 +11864,693 @@ function campaignArrows() {
   }).filter(Boolean);
 }
 
+// ===== barons.js =====
+// Die Barone (Phase 6): sechs Herren mit eigener Burg, verteilt über das Reich: Wales, Schottland, Normandie,
+// Südengland, Mittelengland und Irland. Sie handeln wie du: Sie bauen ihre Burg aus (dieselben Gebäude auf denselben
+// Bauplätzen), werben Männer an, erfüllen Aufträge, treiben Handel, schwören im Krieg einer Seite die Treue oder kämpfen
+// für sich selbst und nehmen Grafschaften ein. Wie geschickt und wie reich sie sind, legt der Schwierigkeitsgrad fest.
+// Dir gegenüber haben sie ein Verhältnis: Geschenke und Hilfe machen Freunde und Verbündete, Raub und Streit machen
+// Feinde. In einer Fehde ziehen sie gegen deine Burg, und du darfst ihre Burg belagern. Wer unterliegt, wird Vasall.
+//
+// Spielstand: G.s.barons[id] = { gold, men, level, plots, con, renown, side, rel, ally, feud, vassal, march, ... }
+// Ein Baron sitzt in einer Burg (Ort mit type 'burg' und baron: id). Ihre Burgstufe ist die des Barons.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ---------------------------------------------------------------- Schwierigkeit
+// inc: Anteil am Einkommen, days: Bauzeit, start: Burgstufe und Gebäude zu Beginn, gold: Startgold,
+// smart: wie oft der Baron das Vernünftigste tut statt etwas Beliebiges, feud: ab welchem Verhältnis und Tag
+// er Fehde gegen dich führt, raid: Stärke seiner Angriffe
+const DIFFICULTY = {
+  leicht: { name: 'Leicht', inc: 0.62, days: 1.5, start: 1, builds: 2, gold: 200, men: 8, smart: 0.35, feudAt: -60, feudDay: 30, raid: 0.75,
+    text: 'Die Barone wirtschaften gemächlich und lassen dich lange in Ruhe.' },
+  mittel: { name: 'Mittel', inc: 0.9, days: 1.15, start: 1, builds: 3, gold: 450, men: 14, smart: 0.6, feudAt: -45, feudDay: 18, raid: 1,
+    text: 'Die Barone bauen zügig, handeln klug und nehmen dir übel, was du ihnen antust.' },
+  schwer: { name: 'Schwer', inc: 1.25, days: 0.85, start: 2, builds: 4, gold: 800, men: 24, smart: 0.85, feudAt: -25, feudDay: 10, raid: 1.3,
+    text: 'Die Barone sind reich, gerissen und greifen früh nach allem, was du nicht verteidigst.' },
+};
+const DIFF_IDS = Object.keys(DIFFICULTY);
+function difficulty() { return DIFFICULTY[(G.s && G.s.difficulty) || 'leicht'] || DIFFICULTY.leicht; }
+
+// ---------------------------------------------------------------- Die sechs Barone
+// trait: kriegsherr (wirbt an und greift an), kaufmann (Handel und Markt), wendehals (wechselt zur stärkeren Seite),
+// baumeister (baut zuerst die Burg), frommer (Aufträge der Kirche, Kapelle), rebell (kämpft für sich gegen die Normannen)
+const BARONS = {
+  gwilym: {
+    name: 'Gwilym ap Rhys', short: 'Gwilym', seat: 'garw', region: 'Wales', color: '#d4507f', arms: { field: '#d4507f', metal: 'gold', charge: 'rabe' },
+    side: 'richard', trait: 'kriegsherr', female: false,
+    desc: 'Ein walisischer Herr aus den Bergen von Powys. Er hasst Johanns Barone und zählt seine Feinde wie andere ihre Schafe.',
+  },
+  malcolm: {
+    name: 'Malcolm von Glenarden', short: 'Malcolm', seat: 'glenarden', region: 'Schottland', color: '#2b3a78', arms: { field: '#2b3a78', metal: 'silber', charge: 'hirsch' },
+    side: null, trait: 'kaufmann', female: false,
+    desc: 'Ein Lehnsmann König Wilhelms am Rand der Highlands. Er handelt mit Fellen, Wolle und Lachs und sieht zuerst auf sein Silber.',
+  },
+  raoul: {
+    name: 'Raoul de Montcabré', short: 'Raoul', seat: 'montcabre', region: 'Normandie', color: '#262626', arms: { field: '#262626', metal: 'gold', charge: 'eber' },
+    side: 'philipp', trait: 'wendehals', female: false,
+    desc: 'Ein normannischer Baron, der Philipp von Frankreich zuhört, solange es sich lohnt. Er dient immer dem, der gerade gewinnt.',
+  },
+  hugh: {
+    name: 'Hugh de Ravensmere', short: 'Hugh', seat: 'ravensmere', region: 'Südengland', color: '#6b4a2f', arms: { field: '#6b4a2f', metal: 'silber', charge: 'turm' },
+    side: 'john', trait: 'baumeister', female: false,
+    desc: 'Prinz Johns Gefolgsmann in Hampshire. Er baut Mauern lieber als Freundschaften.',
+  },
+  geoffrey: {
+    name: 'Geoffrey von Kirkwold', short: 'Geoffrey', seat: 'kirkwold', region: 'Mittelengland', color: '#6f9a2c', arms: { field: '#6f9a2c', metal: 'silber', charge: 'kreuz' },
+    side: 'richard', trait: 'frommer', female: false,
+    desc: 'Ein Kreuzfahrer wie du, zurück aus Akkon. Er stiftet Kapellen, hält sein Wort und betet für König Richard.',
+  },
+  fergal: {
+    name: 'Fergal Ó Duibhne', short: 'Fergal', seat: 'rathcarraig', region: 'Irland', color: '#4c94d0', arms: { field: '#4c94d0', metal: 'gold', charge: 'mond' },
+    side: null, trait: 'rebell', female: false,
+    desc: 'Ein gälischer Herr in den Mittellanden. Er nimmt den Normannen ab, was sie den Iren genommen haben.',
+  },
+};
+const BARON_IDS = Object.keys(BARONS);
+const BARON_TRAIT = {
+  kriegsherr: { name: 'Kriegsherr', build: 0.8, baronRecruit: 1.6, quest: 0.8, trade: 0.7, war: 1.6, faction: null },
+  kaufmann: { name: 'Kaufmann', build: 1.0, baronRecruit: 0.8, quest: 0.9, trade: 1.8, war: 0.6, faction: 'gilde' },
+  wendehals: { name: 'Wendehals', build: 1.0, baronRecruit: 1.0, quest: 1.0, trade: 1.1, war: 1.0, faction: null },
+  baumeister: { name: 'Baumeister', build: 1.6, baronRecruit: 0.9, quest: 0.8, trade: 1.0, war: 0.8, faction: null },
+  frommer: { name: 'Frommer Ritter', build: 1.0, baronRecruit: 0.9, quest: 1.6, trade: 0.8, war: 0.8, faction: 'kirche' },
+  rebell: { name: 'Rebell', build: 0.9, baronRecruit: 1.3, quest: 0.9, trade: 0.9, war: 1.4, faction: null },
+};
+function traitName(id) { return BARON_TRAIT[BARONS[id].trait].name; }
+// Seiten im Krieg (war.js): Richard, Johann oder Philipp; ohne Seite kämpft der Baron für sich
+const SIDE_NAME = { richard: 'König Richard', john: 'Prinz Johann', philipp: 'König Philipp' };
+const BARON_SIDE_FACTION = { richard: 'sachsen', john: 'normannen', philipp: 'franken' };
+
+// Heere und Handelszüge der Barone in ihren Farben (Gruppen auf der Karte)
+for (const [id, b] of Object.entries(BARONS)) {
+  GROUP_TYPES[`heer_${id}`] = {
+    name: `Das Heer von ${b.name}`, nom: `Das Heer von ${b.name}`, acc: `das Heer von ${b.name}`, pl: false, faction: null, baron: id, livery: b.color, army: true,
+    members: [['ritter_n', 3, 3], ['soldat', 12, 12], ['armbrust', 6, 6], ['soeldner', 7, 7]],
+    gold: [160, 320], itemChance: 1, renown: 8, count: 0, spawn: 'army', speed: 1.05,
+  };
+  GROUP_TYPES[`zug_${id}`] = {
+    name: `Handelszug von ${b.short}`, nom: `Der Handelszug von ${b.name}`, acc: `den Handelszug von ${b.name}`, pl: false, faction: null, baron: id, livery: b.color,
+    members: [['haendler', 1, 1], ['wache', 1, 2]], gold: [60, 130], goods: true, renown: 0, count: 0, spawn: 'route', speed: 1.12,
+  };
+}
+
+// ---------------------------------------------------------------- Zustand
+function barons() { return (G.s && G.s.barons) || {}; }
+function baron(id) { return barons()[id] || null; }
+function baronSite(id) { return G.world.sites.find((s) => s.baron === id) || null; }
+function siteBaron(s) { return s && s.baron ? s.baron : null; }
+function baronColor(id) { return BARONS[id] ? BARONS[id].color : '#8a8070'; }
+function isBaronOwner(o) { return typeof o === 'string' && o.startsWith('b:'); }
+function ownerBaron(o) { return isBaronOwner(o) ? o.slice(2) : null; }
+function baronActive(id) { const b = baron(id); return !!b && !b.gone; }
+
+// Bauplätze: dieselbe Anlage wie deine Turmburg
+function baronLayout(id) { const s = baronSite(id); return s ? plotLayout(s, 'turm') : []; }
+function baronPlots(id) {
+  const b = baron(id), lay = baronLayout(id);
+  if (!b) return [];
+  if (!b.plots) b.plots = lay.map(() => null);
+  while (b.plots.length < lay.length) b.plots.push(null);
+  if (b.plots.length > lay.length) b.plots.length = lay.length;
+  return b.plots;
+}
+function baronBLevel(id, bid) { return baronPlots(id).reduce((a, p) => (p && p.id === bid ? Math.max(a, p.lv) : a), 0); }
+function baronBSum(id, bid, table) { return baronPlots(id).reduce((a, p) => a + (p && p.id === bid ? table[p.lv] : 0), 0); }
+
+// Neues Spiel: Burgen und Kassen je nach Schwierigkeit
+function initBarons() {
+  const D = difficulty();
+  G.s.barons = {};
+  for (const [id, def] of Object.entries(BARONS)) {
+    const b = G.s.barons[id] = {
+      gold: D.gold + randInt(0, 120), men: D.men + randInt(0, 6), level: D.start, plots: null, con: null,
+      renown: D.start >= 2 ? 30 : 8, side: def.side, rel: baronStartRel(id), ally: false, feud: false, vassal: false,
+      quests: 0, trades: 0, wins: 0, losses: 0, lastGift: -9, lastAct: 0, march: null, feudSince: null, lastRaid: -99, tribute: 0, log: [],
+    };
+    const plots = baronPlots(id), lay = baronLayout(id);
+    const want = baronStartBuilds(def.trait).slice(0, D.builds);
+    for (const bid of want) { const i = baronFreePlot(id, bid, lay, plots); if (i >= 0) plots[i] = { id: bid, lv: D.start >= 2 && Math.random() < 0.5 ? 2 : 1 }; }
+  }
+  applyBarons();
+}
+function baronStartRel(id) {
+  const def = BARONS[id];
+  // Kreuzfahrer und Richards Leute mögen dich anfangs eher, Johanns Leute und Rebellen weniger
+  return { richard: 10, john: -5, philipp: -10 }[def.side] ?? 0;
+}
+function baronStartBuilds(trait) {
+  const base = { kriegsherr: ['kaserne', 'halle', 'schmiede', 'felder'], kaufmann: ['markt', 'schafzucht', 'felder', 'halle'], wendehals: ['halle', 'markt', 'kaserne', 'felder'],
+    baumeister: ['steinbruch', 'holzfaeller', 'halle', 'markt'], frommer: ['kapelle', 'felder', 'halle', 'hospiz'], rebell: ['kaserne', 'felder', 'halle', 'stall'] };
+  return base[trait];
+}
+function baronFreePlot(id, bid, lay, plots) {
+  const inner = !OUTER_ONLY[bid] && bid !== 'wehr' && bid !== 'markt';
+  const ok = lay.filter((p) => !plots[p.i] && !(OUTER_ONLY[bid] && p.inner));
+  const pref = ok.find((p) => p.inner === inner);
+  return pref ? pref.i : ok.length ? ok[0].i : -1;
+}
+
+// Nach Laden oder neuem Spiel: Burgstufe auf die Orte übertragen, Hindernisse eintragen
+function applyBarons() {
+  if (!G.s.barons) return;
+  const rects = [];
+  let keep = false;
+  for (const id of BARON_IDS) {
+    const s = baronSite(id), b = baron(id);
+    if (!s || !b) continue;
+    const lv = Math.max(1, b.level);
+    if ((s.castleLevel >= 3) !== (lv >= 3)) keep = true;
+    s.castleLevel = lv;
+    s.baronName = BARONS[id].name;
+    // Gebäude auf den Bauplätzen sind Hindernisse wie in deiner Burg
+    const plots = baronPlots(id), lay = baronLayout(id);
+    plots.forEach((p, i) => { if (p && lay[i]) for (const [x, y, wx, wy, pen] of plotRects(p.id, p.lv, lay[i])) rects.push({ x, y, wx, wy, pen: !!pen }); });
+  }
+  // Der Bergfried einer Festung ist größer
+  if (keep) rebuildStaticWalls(G.world);
+  setBaronRects(G.world, rects);
+  G.staticDirty = true;
+}
+
+// ---------------------------------------------------------------- Werte
+function baronCost(bid, L) {
+  const lv = bid === 'burg' ? BUILDINGS.burg.levels[L] : BUILDINGS[bid] && BUILDINGS[bid].levels[L];
+  if (!lv || !lv.cost) return null;
+  // Ein Baron kauft das Baumaterial ein: Waren zählen mit ihrem Grundpreis
+  return Object.entries(lv.cost).reduce((a, [k, v]) => a + (k === 'gold' ? v : v * GOODS[k].base * 0.8), 0);
+}
+function baronBuildDays(bid, L) {
+  const lv = bid === 'burg' ? BUILDINGS.burg.levels[L] : BUILDINGS[bid].levels[L];
+  return Math.max(1, Math.round((lv.days || 1) * difficulty().days));
+}
+function menCap(id) { const b = baron(id); return 10 + b.level * 8 + baronBLevel(id, 'kaserne') * 8 + (BARONS[id].trait === 'kriegsherr' ? 8 : 0); }
+// Einkommen am Tag (vor Schwierigkeit): Grundertrag, Werkstätten, Felder, Markt und Grafschaften, weniger Sold
+function baronIncome(id) {
+  const b = baron(id), tr = BARON_TRAIT[BARONS[id].trait];
+  let g = 22 + b.level * 18;
+  g += baronBSum(id, 'markt', [0, 15, 35, 60]) * (tr.trade > 1.2 ? 1.25 : 1);
+  g += baronBSum(id, 'felder', [0, 8, 14, 22]) + baronBSum(id, 'holzfaeller', [0, 6, 11, 16]) + baronBSum(id, 'steinbruch', [0, 8, 14, 22]);
+  g += baronBSum(id, 'schafzucht', [0, 8, 15, 24]) + baronBSum(id, 'schmiede', [0, 4, 8, 12]);
+  for (const sid of baronShires(id)) { const sh = SHIRES[sid]; g += 25 + (sh.gold || 0) + Object.entries(sh.goods || {}).reduce((a, [k, v]) => a + v * GOODS[k].base * 0.6, 0); }
+  return Math.round(g * difficulty().inc);
+}
+function baronUpkeep(id) { return Math.round(baron(id).men * 0.8); }
+function baronShires(id) { const st = G.s.shires || {}; return Object.keys(SHIRES).filter((k) => st[k] && st[k].owner === `b:${id}`); }
+// Kampfkraft: Männer, Burg, Schmiede
+function baronStrength(id) {
+  const b = baron(id);
+  if (!b || b.gone) return 0;
+  return Math.round(b.men * (1 + baronBLevel(id, 'schmiede') * 0.12) + b.level * 6);
+}
+function baronDefense(id) {
+  const b = baron(id);
+  return Math.round([5, 25, 55, 90][b.level] + b.men * 1.5 + baronBSum(id, 'wehr', [0, 15, 35, 60]));
+}
+// Rangliste: Burg, Gebäude, Grafschaften, Männer, Ruhm, Gold
+function baronScore(id) {
+  const b = baron(id);
+  const plots = baronPlots(id).reduce((a, p) => a + (p ? p.lv : 0), 0);
+  return Math.round(b.level * 100 + plots * 22 + baronShires(id).length * 90 + b.men * 2 + b.renown + Math.min(b.gold, 6000) / 30);
+}
+
+// ---------------------------------------------------------------- Verhältnis zu dir
+function relName(v) {
+  if (v >= 60) return 'herzlich';
+  if (v >= 25) return 'freundlich';
+  if (v > -10) return 'höflich';
+  if (v > -40) return 'kühl';
+  return 'feindselig';
+}
+function changeBaronRel(id, n, why = '') {
+  const b = baron(id);
+  if (!b || !n) return;
+  const before = b.rel;
+  b.rel = Math.max(-100, Math.min(100, Math.round(b.rel + n)));
+  if (b.rel !== before && why) log(`${BARONS[id].name}: ${why} (Verhältnis ${n > 0 ? '+' : ''}${b.rel - before})`, n > 0 ? 'good' : 'bad');
+  if (b.ally && b.rel < 10) { b.ally = false; log(`${BARONS[id].name} kündigt das Bündnis mit dir auf.`, 'bad'); }
+}
+function baronLogEntry(id, text, kind = 'info', loud = false) {
+  const b = baron(id);
+  b.log.push({ day: G.s.day, text });
+  if (b.log.length > 12) b.log.splice(0, b.log.length - 12);
+  const all = G.s.baronLog || (G.s.baronLog = []);
+  all.push({ day: G.s.day, id, text });
+  if (all.length > 60) all.splice(0, all.length - 60);
+  if (loud) log(text, kind);
+}
+function baronNearPlayer(id, r = 110) { const s = baronSite(id), p = G.s.player; return !!s && Math.hypot(s.x - p.x, s.y - p.y) < r * MAP_K; }
+
+// Was du ihm tun kannst
+const BARON_GIFT = 120;
+function giftBlock(id) {
+  const b = baron(id);
+  if (!b || b.gone) return 'Der Baron ist nicht mehr Herr seiner Burg.';
+  if (b.lastGift >= G.s.day) return 'Heute hast du ihm schon etwas geschenkt.';
+  if (G.s.gold < BARON_GIFT) return `Für ein würdiges Geschenk fehlt dir Gold (${BARON_GIFT}).`;
+  return null;
+}
+function baronGiveGift(id) {
+  if (giftBlock(id)) return false;
+  const b = baron(id);
+  G.s.gold -= BARON_GIFT; b.gold += BARON_GIFT; b.lastGift = G.s.day;
+  changeBaronRel(id, b.feud ? 4 : 10, 'Er nimmt dein Geschenk an');
+  return true;
+}
+function allianceBlock(id) {
+  const b = baron(id);
+  if (!b || b.gone) return 'Der Baron ist nicht mehr Herr seiner Burg.';
+  if (b.ally) return 'Ihr seid schon verbündet.';
+  if (b.feud) return 'Erst muss die Fehde beigelegt sein.';
+  if (b.rel < 40) return `Er traut dir noch nicht genug (Verhältnis ${b.rel}, nötig 40).`;
+  return null;
+}
+function offerAlliance(id) {
+  if (allianceBlock(id)) return false;
+  const b = baron(id);
+  b.ally = true;
+  addRenown(3);
+  log(`${BARONS[id].name} schlägt ein: Ihr seid verbündet. Er schickt dir Männer, wenn du eine Burg belagerst, und hilft, wenn man dich angreift.`, 'gold');
+  return true;
+}
+function feudBlock(id) {
+  const b = baron(id);
+  if (!b || b.gone) return 'Der Baron ist nicht mehr Herr seiner Burg.';
+  if (b.feud) return 'Ihr liegt schon in Fehde.';
+  if (b.vassal) return 'Er ist dein Vasall.';
+  return null;
+}
+function declareFeud(id, byBaron = false) {
+  if (feudBlock(id)) return false;
+  const b = baron(id);
+  b.feud = true; b.ally = false; b.feudSince = G.s.day;
+  b.rel = Math.min(b.rel, -50);
+  if (byBaron) log(`${BARONS[id].name} sagt dir die Fehde an! Seine Männer werden gegen ${homeName()} und deine Burgen ziehen. Du darfst nun auch seine Burg belagern.`, 'bad');
+  else { log(`Du sagst ${BARONS[id].name} die Fehde an. Ab jetzt darfst du seine Burg ${baronSite(id).name} belagern, und er wird sich wehren.`, 'bad'); }
+  return true;
+}
+function peaceCost(id) { const b = baron(id); return 150 + b.level * 120 + Math.round(baronStrength(id) * 2); }
+function peaceBlock(id) {
+  const b = baron(id);
+  if (!b || !b.feud) return 'Ihr liegt nicht in Fehde.';
+  if (G.s.gold < peaceCost(id)) return `Er verlangt ${peaceCost(id)} Gold Sühne.`;
+  return null;
+}
+function makePeace(id) {
+  if (peaceBlock(id)) return false;
+  const b = baron(id);
+  G.s.gold -= peaceCost(id); b.gold += peaceCost(id);
+  b.feud = false; b.march = null; b.rel = Math.max(b.rel, -15);
+  log(`Du zahlst ${BARONS[id].name} Sühne. Die Fehde ist beigelegt.`, 'good');
+  return true;
+}
+// Darfst du seine Burg belagern? Nur in einer Fehde
+function baronSiegeBlock(s) {
+  const id = siteBaron(s), b = id && baron(id);
+  if (!b) return null;
+  if (b.vassal) return `${BARONS[id].name} ist dein Vasall.`;
+  if (!b.feud) return `Ohne Fehde greift kein Ritter die Burg eines Barons an. Sag ${BARONS[id].name} erst die Fehde an.`;
+  return null;
+}
+// Du hast seine Burg genommen: Er zahlt Lösegeld und wird dein Vasall
+function baronConquered(id) {
+  const b = baron(id), def = BARONS[id];
+  if (!b) return;
+  const ransom = Math.min(b.gold, 250 + b.level * 200);
+  b.gold -= ransom; G.s.gold += ransom;
+  b.feud = false; b.march = null; b.vassal = true; b.ally = true; b.rel = 20;
+  b.men = Math.max(4, Math.floor(b.men * 0.3)); b.losses++;
+  const a = G.s.war && G.s.war.allegiance;
+  if (a) b.side = a;
+  addRenown(30);
+  for (const sid of baronShires(id)) claimShire(sid, 'spieler');
+  log(`${baronSite(id).name} ist gefallen! ${def.name} beugt das Knie: Er zahlt ${ransom} Gold Lösegeld, wird dein Vasall und gibt dir seine Grafschaften. Jeden Tag zahlt er dir Tribut.`, 'gold');
+  applyBarons();
+}
+
+// Verbündete Barone schicken Männer zu deiner Belagerung (holdings.js)
+function baronHelpers(target) {
+  const out = [];
+  for (const id of BARON_IDS) {
+    const b = baron(id), s = baronSite(id);
+    if (!b || b.gone || !(b.ally || b.vassal) || b.feud || !s || s.land !== target.land) continue;
+    if (target.baron === id) continue;
+    const n = Math.min(8, Math.max(2, Math.floor(b.men / 6)));
+    if (Math.hypot(s.x - target.x, s.y - target.y) < 260 * MAP_K && b.men > n + 4) out.push({ id, n });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- Tageslauf
+function dailyBarons() {
+  if (!G.s.barons) return;
+  const D = difficulty();
+  let notes = 0;
+  const say = (id, text, kind = 'info', force = false) => {
+    const loud = force || (notes < 2 && baronNearPlayer(id));
+    if (loud && !force) notes++;
+    baronLogEntry(id, text, kind, loud);
+  };
+  for (const id of BARON_IDS) {
+    const b = baron(id), def = BARONS[id], tr = BARON_TRAIT[def.trait];
+    if (!b || b.gone || !baronSite(id)) continue;
+    // Einkommen und Sold
+    const inc = baronIncome(id), up = baronUpkeep(id);
+    b.gold += inc - up;
+    if (b.gold < 0) { const lost = Math.min(b.men, Math.ceil(-b.gold / 10)); b.men -= lost; b.gold = 0; }
+    // Vasallen zahlen Tribut
+    if (b.vassal) { const t = Math.max(5, Math.round(inc * 0.25)); b.gold -= t; G.s.gold += t; b.tribute += t; }
+    // Baustelle fertig?
+    if (b.con && G.s.day >= b.con.done) baronFinishBuild(id, say);
+    // Heerzug angekommen?
+    if (b.march && G.s.day >= b.march.arrive) baronResolveMarch(id, say);
+    // Was der Baron heute tut: ein, an guten Tagen zwei Vorhaben
+    const acts = Math.random() < 0.25 * D.smart ? 2 : 1;
+    for (let k = 0; k < acts; k++) {
+      const smart = Math.random() < D.smart;
+      const w = {
+        bauen: b.con ? 0 : 1.2 * tr.build,
+        anwerben: b.men < menCap(id) ? 0.7 * tr.baronRecruit * (b.feud || b.march ? 1.8 : 1) : 0,
+        auftrag: 0.55 * tr.quest,
+        handel: 0.5 * tr.trade,
+        krieg: !b.march && b.men >= 30 && G.s.day >= 8 && G.s.day - (b.lastWar || -99) >= 10 ? 0.14 * tr.war : 0,
+      };
+      // Klug: zuerst Burg und Einkommen, Krieg nur mit genug Männern
+      if (smart && b.gold > (baronCost('burg', Math.min(3, b.level + 1)) || 9e9) * 0.8 && !b.con) w.bauen *= 2.5;
+      if (smart && b.men < 16) w.anwerben *= 1.8;
+      const act = pickWeighted(w);
+      if (act === 'bauen') baronStartBuild(id, smart, say);
+      else if (act === 'anwerben') baronRecruit(id);
+      else if (act === 'auftrag') baronQuest(id, say);
+      else if (act === 'handel') baronTrade(id, say);
+      else if (act === 'krieg') baronPlanCampaign(id, say);
+    }
+    // Überschuss: Söldner für den Krieg oder eine Stiftung, die Ruhm bringt
+    const rich = Math.max(1500 + b.level * 800, b.level < 3 ? baronCost('burg', b.level + 1) * 1.2 : 0);
+    if (b.gold > rich) {
+      const room = menCap(id) + 20 - b.men;
+      if ((b.feud || b.side || def.trait === 'rebell') && tr.war >= 1 && room > 0) { const n = Math.min(10, room); b.men += n; b.gold -= n * 20; }
+      else {
+        b.gold -= 350; b.renown += 2;
+        if (Math.random() < 0.25) say(id, `${def.name} stiftet ${pick(['ein Glasfenster', 'einen Altar', 'eine Glocke', 'ein Spital', 'eine Brücke'])} in ${pick(G.world.sites.filter((o) => (o.type === 'abtei' || o.type === 'stadt') && o.land === baronSite(id).land)).name}.`);
+      }
+    }
+    // Seite im Krieg prüfen (alle paar Tage)
+    if ((G.s.day + id.length) % 6 === 0) baronReconsiderSide(id, say);
+    // Fehde gegen dich
+    if (!b.feud && !b.vassal && !b.ally && b.rel <= D.feudAt && G.s.day >= D.feudDay && Math.random() < 0.15 * tr.war) declareFeud(id, true);
+    if (b.feud && !b.march && b.men >= 14 && G.s.day - b.lastRaid >= 5 && Math.random() < 0.3 * tr.war) baronPlanFeud(id, say);
+    // Das Verhältnis kühlt ab oder erholt sich langsam
+    if (!b.feud && b.rel < 0 && Math.random() < 0.3) b.rel++;
+  }
+  // Wöchentlich: Tribut der Vasallen melden
+  if (G.s.day % 7 === 0) {
+    const vs = BARON_IDS.filter((id) => baron(id) && baron(id).vassal && baron(id).tribute > 0);
+    if (vs.length) {
+      const sum = vs.reduce((a, id) => a + baron(id).tribute, 0);
+      log(`Tribut deiner Vasallen in dieser Woche: ${sum} Gold (${vs.map((id) => BARONS[id].short).join(', ')}).`, 'gold');
+      for (const id of vs) baron(id).tribute = 0;
+    }
+  }
+}
+function pickWeighted(w) {
+  const sum = Object.values(w).reduce((a, b) => a + b, 0);
+  if (sum <= 0) return null;
+  let r = Math.random() * sum;
+  for (const [k, v] of Object.entries(w)) { r -= v; if (r <= 0) return k; }
+  return null;
+}
+
+// ---- Bauen: Burgstufe oder ein Gebäude auf einem Bauplatz, wie bei dir
+const BARON_PRIORITY = {
+  kriegsherr: ['kaserne', 'schmiede', 'halle', 'felder', 'stall', 'wehr', 'markt', 'holzfaeller', 'steinbruch', 'kapelle', 'schafzucht', 'hospiz'],
+  kaufmann: ['markt', 'schafzucht', 'felder', 'stall', 'halle', 'holzfaeller', 'steinbruch', 'kaserne', 'schmiede', 'kapelle', 'wehr', 'hospiz'],
+  wendehals: ['halle', 'markt', 'kaserne', 'felder', 'schmiede', 'stall', 'schafzucht', 'wehr', 'steinbruch', 'kapelle', 'holzfaeller', 'hospiz'],
+  baumeister: ['steinbruch', 'holzfaeller', 'markt', 'halle', 'wehr', 'kaserne', 'felder', 'schmiede', 'kapelle', 'stall', 'schafzucht', 'hospiz'],
+  frommer: ['kapelle', 'hospiz', 'felder', 'halle', 'markt', 'schafzucht', 'kaserne', 'stall', 'schmiede', 'wehr', 'holzfaeller', 'steinbruch'],
+  rebell: ['kaserne', 'felder', 'halle', 'schmiede', 'stall', 'wehr', 'schafzucht', 'markt', 'holzfaeller', 'kapelle', 'steinbruch', 'hospiz'],
+};
+function baronCandidates(id) {
+  const b = baron(id), plots = baronPlots(id), lay = baronLayout(id), out = [];
+  // Die Burg selbst
+  const nl = b.level + 1;
+  if (nl <= 3) {
+    const need = BUILDINGS.burg.levels[nl].need || {};
+    if (!(need.renown && b.renown < need.renown)) out.push({ kind: 'burg', id: 'burg', level: nl, cost: baronCost('burg', nl), plot: -1 });
+  }
+  // Gebäude ausbauen (höchstens bis zur Burgstufe) oder neu bauen
+  const order = BARON_PRIORITY[BARONS[id].trait];
+  for (const bid of order) {
+    const have = plots.map((p, i) => (p && p.id === bid ? i : -1)).filter((i) => i >= 0);
+    for (const i of have) { const L = plots[i].lv + 1; if (L <= 3 && L <= b.level + 1) out.push({ kind: 'bau', id: bid, level: L, plot: i, cost: baronCost(bid, L) }); }
+    if (!have.length || STACKABLE[bid]) { const i = baronFreePlot(id, bid, lay, plots); if (i >= 0 && (have.length < 2)) out.push({ kind: 'bau', id: bid, level: 1, plot: i, cost: baronCost(bid, 1) }); }
+  }
+  return out.filter((c) => c.cost);
+}
+function baronStartBuild(id, smart, say) {
+  const b = baron(id);
+  if (b.con) return;
+  const cand = baronCandidates(id);
+  if (!cand.length) return;
+  const order = BARON_PRIORITY[BARONS[id].trait];
+  // Klug: erst die Burg, sobald sie bezahlbar ist, sonst nach Rang in der Vorliebe und Preis
+  const rank = (c) => (c.kind === 'burg' ? -5 : order.indexOf(c.id)) + c.level * 1.5;
+  // Wie bei dir: Je größer die Burg, desto mehr Gebäude haben Platz und Leute
+  const count = baronPlots(id).filter(Boolean).length, cap = 3 + b.level * 3;
+  const castle = cand.find((c) => c.kind === 'burg');
+  let ok = cand.filter((c) => c.cost <= b.gold - 40 && (c.kind === 'burg' || c.level > 1 || count < cap));
+  // Klug: auf den nächsten Burgausbau sparen, statt das Gold für Kleinkram auszugeben
+  if (castle && smart && castle.cost > b.gold - 40) ok = ok.filter((c) => b.gold - c.cost >= castle.cost * 0.6);
+  if (!ok.length) return;
+  const c = smart ? ok.sort((x, y) => rank(x) - rank(y))[0] : pick(ok);
+  b.gold -= Math.round(c.cost);
+  const days = baronBuildDays(c.id, c.level);
+  b.con = { ...c, days, done: G.s.day + days };
+  G.staticDirty = true;
+}
+function baronFinishBuild(id, say) {
+  const b = baron(id), c = b.con, def = BARONS[id];
+  b.con = null;
+  if (c.kind === 'burg') {
+    b.level = c.level; b.renown += 6;
+    say(id, `${def.name} hat ${baronSite(id).name} zur ${BUILDINGS.burg.levels[c.level].name} ausgebaut.`, 'info', c.level >= 2);
+  } else {
+    const plots = baronPlots(id);
+    if (plots[c.plot] && plots[c.plot].id !== c.id) return;
+    plots[c.plot] = { id: c.id, lv: c.level };
+    b.renown += 1;
+    if (c.level >= 2) say(id, `${def.name} baut in ${baronSite(id).name}: ${BUILDINGS[c.id].name} Stufe ${c.level}.`);
+  }
+  applyBarons();
+}
+function baronRecruit(id) {
+  const b = baron(id), room = menCap(id) - b.men;
+  if (room <= 0) return;
+  const n = Math.min(room, randInt(2, 5), Math.floor((b.gold - 60) / 14));
+  if (n <= 0) return;
+  b.gold -= n * 14; b.men += n;
+}
+// Aufträge: wie du erledigen die Barone Botengänge, Geleit und Kämpfe für die Parteien ihrer Gegend
+function baronQuest(id, say) {
+  const b = baron(id), def = BARONS[id], s = baronSite(id);
+  const near = G.world.sites.filter((o) => o.faction && o.type !== 'einsiedelei' && o.land === s.land && Math.hypot(o.x - s.x, o.y - s.y) < 160 * MAP_K && FACTIONS[o.faction]);
+  if (!near.length) return;
+  const fav = BARON_TRAIT[def.trait].faction;
+  const town = fav && Math.random() < 0.5 ? (near.find((o) => o.faction === fav) || pick(near)) : pick(near);
+  if (Math.random() > 0.55 + difficulty().smart * 0.35) return;   // Nicht jeder Auftrag gelingt
+  const gold = Math.round(rand(40, 120) * (0.7 + difficulty().inc * 0.4));
+  b.gold += gold; b.renown += randInt(1, 2); b.quests++;
+  if (b.quests % 4 === 0) say(id, `${def.name} hat in ${town.name} einen Auftrag für die ${FACTIONS[town.faction].short} erledigt, schon den ${b.quests}.`);
+}
+// Handel: Waren aus der eigenen Gegend zu einem Markt in der Nähe; in deiner Nähe ziehen echte Handelszüge
+function baronTrade(id, say) {
+  const b = baron(id), def = BARONS[id], s = baronSite(id);
+  const markets = G.world.sites.filter((o) => ['stadt', 'markt'].includes(o.type) && o.land === s.land && Math.hypot(o.x - s.x, o.y - s.y) < 220 * MAP_K);
+  if (!markets.length) return;
+  const m = pick(markets), d = Math.hypot(m.x - s.x, m.y - s.y) / MAP_K;
+  const gain = Math.round((28 + d * 0.25 + baronBLevel(id, 'markt') * 12 + baronBLevel(id, 'stall') * 8) * BARON_TRAIT[def.trait].trade * difficulty().inc);
+  b.gold += gain; b.trades++;
+  // Sichtbar: ein Handelszug in deiner Nähe, den man überfallen kann (das nimmt dir der Baron übel)
+  if (baronNearPlayer(id, 140) && G.groups && !G.groups.some((g) => g.type === `zug_${id}`)) {
+    const g = spawnGroup(`zug_${id}`, { pos: { x: s.x + rand(-1, 1), y: s.y + 6.5 } });
+    if (g) g.baron = id;
+  }
+  if (b.trades % 5 === 0) say(id, `${def.name} schickt Wagen mit Waren nach ${m.name}. Seine Kasse füllt sich.`);
+}
+
+// ---- Krieg: für seine Seite oder für sich selbst eine Grafschaft einnehmen
+function baronEnemySeats(id) {
+  const b = baron(id), s = baronSite(id), def = BARONS[id];
+  const mySide = b.side;
+  return G.world.sites.filter((o) => {
+    if (!SHIRES[o.id] || o.type !== 'burg' || o.land !== s.land) return false;
+    const owner = shireOwner(o.id);
+    if (owner === `b:${id}`) return false;
+    if (owner === 'spieler') return false;              // dich greift er nur in einer Fehde an
+    if (isBaronOwner(owner)) { const ob = baron(ownerBaron(owner)); return ob && !ob.ally && ob.side !== mySide && Math.random() < 0.4; }
+    if (mySide) return BARON_SIDE_FACTION[mySide] !== owner && (owner === 'normannen' || owner === 'sachsen' || owner === 'franken') && baronRivalOfSide(mySide, owner);
+    // Ohne Seite: Rebellen gegen die Normannen, sonst gegen wen es sich lohnt
+    if (def.trait === 'rebell') return owner === 'normannen';
+    return owner !== (s.faction || '') && Math.random() < 0.5;
+  }).filter((o) => Math.hypot(o.x - s.x, o.y - s.y) < 230 * MAP_K);
+}
+function baronRivalOfSide(side, owner) {
+  if (side === 'richard') return owner === 'normannen' || owner === 'franken';
+  if (side === 'john') return owner === 'sachsen' || owner === 'franken';
+  if (side === 'philipp') return owner === 'normannen';
+  return false;
+}
+function baronPlanCampaign(id, say) {
+  const b = baron(id), s = baronSite(id);
+  const cand = baronEnemySeats(id);
+  if (!cand.length) return;
+  cand.sort((x, y) => Math.hypot(x.x - s.x, x.y - s.y) - Math.hypot(y.x - s.x, y.y - s.y));
+  const t = cand[0];
+  const days = Math.max(1, Math.min(4, Math.round(Math.hypot(t.x - s.x, t.y - s.y) / (45 * MAP_K))));
+  const men = Math.floor(b.men * 0.8);
+  b.march = { kind: 'grafschaft', target: t.id, men, arrive: G.s.day + days };
+  b.lastWar = G.s.day;
+  say(id, `${BARONS[id].name} zieht mit ${men} Mann gegen ${t.name} (${shireName(t.id)}).`, 'info', baronNearPlayer(id, 160) || Math.hypot(t.x - G.s.player.x, t.y - G.s.player.y) < 120 * MAP_K);
+}
+function baronPlanFeud(id, say) {
+  const b = baron(id), s = baronSite(id), home = G.world.sites.find((o) => o.type === 'spieler');
+  const held = G.world.sites.filter((o) => shireOwner(o.id) === 'spieler' && SHIRES[o.id] && o.land === s.land);
+  const targets = [...(home.land === s.land || Math.random() < 0.4 ? [home] : []), ...held];
+  if (!targets.length) return;
+  const t = pick(targets);
+  const days = Math.max(1, Math.min(5, Math.round(Math.hypot(t.x - s.x, t.y - s.y) / (45 * MAP_K))));
+  const men = Math.floor(b.men * 0.75);
+  b.march = { kind: 'fehde', target: t.id, men, arrive: G.s.day + days };
+  b.lastRaid = G.s.day;
+  log(`Kundschafter melden: ${BARONS[id].name} zieht mit ${men} Mann gegen ${t.type === 'spieler' ? homeName() : t.name}. Ankunft in etwa ${days} ${days === 1 ? 'Tag' : 'Tagen'}.`, 'bad');
+}
+function baronResolveMarch(id, say) {
+  const b = baron(id), m = b.march, def = BARONS[id];
+  b.march = null;
+  const t = G.world.sites.find((o) => o.id === m.target);
+  if (!t) return;
+  const A = (m.men * (1 + baronBLevel(id, 'schmiede') * 0.12) + b.level * 4) * rand(0.8, 1.2) * (m.kind === 'fehde' ? difficulty().raid : 1);
+  if (m.kind === 'fehde') { baronFeudRaid(id, t, A, m.men); return; }
+  const owner = shireOwner(t.id);
+  if (owner === `b:${id}` || owner === 'spieler') return;
+  // Verteidigung: Burg, Partei, Kriegsglück; eine Burg in Baronshand verteidigt deren Heer
+  // Eine Grafschaftsburg verteidigen ihre Besatzung und, im Krieg, die Stärke ihrer Seite
+  let Dv = (t.castleLevel >= 3 ? 80 : 60) * rand(0.85, 1.2);
+  const th = t.realm === 'nd' || t.realm === 'fr' ? 'normandie' : t.realm === 'en' || t.realm === 'wa' ? 'england' : null;
+  if (th && FACTIONS[owner]) { const defSide = Object.entries({ richard: th === 'normandie' ? 'normannen' : 'sachsen', john: 'normannen', philipp: 'franken' }).find(([sd, f]) => f === owner && (th === 'normandie' ? sd !== 'john' : sd !== 'philipp')); if (defSide) Dv += sideStrength(th, defSide[0]) * 0.25; }
+  if (isBaronOwner(owner)) Dv = baronDefense(ownerBaron(owner)) * 0.9 * rand(0.8, 1.2);
+  const won = Math.random() < Math.max(0.08, Math.min(0.75, 0.32 + ((A - Dv) / (A + Dv)) * 0.8));
+  const lost = Math.round(m.men * (won ? rand(0.12, 0.25) : rand(0.3, 0.5)));
+  b.men = Math.max(0, b.men - lost);
+  const loud = Math.hypot(t.x - G.s.player.x, t.y - G.s.player.y) < 150 * MAP_K || baronNearPlayer(id, 150);
+  if (won) {
+    b.wins++; b.renown += 8;
+    const prev = owner;
+    if (isBaronOwner(prev)) { const ob = baron(ownerBaron(prev)); if (ob) { ob.losses++; ob.renown = Math.max(0, ob.renown - 4); } }
+    claimShire(t.id, `b:${id}`);
+    if (b.side && BARON_SIDE_FACTION[b.side]) { (G.s.siteFaction || (G.s.siteFaction = {}))[t.id] = BARON_SIDE_FACTION[b.side]; t.faction = BARON_SIDE_FACTION[b.side]; }
+    G.shireTint = null;
+    say(id, `${def.name} hat ${t.name} erobert. Die Grafschaft ${shireName(t.id)} gehört jetzt ihm.`, 'info', true);
+  } else {
+    b.losses++;
+    say(id, `${def.name} ist vor ${t.name} gescheitert und hat ${lost} Mann verloren.`, 'info', loud);
+  }
+}
+
+// Fehde: Das Heer des Barons steht vor deiner Burg oder einer deiner Grafschaftsburgen. Bist du in der Nähe, wird daraus
+// eine echte Belagerung; sonst entscheidet die Verteidigung gegen seine Stärke.
+function baronFeudRaid(id, t, A, men) {
+  const b = baron(id), def = BARONS[id], p = G.s.player;
+  const home = t.type === 'spieler';
+  const near = Math.hypot(t.x - p.x, t.y - p.y) < 100 * MAP_K;
+  if (near && !G.siege && !G.battle && startSiege(t, `heer_${id}`, Math.min(1.2, 0.5 + men / 60))) {
+    if (home) G.s.lastHomeSiege = G.s.day;
+    return;
+  }
+  const allies = BARON_IDS.filter((o) => o !== id && baron(o) && (baron(o).ally || baron(o).vassal) && !baron(o).feud).reduce((a, o) => a + baronStrength(o) * 0.25, 0);
+  const D = (home ? castleDefense() : isHeld(t) ? holdingDefense(holdingOf(t)) : 40) + allies;
+  if (D * rand(0.85, 1.15) >= A) {
+    const lost = Math.round(men * rand(0.25, 0.45));
+    b.men = Math.max(0, b.men - lost); b.losses++;
+    addRenown(3);
+    log(`${def.name} ist vor ${home ? homeName() : t.name} gescheitert (Verteidigung ${Math.round(D)} gegen ${Math.round(A)}). Er verliert ${lost} Mann.`, 'good');
+    return;
+  }
+  b.wins++; b.renown += 5;
+  if (home) {
+    const lostGold = Math.floor(G.s.gold * 0.15);
+    G.s.gold -= lostGold; b.gold += lostGold;
+    for (const g of Object.keys(G.s.castle.storage)) G.s.castle.storage[g] = Math.floor(G.s.castle.storage[g] * 0.75);
+    burnOuterPlots(0.25, def.name);
+    log(`${def.name} hat ${homeName()} überfallen (Verteidigung ${Math.round(D)} gegen ${Math.round(A)})! Er raubt ${lostGold} Gold und Vorräte und legt Feuer vor der Mauer.`, 'bad');
+  } else if (isHeld(t)) {
+    loseHolding(t, `${def.name} hat deine Burg ${t.name} gestürmt! Die Grafschaft ${shireName(t.id)} gehört jetzt ihm.`, null);
+    claimShire(t.id, `b:${id}`);
+    G.shireTint = null;
+  }
+}
+
+// Seite wechseln: der Wendehals geht zur stärkeren Seite, andere bleiben, solange es nicht ganz schlecht steht
+function baronReconsiderSide(id, say) {
+  const b = baron(id), def = BARONS[id];
+  if (b.vassal) { const a = G.s.war && G.s.war.allegiance; if (a && b.side !== a) b.side = a; return; }
+  const s = baronSite(id);
+  const th = s.realm === 'nd' || s.realm === 'fr' ? 'normandie' : 'england';
+  const sides = th === 'normandie' ? ['richard', 'philipp'] : ['richard', 'john'];
+  const st = sides.map((sd) => sideStrength(th, sd));
+  const best = st[0] >= st[1] ? sides[0] : sides[1];
+  const ratio = Math.max(...st) / Math.max(1, Math.min(...st));
+  if (def.trait === 'wendehals' ? ratio > 1.15 && b.side !== best : def.trait !== 'frommer' && def.trait !== 'rebell' && ratio > 1.8 && b.side && b.side !== best && Math.random() < 0.3) {
+    const old = b.side;
+    b.side = best;
+    say(id, `${def.name} wechselt die Seite: ${old ? `Er verlässt ${SIDE_NAME[old]} und` : 'Er'} schwört ${SIDE_NAME[best]} die Treue.`, 'info', true);
+  }
+}
+
+// ---------------------------------------------------------------- Für die Anzeige
+// Alle sieben Herren mit Punkten: die Barone und du
+function ranking(player) {
+  const rows = BARON_IDS.filter((id) => baron(id)).map((id) => {
+    const b = baron(id), s = baronSite(id);
+    return { id, name: BARONS[id].name, seat: s ? s.name : '', region: BARONS[id].region, color: BARONS[id].color, arms: BARONS[id].arms, level: b.level,
+      men: b.men, shires: baronShires(id).length, renown: b.renown, gold: b.gold, score: baronScore(id), side: b.side, rel: b.rel, ally: b.ally, feud: b.feud, vassal: b.vassal, march: b.march };
+  });
+  if (player) rows.push(player);
+  rows.sort((a, b) => b.score - a.score);
+  return rows;
+}
+function baronStatus(id) {
+  const b = baron(id);
+  if (!b) return '';
+  if (b.vassal) return 'dein Vasall';
+  if (b.feud) return 'in Fehde mit dir';
+  if (b.ally) return 'dein Verbündeter';
+  return relName(b.rel);
+}
+function baronNews(n = 12) { return (G.s.baronLog || []).slice(-n).reverse(); }
+function sideStrengthBonus(th, side) {
+  let add = 0;
+  for (const id of BARON_IDS) {
+    const b = baron(id), s = baronSite(id);
+    if (!b || b.gone || b.side !== side || !s) continue;
+    const bth = s.realm === 'nd' || s.realm === 'fr' ? 'normandie' : 'england';
+    // Barone aus Schottland und Irland schicken ihre Männer nach England
+    if (bth !== th) continue;
+    add += Math.round(baronStrength(id) * 0.12);
+  }
+  return Math.min(25, add);
+}
+
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
 // an der Quelle (billiger als in der Stadt, aber nur, was sie gerade haben). Im Waldlager heuern Söldner an, und wer
@@ -11629,6 +12703,7 @@ function mercFaction(site) { return FACTIONS[site.faction] ? FACTIONS[site.facti
 
 
 
+
 function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
@@ -11681,6 +12756,7 @@ function newDay() {
   dailyCastle();
   dailyHoldings();
   dailyWar();
+  dailyBarons();
   dailyQuests();
   maintainGroups();
   replenishAnimals();
@@ -12430,6 +13506,7 @@ function drawKnightPlate(c, w, h, arms, t = 0, opt = {}) {
 
 
 
+
 // Heere im Krieg (war.js): Pfeil von der Ausgangsburg zum Ziel in der Farbe der Partei, der Punkt zeigt, wie weit sie sind
 function drawCampaigns(c, v) {
   for (const a of campaignArrows()) {
@@ -12453,7 +13530,7 @@ function drawCampaigns(c, v) {
 }
 
 // Farbe eines Heeres: dein Aufgebot in deinen Farben, sonst die der Partei
-function armyColor(g) { return g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
+function armyColor(g) { return g.baron ? baronColor(g.baron) : g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -13691,6 +14768,32 @@ function drawRoundKeep(c, b) {
   }
 }
 
+// Irischer Rundturm neben einer kleinen Steinkirche: schlank, mit steinerner Kegelhaube und der Tür hoch über dem Boden
+function drawIrishRoundTower(c, b) {
+  const kx = b.x - 0.45, ky = b.y + 0.15;
+  drawShadow(c, kx, ky, 1.3, 0.75, 16);
+  drawBox(c, kx, ky, 1.3, 0.72, 13, '#bdb6a5', 0, 'stone');
+  drawGableRoof(c, kx, ky, 1.3, 0.72, 13, 9, ROOFS.slate, '#bdb6a5', true);
+  const tx = b.x + 0.7, ty = b.y - 0.25, g = P(tx, ty, 0), RX = 12, RY = 6.1, H = 104;
+  c.fillStyle = 'rgba(30,40,20,0.25)'; c.beginPath(); c.ellipse(g[0] + 10, g[1] + 3, RX + 8, RY + 3, 0, 0, Math.PI * 2); c.fill();
+  const grad = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
+  grad.addColorStop(0, '#dcd5c4'); grad.addColorStop(0.5, '#c2baa7'); grad.addColorStop(1, '#8c8577');
+  c.fillStyle = grad;
+  c.beginPath(); c.moveTo(g[0] - RX, g[1]); c.lineTo(g[0] - RX * 0.86, g[1] - H); c.lineTo(g[0] + RX * 0.86, g[1] - H); c.lineTo(g[0] + RX, g[1]);
+  c.ellipse(g[0], g[1], RX, RY, 0, 0, Math.PI, false); c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(60,50,40,0.3)'; c.lineWidth = 1;
+  for (let z = 9; z < H; z += 9) { const f = 1 - (z / H) * 0.14; c.beginPath(); c.ellipse(g[0], g[1] - z, RX * f, RY * f, 0, 0.15, Math.PI - 0.15, false); c.stroke(); }
+  // Tür hoch oben, Schlitzfenster und vier Fenster unter der Haube
+  c.fillStyle = '#3a332c'; c.beginPath(); c.moveTo(g[0] - 3, g[1] - 30); c.lineTo(g[0] - 3, g[1] - 39); c.arc(g[0], g[1] - 39, 3, Math.PI, 0); c.lineTo(g[0] + 3, g[1] - 30); c.fill();
+  c.fillStyle = GLASS(); c.fillRect(g[0] + 3, g[1] - 62, 2, 6);
+  for (const dx of [-6, 0, 6]) c.fillRect(g[0] + dx - 1, g[1] - H + 6, 2.5, 6);
+  // Kegelhaube aus Stein
+  const cg = c.createLinearGradient(g[0] - RX, 0, g[0] + RX, 0);
+  cg.addColorStop(0, '#a49d8e'); cg.addColorStop(1, '#6c665c');
+  c.fillStyle = cg; c.beginPath(); c.moveTo(g[0] - RX * 0.95, g[1] - H); c.lineTo(g[0], g[1] - H - 28); c.lineTo(g[0] + RX * 0.95, g[1] - H);
+  c.ellipse(g[0], g[1] - H, RX * 0.95, RY * 0.9, 0, 0, Math.PI, false); c.closePath(); c.fill();
+}
+
 // Tuch- und Messehalle mit Arkaden, in Brügge mit Belfried
 function drawClothHall(c, b) {
   const col = '#cdbfa2', wx = 3.2, wy = 1.3, h = 22;
@@ -13740,6 +14843,7 @@ function drawLandmark(c, b) {
     case 'tower': if (b.grey && flemish(b) && drawGravensteen(c, b)) return null; return drawGreatKeep(c, b);
     case 'motte': return drawMotte(c, b);
     case 'rundturm': return drawRoundKeep(c, b);
+    case 'rundturm_ir': return drawIrishRoundTower(c, b);
     case 'tuchhalle': if (flemish(b) && drawFlemishClothHall(c, b)) return null; return drawClothHall(c, b);
     case 'tor': return drawTor(c, b);
     default: return null;
@@ -14716,6 +15820,7 @@ function buildStaticParts() {
       });
     }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, siteColor(s)));
+    if (s.baron) parts.push(...baronCastleParts(s));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
     if (s.cemetery) {
       const cm = s.cemetery;
@@ -15362,8 +16467,8 @@ function eigenPick(base, dmg = 0) {
 function eigenBase(id, L, p) { const nm = EIGEN_NAME[id]; return nm && L ? `${nm}${p.size < 3 ? '_hof' : ''}_${L}` : null; }
 // Ein Platzbild malen; Abgebranntes raucht noch an den Feuerstellen, nachts brennt Licht in bewohnten Gebäuden
 const EIGEN_LIT = { halle: 1, kaserne: 1, schmiede: 1, hospiz: 1, kapelle: 0.6, markt: 0.5 };
-function drawEigen(c, sid, p, id, dmg) {
-  if (!p5(c, sid, p.x, p.y, 1, false, playerColor())) return;
+function drawEigen(c, sid, p, id, dmg, col = playerColor()) {
+  if (!p5(c, sid, p.x, p.y, 1, false, col)) return;
   if (dmg === 2) {
     const fp = EIGEN_FEUER[sid.replace(/^eigen_/, '').replace(/_winter$/, '')];
     if (fp && Math.random() < 0.05) { const q = fp[Math.floor(Math.random() * fp.length)], g = P(p.x, p.y, 0); smokeEmit(g[0] + q[0], g[1] + q[1], 0.3); }
@@ -15408,6 +16513,37 @@ function addCastleActors(add, id, L, p, dmg) {
     case 'felder': if (seasonIndex() < 3) wk(p.x - 0.4, p.y + 0.7, 'hacke', p.x * 1.3, { col: '#8a7a55', hat: '#c9b06a', speed: 2.2 }); break;
     default: break;
   }
+}
+
+// Burg eines Barons (barons.js): dieselben gemalten Gebäude auf denselben Bauplätzen wie bei dir, in seiner Farbe,
+// dazu die Baustelle, an der er gerade arbeitet. Mauern und Bergfried zeichnet castlePieces nach seiner Burgstufe.
+function baronCastleParts(s) {
+  const id = s.baron, b = baron(id);
+  if (!b) return [];
+  const parts = [], z0 = groundZ(G.world, s.x, s.y), col = baronColor(id);
+  const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
+  const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
+  const plots = baronPlots(id), lay = baronLayout(id), con = b.con;
+  lay.forEach((p, i) => {
+    const pl = plots[i], building = con && con.kind === 'bau' && con.plot === i;
+    if (!pl && !building) return;
+    const bid = pl ? pl.id : con.id, L = pl ? pl.lv : 0;
+    const base = eigenBase(bid, L, p), sid = base && eigenPick(base);
+    if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, bid, 0, col)); addCastleActors(add, bid, L, p, 0); }
+    else if (L) { addCastleBuilding(add, bid, L, p, s); addNewCastleBuilding(add, addFlat, bid, L, p, s); }
+    if (building) {
+      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`), b2 = b1 && eigenPick(`baustelle${hof}_2`);
+      const prog = () => Math.max(0, Math.min(1, (G.s.day - (con.done - (con.days || 1)) + G.s.time / DAY_LEN) / (con.days || 1)));
+      if (b1 && b2) add(p.x, p.y, (c) => p5(c, prog() < 0.5 ? b1 : b2, p.x, p.y, 1, false, col));
+      else add(p.x, p.y, (c) => drawScaffold(c, p.x, p.y, p.size * 0.7, p.size * 0.7, 30));
+      add(p.x + p.size * 0.4 + 0.4, p.y + p.size * 0.4, (c) => drawWorker(c, p.x + p.size * 0.4 + 0.4, p.y + p.size * 0.4, 'hammer', 0.5, { col: '#8a6e4b', flip: true, speed: 4.5 }));
+    }
+  });
+  // Der Baron baut seine Burg aus: Gerüst am Bergfried
+  if (con && con.kind === 'burg') add(s.x - 1.1, s.y - 0.2, (c) => { drawScaffold(c, s.x - 1.1, s.y - 1.1, 2.4, 2.4, 70); drawStones(c, s.x + 1.2, s.y + 1.4, 6); });
+  // Ein Banner in seiner Farbe am Tor
+  add(s.x + 1.4, s.y + 4.6, (c) => banner(c, s.x + 1.4, s.y + 4.6, 30, col));
+  return parts;
 }
 
 function buildPlayerCastle() {
@@ -19050,6 +20186,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -19214,8 +20351,10 @@ function townPanel() {
   const f = site.faction;
   const town = G.s.towns[site.id];
   const shire = shireOfSite(site);
-  const sub = `${esc(TYPE_NAME[site.type])} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
-  if (isHostileFaction(f)) {
+  const sub = site.baron && BARONS[site.baron]
+    ? `${esc(siteTypeName(site))} · <span class="swatch" style="--c:${BARONS[site.baron].color}"></span>${esc(BARONS[site.baron].name)} · ${esc(baronStatus(site.baron))}${shire ? ` · Grafschaft ${esc(shireName(shire))}` : ''}`
+    : `${esc(siteTypeName(site))} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
+  if (isHostileFaction(f) && !site.baron) {
     return {
       title: site.name, sub, tabs: [],
       body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${letterActions(site, 'den Herrn der Stadt; die Torwache reicht ihn weiter, auch wenn sie dich nicht einlässt')}${siegeAt(site) ? siegeActions() : ''}${besiegeActions(site)}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
@@ -19237,7 +20376,7 @@ function townInfo(site) {
     <div>
       <p class="lede">${esc(site.desc)}</p>
       <dl class="facts">
-        <dt>Herrschaft</dt><dd>${swatch(f)}${esc(FACTIONS[f].name)}</dd>
+        <dt>Herrschaft</dt><dd>${site.baron && BARONS[site.baron] ? `<span class="swatch" style="--c:${BARONS[site.baron].color}"></span>${esc(BARONS[site.baron].name)} <span class="muted">(steht zu den ${esc(FACTIONS[f].short)})</span>` : `${swatch(f)}${esc(FACTIONS[f].name)}`}</dd>
         <dt>Dein Ansehen</dt><dd>${repPill(f)}</dd>
         <dt>Billig zu haben</dt><dd>${list(site.produces)}</dd>
         <dt>Gesucht</dt><dd>${list(site.demands)}</dd>
@@ -19245,6 +20384,7 @@ function townInfo(site) {
       </dl>
     </div>
     <div class="actions">
+      ${site.baron ? baronAudience(site) : ''}
       ${letterActions(site)}
       ${siegeAt(site) ? siegeActions() : ''}
       ${besiegeActions(site)}
@@ -19354,7 +20494,7 @@ function letterActions(site, who = null) {
 function abandonedPanel(site) {
   const back = G.s.abandoned[site.id];
   return {
-    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · verlassen`, tabs: [],
+    title: site.name, sub: `${esc(siteTypeName(site))} · verlassen`, tabs: [],
     body: `<div class="notice bad"><p>Die Türen stehen offen, die Herdstellen sind kalt. Seit deinem Überfall wohnt in ${esc(site.name)} niemand mehr. Markt, Gasthaus und Werkstätten sind verlassen.</p><p>Erst um Tag ${back} wagen sich die ersten Leute zurück.</p></div>
       <div class="actions">${letterActions(site, 'die wenigen, die geblieben sind')}${blightActions(site)}${site.port ? harbourActions(site) : ''}</div>`,
   };
@@ -19388,7 +20528,7 @@ function hermitPanel(site) {
   const st = hermitState(site);
   const bless = canBless(site);
   return {
-    title: site.name, sub: `${esc(TYPE_NAME[site.type])} · Einsiedelei`, tabs: [],
+    title: site.name, sub: `${esc(siteTypeName(site))} · Einsiedelei`, tabs: [],
     body: `<div class="cols">
       <div><p class="lede">${esc(site.desc)}</p><p>${esc(FEATURE_TEXT[site.feature] || '')} Glühwürmchen tanzen hier in der Dämmerung, und es ist seltsam still.</p></div>
       <div class="actions">
@@ -20077,7 +21217,7 @@ function ownerSwatch(o) { return `<span class="swatch" style="--c:${ownerColor(o
 function shireCard(id, withSeat = false) {
   const seat = G.world.sites.find((s) => s.id === id), sh = SHIRES[id], own = shireOwner(id);
   const places = shireSites(id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(TYPE_NAME[s.type])})</span>`).join(', ') : 'keine weiteren Orte';
+  const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(siteTypeName(s))})</span>`).join(', ') : 'keine weiteren Orte';
   const home = id === HOME_SHIRE;
   return `<div class="shire${home ? ' home' : ''}${own === 'spieler' ? ' mine' : ''}">
     <div class="shire-head"><b>${esc(sh.name)}</b>${withSeat && seat ? `<span class="muted">Sitz: ${esc(seat.name)}</span>` : ''}<span>${ownerSwatch(own)}Herr: ${esc(ownerName(own))}</span></div>
@@ -20088,7 +21228,7 @@ function shireCard(id, withSeat = false) {
   </div>`;
 }
 function shiresList() {
-  const realmRank = { en: 0, wa: 1, nd: 2, fr: 3 };
+  const realmRank = { en: 0, wa: 1, sc: 2, ir: 3, nd: 4, fr: 5, fl: 6 };
   const ids = Object.keys(SHIRES).filter((id) => G.world.sites.some((s) => s.id === id));
   const seatOf = (id) => G.world.sites.find((s) => s.id === id);
   ids.sort((a, b) => (a === HOME_SHIRE ? -1 : b === HOME_SHIRE ? 1 : 0) || (shireOwner(a) === 'spieler' ? -1 : 0) - (shireOwner(b) === 'spieler' ? -1 : 0) || realmRank[seatOf(a).realm] - realmRank[seatOf(b).realm] || SHIRES[a].name.localeCompare(SHIRES[b].name, 'de'));
@@ -20098,6 +21238,72 @@ function homeShireNote() {
   if (shireOwner(HOME_SHIRE) === 'spieler') return '';
   const seat = G.world.sites.find((s) => s.id === HOME_SHIRE);
   return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;
+}
+
+// ---------------------------------------------------------------- Barone (barons.js)
+// Rangliste aller sieben Herren (die Barone und du), dazu ihre Nachrichten
+function playerRankRow() {
+  const plots = castlePlots().reduce((a, p) => a + (p ? p.lv : 0), 0);
+  const shires = Object.values(G.s.shires || {}).filter((v) => v.owner === 'spieler').length;
+  const men = G.s.companions.length;
+  const score = Math.round(G.s.castle.level * 100 + plots * 22 + shires * 90 + men * 6 + G.s.renown + G.s.gold / 12);
+  return { id: null, name: `${G.s.player.name} (du)`, seat: homeName(), region: '', color: playerColor(), arms: G.s.arms, level: G.s.castle.level, men, shires, renown: G.s.renown, score, side: allegiance() };
+}
+function baronsView() {
+  const rows = ranking(playerRankRow());
+  const lv = (l) => BUILDINGS.burg.levels[l].name;
+  const table = rows.map((r, i) => {
+    const b = r.id ? baron(r.id) : null;
+    const status = b ? `<span class="baronrel ${b.feud ? 'bad' : b.ally || b.vassal ? 'good' : ''}">${esc(baronStatus(r.id))}</span>` : '<span class="muted">du</span>';
+    const march = b && b.march ? ` · zieht gegen ${esc((siteById(b.march.target) || {}).name || '')}` : '';
+    return `<div class="baron${r.id ? '' : ' mine'}">
+      <span class="rank">${i + 1}.</span>
+      <span class="arms-mini">${r.arms ? armsSVG(r.arms, 28, r.name) : ''}</span>
+      <div class="baron-main">
+        <div class="baron-head"><b>${esc(r.name)}</b><span class="muted">${esc(r.seat)}${r.region ? ` · ${esc(r.region)}` : ''}</span>${status}</div>
+        <div class="baron-facts">${esc(lv(r.level))} · ${r.men} Mann · ${r.shires} Grafschaft${r.shires === 1 ? '' : 'en'} · Ruhm ${r.renown} · ${r.side ? `Seite: ${esc(SIDE_NAME[r.side] || '')}` : 'kämpft für sich'}${b ? ` · ${esc(traitName(r.id))}` : ''}${march}</div>
+      </div>
+      <span class="score" title="Rang aus Burg, Gebäuden, Grafschaften, Männern, Ruhm und Gold">${r.score}</span>
+      ${r.id ? `<button class="btn sm" data-act="barongo" data-b="${r.id}">Hinreisen</button>` : ''}
+    </div>`;
+  }).join('');
+  const news = baronNews(14).map((e) => `<li><span class="muted">Tag ${e.day}</span> ${esc(e.text)}</li>`).join('');
+  return `<div class="barons">${table}</div>
+    <p class="hint">Besuche einen Baron in seiner Burg (E an der Burg): Dort kannst du ihm Geschenke machen, ein Bündnis schließen, ihm die Fehde ansagen oder Frieden schließen. Verbündete schicken dir Männer vor fremde Burgen, Vasallen zahlen Tribut. Wer ihre Handelszüge überfällt, macht sich Feinde.</p>
+    <h3>Nachrichten von den Baronen</h3>${news ? `<ul class="warnews">${news}</ul>` : '<p class="muted">Noch gibt es nichts zu berichten.</p>'}`;
+}
+// Audienz in der Burg eines Barons
+function baronAudience(site) {
+  const id = site.baron, b = baron(id), def = BARONS[id];
+  if (!b) return '';
+  const lv = BUILDINGS.burg.levels[b.level].name;
+  const btn = (act, label, why, cls = '') => `<button class="btn ${cls}" data-act="${act}" data-b="${id}" ${why ? `disabled title="${esc(why)}"` : ''}>${esc(label)}</button>`;
+  const con = b.con ? (b.con.kind === 'burg' ? `Ausbau zur ${BUILDINGS.burg.levels[b.con.level].name}` : `${BUILDINGS[b.con.id].name} Stufe ${b.con.level}`) : '';
+  const shires = baronShires(id).map((sid) => SHIRES[sid].name).join(', ');
+  return `<h3>Audienz bei ${esc(def.name)}</h3>
+    <div class="notice${b.feud ? ' bad' : b.ally || b.vassal ? ' good' : ''}">
+      <div class="baron-audience"><span class="arms-mini">${armsSVG(def.arms, 44, def.name)}</span><p>${esc(def.desc)}</p></div>
+      <dl class="facts">
+        <dt>Verhältnis zu dir</dt><dd>${esc(baronStatus(id))} (${b.rel > 0 ? '+' : ''}${b.rel})</dd>
+        <dt>Burg</dt><dd>${esc(lv)}${con ? ` · baut: ${esc(con)}` : ''}</dd>
+        <dt>Männer</dt><dd>${b.men} von ${menCap(id)} · Kampfkraft ${baronStrength(id)} · Verteidigung ${baronDefense(id)}</dd>
+        <dt>Im Krieg</dt><dd>${b.side ? `schwört ${esc(SIDE_NAME[b.side])} die Treue` : 'kämpft für sich selbst'} · ${esc(traitName(id))}</dd>
+        <dt>Grafschaften</dt><dd>${shires ? esc(shires) : 'keine'}</dd>
+        <dt>Einkommen</dt><dd>etwa ${fmt(baronIncome(id) - baronUpkeep(id))} Gold am Tag${b.vassal ? ' (ein Viertel davon als Tribut an dich)' : ''}</dd>
+      </dl>
+    </div>
+    <div class="action"><div><b>Geschenk (${BARON_GIFT} Gold)</b><p>Silber, ein guter Falke, ein Fass Wein: Das Verhältnis steigt. Einmal am Tag.</p></div>${btn('bgift', 'Schenken', giftBlock(id))}</div>
+    ${b.ally || b.vassal ? '' : `<div class="action"><div><b>Bündnis anbieten</b><p>Ab einem Verhältnis von 40: Er schickt Männer, wenn du eine Burg belagerst, steht dir gegen Angreifer bei und greift dich nicht an.</p></div>${btn('bally', 'Bündnis', allianceBlock(id))}</div>`}
+    ${b.feud ? `<div class="action"><div><b>Frieden schließen</b><p>Er verlangt ${fmt(peaceCost(id))} Gold Sühne. Oder du belagerst seine Burg: Fällt sie, zahlt er Lösegeld und wird dein Vasall.</p></div>${btn('bpeace', 'Sühne zahlen', peaceBlock(id))}</div>`
+      : b.vassal ? '' : `<div class="action"><div><b>Fehde ansagen</b><p>Dann darfst du seine Burg belagern (das Aufgebot findest du unten). Er wird seinerseits gegen deine Burgen ziehen.</p></div>${btn('bfeud', 'Fehde', feudBlock(id), 'danger')}</div>`}
+    ${b.feud ? baronSiegeBox(site) : ''}`;
+}
+function baronSiegeBox(site) {
+  if (isHeld(site) || siegeAt(site)) return '';
+  const why = besiegeBlock(site);
+  return `<h3>Burg belagern</h3>
+    <div class="notice"><p>Mit einem Aufgebot aus Söldnern ziehst du vor ${esc(site.name)}. Die Besatzung zählt rund ${baron(site.baron).men} Mann. Fällt die Burg, zahlt ${esc(BARONS[site.baron].name)} Lösegeld, gibt dir seine Grafschaften und wird dein Vasall.</p>${why ? `<p class="muted">${esc(why)}</p>` : ''}</div>
+    ${LEVIES.map((l) => `<div class="action"><div><b>${esc(l.name)}: ${l.n} Söldner</b><p>Handgeld für ${l.n} Mann (je ${MERC_COST} Gold) und das Belagerungsgerät mit Trebuchet (${SIEGE_GEAR} Gold).</p></div><button class="btn danger" data-act="besiege" data-n="${l.n}" ${besiegeBlock(site, l.n) ? 'disabled' : ''}>Belagern (${fmt(levyCost(l.n))} Gold)</button></div>`).join('')}`;
 }
 
 // ---------------------------------------------------------------- Krieg (war.js)
@@ -20141,11 +21347,12 @@ function warView() {
     <h3>Kriegsnachrichten</h3>${news ? `<ul class="warnews">${news}</ul>` : '<p class="muted">Noch ist es ruhig.</p>'}`;
 }
 
-const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften']];
+const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften'], ['barone', 'Barone']];
 function mapPanel() {
   if (G.ui.tab === 'grafschaften') {
     return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: MAP_TABS, body: shiresList() };
   }
+  if (G.ui.tab === 'barone') return { title: 'Die Barone', sub: `Sieben Herren ringen um Macht und Land, du bist einer davon. Schwierigkeit: ${esc(difficulty().name)}.`, tabs: MAP_TABS, body: baronsView() };
   if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: MAP_TABS, body: warView() };
   return {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: MAP_TABS,
@@ -20377,6 +21584,11 @@ const ACTIONS = {
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
+  bgift: (d) => { baronGiveGift(d.b); refreshPanel(); },
+  bally: (d) => { offerAlliance(d.b); refreshPanel(); },
+  bfeud: (d) => confirmDialog(`${BARONS[d.b].name} die Fehde ansagen? Er wird gegen deine Burgen ziehen, und seine Freunde sehen das ungern.`, 'Fehde', () => { declareFeud(d.b); refreshPanel(); }),
+  bpeace: (d) => { makePeace(d.b); refreshPanel(); },
+  barongo: (d) => { const s = G.world.sites.find((x) => x.baron === d.b); if (s) { closePanel(); travelTo({ x: s.x, y: s.y + 6 }, null); } },
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
   sdef: () => joinSiege('def'),
@@ -20481,7 +21693,7 @@ const ACTIONS = {
   hire: (d) => hire(Number(d.i)),
   besiege: (d) => {
     const site = G.ui.arg, n = Number(d.n);
-    confirmDialog(`${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
+    confirmDialog(site.baron ? `${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold. Fällt die Burg, wird ${BARONS[site.baron].name} dein Vasall.` : `${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
   },
   sabort: () => confirmDialog('Die Belagerung aufgeben? Die Söldner ziehen ab, das Handgeld ist fort.', 'Aufgeben', () => { abortOwnSiege(); closePanel(); }),
   warswear: (d) => {
@@ -20679,12 +21891,13 @@ function saveSummary(data = readSave()) {
 
 
 
+
 const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
 function newGame(opts) {
-  const { name, castleName, color, female, arms } = opts;
+  const { name, castleName, color, female, arms, difficulty } = opts;
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed);
   G.nextId = 1;
@@ -20695,8 +21908,8 @@ function newGame(opts) {
     x: site.x + 0.3, y: site.y + 2.6,
   });
   G.s = {
-    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0,
-    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10 },
+    seed, castleName, color, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
+    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
     castle: { level: 0, b: {}, storage: { holz: 30, stein: 0, eisen: 0, getreide: 20, fleisch: 4 }, construction: null, recruits: [], recruitDay: 0 },
@@ -20732,6 +21945,8 @@ function startWorld() {
     G.s.worldSig = sig;
   }
   refreshCastleBlock();
+  // Die Barone: im neuen Spiel (oder einem Spielstand ohne sie) ihre Burgen anlegen, sonst Burgstufen übertragen
+  if (!G.s.barons) initBarons(); else applyBarons();
   applyDamage();
   applyHoldings();
   initWar();
@@ -20803,12 +22018,16 @@ function buildSetupForm() {
       if (!titleFemale && ni.value === 'Aelfgifu') ni.value = 'Aldric';
     });
   }
+  for (const r of document.querySelectorAll('input[name="schwierigkeit"]')) {
+    r.addEventListener('change', () => { if (r.checked && DIFFICULTY[r.value]) byId('diff-text').textContent = DIFFICULTY[r.value].text; });
+  }
   byId('setup-form').addEventListener('submit', (e) => {
     e.preventDefault();
     startAudio();
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
-    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms() });
+    const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
+    newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' });
   });
 }
 
@@ -21521,7 +22740,7 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
 
 })();
 </script>

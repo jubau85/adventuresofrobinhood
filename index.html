@@ -67,7 +67,7 @@
       <header class="title-head">
         <p class="eyebrow">England, Schottland, Irland und Frankreich, im Jahre des Herrn 1194</p>
         <h1>A Knight's Tale</h1>
-        <p class="intro">König Richard ist aus der Gefangenschaft frei, doch Prinz Johns Barone halten noch die Burgen. Jenseits des Kanals greift König Philipp nach der Normandie, die sächsischen Familien murren, in den Wäldern sammeln sich die Geächteten. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben.</p>
+        <p class="intro">König Richard ist aus der Gefangenschaft frei, doch Prinz Johns Barone halten noch die Burgen. Jenseits des Kanals greift König Philipp nach der Normandie, die sächsischen Familien murren, in den Wäldern sammeln sich die Geächteten. Sechs Barone von Wales bis Irland greifen nach Macht und Land. Du kehrst aus dem Heiligen Land zurück. Von deinem Erbe ist nur ein verfallener Burgstall geblieben.</p>
       </header>
       <form class="title-card" id="setup-form" autocomplete="off" novalidate>
         <h2>Wer kehrt heim?</h2>
@@ -108,6 +108,14 @@
           </div>
           <div class="preview"><canvas id="hero-preview" width="240" height="340" aria-label="Vorschau: dein Ritter mit Wappen"></canvas></div>
         </div>
+        <fieldset class="field">
+          <legend>Schwierigkeit der Barone <span id="diff-text" class="muted">Die Barone wirtschaften gemächlich und lassen dich lange in Ruhe.</span></legend>
+          <div class="seg" id="diff-pick">
+            <label><input type="radio" name="schwierigkeit" value="leicht" checked><span>Leicht</span></label>
+            <label><input type="radio" name="schwierigkeit" value="mittel"><span>Mittel</span></label>
+            <label><input type="radio" name="schwierigkeit" value="schwer"><span>Schwer</span></label>
+          </div>
+        </fieldset>
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>

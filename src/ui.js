@@ -45,6 +45,10 @@ import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
 import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, hireInTown } from './camps.js';
 import { armsSVG } from './heraldry.js';
+import {
+  BARONS, baron, ranking, baronStatus, baronNews, traitName, SIDE_NAME, difficulty, BARON_GIFT, giftBlock, baronGiveGift, allianceBlock, offerAlliance,
+  feudBlock, declareFeud, peaceBlock, peaceCost, makePeace, baronIncome, baronUpkeep, baronShires, baronStrength, baronDefense, menCap, baronSiegeBlock,
+} from './barons.js';
 import { SHIRES, HOME_SHIRE, shireOfSite, shireName, shireSites, shireOwner, ownerName, ownerPhrase, ownerColor, shireTax } from './shires.js';
 
 export function byId(id) { return document.getElementById(id); }
@@ -211,8 +215,10 @@ function townPanel() {
   const f = site.faction;
   const town = G.s.towns[site.id];
   const shire = shireOfSite(site);
-  const sub = `${esc(siteTypeName(site))} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
-  if (isHostileFaction(f)) {
+  const sub = site.baron && BARONS[site.baron]
+    ? `${esc(siteTypeName(site))} · <span class="swatch" style="--c:${BARONS[site.baron].color}"></span>${esc(BARONS[site.baron].name)} · ${esc(baronStatus(site.baron))}${shire ? ` · Grafschaft ${esc(shireName(shire))}` : ''}`
+    : `${esc(siteTypeName(site))} · ${swatch(f)}${esc(FACTIONS[f].name)} · ${repPill(f)}${shire ? ` · ${SHIRES[site.id] ? 'Sitz der Grafschaft' : 'Grafschaft'} ${esc(shireName(shire))}` : ''}`;
+  if (isHostileFaction(f) && !site.baron) {
     return {
       title: site.name, sub, tabs: [],
       body: `<div class="notice bad"><p>Die Wachen von ${esc(site.name)} verwehren dir den Zutritt. Die ${esc(FACTIONS[f].name)} sind dir feindlich gesinnt.</p><p>Erledige Aufträge für ihre Freunde, mach Geschenke an verbündete Höfe oder meide ihre Rivalen, damit sich das wieder ändert.</p></div><div class="actions">${letterActions(site, 'den Herrn der Stadt; die Torwache reicht ihn weiter, auch wenn sie dich nicht einlässt')}${siegeAt(site) ? siegeActions() : ''}${besiegeActions(site)}${site.port ? harbourActions(site) : ''}${blightActions(site)}${raidAction(site)}</div>`,
@@ -234,7 +240,7 @@ function townInfo(site) {
     <div>
       <p class="lede">${esc(site.desc)}</p>
       <dl class="facts">
-        <dt>Herrschaft</dt><dd>${swatch(f)}${esc(FACTIONS[f].name)}</dd>
+        <dt>Herrschaft</dt><dd>${site.baron && BARONS[site.baron] ? `<span class="swatch" style="--c:${BARONS[site.baron].color}"></span>${esc(BARONS[site.baron].name)} <span class="muted">(steht zu den ${esc(FACTIONS[f].short)})</span>` : `${swatch(f)}${esc(FACTIONS[f].name)}`}</dd>
         <dt>Dein Ansehen</dt><dd>${repPill(f)}</dd>
         <dt>Billig zu haben</dt><dd>${list(site.produces)}</dd>
         <dt>Gesucht</dt><dd>${list(site.demands)}</dd>
@@ -242,6 +248,7 @@ function townInfo(site) {
       </dl>
     </div>
     <div class="actions">
+      ${site.baron ? baronAudience(site) : ''}
       ${letterActions(site)}
       ${siegeAt(site) ? siegeActions() : ''}
       ${besiegeActions(site)}
@@ -1097,6 +1104,72 @@ function homeShireNote() {
   return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;
 }
 
+// ---------------------------------------------------------------- Barone (barons.js)
+// Rangliste aller sieben Herren (die Barone und du), dazu ihre Nachrichten
+function playerRankRow() {
+  const plots = castlePlots().reduce((a, p) => a + (p ? p.lv : 0), 0);
+  const shires = Object.values(G.s.shires || {}).filter((v) => v.owner === 'spieler').length;
+  const men = G.s.companions.length;
+  const score = Math.round(G.s.castle.level * 100 + plots * 22 + shires * 90 + men * 6 + G.s.renown + G.s.gold / 12);
+  return { id: null, name: `${G.s.player.name} (du)`, seat: homeName(), region: '', color: playerColor(), arms: G.s.arms, level: G.s.castle.level, men, shires, renown: G.s.renown, score, side: allegiance() };
+}
+function baronsView() {
+  const rows = ranking(playerRankRow());
+  const lv = (l) => BUILDINGS.burg.levels[l].name;
+  const table = rows.map((r, i) => {
+    const b = r.id ? baron(r.id) : null;
+    const status = b ? `<span class="baronrel ${b.feud ? 'bad' : b.ally || b.vassal ? 'good' : ''}">${esc(baronStatus(r.id))}</span>` : '<span class="muted">du</span>';
+    const march = b && b.march ? ` · zieht gegen ${esc((siteById(b.march.target) || {}).name || '')}` : '';
+    return `<div class="baron${r.id ? '' : ' mine'}">
+      <span class="rank">${i + 1}.</span>
+      <span class="arms-mini">${r.arms ? armsSVG(r.arms, 28, r.name) : ''}</span>
+      <div class="baron-main">
+        <div class="baron-head"><b>${esc(r.name)}</b><span class="muted">${esc(r.seat)}${r.region ? ` · ${esc(r.region)}` : ''}</span>${status}</div>
+        <div class="baron-facts">${esc(lv(r.level))} · ${r.men} Mann · ${r.shires} Grafschaft${r.shires === 1 ? '' : 'en'} · Ruhm ${r.renown} · ${r.side ? `Seite: ${esc(SIDE_NAME[r.side] || '')}` : 'kämpft für sich'}${b ? ` · ${esc(traitName(r.id))}` : ''}${march}</div>
+      </div>
+      <span class="score" title="Rang aus Burg, Gebäuden, Grafschaften, Männern, Ruhm und Gold">${r.score}</span>
+      ${r.id ? `<button class="btn sm" data-act="barongo" data-b="${r.id}">Hinreisen</button>` : ''}
+    </div>`;
+  }).join('');
+  const news = baronNews(14).map((e) => `<li><span class="muted">Tag ${e.day}</span> ${esc(e.text)}</li>`).join('');
+  return `<div class="barons">${table}</div>
+    <p class="hint">Besuche einen Baron in seiner Burg (E an der Burg): Dort kannst du ihm Geschenke machen, ein Bündnis schließen, ihm die Fehde ansagen oder Frieden schließen. Verbündete schicken dir Männer vor fremde Burgen, Vasallen zahlen Tribut. Wer ihre Handelszüge überfällt, macht sich Feinde.</p>
+    <h3>Nachrichten von den Baronen</h3>${news ? `<ul class="warnews">${news}</ul>` : '<p class="muted">Noch gibt es nichts zu berichten.</p>'}`;
+}
+// Audienz in der Burg eines Barons
+function baronAudience(site) {
+  const id = site.baron, b = baron(id), def = BARONS[id];
+  if (!b) return '';
+  const lv = BUILDINGS.burg.levels[b.level].name;
+  const btn = (act, label, why, cls = '') => `<button class="btn ${cls}" data-act="${act}" data-b="${id}" ${why ? `disabled title="${esc(why)}"` : ''}>${esc(label)}</button>`;
+  const con = b.con ? (b.con.kind === 'burg' ? `Ausbau zur ${BUILDINGS.burg.levels[b.con.level].name}` : `${BUILDINGS[b.con.id].name} Stufe ${b.con.level}`) : '';
+  const shires = baronShires(id).map((sid) => SHIRES[sid].name).join(', ');
+  return `<h3>Audienz bei ${esc(def.name)}</h3>
+    <div class="notice${b.feud ? ' bad' : b.ally || b.vassal ? ' good' : ''}">
+      <div class="baron-audience"><span class="arms-mini">${armsSVG(def.arms, 44, def.name)}</span><p>${esc(def.desc)}</p></div>
+      <dl class="facts">
+        <dt>Verhältnis zu dir</dt><dd>${esc(baronStatus(id))} (${b.rel > 0 ? '+' : ''}${b.rel})</dd>
+        <dt>Burg</dt><dd>${esc(lv)}${con ? ` · baut: ${esc(con)}` : ''}</dd>
+        <dt>Männer</dt><dd>${b.men} von ${menCap(id)} · Kampfkraft ${baronStrength(id)} · Verteidigung ${baronDefense(id)}</dd>
+        <dt>Im Krieg</dt><dd>${b.side ? `schwört ${esc(SIDE_NAME[b.side])} die Treue` : 'kämpft für sich selbst'} · ${esc(traitName(id))}</dd>
+        <dt>Grafschaften</dt><dd>${shires ? esc(shires) : 'keine'}</dd>
+        <dt>Einkommen</dt><dd>etwa ${fmt(baronIncome(id) - baronUpkeep(id))} Gold am Tag${b.vassal ? ' (ein Viertel davon als Tribut an dich)' : ''}</dd>
+      </dl>
+    </div>
+    <div class="action"><div><b>Geschenk (${BARON_GIFT} Gold)</b><p>Silber, ein guter Falke, ein Fass Wein: Das Verhältnis steigt. Einmal am Tag.</p></div>${btn('bgift', 'Schenken', giftBlock(id))}</div>
+    ${b.ally || b.vassal ? '' : `<div class="action"><div><b>Bündnis anbieten</b><p>Ab einem Verhältnis von 40: Er schickt Männer, wenn du eine Burg belagerst, steht dir gegen Angreifer bei und greift dich nicht an.</p></div>${btn('bally', 'Bündnis', allianceBlock(id))}</div>`}
+    ${b.feud ? `<div class="action"><div><b>Frieden schließen</b><p>Er verlangt ${fmt(peaceCost(id))} Gold Sühne. Oder du belagerst seine Burg: Fällt sie, zahlt er Lösegeld und wird dein Vasall.</p></div>${btn('bpeace', 'Sühne zahlen', peaceBlock(id))}</div>`
+      : b.vassal ? '' : `<div class="action"><div><b>Fehde ansagen</b><p>Dann darfst du seine Burg belagern (das Aufgebot findest du unten). Er wird seinerseits gegen deine Burgen ziehen.</p></div>${btn('bfeud', 'Fehde', feudBlock(id), 'danger')}</div>`}
+    ${b.feud ? baronSiegeBox(site) : ''}`;
+}
+function baronSiegeBox(site) {
+  if (isHeld(site) || siegeAt(site)) return '';
+  const why = besiegeBlock(site);
+  return `<h3>Burg belagern</h3>
+    <div class="notice"><p>Mit einem Aufgebot aus Söldnern ziehst du vor ${esc(site.name)}. Die Besatzung zählt rund ${baron(site.baron).men} Mann. Fällt die Burg, zahlt ${esc(BARONS[site.baron].name)} Lösegeld, gibt dir seine Grafschaften und wird dein Vasall.</p>${why ? `<p class="muted">${esc(why)}</p>` : ''}</div>
+    ${LEVIES.map((l) => `<div class="action"><div><b>${esc(l.name)}: ${l.n} Söldner</b><p>Handgeld für ${l.n} Mann (je ${MERC_COST} Gold) und das Belagerungsgerät mit Trebuchet (${SIEGE_GEAR} Gold).</p></div><button class="btn danger" data-act="besiege" data-n="${l.n}" ${besiegeBlock(site, l.n) ? 'disabled' : ''}>Belagern (${fmt(levyCost(l.n))} Gold)</button></div>`).join('')}`;
+}
+
 // ---------------------------------------------------------------- Krieg (war.js)
 function warView() {
   const w = war(), a = allegiance();
@@ -1138,11 +1211,12 @@ function warView() {
     <h3>Kriegsnachrichten</h3>${news ? `<ul class="warnews">${news}</ul>` : '<p class="muted">Noch ist es ruhig.</p>'}`;
 }
 
-const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften']];
+const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften'], ['barone', 'Barone']];
 function mapPanel() {
   if (G.ui.tab === 'grafschaften') {
     return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: MAP_TABS, body: shiresList() };
   }
+  if (G.ui.tab === 'barone') return { title: 'Die Barone', sub: `Sieben Herren ringen um Macht und Land, du bist einer davon. Schwierigkeit: ${esc(difficulty().name)}.`, tabs: MAP_TABS, body: baronsView() };
   if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: MAP_TABS, body: warView() };
   return {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: MAP_TABS,
@@ -1374,6 +1448,11 @@ const ACTIONS = {
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
+  bgift: (d) => { baronGiveGift(d.b); refreshPanel(); },
+  bally: (d) => { offerAlliance(d.b); refreshPanel(); },
+  bfeud: (d) => confirmDialog(`${BARONS[d.b].name} die Fehde ansagen? Er wird gegen deine Burgen ziehen, und seine Freunde sehen das ungern.`, 'Fehde', () => { declareFeud(d.b); refreshPanel(); }),
+  bpeace: (d) => { makePeace(d.b); refreshPanel(); },
+  barongo: (d) => { const s = G.world.sites.find((x) => x.baron === d.b); if (s) { closePanel(); travelTo({ x: s.x, y: s.y + 6 }, null); } },
   donate: () => donate(G.ui.arg),
   tjoin: () => joinTourney(),
   sdef: () => joinSiege('def'),
@@ -1478,7 +1557,7 @@ const ACTIONS = {
   hire: (d) => hire(Number(d.i)),
   besiege: (d) => {
     const site = G.ui.arg, n = Number(d.n);
-    confirmDialog(`${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
+    confirmDialog(site.baron ? `${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold. Fällt die Burg, wird ${BARONS[site.baron].name} dein Vasall.` : `${site.name} mit ${n} Söldnern belagern? Das kostet ${levyCost(n)} Gold, und die ${FACTIONS[site.faction].short} werden dir das nicht verzeihen (Ansehen −25 sofort).`, 'Belagern', () => { if (startOwnSiege(site, n)) closePanel(); else refreshPanel(); });
   },
   sabort: () => confirmDialog('Die Belagerung aufgeben? Die Söldner ziehen ab, das Handgeld ist fort.', 'Aufgeben', () => { abortOwnSiege(); closePanel(); }),
   warswear: (d) => {

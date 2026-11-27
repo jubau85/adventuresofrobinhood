@@ -368,10 +368,13 @@ export function setPlayerWalls(W, on, rects, R) {
   const N = W.N;
   W.playerWalls = on;
   if (R) W.playerR = R;
-  if (rects) {
-    W.castleObs = rects.map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
+  if (rects) W.playerRects = rects;
+  // Gebäude deiner Burg und der Burgen der Barone (barons.js) zusammen
+  if (rects || W.baronDirty) {
+    W.castleObs = [...(W.playerRects || []), ...(W.baronRects || [])].map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
     W.cgrid = new Map();
     for (const o of W.castleObs) gridAdd(W.cgrid, N, o);
+    W.baronDirty = false;
   }
   W.block = new Uint8Array(W.blockStatic);
   W.penTile = new Uint8Array(N * N);
@@ -387,6 +390,13 @@ export function setPlayerWalls(W, on, rects, R) {
   for (const list of Object.values(W.tempObs || {})) for (const o of list) for (const [x, y] of obstacleTiles(W, o, false)) W.block[y * N + x] = 1;
   // Breschen und geschlossene Tore einer Belagerung wieder eintragen (siege.js)
   if (W.afterBlock) W.afterBlock();
+}
+
+// Gebäude auf den Bauplätzen der Barone als Hindernis (Rechtecke {x, y, wx, wy, pen})
+export function setBaronRects(W, rects) {
+  W.baronRects = rects;
+  W.baronDirty = true;
+  if (W.blockStatic) setPlayerWalls(W, !!W.playerWalls);
 }
 
 // Hindernisse auf Zeit (z. B. der Turnierplatz): unter einem Schlüssel Rechtecke {x, y, wx, wy}; ohne rects wieder fort
@@ -888,7 +898,8 @@ function waterDist(W, cx, cy, r) {
 // Mindestabstand zweier Orte: die eigene Burg braucht Platz, Lager kommen mit wenig aus
 function siteGap(a, b) {
   const lager = a.type === 'lager' || b.type === 'lager';
-  if (a.type === 'spieler' || b.type === 'spieler') return lager ? 18 : 26;
+  // Die eigene Burg und die Burgen der Barone brauchen Platz für ihre Bauplätze
+  if (a.type === 'spieler' || b.type === 'spieler' || a.baron || b.baron) return lager ? 18 : 26;
   if (lager) return 16;
   return a.clear + b.clear + 2;
 }
@@ -1174,7 +1185,7 @@ function addFields(W, s, rng) {
   const keepR = s.type === 'halle' ? PALISADE_R + 1.4 : 0;
   for (let k = 0; k < n; k++) {
     const a = rng() * Math.PI * 2;
-    const r = (s.type === 'spieler' ? 11 : 5.5) + rng() * 3;
+    const r = (s.type === 'spieler' || s.baron ? 11 : 5.5) + rng() * 3;
     const cx = Math.floor(s.x + Math.cos(a) * r), cy = Math.floor(s.y + Math.sin(a) * r);
     const w = 2 + Math.floor(rng() * 3), h = 2 + Math.floor(rng() * 2);
     for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) {
@@ -1246,7 +1257,7 @@ const TAVERN_NAMES = ['Zum Goldenen Krug', 'Zur Krone', 'Zum Weißen Hirsch', 'Z
 
 // Friedhof neben der Kirche (oder am Ortsrand), umzäunt, mit Steinkreuz
 function placeCemetery(W, s) {
-  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei') return;
+  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei' || s.baron) return;
   const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
   const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
   const wx = 2.6, wy = 2.0, N = W.N;
@@ -1524,7 +1535,7 @@ function genBuildings(W, s, rng) {
       return;
     }
   };
-  if (s.type !== 'stadt' && s.type !== 'halle') tavern();
+  if (s.type !== 'stadt' && s.type !== 'halle' && !s.baron) tavern();
   switch (s.type) {
     case 'stadt':
       genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral);
@@ -1566,6 +1577,8 @@ function genBuildings(W, s, rng) {
     }
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
+      // Burgen der Barone: Die Gebäude stehen auf Bauplätzen wie bei dir (barons.js), dazu nur ein paar Katen weiter draußen
+      if (s.baron) { ring(5, s.clear + 9, s.clear + 11, (x, y) => house(x, y)); break; }
       ring(12, 6.4, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;

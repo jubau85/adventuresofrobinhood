@@ -11,10 +11,11 @@ import { spawnGroup, rebuildUnits, inCombat, makeNpc, partyMembers } from './uni
 import { isWalkable, landAt, findPath, wallRing, palisadeBand, nearestWalkable } from './world.js';
 import { villageHouses, castleDefense, bSum, burnOuterPlots } from './castle.js';
 import { ringR } from './plots.js';
+import { baronConquered, baron } from './barons.js';
 import { sfxAt } from './audio.js';
 import { isHeld, isOwnSite, holdingOf, conquer, holdingSiegeOver, holdingHolds } from './holdings.js';
 import { seatSiegeOver } from './war.js';
-import { SHIRES } from './shires.js';
+import { SHIRES, claimShire } from './shires.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
@@ -120,7 +121,7 @@ export function startSiege(target = null, armyType = null, scale = null, opts = 
   const W = G.world, p = G.s.player, land = landAt(W, p.x, p.y);
   if (!target) {
     // Grafschaftsburgen belagern die Heere im Krieg (war.js); hier geht es um Städte, Hallen und Märkte
-    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && !SHIRES[s.id] && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
+    const cand = W.sites.filter((s) => ['burg', 'stadt', 'halle', 'markt'].includes(s.type) && !SHIRES[s.id] && !s.baron && s.land === land && !isHeld(s) && !(G.s.abandoned && (G.s.abandoned[s.id] || 0) > G.s.day) && ATTACKER[s.faction] && ATTACKER[s.faction][s.realm]
       && Math.hypot(s.x - p.x, s.y - p.y) > 18 && Math.hypot(s.x - p.x, s.y - p.y) < 85 * MAP_K);
     if (!cand.length) return false;
     target = pick(cand);
@@ -564,11 +565,13 @@ function endSiege(sg, how, quiet = false) {
   const mine = isHeld(s);
   if (sg.lead) {
     // Deine eigene Belagerung: Fällt die Burg, gehört sie dir
-    if (how === 'gefallen') { for (const b of siteBuildings(s.id)) if (Math.random() < 0.3) damageBuilding(b, rand(0.15, 0.35)); conquer(sg); }
+    if (how === 'gefallen') { for (const b of siteBuildings(s.id)) if (Math.random() < 0.3) damageBuilding(b, rand(0.15, 0.35)); if (s.baron) baronConquered(s.baron); else conquer(sg); }
     else if (how === 'abgewehrt') log(`Dein Sturm auf ${name} ist gescheitert. Die Überlebenden deines Aufgebots zerstreuen sich.`, 'bad');
     else log(`Dein Aufgebot zieht von ${name} ab, ohne die Burg genommen zu haben. Die Söldner gehen ihrer Wege.`, 'bad');
   } else if (mine) {
     holdingSiegeOver(s, how, sg.def && G.groups.includes(sg.def) ? sg.def.members.length : 0, sg.army && sg.army.faction);
+    // Ein Baron in Fehde nimmt die Grafschaft für sich
+    if (how === 'gefallen' && sg.army && sg.army.baron && !isHeld(s)) { claimShire(s.id, `b:${sg.army.baron}`); G.shireTint = null; }
     if (how === 'abgewehrt') log(`Die Belagerung deiner Burg ${name} ist abgeschlagen!`, 'good');
   } else if (how === 'gefallen') {
     for (const b of siteBuildings(s.id)) if (Math.random() < 0.4) damageBuilding(b, rand(0.2, 0.45));
@@ -577,6 +580,7 @@ function endSiege(sg, how, quiet = false) {
       G.s.gold -= lost;
       for (const g of Object.keys(G.s.castle.storage)) G.s.castle.storage[g] = Math.floor(G.s.castle.storage[g] * 0.6);
       log(`${name} wurde gestürmt und geplündert! Verloren: ${lost} Gold und ein Teil der Vorräte.`, 'bad');
+      if (sg.army && sg.army.baron && baron(sg.army.baron)) baron(sg.army.baron).gold += lost;
     } else {
       const town = G.s.towns[s.id];
       if (town) for (const g of Object.keys(town.stock)) town.stock[g] = Math.floor(town.stock[g] * 0.5);

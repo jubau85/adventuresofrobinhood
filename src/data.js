@@ -699,6 +699,19 @@ export const SETTLEMENTS = [
     desc: 'Der Sitz der alten Hochkönige. Auf dem Hügel steht der Stein des Schicksals, der aufschreit, wenn der wahre König ihn berührt.' },
   { id: 'kildare', name: 'Quelle der heiligen Brigid', type: 'einsiedelei', feature: 'quelle', faction: 'kirche', clear: 3, realm: 'ir', lon: -6.93, lat: 53.15, produces: [], demands: [],
     desc: 'Bei Kildare entspringt die Quelle der heiligen Brigid. Die Nonnen hüten dort ein Feuer, das nie erlischt.' },
+  // ---------------- Die Burgen der sechs Barone (barons.js): Ihre Burgstufe und Gebäude wachsen im Spiel
+  { id: 'garw', name: 'Castell Garw', type: 'burg', baron: 'gwilym', faction: 'sachsen', clear: 9, realm: 'wa', lon: -3.45, lat: 52.55, produces: ['wolle', 'fleisch', 'felle'], demands: ['wein', 'eisen', 'salz', 'getreide'],
+    desc: 'Die Burg des Gwilym ap Rhys in den Bergen von Powys. Von hier sieht man die Täler, in denen die Marcher-Barone ihre Leute verloren haben.' },
+  { id: 'glenarden', name: 'Glenarden', type: 'burg', baron: 'malcolm', faction: 'schotten', clear: 9, realm: 'sc', lon: -3.95, lat: 56.45, produces: ['felle', 'wolle', 'holz'], demands: ['wein', 'getreide', 'eisen', 'salz'],
+    desc: 'Die Burg Malcolms am Rand der Highlands, wo die Händler aus Perth die Felle der Clans kaufen.' },
+  { id: 'montcabre', name: 'Montcabré', type: 'burg', baron: 'raoul', faction: 'normannen', clear: 9, realm: 'nd', lon: 0.45, lat: 49.15, produces: ['getreide', 'wein', 'stein'], demands: ['eisen', 'wolle', 'salz', 'fleisch'],
+    desc: 'Die Burg des Raoul de Montcabré im Lieuvin. Französische Boten gehen hier ein und aus, sagt man.' },
+  { id: 'ravensmere', name: 'Ravensmere', type: 'burg', baron: 'hugh', faction: 'normannen', clear: 9, realm: 'en', lon: -1.45, lat: 51.3, produces: ['stein', 'wolle', 'getreide'], demands: ['wein', 'eisen', 'salz', 'holz'],
+    desc: 'Die Burg des Hugh de Ravensmere in Hampshire, umgeben von Steinbrüchen und Gerüsten. Er baut immer an irgendetwas.' },
+  { id: 'kirkwold', name: 'Kirkwold', type: 'burg', baron: 'geoffrey', faction: 'sachsen', clear: 9, realm: 'en', lon: -1.1, lat: 52.6, produces: ['getreide', 'bier', 'wolle'], demands: ['wein', 'eisen', 'salz', 'stein'],
+    desc: 'Die Burg Geoffreys von Kirkwold zwischen Charnwood und den Kornfeldern von Leicester. Hier wird mehr gebetet als gezecht.' },
+  { id: 'rathcarraig', name: 'Rathcarraig', type: 'burg', baron: 'fergal', faction: 'iren', clear: 9, realm: 'ir', lon: -7.5, lat: 53.2, produces: ['fleisch', 'felle', 'holz'], demands: ['wein', 'eisen', 'salz', 'getreide'],
+    desc: 'Die Burg des Fergal Ó Duibhne in den Mittellanden, auf einem alten Ringwall gebaut. Normannen sind hier nicht willkommen.' },
 ];
 
 // Fähren zwischen den Häfen: Kosten in Gold je Person, Dauer in Stunden
@@ -734,7 +747,7 @@ export const REGIONS = [
 
 // Hallen heißen je nach Land anders
 const HALL_NAME = { en: 'Sächsische Halle', wa: 'Walisische Fürstenhalle', sc: 'Halle eines Clanherrn', ir: 'Halle eines irischen Königs' };
-export function siteTypeName(s) { return s.type === 'halle' && HALL_NAME[s.realm] ? HALL_NAME[s.realm] : TYPE_NAME[s.type]; }
+export function siteTypeName(s) { return s.baron ? 'Burg eines Barons' : s.type === 'halle' && HALL_NAME[s.realm] ? HALL_NAME[s.realm] : TYPE_NAME[s.type]; }
 export const TYPE_NAME = {
   spieler: 'Dein Burgstall', stadt: 'Stadt', markt: 'Marktflecken', halle: 'Sächsische Halle', burg: 'Burg',
   abtei: 'Abtei', lager: 'Lager', dorf: 'Dorf', mine: 'Erzgrube', einsiedelei: 'Mystischer Ort',

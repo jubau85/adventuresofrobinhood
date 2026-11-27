@@ -15,6 +15,7 @@ import { changeRep, addRenown } from './politics.js';
 import { siteById } from './economy.js';
 import { startSiege } from './siege.js';
 import { isHeld, holdingOf, holdingDefense, loseHolding, applyHoldings } from './holdings.js';
+import { sideStrengthBonus, isBaronOwner, ownerBaron, baron } from './barons.js';
 
 export const THEATERS = {
   england: {
@@ -64,6 +65,8 @@ export function theaterSeats(th) { return G.world.sites.filter((s) => SHIRES[s.i
 // Wem eine Grafschaft im Krieg zählt: der Partei ihres Herrn; deine nur der Seite, der du die Treue geschworen hast
 export function sideOfOwner(th, owner) {
   if (owner === 'spieler') { const a = allegiance(); return a && THEATERS[th].sides[a] ? a : null; }
+  // Grafschaften eines Barons zählen für die Seite, der er die Treue geschworen hat
+  if (isBaronOwner(owner)) { const b = baron(ownerBaron(owner)); return b && b.side && THEATERS[th].sides[b.side] ? b.side : null; }
   return Object.keys(THEATERS[th].sides).find((k) => THEATERS[th].sides[k] === owner) || null;
 }
 export function sideOfSeat(th, s) { return sideOfOwner(th, shireOwner(s.id)); }
@@ -80,6 +83,7 @@ export function sideStrength(th, side) {
   let st = T.base[side] + seats * 3 + (w.morale[side] || 0);
   if (w.support && w.support.side === side && w.support.until >= G.s.day) st += w.support.add;
   if (allegiance() === side) st += Math.min(30, Math.round(G.s.renown / 8));
+  st += sideStrengthBonus(th, side);
   return Math.max(10, Math.round(st));
 }
 

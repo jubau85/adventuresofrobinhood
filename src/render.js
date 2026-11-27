@@ -2,7 +2,7 @@
 // Schatten, Tiere, Vögel, Tag/Nacht, Retro-Modus (Amiga-Stil) und Minikarte.
 
 import { G, homeName, playerColor } from './state.js';
-import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, CASTLE_PLOT, POIS, KM_PER_TILE } from './data.js';
+import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, CASTLE_PLOT, POIS, KM_PER_TILE, DAY_LEN } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand } from './rng.js';
 import { groundZ, tileAt, PAL_GATE } from './world.js';
@@ -21,6 +21,7 @@ import { gallowsFor } from './justice.js';
 import { snowLevel, lookSeason, treeSeason, weatherKind, precip } from './weather.js';
 import { abandonedId } from './dynamics.js';
 import { homeGateClosed, homeSite } from './siege.js';
+import { baron, baronColor, baronPlots, baronLayout } from './barons.js';
 import { drawCharge, drawKnightPlate } from './heraldry.js';
 import { drawShires } from './shires.js';
 import { siteColor } from './holdings.js';
@@ -50,7 +51,7 @@ function drawCampaigns(c, v) {
 }
 
 // Farbe eines Heeres: dein Aufgebot in deinen Farben, sonst die der Partei
-function armyColor(g) { return g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
+function armyColor(g) { return g.baron ? baronColor(g.baron) : g.own || !g.faction ? playerColor() : FACTIONS[g.faction].color; }
 
 let canvas = null, ctx = null;
 let lowCv = null, lowCtx = null;
@@ -2340,6 +2341,7 @@ function buildStaticParts() {
       });
     }
     if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, siteColor(s)));
+    if (s.baron) parts.push(...baronCastleParts(s));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
     if (s.cemetery) {
       const cm = s.cemetery;
@@ -2986,8 +2988,8 @@ function eigenPick(base, dmg = 0) {
 function eigenBase(id, L, p) { const nm = EIGEN_NAME[id]; return nm && L ? `${nm}${p.size < 3 ? '_hof' : ''}_${L}` : null; }
 // Ein Platzbild malen; Abgebranntes raucht noch an den Feuerstellen, nachts brennt Licht in bewohnten Gebäuden
 const EIGEN_LIT = { halle: 1, kaserne: 1, schmiede: 1, hospiz: 1, kapelle: 0.6, markt: 0.5 };
-function drawEigen(c, sid, p, id, dmg) {
-  if (!p5(c, sid, p.x, p.y, 1, false, playerColor())) return;
+function drawEigen(c, sid, p, id, dmg, col = playerColor()) {
+  if (!p5(c, sid, p.x, p.y, 1, false, col)) return;
   if (dmg === 2) {
     const fp = EIGEN_FEUER[sid.replace(/^eigen_/, '').replace(/_winter$/, '')];
     if (fp && Math.random() < 0.05) { const q = fp[Math.floor(Math.random() * fp.length)], g = P(p.x, p.y, 0); smokeEmit(g[0] + q[0], g[1] + q[1], 0.3); }
@@ -3032,6 +3034,37 @@ function addCastleActors(add, id, L, p, dmg) {
     case 'felder': if (seasonIndex() < 3) wk(p.x - 0.4, p.y + 0.7, 'hacke', p.x * 1.3, { col: '#8a7a55', hat: '#c9b06a', speed: 2.2 }); break;
     default: break;
   }
+}
+
+// Burg eines Barons (barons.js): dieselben gemalten Gebäude auf denselben Bauplätzen wie bei dir, in seiner Farbe,
+// dazu die Baustelle, an der er gerade arbeitet. Mauern und Bergfried zeichnet castlePieces nach seiner Burgstufe.
+function baronCastleParts(s) {
+  const id = s.baron, b = baron(id);
+  if (!b) return [];
+  const parts = [], z0 = groundZ(G.world, s.x, s.y), col = baronColor(id);
+  const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
+  const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
+  const plots = baronPlots(id), lay = baronLayout(id), con = b.con;
+  lay.forEach((p, i) => {
+    const pl = plots[i], building = con && con.kind === 'bau' && con.plot === i;
+    if (!pl && !building) return;
+    const bid = pl ? pl.id : con.id, L = pl ? pl.lv : 0;
+    const base = eigenBase(bid, L, p), sid = base && eigenPick(base);
+    if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, bid, 0, col)); addCastleActors(add, bid, L, p, 0); }
+    else if (L) { addCastleBuilding(add, bid, L, p, s); addNewCastleBuilding(add, addFlat, bid, L, p, s); }
+    if (building) {
+      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`), b2 = b1 && eigenPick(`baustelle${hof}_2`);
+      const prog = () => Math.max(0, Math.min(1, (G.s.day - (con.done - (con.days || 1)) + G.s.time / DAY_LEN) / (con.days || 1)));
+      if (b1 && b2) add(p.x, p.y, (c) => p5(c, prog() < 0.5 ? b1 : b2, p.x, p.y, 1, false, col));
+      else add(p.x, p.y, (c) => drawScaffold(c, p.x, p.y, p.size * 0.7, p.size * 0.7, 30));
+      add(p.x + p.size * 0.4 + 0.4, p.y + p.size * 0.4, (c) => drawWorker(c, p.x + p.size * 0.4 + 0.4, p.y + p.size * 0.4, 'hammer', 0.5, { col: '#8a6e4b', flip: true, speed: 4.5 }));
+    }
+  });
+  // Der Baron baut seine Burg aus: Gerüst am Bergfried
+  if (con && con.kind === 'burg') add(s.x - 1.1, s.y - 0.2, (c) => { drawScaffold(c, s.x - 1.1, s.y - 1.1, 2.4, 2.4, 70); drawStones(c, s.x + 1.2, s.y + 1.4, 6); });
+  // Ein Banner in seiner Farbe am Tor
+  add(s.x + 1.4, s.y + 4.6, (c) => banner(c, s.x + 1.4, s.y + 4.6, 30, col));
+  return parts;
 }
 
 function buildPlayerCastle() {

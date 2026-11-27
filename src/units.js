@@ -10,6 +10,7 @@ import { isWalkable, findPath, tileAt, nearestWalkable, landAt, groundZ } from '
 import { isoX, isoY } from './iso.js';
 import { rand, randInt, pick, clamp } from './rng.js';
 import { changeRep, isHostileFaction, isAlly, addRenown, onQuestGroupDestroyed } from './politics.js';
+import { changeBaronRel } from './barons.js';
 import { cargoFree, addCargo, siteById } from './economy.js';
 import { castleSite, bLevel, castleBonusAt, workingPlots } from './castle.js';
 import { hourOf, passHours } from './sim.js';
@@ -531,6 +532,7 @@ function groupDestroyed(g) {
   }
   log(`Sieg über ${g.questId ? 'die gesuchte Bande' : gt.acc}! Beute: ${loot.join(', ')}.`, 'good');
   if (gt.kill) for (const [f, v] of Object.entries(gt.kill)) changeRep(f, v);
+  if (g.baron) changeBaronRel(g.baron, gt.army ? -12 : -30, gt.army ? 'Du hast sein Heer geschlagen' : 'Du hast seinen Handelszug überfallen');
   if (gt.renown) addRenown(gt.renown);
   onQuestGroupDestroyed(g);
   const i = G.groups.indexOf(g);
@@ -915,8 +917,10 @@ export function spawnGroup(type, opts = {}) {
   }
   if (!g.members.length) return null;
   // Bewaffnete einer Partei tragen deren Livree (Heere, Wachen, Streifen); Wegelagerer und Zivile bleiben, wie sie sind
-  const liv = LIVERY[g.faction];
-  if (liv) for (const m of g.members) if (m.cls === 'soldat' || m.cls === 'ritter') { m.tunic = liv; m.livery = liv; }
+  // Heere und Handelszüge der Barone tragen deren Farbe (barons.js)
+  if (gt.baron) g.baron = gt.baron;
+  const liv = LIVERY[g.faction] || gt.livery;
+  if (liv) for (const m of g.members) if (m.cls === 'soldat' || m.cls === 'ritter' || (gt.livery && m.cls !== 'haendler')) { m.tunic = liv; m.livery = liv; }
   G.groups.push(g);
   for (const m of g.members) G.units.push(m);
   return g;

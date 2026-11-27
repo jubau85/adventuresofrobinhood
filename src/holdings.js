@@ -6,6 +6,7 @@
 
 import { G, log, playerColor } from './state.js';
 import { FACTIONS, LIVERY, MAP_K } from './data.js';
+import { baronColor, baronSiegeBlock, baronHelpers } from './barons.js';
 import { rand, randInt } from './rng.js';
 import { SHIRES, HOME_SHIRE, claimShire, shireTax, shireName } from './shires.js';
 import { changeRep, addRenown, isAlly } from './politics.js';
@@ -22,7 +23,7 @@ export function isHeld(s) { return !!holdingOf(s); }
 // Deine Burg Ashcombe oder eine eroberte
 export function isOwnSite(s) { return !!s && (s.type === 'spieler' || isHeld(s)); }
 // Farbe der Herrschaft eines Ortes (Banner, Wachen, Kartenzeichen)
-export function siteColor(s) { return isHeld(s) ? playerColor() : s && s.faction ? FACTIONS[s.faction].color : null; }
+export function siteColor(s) { return isHeld(s) ? playerColor() : s && s.baron ? baronColor(s.baron) : s && s.faction ? FACTIONS[s.faction].color : null; }
 export function heldSites() { return Object.keys(holdings()).map(siteById).filter(Boolean); }
 
 // Ausbau der Burgen bleibt, auch wenn sie den Herrn wechseln (die Welt wird beim Laden neu erzeugt)
@@ -203,7 +204,8 @@ export function siegeHelpers(s) {
 
 // Was eine Belagerung verhindert (ohne Angabe der Größe: was jede verhindert)
 export function besiegeBlock(s, n = null) {
-  if (!s || s.type !== 'burg' || !SHIRES[s.id]) return 'Belagern kannst du nur die Burgen, die eine Grafschaft beherrschen.';
+  if (!s || s.type !== 'burg' || (!SHIRES[s.id] && !s.baron)) return 'Belagern kannst du nur die Burgen, die eine Grafschaft beherrschen, und die Burgen der Barone.';
+  if (s.baron) { const why = baronSiegeBlock(s); if (why) return why; }
   if (isHeld(s)) return `${s.name} gehört dir schon.`;
   if (G.siege) return G.siege.site === s ? `${s.name} wird gerade belagert.` : `Gerade wird ${G.siege.site.type === 'spieler' ? 'deine Burg' : G.siege.site.name} belagert. Zwei Belagerungen zugleich gibt das Land nicht her.`;
   if (G.battle || inCombat()) return 'Erst muss der Kampf hier vorbei sein.';
@@ -230,6 +232,12 @@ function levyUnits(s, n) {
         out.push(m);
       }
     }
+    // Verbündete Barone und Vasallen schicken Männer in ihren Farben
+    for (const { id, n: k } of baronHelpers(s)) for (let j = 0; j < k; j++) {
+      const m = makeNpc(j % 3 === 2 ? 'armbrust' : 'soldat', pos.x + rand(-1, 1), pos.y + rand(-1, 1), bonus);
+      m.tunic = baronColor(id); m.livery = baronColor(id); m.ally = `b:${id}`;
+      out.push(m);
+    }
     return out;
   };
 }
@@ -245,8 +253,11 @@ export function startOwnSiege(s, n) {
   G.s.gold -= levyCost(n);
   const sg = G.siege;
   sg.lead = true; sg.side = 'att'; sg.levy = n;
-  changeRep(s.faction, -25);
-  for (const f of Object.keys(FACTIONS)) if (rivalsOf(f, s.faction)) changeRep(f, 4);
+  // Eine Fehde mit einem Baron ist seine Sache, nicht die seiner Partei
+  if (!s.baron) {
+    changeRep(s.faction, -25);
+    for (const f of Object.keys(FACTIONS)) if (rivalsOf(f, s.faction)) changeRep(f, 4);
+  }
   const help = helpers.map((h) => `${h.n} ${FACTIONS[h.f].short}`).join(', ');
   log(`Du rufst dein Aufgebot zusammen: ${n} Söldner mit Trebuchet${help ? `, dazu schicken deine Verbündeten Männer (${help})` : ''}. Sie ziehen vor ${s.name} und schlagen ein Feldlager auf. Im Lager (E) gibst du das Zeichen zum Sturm.`, 'gold');
   return true;
