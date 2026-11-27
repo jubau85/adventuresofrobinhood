@@ -146,7 +146,7 @@ export function startSiege(target = null, armyType = null, scale = null, opts = 
   army.siege = true; army.path = path; army.pathI = 0; army.wait = 0;
   const ang = Math.atan2(target.y - camp.y, target.x - camp.x);
   G.siege = {
-    site: target, army, def: null, camp, stage: 'anmarsch', t: 0, shotT: 4,
+    site: target, army, def: null, camp, stage: 'anmarsch', t: 0, shotT: 4, lead: !!opts.lead, side: opts.lead ? 'att' : undefined,
     tre: { x: camp.x + Math.cos(ang) * 2.2, y: camp.y + Math.sin(ang) * 2.2, fired: -10 },
     tents: [0, 1, 2, 3].map((k) => ({ x: camp.x - Math.cos(ang) * (1.4 + (k % 2) * 1.1) + Math.cos(ang + Math.PI / 2) * (k - 1.5) * 1.2, y: camp.y - Math.sin(ang) * (1.4 + (k % 2) * 1.1) + Math.sin(ang + Math.PI / 2) * (k - 1.5) * 1.2 })),
     shots: [],

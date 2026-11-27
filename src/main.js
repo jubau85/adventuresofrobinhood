@@ -705,6 +705,13 @@ function updateCamera(dt) {
 // Ein Fehler beim Zeichnen hält die Schleife nicht mehr an, sondern wird angezeigt.
 const BOOT_ID = (window.__aktBoot = (window.__aktBoot || 0) + 1);
 let faultShown = false;
+// Wo der Fehler entstand: die ersten Funktionen aus dem Stapel (Chrome „at name“, Firefox/Safari „name@“)
+function faultWhere(e) {
+  const names = String((e && e.stack) || '').split('\n')
+    .map((l) => (l.match(/^\s*at (?:new )?([\w.$<>]+) /) || l.match(/^([\w.$<>]+)@/) || [])[1])
+    .filter((n) => n && n !== 'Object.<anonymous>').slice(0, 4);
+  return names.length ? names.join(' ← ') : '';
+}
 function showFault(e) {
   console.error(e);
   if (faultShown) return;
@@ -712,10 +719,14 @@ function showFault(e) {
   const box = document.createElement('div');
   box.id = 'fault';
   box.setAttribute('role', 'alert');
-  box.innerHTML = `<p><b>Hier ist etwas schiefgegangen.</b> ${esc(e && e.message ? e.message : String(e))}</p><p>Lade die Seite bitte neu. Passiert es wieder, schick diese Meldung.</p><button class="btn primary" type="button">Seite neu laden</button>`;
+  const where = faultWhere(e);
+  box.innerHTML = `<p><b>Hier ist etwas schiefgegangen.</b> ${esc(e && e.message ? e.message : String(e))}</p>${where ? `<p class="muted">Stelle: ${esc(where)}</p>` : ''}<p>Lade die Seite bitte neu. Passiert es wieder, schick diese Meldung.</p><button class="btn primary" type="button">Seite neu laden</button>`;
   box.querySelector('button').addEventListener('click', () => location.reload());
   document.body.appendChild(box);
 }
+
+// Auch Fehler außerhalb der Zeichenschleife (Knöpfe in Tafeln und Dialogen) anzeigen, statt still weiterzulaufen
+window.addEventListener('error', (ev) => { if (window.__aktBoot === BOOT_ID && G.started && ev.error) showFault(ev.error); });
 
 function frame(now) {
   if (window.__aktBoot !== BOOT_ID) return;

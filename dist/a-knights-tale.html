@@ -7058,7 +7058,7 @@ function startSiege(target = null, armyType = null, scale = null, opts = {}) {
   army.siege = true; army.path = path; army.pathI = 0; army.wait = 0;
   const ang = Math.atan2(target.y - camp.y, target.x - camp.x);
   G.siege = {
-    site: target, army, def: null, camp, stage: 'anmarsch', t: 0, shotT: 4,
+    site: target, army, def: null, camp, stage: 'anmarsch', t: 0, shotT: 4, lead: !!opts.lead, side: opts.lead ? 'att' : undefined,
     tre: { x: camp.x + Math.cos(ang) * 2.2, y: camp.y + Math.sin(ang) * 2.2, fired: -10 },
     tents: [0, 1, 2, 3].map((k) => ({ x: camp.x - Math.cos(ang) * (1.4 + (k % 2) * 1.1) + Math.cos(ang + Math.PI / 2) * (k - 1.5) * 1.2, y: camp.y - Math.sin(ang) * (1.4 + (k % 2) * 1.1) + Math.sin(ang + Math.PI / 2) * (k - 1.5) * 1.2 })),
     shots: [],
@@ -19619,6 +19619,13 @@ function updateCamera(dt) {
 // Ein Fehler beim Zeichnen hält die Schleife nicht mehr an, sondern wird angezeigt.
 const BOOT_ID = (window.__aktBoot = (window.__aktBoot || 0) + 1);
 let faultShown = false;
+// Wo der Fehler entstand: die ersten Funktionen aus dem Stapel (Chrome „at name“, Firefox/Safari „name@“)
+function faultWhere(e) {
+  const names = String((e && e.stack) || '').split('\n')
+    .map((l) => (l.match(/^\s*at (?:new )?([\w.$<>]+) /) || l.match(/^([\w.$<>]+)@/) || [])[1])
+    .filter((n) => n && n !== 'Object.<anonymous>').slice(0, 4);
+  return names.length ? names.join(' ← ') : '';
+}
 function showFault(e) {
   console.error(e);
   if (faultShown) return;
@@ -19626,10 +19633,14 @@ function showFault(e) {
   const box = document.createElement('div');
   box.id = 'fault';
   box.setAttribute('role', 'alert');
-  box.innerHTML = `<p><b>Hier ist etwas schiefgegangen.</b> ${esc(e && e.message ? e.message : String(e))}</p><p>Lade die Seite bitte neu. Passiert es wieder, schick diese Meldung.</p><button class="btn primary" type="button">Seite neu laden</button>`;
+  const where = faultWhere(e);
+  box.innerHTML = `<p><b>Hier ist etwas schiefgegangen.</b> ${esc(e && e.message ? e.message : String(e))}</p>${where ? `<p class="muted">Stelle: ${esc(where)}</p>` : ''}<p>Lade die Seite bitte neu. Passiert es wieder, schick diese Meldung.</p><button class="btn primary" type="button">Seite neu laden</button>`;
   box.querySelector('button').addEventListener('click', () => location.reload());
   document.body.appendChild(box);
 }
+
+// Auch Fehler außerhalb der Zeichenschleife (Knöpfe in Tafeln und Dialogen) anzeigen, statt still weiterzulaufen
+window.addEventListener('error', (ev) => { if (window.__aktBoot === BOOT_ID && G.started && ev.error) showFault(ev.error); });
 
 function frame(now) {
   if (window.__aktBoot !== BOOT_ID) return;
