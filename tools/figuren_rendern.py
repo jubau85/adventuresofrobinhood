@@ -1,6 +1,8 @@
 # Rendert alle Figuren (Modelle und Bemalungen) aus tools/meshy_figuren.py mit tools/sprites.py nach <arbeitsordner>/sp_<schlüssel>/.
 # Aufruf: python3 tools/figuren_rendern.py <arbeitsordner> <held-ordner mit teile/topfhelm.glb> [schlüssel ...]
-import subprocess, sys, os, json, time
+# Schlüssel held_<stufe> rendern den Helden (edel, gambeson, leder, kette, schuppe, ritter) nach <held-ordner>/sp_<stufe>/.
+# Ohne Schlüssel: erst der Held, dann alle übrigen Figuren.
+import subprocess, sys, os, json, time, shutil
 D = os.path.abspath(sys.argv[1]); R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 B = '/opt/blender-venv/bin/python'
 E = os.path.abspath(sys.argv[2])
@@ -26,19 +28,40 @@ KEYS = {k: (k, None, False) for k in MOD}
 KEYS['soldat'] = ('soldat', 'gambeson', False)
 for v in ['leder', 'kette', 'schuppe']: KEYS[f'soldat_{v}'] = ('soldat', v, False)
 for v in ['gambeson', 'leder', 'kette', 'schuppe', 'ritter']: KEYS[f'ritterin_{v}'] = ('ritterin', v, v == 'ritter')
-want = sys.argv[3:] or list(KEYS)
+HELD = ['edel', 'gambeson', 'leder', 'kette', 'schuppe', 'ritter']
+want = sys.argv[3:] or [f'held_{v}' for v in HELD] + list(KEYS)
+# Bildgüte: dreifach … zweifach groß rendern und flächig verkleinern (statt kleiner Bilder mit Entrauscher, der die
+# Bemalung verschmiert), dünner Umriss, kräftigere Sonne mit Gegenlicht und Umgebungsverdeckung in den Falten
+QUALI = ['--ss', '2', '--samples', '32', '--entrauschen', '0', '--linie', '1.2', '--schaerfe', '0.35',
+         '--sonne', '4.6', '--umgebung', '0.8', '--gegenlicht', '2.5', '--ao', '0.8']
 def run(args):
     p = subprocess.run([B, os.path.join(R, 'tools/sprites.py'), '--'] + args, capture_output=True, text=True)
     out = [l for l in (p.stdout + p.stderr).splitlines() if l.startswith('fertig') or 'Error' in l or 'Traceback' in l]
     print('   ', ' | '.join(out)[:400], flush=True)
-for key in want:
+def fresh(out):
+    # alte Bögen weg, damit sprites.json nur die neuen Bewegungen kennt
+    if os.path.isdir(out) and os.path.basename(out).startswith('sp_'): shutil.rmtree(out)
+    os.makedirs(out)
+for key in [k for k in want if k.startswith('held_')]:
+    v = key[5:]; out = os.path.join(E, f'sp_{v}'); t0 = time.time(); fresh(out)
+    X = ['--meter', '1.8', '--zelle', '224', '--figur', '120', '--punkt', 'RightHand,LeftHand,Hips'] + QUALI
+    if v != 'edel': X += ['--textur', os.path.join(E, f'{v}_farbe.png')]
+    if v == 'ritter': X += ['--helm', os.path.join(E, 'teile', 'topfhelm.glb')]
+    print(key, flush=True)
+    run([os.path.join(E, 'edel_walking.glb'), out] + X + ['--bilder', 'walking_man=8'])
+    run([os.path.join(E, 'edel_running.glb'), out] + X + ['--bilder', 'running=8'])
+    run([os.path.join(E, 'edel_aktionen.glb'), out] + X + ['--nur', 'Idle,Right_Hand_Sword_Slash,Hit_Reaction', '--bilder', 'Idle=4,Right_Hand_Sword_Slash=6,Hit_Reaction=4'])
+    run([os.path.join(E, 'edel_rig.glb'), out] + X + ['--reitpose', '1', '--nur', 'reiten', '--bilder', 'reiten=1'])
+    run([os.path.join(E, 'edel_rig.glb'), out] + X + ['--reitpose', '1', '--fernbein', '1', '--nur', 'reiten', '--bilder', 'reiten=1'])
+    print(key, 'fertig', round(time.time() - t0), 's', flush=True)
+for key in [k for k in want if not k.startswith('held_')]:
     mod, var, helm = KEYS[key]
     folder, walk, ride = MOD[mod]
     src = os.path.join(D, folder) if mod != 'bauer' else os.path.join(D, 'bauer')
     out = os.path.join(D, f'sp_{key}')
-    t0 = time.time(); os.makedirs(out, exist_ok=True)
-    # direkt in Spielgröße (Zelle 168, Figur 90 px): schneller als 224 und danach verkleinern
-    X = ['--meter', '1.8', '--zelle', '168', '--figur', '90', '--punkt', 'RightHand,LeftHand,Hips']
+    t0 = time.time(); fresh(out)
+    # Spielgröße (Zelle 168, Figur 90 px), intern doppelt so groß gerendert
+    X = ['--meter', '1.8', '--zelle', '168', '--figur', '90', '--punkt', 'RightHand,LeftHand,Hips'] + QUALI
     if var: X += ['--textur', os.path.join(D, folder, f'{var}_farbe.png')]
     if helm: X += ['--helm', os.path.join(E, 'teile', 'topfhelm.glb')]
     rig = os.path.join(src, 'rig.glb')
@@ -50,6 +73,8 @@ for key in want:
         if not os.path.exists(akt): continue
         run([akt, out] + X + ['--nur', ','.join(names), '--bilder', ','.join(f'{n}={v}' for n, v in ANIM.items()),
              '--bereich', ','.join(f'{n}={v}' for n, v in BEREICH.items()), '--stelle', STELLE])
-    if ride: run([rig, out] + X + ['--reitpose', '1', '--nur', 'reiten', '--bilder', 'reiten=1'])
+    if ride:
+        run([rig, out] + X + ['--reitpose', '1', '--nur', 'reiten', '--bilder', 'reiten=1'])
+        run([rig, out] + X + ['--reitpose', '1', '--fernbein', '1', '--nur', 'reiten', '--bilder', 'reiten=1'])
     print(key, 'fertig', round(time.time() - t0), 's', flush=True)
 print('RENDERN FERTIG', flush=True)

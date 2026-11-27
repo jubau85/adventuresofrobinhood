@@ -20,6 +20,12 @@
 #   --punkt <a,b,...>    auch mehrere Knochen, je Name eine Liste
 #   --bereich name=a:b,… nur diesen Teil der Bewegung (Anteile 0…1), z. B. die Endhaltung eines Hinsetzens (0.97:1)
 #   --stelle <name,...>  diese Bewegungen auf der Stelle halten (Hüfte waagerecht zum Ursprung), auch ohne „walk“ im Namen
+#   --ss <n>             n-fach größer rendern und flächig verkleinern (Überabtastung, schärfere Texturen)
+#   --samples <n>        Cycles-Strahlen je Bildpunkt (Standard 24); --entrauschen 0 schaltet den Entrauscher ab
+#   --sonne <w> --umgebung <w>  Stärke von Sonnen- und Umgebungslicht (Standard 3.6 und 1.25)
+#   --gegenlicht <w>     zusätzliches Licht von hinten oben, das die Umrisse absetzt (Standard 0)
+#   --ao <a>             Umgebungsverdeckung in die Grundfarbe (0 … 1), --ao_weite <m> ihre Reichweite (Standard 0,08 m)
+#   --schaerfe <a>       nach dem Verkleinern leicht nachschärfen (0 … 1, Standard 0)
 #   --meter <m>          Körpergröße, an der sich der Maßstab misst (Standard: Höhe des Modells); mit --figur
 #                        zusammen bleibt der Maßstab über Modelle hinweg gleich (Mensch 1,75 m = 120 px)
 #
@@ -41,6 +47,8 @@ while k < len(argv):
     if a == '--probe': opt['probe'] = True; k += 1; continue
     opt[a.lstrip('-')] = argv[k + 1]; k += 2
 CELL = int(opt.get('zelle', 224))
+SS = int(opt.get('ss', 1))
+HI = CELL * SS
 FIG_PX = float(opt.get('figur', 120))
 DIRS = int(opt.get('richtungen', 8))
 FRAMES = {}
@@ -135,6 +143,24 @@ if opt.get('textur'):
                     if nd.type == 'TEX_IMAGE' and nd.image and any(l.to_socket.name == 'Base Color' for l in nd.outputs[0].links):
                         nd.image = img; n += 1
     print('Textur getauscht', n)
+
+# Umgebungsverdeckung in die Grundfarbe multiplizieren: Falten, Gürtel, Achseln und Übergänge werden dunkler und
+# die Figur wirkt im kleinen Bild plastischer, ähnlich den gemalten Häusern
+if float(opt.get('ao', 0)) > 0:
+    for o in meshes:
+        for m in o.data.materials:
+            if not (m and m.use_nodes): continue
+            nt = m.node_tree
+            bsdf = next((nd for nd in nt.nodes if nd.type == 'BSDF_PRINCIPLED'), None)
+            if not bsdf: continue
+            inp = bsdf.inputs['Base Color']
+            ao = nt.nodes.new('ShaderNodeAmbientOcclusion'); ao.samples = 16
+            ao.inputs['Distance'].default_value = float(opt.get('ao_weite', 0.08))
+            mix = nt.nodes.new('ShaderNodeMixRGB'); mix.blend_type = 'MULTIPLY'; mix.inputs['Fac'].default_value = float(opt['ao'])
+            if inp.links: nt.links.new(inp.links[0].from_socket, mix.inputs['Color1'])
+            else: mix.inputs['Color1'].default_value = inp.default_value
+            nt.links.new(ao.outputs['AO'], mix.inputs['Color2'])
+            nt.links.new(mix.outputs['Color'], inp)
 
 # Reithaltung als eigene Bewegung: Oberschenkel nach vorn und etwas nach außen, Unterschenkel hängen,
 # Oberarme leicht vor, Unterarme nach vorn zu den Zügeln
@@ -245,20 +271,45 @@ world = bpy.data.worlds.new('welt'); sc.world = world
 world.use_nodes = True
 world.node_tree.nodes['Background'].inputs[0].default_value = (0.62, 0.60, 0.56, 1)
 world.node_tree.nodes['Background'].inputs[1].default_value = 1.25
+sun.data.energy = float(opt.get('sonne', 3.6))
+world.node_tree.nodes['Background'].inputs[1].default_value = float(opt.get('umgebung', 1.25))
+if float(opt.get('gegenlicht', 0)) > 0:
+    rim = bpy.data.objects.new('gegenlicht', bpy.data.lights.new('gegenlicht', 'SUN')); sc.collection.objects.link(rim)
+    rim.data.energy = float(opt['gegenlicht']); rim.data.angle = math.radians(20)
+    # von hinten oben, gegenüber der Kamera (die Kamera schaut aus Süd-Ost nach Nord-West)
+    rim.rotation_euler = (math.radians(-55), 0, math.radians(45))
 
 r = sc.render
-r.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = 24; sc.cycles.use_denoising = True
-r.resolution_x = r.resolution_y = CELL; r.film_transparent = True
+r.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = int(opt.get('samples', 24))
+sc.cycles.use_denoising = opt.get('entrauschen', '1') != '0'
+r.resolution_x = r.resolution_y = HI; r.film_transparent = True
 r.image_settings.file_format = 'PNG'; r.image_settings.color_mode = 'RGBA'
 sc.view_settings.view_transform = 'Standard'
 # Umriss wie bei den gezeichneten Figuren: nach dem Rendern als dunkle Kante um die Figur gelegt.
 # Breite in Pixeln der großen Fassung, im Spiel wird daraus etwa ein Pixel.
-LINE = int(opt.get('linie', 3))
+LINE = float(opt.get('linie', 3))
+SHARP = float(opt.get('schaerfe', 0))
+def shrink(a):
+    # flächig verkleinern mit vormultipliziertem Alpha, damit keine hellen Säume entstehen
+    if SS == 1: return a
+    pm = a.copy(); pm[..., :3] *= pm[..., 3:4]
+    pm = pm.reshape(CELL, SS, CELL, SS, 4).mean((1, 3))
+    al = pm[..., 3:4]
+    pm[..., :3] = np.where(al > 1e-4, pm[..., :3] / np.maximum(al, 1e-4), 0)
+    return pm
+def sharpen(a):
+    if SHARP <= 0: return a
+    # unscharfe Maske nur auf die Farbe, Rand der Figur bleibt
+    c = a[..., :3]
+    b = c.copy()
+    b[1:-1, 1:-1] = (c[:-2, 1:-1] + c[2:, 1:-1] + c[1:-1, :-2] + c[1:-1, 2:] + 4 * c[1:-1, 1:-1]) / 8
+    a[..., :3] = np.clip(c + SHARP * (c - b), 0, 1)
+    return a
 def outline(px):
-    a = np.array(px, dtype=np.float32).reshape(CELL, CELL, 4)
+    a = np.array(px, dtype=np.float32).reshape(HI, HI, 4)
     m = a[..., 3] > 0.35
     d = m.copy()
-    for _ in range(LINE):
+    for _ in range(max(1, round(LINE * SS))):
         e = d.copy()
         e[1:] |= d[:-1]; e[:-1] |= d[1:]; e[:, 1:] |= d[:, :-1]; e[:, :-1] |= d[:, 1:]
         d = e
@@ -267,7 +318,7 @@ def outline(px):
     # halbdurchsichtige Ränder der Figur selbst etwas abdunkeln, damit die Kante weich anschließt
     soft = (a[..., 3] > 0.02) & ~m & ~edge
     a[soft] = (0.16, 0.11, 0.08, 0.92)
-    return a.ravel()
+    return sharpen(shrink(a)).ravel()
 
 # Fußpunkt im Bild
 bpy.context.view_layer.update()
