@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('ritterDesktop', {
     remove: (key) => ipcRenderer.sendSync('saves:remove', String(key)),
   },
   info: () => ipcRenderer.sendSync('app:info'),
+  relay: { start: (port) => ipcRenderer.sendSync('relay:start', port) },
   quit: () => ipcRenderer.send('app:quit'),
 });

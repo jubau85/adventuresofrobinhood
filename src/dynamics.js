@@ -193,7 +193,8 @@ export function updateDynamics(dt) {
     fireT = rand(140, 300);
     const h = hourOf();
     const s = G.world.sites.find((x) => GROWING[x.type] && Math.hypot(x.x - p.x, x.y - p.y) < (x.clear || 6) + 3);
-    if (s && h > 7 && h < 20 && !G.siege && !G.raid && !isBlighted(s) && Math.random() < 0.55) {
+    // Im Mehrspieler brennt es nur beim Gastgeber: Die Schäden gehören zur gemeinsamen Welt
+    if (s && h > 7 && h < 20 && !G.siege && !G.raid && !isBlighted(s) && !(G.mp && G.mp.role === 'guest') && Math.random() < 0.55) {
       const cand = siteHouses(s.id).filter((b) => standing(b) && !b.tavern && !(b.fire > G.time) && Math.hypot(b.x - p.x, b.y - p.y) < 11);
       if (cand.length) {
         const b = pick(cand);

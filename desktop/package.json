@@ -23,6 +23,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "relay.js",
       "package.json",
       "build/icon.png"
     ],

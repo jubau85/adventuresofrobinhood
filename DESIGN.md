@@ -166,14 +166,29 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Verhältnis −60 und Tag 30), Mittel (×0,9, ×1,15, 3 Gebäude, −45, Tag 18), Schwer (×1,25, ×0,85, Steinburg mit 4
   Gebäuden, −25, Tag 10). Dazu „klug“: wie oft ein Baron das Vernünftigste tut (35 %, 60 %, 85 %).
 
-### Phase 7: Mehrspieler (2 bis 6)
-- Jeder beginnt in einer anderen Grafschaft mit einer Burgruine, wächst, schließt Bündnisse, handelt und führt
-  Feldschlachten.
-- Technisch der größte Schritt: Es braucht einen Server (eine Artifact-Seite allein kann keine Echtzeitspiele
-  verbinden), entweder mit maßgeblicher Simulation auf dem Server oder als Gleichschritt, bei dem alle Rechner
-  dieselbe Simulation aus denselben Befehlen rechnen.
-- Vorbereitung: Die Barone (Phase 6b) sind schon „Herren“ im Spielstand; noch fehlen alle Handlungen als Befehle; ein Zufallsgenerator
-  mit Startwert statt Math.random in der Simulation. Später übernehmen Menschen die KI-Herren.
+### Phase 7: Mehrspieler (2 bis 6) – Kern umgesetzt (mp.js, net.js)
+- Ziel: Jeder sitzt auf einer Burg, wächst, schließt Bündnisse, handelt und führt Feldschlachten; ausgeliefert über
+  Steam (Desktop-App in `desktop/`, Lobbys und Verbindungen über Steam).
+- **Gastgeber-Modell:** Ein Spieler ist Gastgeber und rechnet die gemeinsame Welt allein: Uhrzeit und Tage, Märkte,
+  Barone, Krieg, Grafschaften, Schäden, Bauten, Wetter, Turniere, Hinrichtungen (`SHARED_KEYS` in `mp.js`). Er schickt
+  den ganzen Stand (nicht nur Änderungen), alle 3 s, wenn sich etwas geändert hat, die Märkte alle 8 s, die Uhr zweimal
+  je Sekunde. Gäste rechnen täglich nur Persönliches (Sold, Aufträge, eigene Begegnungen; `guestDay` in `sim.js`).
+  Dorfleben, Tiere und Gruppen unterwegs rechnet jeder für sich.
+- **Plätze:** Der Gastgeber sitzt auf seiner Burg (`heim`), jeder Gast auf der Burg eines Barons, dessen KI dann ruht
+  (`barons[id].human`); die Burg trägt die Farbe des Menschen. Gäste starten vor dieser Burg mit eigenem Helden, Gefolge
+  und Gold. Die Heimburg gehört dem Gastgeber.
+- **Befehle:** Was ein Gast an der gemeinsamen Welt ändert, geht als Befehl an den Gastgeber (bisher: Markt-Lager nach
+  Kauf und Verkauf, Platzwechsel). Weitere folgen mit 7b.
+- **Helden der anderen:** jeder schickt 10-mal je Sekunde Position, Pferd, Ausrüstung und Farbe; die anderen zeigen ihn
+  als 3D-Figur mit Namen und Ring in seiner Farbe, weich zwischen den Meldungen.
+- **Gastgeber-Wechsel:** Kommt vom Gastgeber 8 s nichts, übernimmt der Gast mit der kleinsten Kennung mit dem zuletzt
+  empfangenen Weltstand. Neu Beitretende haben eine Schonfrist, solange sie die Welt erzeugen.
+- **Verbindung (`net.js`):** Browser-Kanal (zwei Fenster auf einem Rechner), WebSocket-Relais (`desktop/relay.js`,
+  in der Desktop-App beim Eröffnen eingebaut, sonst `node tools/relay.mjs`), später Steam. Chrome verlangt für Seiten
+  aus dem Netz eine Freigabe für Verbindungen ins Heimnetz; die Desktop-App ist davon nicht betroffen.
+- **Noch offen (7b/7c):** eigene Burg der Gäste verwalten (Ausbau als Befehle), Belagerungen und Feldschlachten
+  zwischen Menschen und deren Anzeige bei allen, Diplomatie zwischen Menschen, Gruppen auf der Karte gemeinsam,
+  Wappenfarbe des Gastgebers auf seiner Burg bei den Gästen, Speichern einer Mehrspieler-Partie für alle, Steam-Lobby.
 
 ## Ausbauplan
 

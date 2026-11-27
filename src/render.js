@@ -4370,8 +4370,9 @@ function softGround(c, cvs, W, x0, y0, ox, oy, cs, look) {
     c.save(); outline(c); c.clip();
     c.strokeStyle = pat; c.lineJoin = 'round';
     const soft = field ? 0.5 : 1;
-    c.globalAlpha = 0.32; c.lineWidth = 9 * soft; c.stroke(edge);
-    c.globalAlpha = 0.42; c.lineWidth = 4.5 * soft; c.stroke(edge);
+    c.globalAlpha = 0.22; c.lineWidth = 14 * soft; c.stroke(edge);
+    c.globalAlpha = 0.3; c.lineWidth = 8 * soft; c.stroke(edge);
+    c.globalAlpha = 0.4; c.lineWidth = 3.5 * soft; c.stroke(edge);
     c.restore();
   }
   return true;
@@ -4638,6 +4639,11 @@ function drawFigure(c, u, x, y) {
     c.lineWidth = 1.4;
     c.beginPath(); c.ellipse(0, 0, m ? 16 : 10, m ? 6 : 4.4, 0, 0, Math.PI * 2); c.stroke();
   }
+  else if (u.kind === 'remote') {
+    // Held eines Mitspielers: Ring in seiner Wappenfarbe
+    c.strokeStyle = u.tunic || '#d8c080'; c.lineWidth = 1.8;
+    c.beginPath(); c.ellipse(0, 0, m ? 16 : 10, m ? 6 : 4.4, 0, 0, Math.PI * 2); c.stroke();
+  }
   else if (u.livery && !u.dead) {
     // Ring in der Farbe der Partei: im Getümmel sieht man sofort, wer zu wem gehört
     c.strokeStyle = u.livery; c.globalAlpha = 0.85; c.lineWidth = 1.6;
@@ -4663,6 +4669,14 @@ function drawFigure(c, u, x, y) {
     c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
     c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
     c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
+  }
+  // Name über dem Helden eines Mitspielers
+  if (u.kind === 'remote' && u.name) {
+    const top = y + (m ? -50 : -38) * FIG;
+    c.font = '600 11px Alegreya, Georgia, serif'; c.textAlign = 'center';
+    c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,8,0.8)'; c.strokeText(u.name, x, top);
+    c.fillStyle = '#f4e7c8'; c.fillText(u.name, x, top);
+    c.textAlign = 'start';
   }
 }
 
@@ -4800,7 +4814,7 @@ function modelFor(u, m) {
   if (u.hidden) return null;
   const r = u.eq && u.eq.ruestung;
   let key;
-  if (u.kind === 'player' || u.kind === 'preview') key = u.female ? RITTERIN[r] || 'ritterin' : `held_${heroVariant(u)}`;
+  if (u.kind === 'player' || u.kind === 'preview' || u.kind === 'remote') key = u.female ? RITTERIN[r] || 'ritterin' : `held_${heroVariant(u)}`;
   else if (u.kind === 'peasant') key = u.small || u.role === 'kind' ? 'kind' : u.female ? 'frau' : ROLLE3D[u.role] || 'bauer';
   else if (u.female) key = RITTERIN[r] || 'ritterin';
   else if (r === 'kettenruestung' || u.cls === 'ritter') key = 'held_ritter';
@@ -5890,6 +5904,11 @@ export function render() {
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
+    objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)), box: [u.x - 0.15, u.x + 0.15, u.y - 0.15, u.y + 0.15] });
+  }
+  // Helden der Mitspieler (mp.js)
+  for (const u of G.remoteUnits || []) {
+    if (u.hidden || u.dead || !inView(u.x, u.y)) continue;
     objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)), box: [u.x - 0.15, u.x + 0.15, u.y - 0.15, u.y + 0.15] });
   }
   const night = darkness() > 0.4;

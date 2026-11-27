@@ -502,6 +502,19 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 .loading-bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #a8791f, #e3b843); transition: width 0.15s; }
 /* Warenbilder in Markt und Lager */
 .ware-bild { display: inline-block; width: 22px; height: 22px; object-fit: contain; vertical-align: -6px; margin-right: 6px; }
+
+/* Mehrspieler */
+.mp-title { margin-top: 10px; }
+.mp-title summary { cursor: pointer; font-family: var(--font-head); color: var(--ink, #3a2a18); }
+.mp-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.mp-row label { display: flex; flex-direction: column; font-size: 13px; gap: 3px; flex: 1 1 140px; }
+.mp-row input, .mp-in { padding: 5px 7px; border: 1px solid rgba(60,40,20,0.4); border-radius: 3px; background: rgba(255,250,235,0.85); font: inherit; color: #2a1c10; }
+.mp-box { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid rgba(200,170,110,0.25); }
+.mp-roster { list-style: none; margin: 0; padding: 0; }
+.mp-roster li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.mp-roster .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.4); }
+#chat-input { position: fixed; left: 16px; bottom: 64px; width: min(520px, calc(100% - 32px)); z-index: 40; padding: 7px 10px; border-radius: 4px; border: 1px solid var(--gold, #c9a048); background: rgba(28,20,14,0.92); color: var(--parchment, #f1e3c2); font: inherit; }
+.log .chat, .msg.chat { color: #bfe3ff; }
 </style>
 </head>
 <body>
@@ -618,11 +631,24 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
         </div>
         <p class="hint" id="continue-info"></p>
+        <details class="mp-title">
+          <summary>Mehrspieler</summary>
+          <div class="mp-row">
+            <label>Partie <input id="mp-room" value="burg" maxlength="32" autocomplete="off"></label>
+            <label>Relais <input id="mp-relay" placeholder="leer: dieser Rechner" autocomplete="off"></label>
+          </div>
+          <div class="row">
+            <button type="button" class="btn" id="btn-host">Partie eröffnen</button>
+            <button type="button" class="btn" id="btn-join">Partie beitreten</button>
+          </div>
+          <p class="hint" id="mp-status"></p>
+        </details>
       </form>
     </div>
     <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
   </section>
 </div>
+<input id="chat-input" hidden maxlength="200" placeholder="Zu allen in der Partie sprechen … (Enter schickt, Esc schließt)" autocomplete="off">
 <div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
 <script>
 (function () {
@@ -8702,7 +8728,8 @@ function updateDynamics(dt) {
     fireT = rand(140, 300);
     const h = hourOf();
     const s = G.world.sites.find((x) => GROWING[x.type] && Math.hypot(x.x - p.x, x.y - p.y) < (x.clear || 6) + 3);
-    if (s && h > 7 && h < 20 && !G.siege && !G.raid && !isBlighted(s) && Math.random() < 0.55) {
+    // Im Mehrspieler brennt es nur beim Gastgeber: Die Schäden gehören zur gemeinsamen Welt
+    if (s && h > 7 && h < 20 && !G.siege && !G.raid && !isBlighted(s) && !(G.mp && G.mp.role === 'guest') && Math.random() < 0.55) {
       const cand = siteHouses(s.id).filter((b) => standing(b) && !b.tavern && !(b.fire > G.time) && Math.hypot(b.x - p.x, b.y - p.y) < 11);
       if (cand.length) {
         const b = pick(cand);
@@ -10023,6 +10050,7 @@ function buy(site, good, n) {
     addCargo(good, 1);
     bought++;
   }
+  if (bought && G.onStock) G.onStock(site.id, good, -bought);
   return { bought, spent };
 }
 
@@ -10037,6 +10065,7 @@ function sell(site, good, n) {
     G.s.cargo[good]--;
     sold++;
   }
+  if (sold && G.onStock) G.onStock(site.id, good, sold);
   return { sold, earned };
 }
 
@@ -10055,6 +10084,7 @@ function sellStored(site, good, n, keep = 0) {
     st[good]--;
     sold++;
   }
+  if (sold && G.onStock) G.onStock(site.id, good, sold);
   return { sold, earned };
 }
 
@@ -12162,7 +12192,7 @@ function barons() { return (G.s && G.s.barons) || {}; }
 function baron(id) { return barons()[id] || null; }
 function baronSite(id) { return G.world.sites.find((s) => s.baron === id) || null; }
 function siteBaron(s) { return s && s.baron ? s.baron : null; }
-function baronColor(id) { return BARONS[id] ? BARONS[id].color : '#8a8070'; }
+function baronColor(id) { const b = G.s && G.s.barons && G.s.barons[id]; if (b && b.human && b.human.color) return b.human.color; return BARONS[id] ? BARONS[id].color : '#8a8070'; }
 function isBaronOwner(o) { return typeof o === 'string' && o.startsWith('b:'); }
 function ownerBaron(o) { return isBaronOwner(o) ? o.slice(2) : null; }
 function baronActive(id) { const b = baron(id); return !!b && !b.gone; }
@@ -12415,7 +12445,8 @@ function dailyBarons() {
   };
   for (const id of BARON_IDS) {
     const b = baron(id), def = BARONS[id], tr = BARON_TRAIT[def.trait];
-    if (!b || b.gone || !baronSite(id)) continue;
+    // Sitzt ein Mitspieler auf dieser Burg (mp.js), ruht die KI
+    if (!b || b.gone || b.human || !baronSite(id)) continue;
     // Einkommen und Sold
     const inc = baronIncome(id), up = baronUpkeep(id);
     b.gold += inc - up;
@@ -12743,6 +12774,414 @@ function sideStrengthBonus(th, side) {
   return Math.min(25, add);
 }
 
+// ===== net.js =====
+// Verbindungen für den Mehrspieler: eine kleine Schnittstelle, darunter wahlweise
+//  - 'kanal': BroadcastChannel, für zwei Fenster im selben Browser (Tests, ein Rechner)
+//  - 'relais': WebSocket zu tools/relay.mjs (im Heimnetz oder im Internet)
+//  - später 'steam': Lobby und Verbindungen über die Desktop-App (window.ritterDesktop.steam)
+// Jede Nachricht ist ein Umschlag { f: Absender, t: Empfänger oder null für alle, y: Art, d: Daten }. Die Schicht kennt
+// keine Spielregeln; wer da ist, regelt mp.js über regelmäßige Lebenszeichen.
+
+function netId() {
+  const a = new Uint8Array(6);
+  (globalThis.crypto || window.crypto).getRandomValues(a);
+  return [...a].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 10);
+}
+
+function openTransport({ kind = 'kanal', room = 'burg', url = '', id = netId() } = {}) {
+  const handlers = [];
+  const deliver = (env) => {
+    if (!env || env.f === id || (env.t && env.t !== id)) return;
+    for (const h of handlers) { try { h(env); } catch (e) { console.error(e); } }
+  };
+  let sendRaw, closeRaw, ready = Promise.resolve(true), state = { open: true };
+  if (kind === 'relais') {
+    const ws = new WebSocket(url);
+    const queue = [];
+    state.open = false;
+    ready = new Promise((res) => {
+      ws.addEventListener('open', () => { state.open = true; ws.send(JSON.stringify({ join: room, id })); for (const q of queue.splice(0)) ws.send(q); res(true); });
+      ws.addEventListener('error', () => res(false));
+    });
+    ws.addEventListener('message', (ev) => { try { deliver(JSON.parse(ev.data)); } catch (e) { /* kaputte Nachricht */ } });
+    ws.addEventListener('close', () => { state.open = false; state.closed = true; });
+    sendRaw = (text) => { if (ws.readyState === 1) ws.send(text); else if (ws.readyState === 0) queue.push(text); };
+    closeRaw = () => ws.close();
+  } else {
+    const ch = new BroadcastChannel(`akt-${room}`);
+    ch.onmessage = (ev) => deliver(ev.data);
+    sendRaw = (env) => ch.postMessage(env);
+    closeRaw = () => ch.close();
+  }
+  const pack = (to, y, d) => {
+    const env = { f: id, t: to || null, y, d };
+    return kind === 'relais' ? JSON.stringify(env) : env;
+  };
+  return {
+    id, kind, room, ready, state,
+    send: (to, type, data) => sendRaw(pack(to, type, data)),
+    broadcast: (type, data) => sendRaw(pack(null, type, data)),
+    on: (fn) => handlers.push(fn),
+    close: () => { state.open = false; try { closeRaw(); } catch (e) { /* schon zu */ } },
+  };
+}
+
+// ===== mp.js =====
+// Mehrspieler (Phase 7, Kern): Ein Spieler ist Gastgeber und rechnet die gemeinsame Welt – Uhrzeit und Tage, Märkte,
+// Barone, Krieg, Grafschaften, Schäden und Bauten, Wetter. Die Gäste spielen ihren Helden mit Gefolge, Gold und
+// Aufträgen selbst und bekommen die Welt vom Gastgeber; ihr Dorfleben, Tiere und Begegnungen unterwegs rechnet jeder
+// für sich. Jeder Mensch sitzt auf einem Platz: der Gastgeber auf seiner Burg ('heim'), Gäste auf der Burg eines
+// Barons, dessen KI dann ruht. Was die gemeinsame Welt ändert, schickt ein Gast als Befehl an den Gastgeber.
+// Geht der Gastgeber, übernimmt der Gast mit der kleinsten Kennung mit dem zuletzt empfangenen Weltstand.
+// Die Verbindung selbst liegt in net.js (Browser-Kanal, Relais, später Steam).
+
+
+
+
+
+
+
+
+// Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
+const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
+  'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'castle', 'castleName', 'hostArms'];
+const MARKET_KEYS = ['towns'];
+// Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
+const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 7, HOST_TIMEOUT = 8, JOIN_GRACE = 120;
+
+function mpActive() { return !!G.mp; }
+function mpGuest() { return !!(G.mp && G.mp.role === 'guest'); }
+function mpHostRole() { return !!(G.mp && G.mp.role === 'host'); }
+
+function hashText(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + t.length; }
+function pickKeys(s, keys) { const o = {}; for (const k of keys) if (s[k] !== undefined) o[k] = s[k]; return o; }
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// Plätze: 'heim' (die Burg des ersten Gastgebers) und je Baron seine Burg
+function seatIds() { return ['heim', ...BARON_IDS]; }
+function seatName(seat) {
+  if (seat === 'heim') return (G.s && (G.s.castleName)) || 'Ashcombe';
+  const s = G.world && baronSite(seat);
+  return s ? s.name : (BARONS[seat] ? BARONS[seat].short : seat);
+}
+
+function me() { return { name: G.s ? G.s.player.name : '?', color: G.s ? G.s.color : '#888', arms: G.s ? G.s.arms : null, female: G.s ? !!G.s.player.female : false }; }
+
+function newSession(role, opts) {
+  const id = opts.id || netId();
+  const tr = openTransport({ kind: opts.kind || 'kanal', room: opts.room || 'burg', url: opts.url || '', id });
+  const mp = {
+    role, id, room: opts.room || 'burg', kind: opts.kind || 'kanal', tr, hostId: role === 'host' ? id : null,
+    peers: new Map(), seats: {}, seat: null, t: { hero: 0, clock: 0, world: 0, market: 0, hello: 0 },
+    hash: { world: '', market: '' }, lastHost: performance.now() / 1000, pending: new Map(), cmdSeq: 1,
+  };
+  tr.on((env) => onMessage(mp, env));
+  return mp;
+}
+
+// ---------------------------------------------------------------- Partie eröffnen und beitreten
+// Gastgeber: die laufende Partie (eigener Spielstand) wird geöffnet; der Gastgeber sitzt auf seiner Burg
+function mpHost(opts = {}) {
+  const mp = newSession('host', opts);
+  mp.seats.heim = mp.id;
+  mp.seat = 'heim';
+  G.mp = mp;
+  G.s.hostArms = { arms: G.s.arms, color: G.s.color, name: G.s.player.name };
+  hookGame();
+  log(`Die Partie „${mp.room}“ ist offen. Mitspieler treten mit diesem Namen bei.`, 'gold');
+  return mp;
+}
+
+// Gast: Lebenszeichen senden, bis ein Gastgeber mit dem Weltstand antwortet. onWelcome baut daraus das Spiel (main.js).
+function mpJoin(opts, onWelcome, onFail) {
+  const mp = newSession('guest', opts);
+  mp.want = opts.seat || null;
+  mp.join = { name: opts.name, color: opts.color, arms: opts.arms, female: !!opts.female, want: mp.want };
+  mp.onWelcome = onWelcome;
+  G.mp = mp;
+  let tries = 0;
+  const knock = () => {
+    if (G.mp !== mp || mp.welcomed) return;
+    if (++tries > 10) { G.mp = null; mp.tr.close(); if (onFail) onFail('Keine Partie mit diesem Namen gefunden.'); return; }
+    mp.tr.broadcast('hallo', mp.join);
+    setTimeout(knock, 700);
+  };
+  mp.tr.ready.then((ok) => { if (!ok) { G.mp = null; if (onFail) onFail('Keine Verbindung zum Relais.'); return; } knock(); });
+  return mp;
+}
+
+function mpLeave() {
+  const mp = G.mp;
+  if (!mp) return;
+  mp.tr.broadcast('tschuess', {});
+  mp.tr.close();
+  for (const p of mp.peers.values()) dropHero(p);
+  G.mp = null;
+  G.remoteUnits = [];
+}
+
+// ---------------------------------------------------------------- Laufend (aus der Hauptschleife)
+function mpUpdate(dt) {
+  const mp = G.mp;
+  if (!mp || !G.started || (mp.role === 'guest' && !mp.welcomed)) return;
+  const now = performance.now() / 1000;
+  for (const k of Object.keys(mp.t)) mp.t[k] += dt;
+  if (mp.t.hero >= HERO_EVERY) { mp.t.hero = 0; mp.tr.broadcast('held', heroState()); }
+  if (mp.t.hello >= HELLO_EVERY) { mp.t.hello = 0; mp.tr.broadcast('da', { ...me(), seat: mp.seat, role: mp.role }); }
+  if (mp.role === 'host') {
+    if (mp.t.clock >= CLOCK_EVERY) { mp.t.clock = 0; mp.tr.broadcast('uhr', { day: G.s.day, time: G.s.time, fast: !!G.fast }); }
+    if (mp.t.world >= WORLD_EVERY) { mp.t.world = 0; sendWorld(mp, false); }
+    if (mp.t.market >= MARKET_EVERY) { mp.t.market = 0; sendMarkets(mp, false); }
+  } else if (now - mp.lastHost > HOST_TIMEOUT) migrate(mp);
+  // Mitspieler, von denen nichts mehr kommt, verschwinden
+  for (const [id, p] of mp.peers) if (now - p.last > PEER_TIMEOUT && !(p.joinUntil > now && !p.hero)) peerGone(mp, id, 'ist nicht mehr zu erreichen');
+  moveHeroes(dt);
+}
+
+function heroState() {
+  const p = G.s.player;
+  return { x: +p.x.toFixed(2), y: +p.y.toFixed(2), m: !!p.mounted, run: !!p.run, sw: p.swing > 0 ? 1 : 0, dead: !!p.dead,
+    eq: { waffe: p.eq.waffe, ruestung: p.eq.ruestung, schild: p.eq.schild, pferd: p.eq.pferd }, fem: !!p.female, col: G.s.color, name: p.name };
+}
+
+function sendWorld(mp, force, to = null) {
+  const w = pickKeys(G.s, SHARED_KEYS), text = JSON.stringify(w), h = hashText(text);
+  if (!force && h === mp.hash.world) return;
+  mp.hash.world = h;
+  if (to) mp.tr.send(to, 'welt', w); else mp.tr.broadcast('welt', w);
+}
+function sendMarkets(mp, force, to = null) {
+  const w = pickKeys(G.s, MARKET_KEYS), text = JSON.stringify(w), h = hashText(text);
+  if (!force && h === mp.hash.market) return;
+  mp.hash.market = h;
+  if (to) mp.tr.send(to, 'maerkte', w); else mp.tr.broadcast('maerkte', w);
+}
+
+// ---------------------------------------------------------------- Nachrichten
+function peer(mp, id) {
+  let p = mp.peers.get(id);
+  if (!p) { p = { id, name: '?', color: '#888', seat: null, last: performance.now() / 1000, hero: null, unit: null }; mp.peers.set(id, p); }
+  p.last = performance.now() / 1000;
+  return p;
+}
+
+function onMessage(mp, env) {
+  if (G.mp !== mp) return;
+  const { f: from, y: type, d } = env;
+  if (mp.role === 'host' && type === 'hallo') return welcome(mp, from, d);
+  if (type === 'willkommen') return mp.role === 'guest' && !mp.welcomed ? welcomed(mp, from, d) : null;
+  if (mp.role === 'guest' && !mp.welcomed) return;
+  const p = peer(mp, from);
+  if (from === mp.hostId) mp.lastHost = performance.now() / 1000;
+  switch (type) {
+    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; break;
+    case 'held': p.hero = d; p.name = d.name || p.name; p.color = d.col || p.color; break;
+    case 'uhr': if (mp.role === 'guest' && from === mp.hostId) applyClock(d); break;
+    case 'welt': if (mp.role === 'guest' && from === mp.hostId) applyWorld(d); break;
+    case 'maerkte': if (mp.role === 'guest' && from === mp.hostId) Object.assign(G.s, d); break;
+    case 'sitze': if (from === mp.hostId) { mp.seats = d.seats; if (d.seats) for (const [s, id] of Object.entries(d.seats)) if (id === mp.id) mp.seat = s; } break;
+    case 'chat': log(`${String(d.name || p.name).slice(0, 24)}: ${String(d.text || '').slice(0, 200)}`, 'chat'); break;
+    case 'befehl': if (mp.role === 'host') runCommand(mp, from, d); break;
+    case 'antwort': { const cb = mp.pending.get(d.n); if (cb) { mp.pending.delete(d.n); cb(d); } break; }
+    case 'gastgeber': mp.hostId = from; if (mp.role === 'host' && from !== mp.id) mp.role = 'guest'; log(`${p.name} ist jetzt Gastgeber der Partie.`, 'gold'); break;
+    case 'tschuess': peerGone(mp, from, 'hat die Partie verlassen'); break;
+  }
+}
+
+// Gastgeber: ein neuer Mitspieler klopft an. Er bekommt einen freien Platz (den gewünschten, wenn er frei ist) und den
+// ganzen Weltstand.
+function welcome(mp, from, d) {
+  const p = peer(mp, from);
+  Object.assign(p, { name: d.name || 'Gast', color: d.color, arms: d.arms, female: d.female });
+  let seat = Object.keys(mp.seats).find((s) => mp.seats[s] === from) || null;
+  if (!seat) {
+    const free = seatIds().filter((s) => !mp.seats[s] && s !== 'heim' && G.s.barons && G.s.barons[s] && !G.s.barons[s].gone);
+    seat = d.want && free.includes(d.want) ? d.want : free[0] || null;
+    if (!seat) { mp.tr.send(from, 'willkommen', { voll: true }); return; }
+    mp.seats[seat] = from;
+    if (G.s.barons[seat]) G.s.barons[seat].human = { id: from, name: p.name, color: p.color };
+    log(`${p.name} tritt der Partie bei und übernimmt ${seatName(seat)}.`, 'gold');
+  }
+  p.seat = seat;
+  p.joinUntil = performance.now() / 1000 + JOIN_GRACE;
+  mp.tr.send(from, 'willkommen', { hostId: mp.id, host: me(), seat, seats: mp.seats, world: pickKeys(G.s, [...SHARED_KEYS, ...MARKET_KEYS]), seed: G.s.seed });
+  mp.tr.broadcast('sitze', { seats: mp.seats });
+  mp.hash.world = '';
+}
+
+function welcomed(mp, from, d) {
+  if (d.voll) { mpLeave(); if (mp.onWelcome) mp.onWelcome(null, 'Alle Plätze in dieser Partie sind besetzt.'); return; }
+  mp.welcomed = true;
+  mp.hostId = from;
+  if (d.host) Object.assign(peer(mp, from), { name: d.host.name, color: d.host.color, arms: d.host.arms, female: d.host.female, seat: 'heim' });
+  mp.seat = d.seat;
+  mp.seats = d.seats;
+  mp.lastHost = performance.now() / 1000;
+  if (mp.onWelcome) mp.onWelcome(d);
+}
+
+// ---------------------------------------------------------------- Weltstand beim Gast
+function applyClock(d) {
+  const s = G.s;
+  // Tage nachholen (nur die eigenen Tagesdinge, siehe sim.js), Uhrzeit nachziehen; kleine Abweichungen weich
+  if (d.day > s.day + 30) s.day = d.day - 1;
+  while (s.day < d.day) { s.time = 0; if (G.mpNewDay) G.mpNewDay(); else s.day++; }
+  if (s.day === d.day) { const diff = d.time - s.time; s.time += Math.abs(diff) > 30 ? diff : diff * 0.3; }
+  G.fast = !!d.fast;
+}
+
+function applyWorld(w) {
+  const s = G.s, before = { barons: JSON.stringify(s.barons || null), damage: JSON.stringify(s.damage || null), cons: JSON.stringify(s.cons || null), castle: JSON.stringify(s.castle || null) };
+  const day = s.day, time = s.time;
+  Object.assign(s, w);
+  s.day = day; s.time = time;   // die Uhr kommt über 'uhr'
+  if (JSON.stringify(s.barons || null) !== before.barons) applyBarons();
+  if (JSON.stringify(s.damage || null) !== before.damage) applyDamage();
+  if (JSON.stringify(s.cons || null) !== before.cons) applyCons();
+  if (JSON.stringify(s.castle || null) !== before.castle) G.castleDirty = true;
+  G.staticDirty = true;
+}
+
+// ---------------------------------------------------------------- Befehle (Gast -> Gastgeber)
+function mpCommand(cmd, args = {}, cb = null) {
+  const mp = G.mp;
+  if (!mp) return false;
+  if (mp.role === 'host') { const r = execCommand(mp, mp.id, cmd, args); if (cb) cb(r); return true; }
+  const n = mp.cmdSeq++;
+  if (cb) mp.pending.set(n, cb);
+  mp.tr.send(mp.hostId, 'befehl', { n, cmd, args });
+  return true;
+}
+function runCommand(mp, from, d) {
+  const r = execCommand(mp, from, d.cmd, d.args || {});
+  mp.tr.send(from, 'antwort', { n: d.n, ...r });
+}
+const COMMANDS = {
+  // Ein Gast hat auf dem Markt gekauft (negativ) oder verkauft (positiv): das Warenlager der Stadt nachführen
+  markt(mp, from, a) {
+    const town = G.s.towns && G.s.towns[a.site];
+    if (!town || !(a.good in town.stock)) return { ok: false };
+    town.stock[a.good] = Math.max(0, (town.stock[a.good] || 0) + Math.max(-50, Math.min(50, a.delta | 0)));
+    return { ok: true, stock: town.stock[a.good] };
+  },
+  // Platz wechseln (auf eine freie Baronsburg)
+  sitz(mp, from, a) {
+    const seat = a.seat;
+    if (!BARONS[seat] || mp.seats[seat] || !G.s.barons[seat] || G.s.barons[seat].gone) return { ok: false, msg: 'Dieser Platz ist nicht frei.' };
+    const old = Object.keys(mp.seats).find((s) => mp.seats[s] === from);
+    if (old && old !== 'heim') { delete mp.seats[old]; if (G.s.barons[old]) delete G.s.barons[old].human; }
+    mp.seats[seat] = from;
+    const p = mp.peers.get(from) || { name: 'Gast' };
+    G.s.barons[seat].human = { id: from, name: p.name, color: p.color };
+    mp.tr.broadcast('sitze', { seats: mp.seats });
+    return { ok: true, seat };
+  },
+};
+function execCommand(mp, from, cmd, args) {
+  const f = COMMANDS[cmd];
+  if (!f) return { ok: false, msg: 'Unbekannter Befehl.' };
+  try { return f(mp, from, args); } catch (e) { return { ok: false, msg: e.message }; }
+}
+
+// Kauf und Verkauf beim Gast: der Gastgeber führt die Warenlager
+function mpNoteStock(siteId, good, delta) {
+  if (mpGuest() && delta) mpCommand('markt', { site: siteId, good, delta });
+}
+
+function mpChat(text) {
+  const mp = G.mp;
+  const t = String(text || '').trim().slice(0, 200);
+  if (!mp || !t) return;
+  mp.tr.broadcast('chat', { text: t, name: G.s.player.name });
+  log(`${G.s.player.name}: ${t}`, 'chat');
+}
+
+// ---------------------------------------------------------------- Gastgeber-Wechsel und Abschied
+function peerGone(mp, id, why) {
+  const p = mp.peers.get(id);
+  if (!p) return;
+  mp.peers.delete(id);
+  dropHero(p);
+  log(`${p.name} ${why}.`, 'info');
+  if (mp.role === 'host') {
+    for (const [s, pid] of Object.entries(mp.seats)) if (pid === id) { delete mp.seats[s]; if (G.s.barons && G.s.barons[s]) delete G.s.barons[s].human; }
+    mp.tr.broadcast('sitze', { seats: mp.seats });
+  } else if (id === mp.hostId) migrate(mp);
+}
+
+function migrate(mp) {
+  const now = performance.now() / 1000;
+  const alive = [mp.id, ...[...mp.peers.values()].filter((p) => p.id !== mp.hostId && now - p.last < PEER_TIMEOUT).map((p) => p.id)].sort();
+  const old = mp.hostId;
+  mp.lastHost = now;
+  if (old) { const p = mp.peers.get(old); if (p) { mp.peers.delete(old); dropHero(p); } }
+  if (alive[0] === mp.id) {
+    mp.role = 'host';
+    mp.hostId = mp.id;
+    for (const [s, pid] of Object.entries(mp.seats)) if (pid === old) delete mp.seats[s];
+    mp.hash.world = ''; mp.hash.market = '';
+    mp.tr.broadcast('gastgeber', {});
+    mp.tr.broadcast('sitze', { seats: mp.seats });
+    log('Der Gastgeber ist fort. Du führst die Partie jetzt weiter.', 'gold');
+  } else mp.hostId = alive[0];
+}
+
+// ---------------------------------------------------------------- Helden der Mitspieler
+function dropHero(p) {
+  if (p.unit && G.remoteUnits) G.remoteUnits = G.remoteUnits.filter((u) => u !== p.unit);
+  p.unit = null;
+}
+function moveHeroes(dt) {
+  const mp = G.mp;
+  if (!G.remoteUnits) G.remoteUnits = [];
+  for (const p of mp.peers.values()) {
+    const h = p.hero;
+    if (!h) continue;
+    let u = p.unit;
+    if (!u) {
+      u = makeUnit({ kind: 'remote', cls: 'ritter', name: h.name || p.name, eq: h.eq, female: h.fem, x: h.x, y: h.y, tunic: h.col });
+      u.team = 'remote'; u.peer = p.id;
+      p.unit = u;
+      G.remoteUnits.push(u);
+    }
+    u.name = h.name || p.name; u.tunic = h.col || p.color; u.female = !!h.fem; u.eq = { ...u.eq, ...h.eq }; u.mounted = !!h.m; u.run = !!h.run; u.dead = !!h.dead;
+    if (h.sw && !(u.swing > 0)) u.swing = 0.3;
+    if (u.swing > 0) u.swing -= dt;
+    const dx = h.x - u.x, dy = h.y - u.y, d = Math.hypot(dx, dy);
+    if (d > 6) { u.x = h.x; u.y = h.y; }
+    else if (d > 0.01) {
+      const k = Math.min(1, dt * 10);
+      u.x += dx * k; u.y += dy * k;
+      u.dirX = dx / d; u.dirY = dy / d;
+      const sx = dx - dy;
+      if (Math.abs(sx) > 0.02) u.facing = sx >= 0 ? 1 : -1;
+    }
+    u.moving = d > 0.03;
+  }
+}
+
+// Spieler in der Partie, für die Anzeige: [{ name, color, seat, you, host }]
+function mpRoster() {
+  const mp = G.mp;
+  if (!mp) return [];
+  const out = [{ name: G.s.player.name, color: G.s.color, seat: mp.seat, you: true, host: mp.role === 'host' }];
+  for (const p of mp.peers.values()) out.push({ name: p.name, color: p.color, seat: p.seat, you: false, host: p.id === mp.hostId });
+  return out;
+}
+
+// Hinweise an das Spiel: Gäste rechnen die gemeinsame Welt nicht selbst (sim.js fragt mpGuest()), Käufe melden sie
+function hookGame() { G.remoteUnits = G.remoteUnits || []; }
+function mpHookGuest() {
+  hookGame();
+  const mp = G.mp;
+  if (!mp) return;
+  const now = performance.now() / 1000;
+  mp.lastHost = now;
+  for (const p of mp.peers.values()) p.last = now;
+  mp.t.hello = HELLO_EVERY;   // gleich beim nächsten Bild melden
+}
+
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
 // an der Quelle (billiger als in der Stadt, aber nur, was sie gerade haben). Im Waldlager heuern Söldner an, und wer
@@ -12941,7 +13380,26 @@ function passHours(h) {
   updateTrips();
 }
 
+// Mehrspieler-Gast: Die gemeinsame Welt rechnet der Gastgeber (mp.js); hier nur, was dem eigenen Helden gehört
+function guestDay() {
+  const before = seasonIndex();
+  G.s.day++;
+  // Sold für das Gefolge aus der eigenen Kasse
+  const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
+  if (wages) {
+    if (G.s.gold >= wages) G.s.gold -= wages;
+    else { G.s.gold = 0; log('Die Kasse reicht nicht für den Sold. Dein Gefolge murrt.', 'bad'); }
+  }
+  dailyQuests();
+  maintainGroups();
+  replenishAnimals();
+  if (seasonIndex() !== before && G.onSeason) G.onSeason();
+  if (G.onNewDay) G.onNewDay();
+}
+G.mpNewDay = () => newDay();
+
 function newDay() {
+  if (G.mp && G.mp.role === 'guest') { guestDay(); return; }
   const before = seasonIndex();
   G.s.day++;
   dailyEconomy();
@@ -18041,8 +18499,9 @@ function softGround(c, cvs, W, x0, y0, ox, oy, cs, look) {
     c.save(); outline(c); c.clip();
     c.strokeStyle = pat; c.lineJoin = 'round';
     const soft = field ? 0.5 : 1;
-    c.globalAlpha = 0.32; c.lineWidth = 9 * soft; c.stroke(edge);
-    c.globalAlpha = 0.42; c.lineWidth = 4.5 * soft; c.stroke(edge);
+    c.globalAlpha = 0.22; c.lineWidth = 14 * soft; c.stroke(edge);
+    c.globalAlpha = 0.3; c.lineWidth = 8 * soft; c.stroke(edge);
+    c.globalAlpha = 0.4; c.lineWidth = 3.5 * soft; c.stroke(edge);
     c.restore();
   }
   return true;
@@ -18309,6 +18768,11 @@ function drawFigure(c, u, x, y) {
     c.lineWidth = 1.4;
     c.beginPath(); c.ellipse(0, 0, m ? 16 : 10, m ? 6 : 4.4, 0, 0, Math.PI * 2); c.stroke();
   }
+  else if (u.kind === 'remote') {
+    // Held eines Mitspielers: Ring in seiner Wappenfarbe
+    c.strokeStyle = u.tunic || '#d8c080'; c.lineWidth = 1.8;
+    c.beginPath(); c.ellipse(0, 0, m ? 16 : 10, m ? 6 : 4.4, 0, 0, Math.PI * 2); c.stroke();
+  }
   else if (u.livery && !u.dead) {
     // Ring in der Farbe der Partei: im Getümmel sieht man sofort, wer zu wem gehört
     c.strokeStyle = u.livery; c.globalAlpha = 0.85; c.lineWidth = 1.6;
@@ -18334,6 +18798,14 @@ function drawFigure(c, u, x, y) {
     c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
     c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
     c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
+  }
+  // Name über dem Helden eines Mitspielers
+  if (u.kind === 'remote' && u.name) {
+    const top = y + (m ? -50 : -38) * FIG;
+    c.font = '600 11px Alegreya, Georgia, serif'; c.textAlign = 'center';
+    c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,8,0.8)'; c.strokeText(u.name, x, top);
+    c.fillStyle = '#f4e7c8'; c.fillText(u.name, x, top);
+    c.textAlign = 'start';
   }
 }
 
@@ -18471,7 +18943,7 @@ function modelFor(u, m) {
   if (u.hidden) return null;
   const r = u.eq && u.eq.ruestung;
   let key;
-  if (u.kind === 'player' || u.kind === 'preview') key = u.female ? RITTERIN[r] || 'ritterin' : `held_${heroVariant(u)}`;
+  if (u.kind === 'player' || u.kind === 'preview' || u.kind === 'remote') key = u.female ? RITTERIN[r] || 'ritterin' : `held_${heroVariant(u)}`;
   else if (u.kind === 'peasant') key = u.small || u.role === 'kind' ? 'kind' : u.female ? 'frau' : ROLLE3D[u.role] || 'bauer';
   else if (u.female) key = RITTERIN[r] || 'ritterin';
   else if (r === 'kettenruestung' || u.cls === 'ritter') key = 'held_ritter';
@@ -19561,6 +20033,11 @@ function render() {
   for (const part of castleParts) if (inView(part.x, part.y)) objs.push(part);
   for (const u of G.units) {
     if (u.hidden || (u.dead && u.kind !== 'player') || !inView(u.x, u.y)) continue;
+    objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)), box: [u.x - 0.15, u.x + 0.15, u.y - 0.15, u.y + 0.15] });
+  }
+  // Helden der Mitspieler (mp.js)
+  for (const u of G.remoteUnits || []) {
+    if (u.hidden || u.dead || !inView(u.x, u.y)) continue;
     objs.push({ d: u.x + u.y + 0.05, z: 0, f: (c) => drawFigure(c, u, isoX(u.x, u.y), isoY(u.x, u.y) - zAt(u.x, u.y)), box: [u.x - 0.15, u.x + 0.15, u.y - 0.15, u.y + 0.15] });
   }
   const night = darkness() > 0.4;
@@ -20889,6 +21366,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -22164,6 +22642,7 @@ function menuPanel() {
         <button class="btn sm${G.musicOn && G.musicOn() ? ' primary' : ''}" data-act="music" aria-pressed="${!!(G.musicOn && G.musicOn())}">Musik ${G.musicOn && G.musicOn() ? 'an' : 'aus'}</button>
         <button class="btn sm${G.sfxOn && G.sfxOn() ? ' primary' : ''}" data-act="sfx" aria-pressed="${!!(G.sfxOn && G.sfxOn())}">Geräusche ${G.sfxOn && G.sfxOn() ? 'an' : 'aus'}</button>
       </div>
+      ${mpMenu()}
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn" data-act="chronik">Chronik</button>
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
@@ -22171,6 +22650,20 @@ function menuPanel() {
     </div>
     <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>`,
   };
+}
+
+// Mehrspieler im Menü: Partie eröffnen (die laufende) oder die Mitspieler, Chat und Verlassen
+function mpMenu() {
+  const mp = G.mp;
+  if (!mp) return `<div class="mp-box"><span class="label">Mehrspieler</span>
+      <input id="mpm-room" class="mp-in" value="burg" maxlength="32" aria-label="Name der Partie">
+      <input id="mpm-relay" class="mp-in" placeholder="Relais (leer: dieser Rechner)" aria-label="Relais-Adresse">
+      <button class="btn sm" data-act="mphost">Diese Partie eröffnen</button></div>`;
+  const rows = mpRoster().map((r) => `<li><span class="dot" style="background:${esc(r.color || '#888')}"></span>${esc(r.name)}${r.you ? ' (du)' : ''}${r.host ? ' · Gastgeber' : ''} <span class="muted">${r.seat ? esc(seatName(r.seat)) : ''}</span></li>`).join('');
+  return `<div class="mp-box"><span class="label">Partie „${esc(mp.room)}“ (${mp.kind === 'relais' ? 'Relais' : 'dieser Rechner'})</span>
+      <ul class="mp-roster">${rows}</ul>
+      <p class="hint">Mit <kbd>Enter</kbd> sprichst du zu allen in der Partie.</p>
+      <button class="btn sm danger" data-act="mpleave">Partie verlassen</button></div>`;
 }
 
 // Testmodus: Schalter und Knöpfe für Ereignisse
@@ -22291,6 +22784,8 @@ function questById(id) { return G.s.quests.find((q) => q.id === Number(id)); }
 const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
+  mphost: () => { const room = (byId('mpm-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg'; if (G.mpHostNow) G.mpHostNow(room, byId('mpm-relay').value.trim()); refreshPanel(); },
+  mpleave: () => { if (G.mpLeaveNow) G.mpLeaveNow(); refreshPanel(); },
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
@@ -22358,8 +22853,9 @@ const ACTIONS = {
   campbuy: (d) => buyAtCamp(G.ui.arg, d.good, Number(d.n)),
   camphire: (d) => hireAtCamp(G.ui.arg, Number(d.i)),
   mercHire: (d) => hireInTown(G.ui.arg, Number(d.i)),
-  sellstore: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
+  sellstore: (d) => { if (G.mp && G.mp.role === 'guest') return; const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
   sellstoreall: () => {
+    if (G.mp && G.mp.role === 'guest') return;
     const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg;
     let n = 0, gold = 0;
     for (const g of GOOD_IDS) { const r = sellStored(site, g, 9999, storeKeep(g)); n += r.sold; gold += r.earned; }
@@ -22615,6 +23111,9 @@ function saveSummary(data = readSave()) {
 
 
 
+
+
+
 const keys = new Set();
 let viewCanvas, mini;
 
@@ -22656,6 +23155,72 @@ function newGame(opts) {
   log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
   log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
 }
+
+// Mehrspieler-Gast: Welt aus dem Startwert des Gastgebers, gemeinsamer Stand von ihm, eigener Held an der Burg des Platzes
+function startGuest(d, who) {
+  const w = d.world;
+  G.world = generateWorld(w.seed);
+  G.nextId = 1;
+  const site = baronSite(d.seat) || G.world.sites.find((s) => s.type === 'spieler');
+  const spot = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
+  const player = makeUnit({
+    kind: 'player', cls: 'ritter', name: who.name, level: 1, female: who.female, hair: who.female ? '#7a3a1e' : '#3b2a1e',
+    eq: { waffe: 'langschwert', ruestung: 'kettenhemd', schild: 'holzschild', pferd: 'klepper' }, x: spot.x + 0.5, y: spot.y + 0.5,
+  });
+  G.s = {
+    rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
+    gold: 300, renown: 0, buff: null, cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
+    quests: [], questSeq: 1, order: 'folgen', companions: [], flags: {}, stats: { quests: 0 }, safeTime: 0,
+    ...w,
+    color: who.color, arms: who.arms, player,
+  };
+  const squire = makeUnit({ kind: 'companion', cls: 'knecht', name: 'Oswin Langbein', level: 1, eq: { ...CLASSES.knecht.start }, status: 'party' });
+  squire.wage = CLASSES.knecht.wage;
+  placeNear(squire, player.x, player.y, 1);
+  G.s.companions.push(squire);
+  G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = []; G.extras = []; G.tour = null; G.exec = null;
+  spawnPeasants();
+  maintainGroups(true);
+  rebuildUnits();
+  spawnAnimals();
+  for (const s of G.world.sites) refreshTownQuests(s);
+  mpHookGuest();
+  G.onStock = mpNoteStock;
+  startWorld();
+  log(`Du bist der Partie „${G.mp.room}“ beigetreten. Dein Platz: ${seatName(d.seat)}.`, 'gold');
+}
+
+// Startmenü: Mehrspieler. Leeres Relais-Feld: Browser-Kanal (zweites Fenster auf diesem Rechner), sonst WebSocket.
+// In der Desktop-App startet, wer eröffnet, das Relais auf seinem Rechner (desktop/relay.js); Mitspieler tragen dann
+// ws://<seine Adresse>:8765 ein.
+function desktopRelay() {
+  const d = window.ritterDesktop;
+  if (!d || !d.relay) return null;
+  const r = d.relay.start(8765);
+  if (!r || !r.port) return null;
+  G.mpLan = (r.addresses || []).map((a) => `ws://${a}:${r.port}`);
+  return `ws://127.0.0.1:${r.port}`;
+}
+function relayKind(url) { return url ? 'relais' : 'kanal'; }
+function mpOpts(forHost) {
+  const room = (byId('mp-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg';
+  let url = byId('mp-relay').value.trim();
+  if (url && !/^wss?:\/\//.test(url)) url = `ws://${url}${/:\d+$/.test(url) ? '' : ':8765'}`;
+  if (!url && forHost) url = desktopRelay() || '';
+  return { room, kind: relayKind(url), url };
+}
+function hostNote() {
+  if (G.mpLan && G.mpLan.length) log(`Mitspieler im Heimnetz tragen als Relais ein: ${G.mpLan.join(' oder ')} (Partie „${G.mp.room}“).`, 'gold');
+}
+G.mpHostNow = (room, url) => {
+  if (G.mp) return;
+  if (url && !/^wss?:\/\//.test(url)) url = `ws://${url}${/:\d+$/.test(url) ? '' : ':8765'}`;
+  if (!url) url = desktopRelay() || '';
+  mpHost({ room: room || 'burg', kind: relayKind(url), url });
+  hostNote();
+};
+G.mpLeaveNow = () => { mpLeave(); log('Du hast die Partie verlassen.', 'info'); };
+G.mpChat = (t) => mpChat(t);
 
 function startWorld() {
   const home = G.world.sites.find((s) => s.type === 'spieler');
@@ -22745,6 +23310,28 @@ function buildSetupForm() {
   for (const r of document.querySelectorAll('input[name="schwierigkeit"]')) {
     r.addEventListener('change', () => { if (r.checked && DIFFICULTY[r.value]) byId('diff-text').textContent = DIFFICULTY[r.value].text; });
   }
+  const formOpts = () => {
+    const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
+    const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
+    const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
+    return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' };
+  };
+  byId('btn-host').addEventListener('click', () => {
+    startAudio();
+    const o = formOpts(), m = mpOpts(true);
+    showLoading('Die Welt wird erschaffen …');
+    setTimeout(() => { newGame(o); mpHost(m); hostNote(); }, 50);
+  });
+  byId('btn-join').addEventListener('click', () => {
+    startAudio();
+    const o = formOpts(), m = mpOpts(false);
+    showLoading(`Suche die Partie „${m.room}“ …`);
+    byId('mp-status').textContent = '';
+    mpJoin({ ...m, name: o.name, color: o.color, arms: o.arms, female: o.female }, (d, err) => {
+      if (!d) { byId('loading').hidden = true; byId('mp-status').textContent = err || 'Beitreten fehlgeschlagen.'; return; }
+      setTimeout(() => startGuest(d, o), 30);
+    }, (msg) => { byId('loading').hidden = true; byId('mp-status').textContent = msg; });
+  });
   byId('setup-form').addEventListener('submit', (e) => {
     e.preventDefault();
     startAudio();
@@ -22807,6 +23394,7 @@ function loadGame() {
 }
 
 G.saveGame = (auto) => {
+  if (mpGuest()) { if (!auto) log('Im Mehrspieler sichert der Gastgeber die Welt.', 'bad'); return; }
   const ok = saveGame();
   if (!auto) log(ok ? 'Spielstand gespeichert.' : 'Speichern ist in diesem Browser nicht möglich.', ok ? 'good' : 'bad');
 };
@@ -22881,9 +23469,11 @@ function buildingReach(a) {
   return (p ? p.size : 2) / 2 + 1.9;
 }
 // a: Anker aus render.js ({ id: 'burg' } oder { id: 'plot', plot, bid })
+function guestCastleNote() { log(`Die Burg ${homeName()} gehört ${(G.s.hostArms && G.s.hostArms.name) || 'dem Gastgeber'}. Deine Burg ist ${seatName(G.mp.seat)}.`, 'info'); }
 function openCastleBuilding(a) {
   G.pendingBuild = null;
   G.s.player.path = null;
+  if (mpGuest()) { guestCastleNote(); return; }
   if (a.id === 'burg') openPanel('castle');
   else openPanel('castle', { focus: 'plot', plot: a.plot }, castleFocusTab(a.plot));
 }
@@ -22901,7 +23491,7 @@ function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
   G.s.player.path = null;
-  if (s.type === 'spieler') openPanel('castle');
+  if (s.type === 'spieler') { if (mpGuest()) guestCastleNote(); else openPanel('castle'); }
   else openPanel('town', s);
 }
 
@@ -23110,6 +23700,7 @@ function cycleOrder() {
 }
 
 function toggleFast() {
+  if (mpGuest()) { log('Den Zeitraffer bestimmt der Gastgeber der Partie.', 'bad'); return; }
   if (!G.fast && inCombat()) { log('Im Kampf vergeht die Zeit nicht schneller.', 'bad'); return; }
   G.fast = !G.fast;
 }
@@ -23209,6 +23800,17 @@ function readInput() {
 
 function bindInput() {
   window.addEventListener('keydown', onKey);
+  const chat = byId('chat-input');
+  window.addEventListener('keydown', (e) => {
+    if (!G.mp || !G.started || e.key !== 'Enter' || document.activeElement === chat) return;
+    if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    e.preventDefault(); chat.hidden = false; chat.value = ''; chat.focus();
+  });
+  chat.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { mpChat(chat.value); chat.value = ''; chat.hidden = true; chat.blur(); }
+    else if (e.key === 'Escape') { chat.hidden = true; chat.blur(); }
+  });
   window.addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); if (!e.shiftKey) keys.delete('shift'); });
   // Fenster verliert den Fokus: keine Taste bleibt „hängen“
   window.addEventListener('blur', () => keys.clear());
@@ -23337,7 +23939,8 @@ function frameBody(now) {
   G.time += dt;
   if (G.started) {
     readInput();
-    const running = !panelOpen() && !dialogOpen() && !G.loadingArt;
+    // Im Mehrspieler läuft die Welt weiter, auch wenn jemand eine Tafel offen hat
+    const running = (G.mp || (!panelOpen() && !dialogOpen())) && !G.loadingArt;
     if (G.loadingArt) G.loadFrames = (G.loadFrames || 0) + 1;
     prefetchArt(dt);
     if (running) {
@@ -23348,6 +23951,7 @@ function frameBody(now) {
       checkNearSite();
       checkPois(dt);
     }
+    if (G.mp) mpUpdate(dt);
     updateCamera(dt);
     hudT -= dt;
     if (hudT <= 0) { updateHUD(); hudT = 0.2; }

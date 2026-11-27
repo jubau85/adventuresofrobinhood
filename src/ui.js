@@ -45,6 +45,7 @@ import { WEATHER_NAME, weatherKind } from './weather.js';
 import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './cheats.js';
 import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, hireInTown } from './camps.js';
 import { armsSVG } from './heraldry.js';
+import { mpRoster, seatName } from './mp.js';
 import {
   BARONS, baron, ranking, baronStatus, baronNews, traitName, SIDE_NAME, difficulty, BARON_GIFT, giftBlock, baronGiveGift, allianceBlock, offerAlliance,
   feudBlock, declareFeud, peaceBlock, peaceCost, makePeace, baronIncome, baronUpkeep, baronShires, baronStrength, baronDefense, menCap, baronSiegeBlock,
@@ -1326,6 +1327,7 @@ function menuPanel() {
         <button class="btn sm${G.musicOn && G.musicOn() ? ' primary' : ''}" data-act="music" aria-pressed="${!!(G.musicOn && G.musicOn())}">Musik ${G.musicOn && G.musicOn() ? 'an' : 'aus'}</button>
         <button class="btn sm${G.sfxOn && G.sfxOn() ? ' primary' : ''}" data-act="sfx" aria-pressed="${!!(G.sfxOn && G.sfxOn())}">Geräusche ${G.sfxOn && G.sfxOn() ? 'an' : 'aus'}</button>
       </div>
+      ${mpMenu()}
       <button class="btn" data-act="help">Steuerung & Tipps</button>
       <button class="btn" data-act="chronik">Chronik</button>
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
@@ -1333,6 +1335,20 @@ function menuPanel() {
     </div>
     <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>`,
   };
+}
+
+// Mehrspieler im Menü: Partie eröffnen (die laufende) oder die Mitspieler, Chat und Verlassen
+function mpMenu() {
+  const mp = G.mp;
+  if (!mp) return `<div class="mp-box"><span class="label">Mehrspieler</span>
+      <input id="mpm-room" class="mp-in" value="burg" maxlength="32" aria-label="Name der Partie">
+      <input id="mpm-relay" class="mp-in" placeholder="Relais (leer: dieser Rechner)" aria-label="Relais-Adresse">
+      <button class="btn sm" data-act="mphost">Diese Partie eröffnen</button></div>`;
+  const rows = mpRoster().map((r) => `<li><span class="dot" style="background:${esc(r.color || '#888')}"></span>${esc(r.name)}${r.you ? ' (du)' : ''}${r.host ? ' · Gastgeber' : ''} <span class="muted">${r.seat ? esc(seatName(r.seat)) : ''}</span></li>`).join('');
+  return `<div class="mp-box"><span class="label">Partie „${esc(mp.room)}“ (${mp.kind === 'relais' ? 'Relais' : 'dieser Rechner'})</span>
+      <ul class="mp-roster">${rows}</ul>
+      <p class="hint">Mit <kbd>Enter</kbd> sprichst du zu allen in der Partie.</p>
+      <button class="btn sm danger" data-act="mpleave">Partie verlassen</button></div>`;
 }
 
 // Testmodus: Schalter und Knöpfe für Ereignisse
@@ -1453,6 +1469,8 @@ function questById(id) { return G.s.quests.find((q) => q.id === Number(id)); }
 const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
+  mphost: () => { const room = (byId('mpm-room').value.trim() || 'burg').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'burg'; if (G.mpHostNow) G.mpHostNow(room, byId('mpm-relay').value.trim()); refreshPanel(); },
+  mpleave: () => { if (G.mpLeaveNow) G.mpLeaveNow(); refreshPanel(); },
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
@@ -1520,8 +1538,9 @@ const ACTIONS = {
   campbuy: (d) => buyAtCamp(G.ui.arg, d.good, Number(d.n)),
   camphire: (d) => hireAtCamp(G.ui.arg, Number(d.i)),
   mercHire: (d) => hireInTown(G.ui.arg, Number(d.i)),
-  sellstore: (d) => { const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
+  sellstore: (d) => { if (G.mp && G.mp.role === 'guest') return; const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg, r = sellStored(site, d.good, 9999); if (r.sold) log(`Aus dem Lager verkauft: ${r.sold} ${GOODS[d.good].name} für ${fmt(r.earned)} Gold.`, 'gold'); },
   sellstoreall: () => {
+    if (G.mp && G.mp.role === 'guest') return;
     const site = G.ui.panel === 'castle' ? castleSite() : G.ui.arg;
     let n = 0, gold = 0;
     for (const g of GOOD_IDS) { const r = sellStored(site, g, 9999, storeKeep(g)); n += r.sold; gold += r.earned; }

@@ -72,6 +72,7 @@ export function buy(site, good, n) {
     addCargo(good, 1);
     bought++;
   }
+  if (bought && G.onStock) G.onStock(site.id, good, -bought);
   return { bought, spent };
 }
 
@@ -86,6 +87,7 @@ export function sell(site, good, n) {
     G.s.cargo[good]--;
     sold++;
   }
+  if (sold && G.onStock) G.onStock(site.id, good, sold);
   return { sold, earned };
 }
 
@@ -104,6 +106,7 @@ export function sellStored(site, good, n, keep = 0) {
     st[good]--;
     sold++;
   }
+  if (sold && G.onStock) G.onStock(site.id, good, sold);
   return { sold, earned };
 }
 

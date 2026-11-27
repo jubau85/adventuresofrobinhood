@@ -1,0 +1,103 @@
+// Mehrspieler-Test mit zwei Spielfenstern: Beitreten, Plätze, Uhr, Helden, Markt-Befehl, Chat, Gastgeber-Wechsel.
+//   node tools/mehrspieler_test.cjs [ausgabe-ordner] [ws://127.0.0.1:8765]
+// Ohne Relais-Adresse über den Browser-Kanal (ein Browser), mit Adresse über das Relais (zwei getrennte Browser;
+// vorher `node tools/relay.mjs` starten). Braucht Playwright mit Chromium.
+const { chromium } = require('playwright');
+const fs = require('fs'), path = require('path');
+const ROOT = path.join(__dirname, '..'), OUT = process.argv[2] || require('os').tmpdir(), RELAY = process.argv[3] || '';
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg' };
+const ok = (c, t) => console.log(`${c ? 'OK  ' : 'FEHL'} ${t}`);
+const http = require('http');
+const BASE = RELAY ? 'http://127.0.0.1:8781' : 'http://game.local';
+if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURIComponent(new URL(req.url, BASE).pathname)); if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' }); res.end(fs.readFileSync(f)); }).listen(8781);
+(async () => {
+  const browser = await chromium.launch(RELAY ? { args: ['--no-proxy-server'] } : {});
+  const mkCtx = async () => { const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await ctx.route('http://game.local/**', async (route) => {
+    const u = new URL(route.request().url()); const f = path.join(ROOT, u.pathname);
+    if (!fs.existsSync(f)) return route.fulfill({ status: 404, body: 'nf' });
+    route.fulfill({ status: 200, contentType: TYPES[path.extname(f)] || 'application/octet-stream', body: fs.readFileSync(f) });
+  });
+  await ctx.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  return ctx; };
+  const ctxA = await mkCtx(), ctxB = RELAY ? await mkCtx() : ctxA;
+  const errors = [];
+  const open = async (tag) => {
+    const p = await (tag === 'A' ? ctxA : ctxB).newPage();
+    p.on('pageerror', (e) => errors.push(`[${tag}] ${e.message} ${(e.stack || '').split('\n').slice(1, 3).join(' | ')}`));
+    await p.goto(`${BASE}/index.html`);
+    await p.waitForSelector('#btn-new');
+    return p;
+  };
+  const A = await open('A'), B = await open('B');
+  const ev = (p, f, a) => p.evaluate(f, a);
+  // A eröffnet
+  await A.fill('#name-input', 'Aldric');
+  await A.evaluate(() => { document.querySelector('.mp-title').open = true; document.getElementById('mp-room').value = 'test1'; }); await A.fill('#mp-relay', RELAY);
+  await A.click('#btn-host');
+  await A.waitForFunction(() => window.__ritter.started && window.__ritter.mp && !window.__ritter.loadingArt, null, { timeout: 90000 });
+  ok(true, 'A hat die Partie eröffnet');
+  // B tritt bei
+  await B.fill('#name-input', 'Brida');
+  await B.evaluate(() => { document.querySelector('.mp-title').open = true; document.getElementById('mp-room').value = 'test1'; }); await B.fill('#mp-relay', RELAY);
+  await B.click('#btn-join');
+  await B.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.welcomed && !window.__ritter.loadingArt, null, { timeout: 90000 });
+  const sB = await ev(B, () => { const G = window.__ritter; return { seat: G.mp.seat, seed: G.s.seed, day: G.s.day, role: G.mp.role, name: G.s.player.name, pos: [G.s.player.x, G.s.player.y] }; });
+  const sA = await ev(A, () => { const G = window.__ritter; return { seed: G.s.seed, day: G.s.day, seats: G.mp.seats, human: Object.entries(G.s.barons).filter(([k, b]) => b.human).map(([k, b]) => [k, b.human.name]) }; });
+  console.log('B', JSON.stringify(sB)); console.log('A', JSON.stringify(sA));
+  ok(sB.seed === sA.seed, 'gleiche Welt (Startwert)');
+  ok(sB.seat && sB.seat !== 'heim' && sA.human.some(([k, n]) => k === sB.seat && n === 'Brida'), `B sitzt auf einer Baronsburg (${sB.seat}), die KI dort ruht`);
+  // Helden: B geht ein Stück, A sieht ihn
+  await B.waitForTimeout(1500);
+  await ev(B, () => { const p = window.__ritter.s.player; p.x += 3; p.y += 1; });
+  await A.waitForTimeout(1500);
+  const seen = await ev(A, () => { const G = window.__ritter; return (G.remoteUnits || []).map((u) => ({ name: u.name, x: +u.x.toFixed(1), y: +u.y.toFixed(1) })); });
+  const posB = await ev(B, () => [window.__ritter.s.player.x, window.__ritter.s.player.y]);
+  console.log('A sieht', JSON.stringify(seen), 'B ist bei', JSON.stringify(posB.map((v) => +v.toFixed(1))));
+  ok(seen.length === 1 && seen[0].name === 'Brida' && Math.hypot(seen[0].x - posB[0], seen[0].y - posB[1]) < 0.6, 'A sieht Bridas Helden an der richtigen Stelle');
+  const seenB = await ev(B, () => (window.__ritter.remoteUnits || []).map((u) => u.name));
+  ok(seenB.includes('Aldric'), 'B sieht Aldrics Helden');
+  // Bild: A schaut auf Brida
+  await ev(A, ([x, y]) => { const G = window.__ritter; G.s.player.x = x - 1.5; G.s.player.y = y + 1; G.s.player.path = null; G.cam.zoom = 2.2; }, posB);
+  await A.waitForTimeout(2500);
+  await A.screenshot({ path: `${OUT}/mp_A_sieht_B.png` });
+  // Markt: B kauft (Befehl an den Gastgeber)
+  const town = await ev(A, () => { const G = window.__ritter; const s = G.world.sites.find((x) => x.type === 'stadt'); return { id: s.id, st: G.s.towns[s.id].stock.getreide }; });
+  await ev(B, (id) => window.__ritter.onStock(id, 'getreide', -5), town.id);
+  await A.waitForTimeout(1000);
+  const after = await ev(A, (id) => window.__ritter.s.towns[id].stock.getreide, town.id);
+  ok(after === Math.max(0, town.st - 5), `Markt-Befehl: Lager in ${town.id} ${town.st} -> ${after}`);
+  await B.waitForTimeout(9000);
+  const bSees = await ev(B, (id) => window.__ritter.s.towns[id].stock.getreide, town.id);
+  ok(bSees === after, `B bekommt das Lager vom Gastgeber (${bSees})`);
+  // Uhr: A springt einen Tag weiter, B zieht nach und zahlt Sold
+  const gold0 = await ev(B, () => window.__ritter.s.gold);
+  const dayA = await ev(A, () => { window.__ritterDebug.passHours(24); return window.__ritter.s.day; });
+  await B.waitForTimeout(1500);
+  const b2 = await ev(B, () => ({ day: window.__ritter.s.day, gold: window.__ritter.s.gold }));
+  ok(b2.day === dayA, `B folgt dem Tag (${b2.day} = ${dayA})`);
+  ok(b2.gold < gold0, `B zahlt Sold (${gold0} -> ${b2.gold})`);
+  // Baron-KI ruht auf Bridas Platz
+  const bar = await ev(A, (seat) => { const G = window.__ritter, b = G.s.barons[seat]; const before = JSON.stringify({ gold: b.gold, men: b.men }); window.__ritterDebug.dailyBarons(); return [before, JSON.stringify({ gold: b.gold, men: b.men })]; }, sB.seat);
+  ok(bar[0] === bar[1], `Baron-KI auf ${sB.seat} ruht (${bar[0]})`);
+  // Chat
+  await ev(A, () => window.__ritter.mpChat('Seid gegrüßt!'));
+  await B.waitForTimeout(800);
+  const chat = await ev(B, () => window.__ritter.messages.map((m) => m.text).filter((t) => /gegrüßt/.test(t)));
+  ok(chat.length === 1 && /^Aldric:/.test(chat[0]), `Chat kommt an (${chat[0]})`);
+  // Gast kann die Heimburg nicht verwalten
+  // Gastgeber geht: B übernimmt
+  await A.close();
+  await B.waitForTimeout(10000);
+  const mig = await ev(B, () => ({ role: window.__ritter.mp.role, peers: window.__ritter.mp.peers.size, msgs: window.__ritter.messages.slice(-3).map((m) => m.text) }));
+  console.log('nach dem Gehen', JSON.stringify(mig));
+  ok(mig.role === 'host', 'B ist jetzt Gastgeber');
+  const day0 = await ev(B, () => window.__ritter.s.day);
+  await ev(B, () => window.__ritterDebug.passHours(24));
+  const day1 = await ev(B, () => ({ day: window.__ritter.s.day }));
+  ok(day1.day === day0 + 1, 'B rechnet die Welt jetzt selbst weiter');
+  await B.screenshot({ path: `${OUT}/mp_B.png` });
+  console.log('ERRORS', JSON.stringify(errors.slice(0, 6)));
+  await browser.close();
+  process.exit(0);
+})().catch((e) => { console.error('ABBRUCH', e.message); process.exit(1); });

@@ -103,7 +103,7 @@ export function barons() { return (G.s && G.s.barons) || {}; }
 export function baron(id) { return barons()[id] || null; }
 export function baronSite(id) { return G.world.sites.find((s) => s.baron === id) || null; }
 export function siteBaron(s) { return s && s.baron ? s.baron : null; }
-export function baronColor(id) { return BARONS[id] ? BARONS[id].color : '#8a8070'; }
+export function baronColor(id) { const b = G.s && G.s.barons && G.s.barons[id]; if (b && b.human && b.human.color) return b.human.color; return BARONS[id] ? BARONS[id].color : '#8a8070'; }
 export function isBaronOwner(o) { return typeof o === 'string' && o.startsWith('b:'); }
 export function ownerBaron(o) { return isBaronOwner(o) ? o.slice(2) : null; }
 export function baronActive(id) { const b = baron(id); return !!b && !b.gone; }
@@ -356,7 +356,8 @@ export function dailyBarons() {
   };
   for (const id of BARON_IDS) {
     const b = baron(id), def = BARONS[id], tr = BARON_TRAIT[def.trait];
-    if (!b || b.gone || !baronSite(id)) continue;
+    // Sitzt ein Mitspieler auf dieser Burg (mp.js), ruht die KI
+    if (!b || b.gone || b.human || !baronSite(id)) continue;
     // Einkommen und Sold
     const inc = baronIncome(id), up = baronUpkeep(id);
     b.gold += inc - up;

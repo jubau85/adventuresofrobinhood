@@ -64,7 +64,26 @@ export function passHours(h) {
   updateTrips();
 }
 
+// Mehrspieler-Gast: Die gemeinsame Welt rechnet der Gastgeber (mp.js); hier nur, was dem eigenen Helden gehört
+function guestDay() {
+  const before = seasonIndex();
+  G.s.day++;
+  // Sold für das Gefolge aus der eigenen Kasse
+  const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
+  if (wages) {
+    if (G.s.gold >= wages) G.s.gold -= wages;
+    else { G.s.gold = 0; log('Die Kasse reicht nicht für den Sold. Dein Gefolge murrt.', 'bad'); }
+  }
+  dailyQuests();
+  maintainGroups();
+  replenishAnimals();
+  if (seasonIndex() !== before && G.onSeason) G.onSeason();
+  if (G.onNewDay) G.onNewDay();
+}
+G.mpNewDay = () => newDay();
+
 function newDay() {
+  if (G.mp && G.mp.role === 'guest') { guestDay(); return; }
   const before = seasonIndex();
   G.s.day++;
   dailyEconomy();

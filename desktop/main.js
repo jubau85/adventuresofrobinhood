@@ -5,6 +5,7 @@ const { app, BrowserWindow, protocol, net, ipcMain, Menu, shell } = require('ele
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
+const { startRelay, lanAddresses } = require('./relay.js');
 
 // Im fertigen Paket liegt das Spiel neben der App unter resources/game (electron-builder extraResources)
 const GAME = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, 'game');
@@ -39,6 +40,15 @@ ipcMain.on('saves:remove', (e, key) => {
   try { fs.rmSync(saveFile(key), { force: true }); e.returnValue = true; } catch (err) { e.returnValue = false; }
 });
 ipcMain.on('app:info', (e) => { e.returnValue = { version: app.getVersion(), platform: process.platform, second }; });
+// Mehrspieler ohne Steam: Wer eine Partie eröffnet, startet hier das Relais; Mitspieler im Heimnetz verbinden sich mit
+// ws://<Adresse dieses Rechners>:<port>. Läuft es schon (oder ist der Port belegt), bleibt es bei der Meldung.
+let relay = null, relayErr = null;
+ipcMain.on('relay:start', (e, port) => {
+  try {
+    if (!relay) relay = startRelay(Number(port) || 8765, (err) => { relayErr = err.message; relay = null; });
+    e.returnValue = { port: relay ? relay.port : null, addresses: lanAddresses(), error: relayErr };
+  } catch (err) { e.returnValue = { error: err.message }; }
+});
 ipcMain.on('app:quit', () => app.quit());
 
 function createWindow() {
