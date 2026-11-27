@@ -38,7 +38,7 @@ KI-Videos schreiben Text fast nie fehlerfrei. Deshalb bleibt die Schrift im Spie
 Prompt:
 
 ```
-cinematic dark background for a film studio logo, slow drifting smoke lit warm amber from below, glowing embers and golden sparks rising, molten gold light rays from the center, a bright anamorphic lens flare flash in the exact center at 1.4 seconds, then soft volumetric god rays slowly rotating, deep black edges with vignette, elegant and epic, medieval fantasy mood, calm empty center area for a title, no text, no letters, no logo, fades to black at the end, 10 seconds
+cinematic dark background for a film studio logo, slow drifting smoke lit warm amber from below, glowing embers and golden sparks rising, molten gold light rays from the center, a bright anamorphic lens flare flash in the exact center at 1.4 seconds, then soft volumetric god rays slowly rotating and pulsing to a drum beat, deep black edges with vignette, elegant and epic, medieval fantasy mood, calm empty center area for a title, no text, no letters, no logo, fades to black at the end, 10 seconds
 ```
 
 Negativ-Prompt:
@@ -62,12 +62,14 @@ text, letters, words, logo, watermark, signature, faces, people, frame, border, 
 | 3,8 s | dumpfer Stempelschlag mit Metallklang, C-Dur |
 | 4,3 bis 4,8 s | Paukenwirbel |
 | 4,8 s | Höhepunkt in D-Dur mit Glockenspiel |
-| ab 8,2 s | Ausklang mit langem Hall |
+| 4,8 bis 7,6 s | Kriegstrommel-Groove |
+| 7,6 s | letzter großer Schlag |
+| bis 9,5 s | Ausklang mit langem Hall |
 
 Prompt:
 
 ```
-epic aggressive cinematic film studio logo sting, 10 seconds, orchestral, choir and pounding war drums: deep thunder rumble at the start, reverse cymbal swell rising into a massive orchestral hit at 1.4 seconds with timpani, brass and wordless choir in D minor, brass chord change to B flat major at 2.4 seconds, heavy stamp-like impact with a metallic clang at 3.8 seconds on C major, timpani roll into a triumphant D major resolution at 4.8 seconds with full choir and glockenspiel sparkles, long reverb tail fading out by 9.5 seconds, medieval heroic mood, no lyrics
+epic aggressive cinematic film studio logo sting, 10 seconds, orchestral, choir and pounding war drums: deep thunder rumble at the start, reverse cymbal swell rising into a massive orchestral hit at 1.4 seconds with taiko drums, timpani, brass and wordless choir in D minor, brass chord change to B flat major at 2.4 seconds, heavy stamp-like impact with a metallic clang at 3.8 seconds on C major, drum roll into a triumphant D major climax at 4.8 seconds with full choir, glockenspiel sparkles and a driving war drum groove until 7.6 seconds, one final hit, long reverb tail fading out by 9.5 seconds, medieval heroic mood, no lyrics
 ```
 
 Kann Oakgen die Zeitmarken nicht genau treffen, schreib mir die Sekunden von Schlag, Stempel und Höhepunkt. Dann richte ich die Schrift nach der Musik.
