@@ -443,6 +443,20 @@ const ART_FILES = {
   thbogen_hafen: 'assets/turnier_hafen/hafen.webp',
   thbogen_hafen_winter: 'assets/turnier_hafen/hafen_winter.webp',
   // Ende Turnier und Hafen
+  // Paket Orte (tools/orte.py): einzelne Bilder je Objekt, bei Bedarf geladen, Bilder ort_<name> (Anker ORTE_P5)
+  ort_baumstumpf_axt: 'assets/orte/baumstumpf_axt.webp',
+  ort_baumstumpf_axt_winter: 'assets/orte/baumstumpf_axt_winter.webp',
+  ort_erzhaufen: 'assets/orte/erzhaufen.webp',
+  ort_erzhaufen_winter: 'assets/orte/erzhaufen_winter.webp',
+  ort_feuerstelle: 'assets/orte/feuerstelle.webp',
+  ort_feuerstelle_winter: 'assets/orte/feuerstelle_winter.webp',
+  ort_steinkreuz: 'assets/orte/steinkreuz.webp',
+  ort_steinkreuz_winter: 'assets/orte/steinkreuz_winter.webp',
+  ort_votivbaum: 'assets/orte/votivbaum.webp',
+  ort_votivbaum_winter: 'assets/orte/votivbaum_winter.webp',
+  ort_wegschrein: 'assets/orte/wegschrein.webp',
+  ort_wegschrein_winter: 'assets/orte/wegschrein_winter.webp',
+  // Ende Orte
   // Paket 6 (tools/eigen.py): Gebäude der eigenen Burg je Bauplatz (Hof 2 × 2, draußen 3 × 3), Stufe 1–3, Schäden,
   // Winter, Felder im Frühling und Herbst, Absteckung, Baustelle, Baumaterial; ein Bogen je Gebäude, Platz und Stufe,
   // erst bei Bedarf geladen und in die einzelnen Bilder zerschnitten (EIGEN_ZELLEN)

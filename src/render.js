@@ -4,7 +4,7 @@
 import { G, homeName, playerColor } from './state.js';
 import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERRIES, REGIONS, geoToTile, CASTLE_TOWERS, CASTLE_PLOT, POIS, KM_PER_TILE, DAY_LEN } from './data.js';
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
-import { hash2, mulberry32, makeNoise, rand } from './rng.js';
+import { hash2, mulberry32, makeNoise, rand, fbm } from './rng.js';
 import { groundZ, tileAt, PAL_GATE } from './world.js';
 import { conProgress, villageSpots, castlePlots, castleLayout, pastureOf } from './castle.js';
 import { ringR, CASTLE_TYPES } from './plots.js';
@@ -321,7 +321,7 @@ function windowOn(c, b, face, u0, u1, z0, z1, lit) {
 
 function drawHouse(c, b) {
   const hs = houseSprite(b);
-  if (hs && drawHouseSprite(c, b, hs)) return;
+  if (hs && drawHouseSprite(c, b, hs)) { if (b.dmg > 0 || b.fire > G.time) drawPaintedDamage(c, b, hs); return; }
   const wall = WALLS[b.wall] || WALLS.plaster;
   const v = b.v ?? hash2(Math.round(b.x * 10), Math.round(b.y * 10), 3);
   if (b.shutter === undefined) b.shutter = v < 0.6 ? Math.floor(v * 10) : null;
@@ -654,6 +654,9 @@ function tourneyParts() {
 // und Kai-Kleinkram. Magenta wird zur Farbe des Ritters oder Gastgebers. Fußpunkt in der Mitte der Grundfläche (Schiffe:
 // Mitte der Wasserlinie), bei Schranke und Steg in der Feldmitte. (P5 entsteht weiter unten, darum erst beim Wählen eingetragen)
 const TH_P5 = {"th_schranke_y":[34.0,33.4,0.3333],"th_schranke_y_winter":[34.0,33.4,0.3333],"th_tribuene_x":[89.5,83.12,0.3333],"th_tribuene_x_winter":[89.38,83.06,0.3333],"th_tribuene_y":[90.0,83.12,0.3333],"th_tribuene_y_winter":[90.0,83.0,0.3333],"th_zelt_eckig":[39.75,72.0,0.3333],"th_zelt_eckig_winter":[39.62,72.31,0.3333],"th_zelt_koenig":[48.25,79.75,0.3333],"th_zelt_koenig_winter":[48.12,79.44,0.3333],"th_zelt_lang":[52.25,49.38,0.3333],"th_zelt_lang_winter":[52.25,49.5,0.3333],"th_zelt_rund":[40.0,78.5,0.3333],"th_zelt_rund_winter":[39.88,78.94,0.3333],"th_aufsteigeblock":[14.12,20.44,0.3333],"th_aufsteigeblock_winter":[14.0,20.12,0.3333],"th_faesser":[21.38,23.81,0.3333],"th_faesser_winter":[21.5,23.5,0.3333],"th_fahne":[34.25,87.0,0.3333],"th_fahne_winter":[33.38,87.31,0.3333],"th_herold":[30.88,36.19,0.3333],"th_herold_winter":[30.75,36.25,0.3333],"th_lanzenbock":[23.25,24.5,0.3333],"th_lanzenbock_winter":[23.5,24.5,0.3333],"th_lanzenstaender":[21.0,49.75,0.3333],"th_lanzenstaender_winter":[20.88,49.31,0.3333],"th_preistisch":[17.0,19.25,0.3333],"th_preistisch_winter":[16.88,18.94,0.3333],"th_ruestungsstaender":[8.88,36.31,0.3333],"th_ruestungsstaender_winter":[8.88,36.69,0.3333],"th_schildbaum":[21.5,44.5,0.3333],"th_schildbaum_winter":[21.5,44.5,0.3333],"th_schranke_x":[34.0,33.4,0.3333],"th_schranke_x_winter":[34.0,33.4,0.3333],"th_anker":[16.5,28.38,0.3333],"th_anker_winter":[16.5,28.38,0.3333],"th_boot_x":[34.62,45.06,0.3333],"th_boot_x_winter":[34.25,45.0,0.3333],"th_boot_y":[33.75,55.62,0.3333],"th_boot_y_winter":[33.88,55.56,0.3333],"th_kogge_x":[76.88,133.69,0.3333],"th_kogge_x_2":[84.62,143.56,0.3333],"th_kogge_x_2_winter":[84.62,143.19,0.3333],"th_kogge_x_winter":[83.38,130.44,0.3333],"th_kogge_y":[88.75,139.62,0.3333],"th_kogge_y_2":[83.75,153.12,0.3333],"th_kogge_y_2_winter":[83.75,153.12,0.3333],"th_kogge_y_winter":[84.38,144.44,0.3333],"th_kran":[64.88,77.19,0.3333],"th_kran_winter":[64.88,77.19,0.3333],"th_ladung":[21.25,30.88,0.3333],"th_ladung_winter":[21.25,30.88,0.3333],"th_poller":[12.25,21.75,0.3333],"th_poller_winter":[12.12,21.69,0.3333],"th_ruderboot":[31.38,36.81,0.3333],"th_ruderboot_winter":[31.5,36.88,0.3333],"th_steg_x":[34.0,48.6,0.3333],"th_steg_x_winter":[34.0,48.6,0.3333],"th_steg_y":[34.0,48.6,0.3333],"th_steg_y_winter":[34.0,48.6,0.3333]};
+// Paket Orte (tools/orte.py): Anker in Weltpixeln, Mitte der Grundfläche
+const ORTE_P5 = {"ort_baumstumpf_axt":[17.39,31.8,0.3333],"ort_baumstumpf_axt_winter":[17.39,31.8,0.3333],"ort_erzhaufen":[25.27,46.55,0.3333],"ort_erzhaufen_winter":[25.27,46.55,0.3333],"ort_feuerstelle":[25.99,32.3,0.3333],"ort_feuerstelle_winter":[25.99,32.3,0.3333],"ort_steinkreuz":[11.85,34.48,0.3333],"ort_steinkreuz_winter":[11.85,34.48,0.3333],"ort_votivbaum":[47.08,76.35,0.3333],"ort_votivbaum_winter":[47.08,76.35,0.3333],"ort_wegschrein":[10.99,36.2,0.3333],"ort_wegschrein_winter":[10.99,36.2,0.3333]};
+function ortPick(n) { const w = `ort_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `ort_${n}`; if (!P5[id] && ORTE_P5[id]) P5[id] = ORTE_P5[id]; return ORTE_P5[id] && wantArt(id) ? id : null; }
 function thPick(n) { const w = `th_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `th_${n}`; if (!P5[id] && TH_P5[id]) P5[id] = TH_P5[id]; return wantArt(id) ? id : null; }
 // Tribüne: das Bild längs x, Zuschauer auf drei Bankreihen
 function drawTribune(c, x, y, col, crowd) {
@@ -1619,6 +1622,8 @@ function drawStones(c, x, y, n) {
 
 // Kleinkram aus York: Fässer, Heuhaufen, Karren, Kisten, Sitzstamm, Kohlenmeiler; gespiegelt nach Zufall des Ortes
 const PROP_YORK = { fass: ['fass', 1], heu: ['heu', 1], karren: ['karren', 1], kisten: ['kisten', 1], sitzstamm: ['sitzstamm', 1], meiler: ['kohlenmeiler', 1] };
+// Bild, Maßstab, Schattengröße, ohne Ersatzzeichnung (nur gemalt)
+const PROP_ORT = { erzhaufen: ['erzhaufen', 0.7, 1, false], baumstumpf_axt: ['baumstumpf_axt', 0.9, 0.8, true], wegschrein: ['wegschrein', 1, 0.7, true], steinkreuz: ['steinkreuz', 1, 0.7, true], votivbaum: ['votivbaum', 1, 2.2, true] };
 function drawProp(c, b) {
   const fp = ART.fl_wollballen && flProp(b);
   if (fp) {
@@ -1634,6 +1639,19 @@ function drawProp(c, b) {
       if (b.prop === 'meiler' && Math.random() < 0.08) smokeEmit(px + 2, pyy - 20, 0.6);
       return;
     }
+  }
+  // Gemalte Einzelstücke aus dem Paket Orte: Erzhaufen, Baumstumpf mit Axt, Wegschrein, Steinkreuz, Votivbaum
+  const po = PROP_ORT[b.prop];
+  if (po) {
+    const id = ortPick(po[0]);
+    if (id) {
+      const [px, pyy] = P(b.x, b.y, 0);
+      c.fillStyle = 'rgba(25,35,15,0.18)'; c.beginPath(); c.ellipse(px + 2, pyy, 10 * po[2], 4 * po[2], 0, 0, Math.PI * 2); c.fill();
+      p5(c, id, b.x, b.y, po[1], (b.v || 0) > 0.5);
+      if (b.prop === 'erzhaufen' && b.ore === 'silber' && Math.sin(G.time * 3 + b.x) > 0.9) { c.fillStyle = '#ffffff'; c.fillRect(px - 2, pyy - 12, 2, 2); }
+      return;
+    }
+    if (po[3]) return;
   }
   const [x, y] = P(b.x, b.y, 0);
   const winter = lookSeason() === 3;
@@ -1729,6 +1747,10 @@ function drawProp(c, b) {
 }
 
 function drawScaffold(c, x, y, wx, wy, h) {
+  drawScaffoldPoles(c, x, y, wx, wy, h);
+  drawStones(c, x - wx / 2 - 0.4, y + 0.2, 4);
+}
+function drawScaffoldPoles(c, x, y, wx, wy, h) {
   c.strokeStyle = '#8a6a40'; c.lineWidth = 1.4;
   const corners = [[x - wx / 2, y + wy / 2], [x + wx / 2, y + wy / 2], [x + wx / 2, y - wy / 2]];
   for (const [cx, cy] of corners) { const [a, b] = P(cx, cy, 0); c.beginPath(); c.moveTo(a, b); c.lineTo(a, b - h); c.stroke(); }
@@ -1736,7 +1758,12 @@ function drawScaffold(c, x, y, wx, wy, h) {
     const [a, b] = P(corners[0][0], corners[0][1], z), [d, e] = P(corners[1][0], corners[1][1], z), [f, g] = P(corners[2][0], corners[2][1], z);
     c.beginPath(); c.moveTo(a, b); c.lineTo(d, e); c.lineTo(f, g); c.stroke();
   }
-  drawStones(c, x - wx / 2 - 0.4, y + 0.2, 4);
+  // Laufbretter auf halber und voller Höhe
+  c.strokeStyle = '#6e5236'; c.lineWidth = 2.2;
+  for (const z of [h * 0.4, h * 0.8]) {
+    const [a, b] = P(corners[0][0], corners[0][1], z), [d, e] = P(corners[1][0], corners[1][1], z), [f, g] = P(corners[2][0], corners[2][1], z);
+    c.beginPath(); c.moveTo(a, b + 1.5); c.lineTo(d, e + 1.5); c.lineTo(f, g + 1.5); c.stroke();
+  }
 }
 
 // ---------------------------------------------------------------- Burgen
@@ -1818,7 +1845,7 @@ const HAUS_BILDER = {
 // Haus als gemaltes Bild: Wirtshaus, sonst nach Dach und Wand ein passendes Bild, dessen Grundriss zur Form des
 // Hauses passt (lang oder fast quadratisch). Welches, entscheidet der Ort des Hauses, also immer dasselbe.
 function houseSprite(b) {
-  if (b.kind !== 'house' || b.cons < 1 || b.dmg > 0 || b.fire > G.time) return null;
+  if (b.kind !== 'house' || b.cons < 1) return null;
   if (b.tavern) {
     if (!ART.bau_taverne) return null;
     const [fw, fh] = BAU_FLAECHE.taverne;
@@ -1846,14 +1873,91 @@ function houseSprite(b) {
   const f = yorkFit(name, b.wx, b.wy);
   return { id: yorkId(name), base: `york_${name}`, name, flip: f.flip, sc: f.sc };
 }
+// Schäden am gemalten Haus: Das Bild bleibt, darüber Ruß (dunkler je nach Schaden), beim Brand Flammen aus dem Dach,
+// Rauch und Feuerschein; danach steht bis zur Ausbesserung ein Gerüst davor, daneben liegen Steine und Bauholz.
+const sootCache = new Map();
+function sootSprite(id) {
+  let cv = sootCache.get(id);
+  if (cv) return cv;
+  const im = ART[id];
+  if (!im) return null;
+  cv = makeCanvas(im.width, im.height);
+  const g = cv.getContext('2d');
+  g.drawImage(im, 0, 0);
+  g.globalCompositeOperation = 'source-atop';
+  // fleckiger Ruß: dunkle Grundschicht, darüber ein paar schwärzere Flecken
+  g.fillStyle = 'rgba(28,20,16,0.62)'; g.fillRect(0, 0, cv.width, cv.height);
+  const r = mulberry32(strHashR(id));
+  for (let k = 0; k < 9; k++) {
+    const x = r() * cv.width, y = r() * cv.height * 0.7, rr = (0.12 + r() * 0.18) * cv.width;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rr);
+    gr.addColorStop(0, 'rgba(10,8,6,0.55)'); gr.addColorStop(1, 'rgba(10,8,6,0)');
+    g.fillStyle = gr; g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+  }
+  sootCache.set(id, cv);
+  if (sootCache.size > 60) sootCache.delete(sootCache.keys().next().value);
+  return cv;
+}
+function strHashR(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function drawPaintedDamage(c, b, hs) {
+  const d = Math.min(1, b.dmg || 0), burning = b.fire > G.time, a = P5[hs.id], im = ART[hs.id];
+  if (!a || !im) return;
+  const [px, py] = P(b.x, b.y, 0), sc = hs.sc, w = im.width * a[2] * sc, h = im.height * a[2] * sc;
+  const left = hs.flip ? -(w - a[0] * sc) : -a[0] * sc, top = -a[1] * sc;
+  // Ruß
+  const so = sootSprite(hs.id), alpha = Math.min(0.92, 0.25 + d * 0.85);
+  if (so && alpha > 0.02) {
+    c.save(); c.globalAlpha = alpha; c.translate(px, py); if (hs.flip) c.scale(-1, 1);
+    c.drawImage(so, -a[0] * sc, top, w, h);
+    c.restore();
+  }
+  if (burning) {
+    // Flammen aus dem Dach: mehrere Zungen über die obere Hälfte des Bildes verteilt, flackernd
+    const r = mulberry32((b.idx || 1) * 31 + 7), n = 4 + Math.round(d * 4), t = G.time;
+    // Feuerschein über dem Dach
+    const gx = px + left + w / 2, gy = py + top + h * 0.3, gr = Math.max(w, h) * 0.55;
+    const glow = c.createRadialGradient(gx, gy, 0, gx, gy, gr);
+    glow.addColorStop(0, `rgba(255,150,50,${0.32 + Math.sin(t * 13) * 0.05})`); glow.addColorStop(1, 'rgba(255,120,40,0)');
+    c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = glow; c.fillRect(gx - gr, gy - gr, gr * 2, gr * 2); c.restore();
+    // Zunge: geschwungene Spitze, die im Wind pendelt; außen dunkelrot, dann orange, innen gelb
+    const tongue = (fx, fy, wd, ht, sway, col) => {
+      c.fillStyle = col; c.beginPath(); c.moveTo(fx - wd, fy);
+      c.bezierCurveTo(fx - wd * 1.1, fy - ht * 0.45, fx + sway - wd * 0.5, fy - ht * 0.7, fx + sway, fy - ht);
+      c.bezierCurveTo(fx + sway + wd * 0.4, fy - ht * 0.65, fx + wd * 1.1, fy - ht * 0.4, fx + wd, fy);
+      c.quadraticCurveTo(fx, fy + wd * 0.35, fx - wd, fy); c.fill();
+    };
+    for (let k = 0; k < n; k++) {
+      const u = 0.2 + r() * 0.6, v = 0.1 + r() * 0.32, sp = 8 + r() * 6, ph = r() * 6;
+      const fx = px + left + u * w, fy = py + top + v * h + 12;
+      const fl = 1 + Math.sin(t * sp + ph) * 0.22 + Math.sin(t * sp * 1.9 + ph) * 0.1, big = (0.8 + r() * 0.6) * (0.85 + d * 0.5);
+      const sway = Math.sin(t * 3.1 + ph) * 3 * big;
+      tongue(fx, fy, 6 * big, 26 * fl * big, sway, 'rgba(196,58,22,0.85)');
+      tongue(fx, fy, 4.4 * big, 20 * fl * big, sway * 0.8, 'rgba(240,128,38,0.92)');
+      tongue(fx, fy, 2.4 * big, 11 * fl * big, sway * 0.5, 'rgba(255,222,110,0.95)');
+      // Funken
+      if (Math.random() < 0.05) { c.fillStyle = '#ffd25a'; c.fillRect(fx + sway + (Math.random() - 0.5) * 8, fy - 30 * big - Math.random() * 14, 1.5, 1.5); }
+    }
+    if (Math.random() < 0.4) smokeEmit(px + left + (0.3 + Math.random() * 0.4) * w, py + top + h * 0.15, 1);
+    addLight(b.x, b.y, b.h + 10, 50, 1.2);
+    return;
+  }
+  // Ausbesserung: Gerüst vor dem Haus, Steine und Bauholz daneben
+  const sh = Math.max(b.h + 6, -top * 0.62);
+  drawScaffoldPoles(c, b.x, b.y, b.wx + 0.3, b.wy + 0.3, sh);
+  const st = eigenLoose('steinquader_2'), bh = eigenLoose('bauholz_1');
+  if (st) p5(c, st, b.x - b.wx / 2 - 0.45, b.y + b.wy / 2 + 0.15, 0.9); else drawStones(c, b.x - b.wx / 2 - 0.4, b.y + 0.2, 4);
+  if (bh) p5(c, bh, b.x + b.wx / 2 + 0.2, b.y + b.wy / 2 + 0.45, 0.85);
+}
+// Lose Baustoffe aus Paket 6 (Steinquader, Bauholz), bei Bedarf geladen
+function eigenLoose(name) { const w = `eigen_${name}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `eigen_${name}`; return P5[id] && wantArt(id) ? id : null; }
 function drawHouseSprite(c, b, hs) {
   drawShadow(c, b.x, b.y, b.wx, b.wy, b.h + b.rh * 0.7);
   if (!p5(c, hs.id, b.x, b.y, hs.sc, hs.flip)) return false;
-  const empty = abandonedId(b.site), lit = b.lit && !empty;
+  const empty = abandonedId(b.site), hurt = b.fire > G.time || (b.dmg || 0) >= 0.45, lit = b.lit && !empty && !hurt;
   if (lit && darkness() > 0.2) { addLight(b.x, b.y + b.wy / 2, b.h * 0.5, 22, 0.8); addLight(b.x + b.wx / 2, b.y, b.h * 0.5, 22, 0.7); }
   // Rauch aus dem gemalten Schornstein
   const r = hs.name && (hs.fl ? FL_RAUCH : YORK_RAUCH)[hs.name], a = P5[hs.base];
-  if (r && a && !empty) { const [px, py] = P(b.x, b.y, 0); b.smoke = [px + (r[0] - a[0]) * hs.sc * (hs.flip ? -1 : 1), py + (r[1] - a[1]) * hs.sc]; }
+  if (r && a && !empty && !hurt) { const [px, py] = P(b.x, b.y, 0); b.smoke = [px + (r[0] - a[0]) * hs.sc * (hs.flip ? -1 : 1), py + (r[1] - a[1]) * hs.sc]; }
   return true;
 }
 
@@ -3742,7 +3846,8 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise, phase = 1) {
     const own = texId !== 'wiese_sommer' || season === 1;
     c.globalAlpha = isWater ? 0 : own ? (season === 4 ? 0.42 : season === 3 ? 0.08 : 0.14) : season === 2 ? 0.5 : season === 4 ? 0.66 : 0.26;
     // (den Hang zeichnet der Lichtverlauf darunter, die Farbe der Jahreszeit liegt eben darüber)
-    if (c.globalAlpha > 0) { c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = baseOf(1); c.fill(); }
+    // (eine Farbe für alles Land, sonst zeichnen sich an der Grenze zweier Bodenarten wieder die Rauten ab)
+    if (c.globalAlpha > 0) { c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath(); c.fillStyle = isWater ? baseOf(1) : shade(tileColor(T.GRASS, pal, pn), varF); c.fill(); }
     // Hänge auch auf der gemalten Wiese sichtbar machen: Lichtseite heller, Schattenseite dunkler, weich verlaufend
     if (!isWater && Math.max(Math.abs(lT - 1), Math.abs(lR - 1), Math.abs(lB - 1), Math.abs(lL - 1)) > 0.01) {
       c.globalAlpha = 1;
@@ -3775,7 +3880,7 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise, phase = 1) {
       c.beginPath(); c.moveTo(Tp[0], Tp[1]); c.lineTo(Rp[0], Rp[1]); c.lineTo(Bp[0], Bp[1]); c.lineTo(Lp[0], Lp[1]); c.closePath();
       c.fillStyle = deep; c.fill(); c.strokeStyle = deep; c.lineWidth = 0.9; c.stroke();
     }
-    c.strokeStyle = pal.foam; c.lineWidth = 1.6;
+    c.strokeStyle = grassArt ? 'rgba(0,0,0,0)' : pal.foam; c.lineWidth = 1.6;
     c.beginPath();
     if (nU) { c.moveTo(Tp[0] + 1, Tp[1] + 1.5); c.lineTo(Rp[0] - 2, Rp[1] + 0.5); }
     if (nR) { c.moveTo(Rp[0] - 2, Rp[1] + 0.5); c.lineTo(Bp[0] + 1, Bp[1] - 1.5); }
@@ -3836,6 +3941,86 @@ function drawTile(c, W, i, j, ox, oy, pal, season, noise, phase = 1) {
 // Wege und Brücken eines Chunks in gemeinsamen Durchgängen über allen Böden: erst der Rand, dann die Wegdecke. So laufen
 // die Stücke benachbarter Kacheln ohne Ringe oder Nähte ineinander. Ein Kranz von einer Kachel um den Chunk schließt die
 // Wege an den Chunkgrenzen an; gezeichnet wird nur auf den eigenen Kacheln (minimal größer, damit keine Haarlinie bleibt).
+// Straßennetz als Linienzüge: Wegkacheln mit genau zwei Nachbarn bilden Ketten zwischen Kreuzungen, Enden und Brücken.
+// Jede Kette wird geglättet (Kreuzungen und Brückenköpfe bleiben fest, kein Punkt weicht mehr als ROAD_DEV Kacheln von
+// seiner Kachel ab). So werden aus den Treppen der Wegsuche Bögen und schräge Geraden; die Kacheln selbst bleiben.
+const ROAD_DEV = 0.62;
+let roadNetW = null, roadNetCache = null;
+function roadNet(W) {
+  if (roadNetW === W) return roadNetCache;
+  const N = W.N, tl = W.tiles;
+  const road = (i, j) => i >= 0 && j >= 0 && i < N && j < N && (tl[j * N + i] === T.ROAD || tl[j * N + i] === T.BRIDGE);
+  const D4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const nbs = (i, j) => D4.filter(([dx, dy]) => road(i + dx, j + dy)).map(([dx, dy]) => [i + dx, j + dy]);
+  const free = (i, j) => road(i, j) && tl[j * N + i] === T.ROAD && nbs(i, j).length === 2;
+  const seen = new Set(), chains = [], inChain = new Set();
+  const walk = (a, b) => {
+    // a: Anfang (Kreuzung, Ende oder Brücke), b: erste freie Kachel
+    const pts = [[a[0] + 0.5, a[1] + 0.5]], tiles = [a], pin = [true];
+    let prev = a, cur = b;
+    while (free(cur[0], cur[1]) && !seen.has(cur[1] * N + cur[0])) {
+      seen.add(cur[1] * N + cur[0]); inChain.add(cur[1] * N + cur[0]);
+      pts.push([cur[0] + 0.5, cur[1] + 0.5]); tiles.push(cur); pin.push(false);
+      const nx = nbs(cur[0], cur[1]).find((q) => q[0] !== prev[0] || q[1] !== prev[1]);
+      prev = cur; cur = nx;
+    }
+    if (!free(cur[0], cur[1])) { pts.push([cur[0] + 0.5, cur[1] + 0.5]); tiles.push(cur); pin.push(true); }
+    // Brückenköpfe: Ende auf der Kante zur Brücke, damit der Weg nicht ins Wasser ragt
+    const brg = (q) => tl[q[1] * N + q[0]] === T.BRIDGE;
+    if (brg(tiles[0]) && tiles.length > 1) { pts[0] = [(tiles[0][0] + tiles[1][0]) / 2 + 0.5, (tiles[0][1] + tiles[1][1]) / 2 + 0.5]; }
+    const L = tiles.length - 1;
+    if (brg(tiles[L]) && L > 0) { pts[L] = [(tiles[L][0] + tiles[L - 1][0]) / 2 + 0.5, (tiles[L][1] + tiles[L - 1][1]) / 2 + 0.5]; }
+    return { pts, tiles, pin };
+  };
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (!road(i, j) || free(i, j)) continue;
+    for (const q of nbs(i, j)) if (free(q[0], q[1]) && !seen.has(q[1] * N + q[0])) chains.push(walk([i, j], q));
+  }
+  // Geschlossene Ringe ohne Kreuzung: an einer Stelle festhalten
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (!free(i, j) || seen.has(j * N + i)) continue;
+    const ch = walk([i, j], nbs(i, j)[0]);
+    seen.add(j * N + i); inChain.add(j * N + i);
+    ch.pts.push([i + 0.5, j + 0.5]); ch.tiles.push([i, j]); ch.pin.push(true);
+    chains.push(ch);
+  }
+  // Glätten: wiederholtes [1 2 1]-Mittel, danach die Abweichung von der eigenen Kachel begrenzen
+  for (const ch of chains) {
+    const P = ch.pts, n = P.length, o = P.map((p) => [p[0], p[1]]);
+    if (n < 3) continue;
+    for (let it = 0; it < 14; it++) {
+      const Q = P.map((p) => [p[0], p[1]]);
+      for (let k = 1; k < n - 1; k++) if (!ch.pin[k]) { P[k][0] = (Q[k - 1][0] + 2 * Q[k][0] + Q[k + 1][0]) / 4; P[k][1] = (Q[k - 1][1] + 2 * Q[k][1] + Q[k + 1][1]) / 4; }
+    }
+    for (let k = 0; k < n; k++) {
+      const dx = P[k][0] - o[k][0], dy = P[k][1] - o[k][1], d = Math.hypot(dx, dy);
+      if (d > ROAD_DEV) { P[k][0] = o[k][0] + (dx / d) * ROAD_DEV; P[k][1] = o[k][1] + (dy / d) * ROAD_DEV; }
+    }
+    // Zwischenpunkte für runde Bögen (Mitte zwischen zwei Punkten, leicht zur Kurve hin)
+    const S = [P[0]];
+    for (let k = 1; k < n; k++) {
+      const a = P[k - 1], b = P[k], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (k > 1 && k < n - 1) { const a0 = P[k - 2], b1 = P[k + 1]; m[0] += (a[0] + b[0] - a0[0] - b1[0]) / 16; m[1] += (a[1] + b[1] - a0[1] - b1[1]) / 16; }
+      S.push(m, b);
+    }
+    ch.smooth = S;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const p of S) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
+    ch.box = [x0, y0, x1, y1];
+  }
+  for (const ch of chains) if (!ch.smooth) { ch.smooth = ch.pts; const xs = ch.pts.map((p) => p[0]), ys = ch.pts.map((p) => p[1]); ch.box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+  // Ketten nach Chunks
+  const byChunk = new Map();
+  for (const ch of chains) {
+    const [bx0, by0, bx1, by1] = ch.box;
+    for (let cy = Math.floor((by0 - 2) / CHUNK); cy <= Math.floor((by1 + 2) / CHUNK); cy++) for (let cx = Math.floor((bx0 - 2) / CHUNK); cx <= Math.floor((bx1 + 2) / CHUNK); cx++) {
+      const k = cy * 100000 + cx; if (!byChunk.has(k)) byChunk.set(k, []); byChunk.get(k).push(ch);
+    }
+  }
+  roadNetW = W; roadNetCache = { chains, inChain, byChunk };
+  return roadNetCache;
+}
+
 function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
   const N = W.N, M = W.M, vh = W.vh;
   const corner = (i, j) => {
@@ -3843,20 +4028,47 @@ function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
     const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
     return (u, v) => [sx + (u - v) * HW, sy + (u + v) * HH - (hT + (hR - hT) * u + (hL - hT) * v + (hT - hR - hL + hB) * u * v)];
   };
+  // Bildpunkt zu einer Stelle in Kachelkoordinaten (mit Geländehöhe)
+  const at = (x, y) => { const i = Math.min(N - 1, Math.max(0, Math.floor(x))), j = Math.min(N - 1, Math.max(0, Math.floor(y))); return corner(i, j)(x - i, y - j); };
+  const net = roadNet(W);
   const segs = [];
   for (let j = y0 - 1; j <= y0 + CHUNK; j++) for (let i = x0 - 1; i <= x0 + CHUNK; i++) {
     if (!isRoadish(W, i, j)) continue;
     const bridge = W.tiles[j * N + i] === T.BRIDGE, lift = bridge ? 4 : 0, tp = corner(i, j);
     const ctr = tp(0.5, 0.5); ctr[1] -= lift;
+    // Kettenkacheln zeichnet der geglättete Linienzug; Kreuzungen verbinden sich hier nur untereinander und mit Brücken
+    const chained = net.inChain.has(j * N + i);
     const arms = [];
-    if (isRoadish(W, i, j - 1)) arms.push(tp(0.5, 0));
-    if (isRoadish(W, i + 1, j)) arms.push(tp(1, 0.5));
-    if (isRoadish(W, i, j + 1)) arms.push(tp(0.5, 1));
-    if (isRoadish(W, i - 1, j)) arms.push(tp(0, 0.5));
+    const link = (a, b2) => isRoadish(W, a, b2) && (bridge || !net.inChain.has(b2 * N + a)) && !chained;
+    if (link(i, j - 1)) arms.push(tp(0.5, 0));
+    if (link(i + 1, j)) arms.push(tp(1, 0.5));
+    if (link(i, j + 1)) arms.push(tp(0.5, 1));
+    if (link(i - 1, j)) arms.push(tp(0, 0.5));
     for (const q of arms) q[1] -= lift;
-    segs.push({ i, j, bridge, ctr, arms, tex: bridge ? null : roadTex(W, i, j, season) });
+    segs.push({ i, j, bridge, chained, ctr, arms, tex: bridge ? null : roadTex(W, i, j, season) });
   }
   if (!segs.length) return;
+  // Stücke der geglätteten Ketten in diesem Chunk, nach Wegtextur getrennt
+  const pieces = [];
+  const inBox = (p) => p[0] >= x0 - 2 && p[0] <= x0 + CHUNK + 2 && p[1] >= y0 - 2 && p[1] <= y0 + CHUNK + 2;
+  for (const ch of net.byChunk.get(Math.floor(y0 / CHUNK) * 100000 + Math.floor(x0 / CHUNK)) || []) {
+    const S = ch.smooth;
+    let cur = null;
+    for (let k = 0; k < S.length; k++) {
+      const p = S[k], q = S[Math.min(S.length - 1, k + 1)];
+      if (!inBox(p) && !inBox(q) && !(k > 0 && inBox(S[k - 1]))) { cur = null; continue; }
+      const t = ch.tiles[Math.min(ch.tiles.length - 1, Math.round(k / 2))];
+      const bt = W.tiles[t[1] * N + t[0]] === T.BRIDGE;
+      const tex = roadTex(W, t[0], t[1], season);
+      if (!cur || cur.tex !== tex) {
+        if (cur) cur.pts.push(at(p[0], p[1]));
+        cur = { tex, pts: [] }; pieces.push(cur);
+      }
+      const sp = at(p[0], p[1]);
+      if (bt) sp[1] -= 4;
+      cur.pts.push(sp);
+    }
+  }
   // nur Kacheln mit Weg in der Nähe gehören in die Schablone
   const near = new Set();
   for (const g of segs) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) near.add((g.j + dj) * N + g.i + di);
@@ -3870,36 +4082,45 @@ function drawRoads(c, W, x0, y0, ox, oy, pal, season) {
   }
   c.clip();
   c.lineCap = 'round'; c.lineJoin = 'round';
-  // Pfad aller Stücke einer Gruppe; Sackgassen als kleiner Fleck
-  const trace = (list, dot) => {
+  // Pfad aller Stücke einer Gruppe; Sackgassen als kleiner Fleck; dazu die geglätteten Kettenstücke als Bögen
+  const trace = (list, dot, pcs) => {
     c.beginPath();
     for (const g of list) {
+      if (g.chained) continue;
       if (!g.arms.length) { c.moveTo(g.ctr[0] + dot, g.ctr[1]); c.ellipse(g.ctr[0], g.ctr[1], dot, dot / 2, 0, 0, Math.PI * 2); continue; }
       for (const q of g.arms) { c.moveTo(g.ctr[0], g.ctr[1]); c.lineTo(q[0], q[1]); }
+    }
+    for (const pc of pcs || []) {
+      const P = pc.pts;
+      if (P.length < 2) continue;
+      c.moveTo(P[0][0], P[0][1]);
+      for (let k = 1; k < P.length - 1; k++) c.quadraticCurveTo(P[k][0], P[k][1], (P[k][0] + P[k + 1][0]) / 2, (P[k][1] + P[k + 1][1]) / 2);
+      c.lineTo(P[P.length - 1][0], P[P.length - 1][1]);
     }
   };
   const ground = segs.filter((g) => !g.bridge), bridges = segs.filter((g) => g.bridge);
   const byTex = new Map();
-  for (const g of ground) { const k = g.tex || ''; if (!byTex.has(k)) byTex.set(k, []); byTex.get(k).push(g); }
+  for (const g of ground) { const k = g.tex || ''; if (!byTex.has(k)) byTex.set(k, { segs: [], pcs: [] }); byTex.get(k).segs.push(g); }
+  for (const pc of pieces) { const k = pc.tex || ''; if (!byTex.has(k)) byTex.set(k, { segs: [], pcs: [] }); byTex.get(k).pcs.push(pc); }
   const art = (k) => (k ? texPattern(c, k, ox, oy) : null);
   const rc = pal.road;
   // Rand: dieselbe Wegtextur, etwas dunkler, mit einem weichen Saum ins Gras
-  if (ground.length) {
-    trace(ground, 9); c.strokeStyle = 'rgba(40,28,14,0.16)'; c.lineWidth = 19.5; c.stroke();
-    for (const [k, list] of byTex) {
+  if (ground.length || pieces.length) {
+    trace(ground, 9, pieces); c.strokeStyle = 'rgba(40,28,14,0.16)'; c.lineWidth = 19.5; c.stroke();
+    for (const [k, grp] of byTex) {
       const pat = art(k);
-      trace(list, 8.5); c.strokeStyle = pat || shade(rc, 0.82); c.lineWidth = 17; c.stroke();
-      if (!pat) { c.fillStyle = shade(rc, 0.82); c.fill(); }
+      trace(grp.segs, 8.5, grp.pcs); c.strokeStyle = pat || shade(rc, 0.82); c.lineWidth = 17; c.stroke();
+      if (!pat) { trace(grp.segs, 8.5); c.fillStyle = shade(rc, 0.82); c.fill(); }
     }
-    trace(ground, 8.5); c.strokeStyle = 'rgba(38,26,12,0.3)'; c.lineWidth = 17; c.stroke();
+    trace(ground, 8.5, pieces); c.strokeStyle = 'rgba(38,26,12,0.3)'; c.lineWidth = 17; c.stroke();
     // Wegdecke
-    for (const [k, list] of byTex) {
+    for (const [k, grp] of byTex) {
       const pat = art(k);
-      trace(list, 6.5); c.strokeStyle = pat || rc; c.lineWidth = 12.5; c.stroke();
-      c.fillStyle = pat || rc; c.fill();
+      trace(grp.segs, 6.5, grp.pcs); c.strokeStyle = pat || rc; c.lineWidth = 12.5; c.stroke();
+      trace(grp.segs, 6.5); c.fillStyle = pat || rc; c.fill();
     }
     // Ohne gemalte Textur: Fahrspuren und Steinchen wie bisher
-    for (const g of byTex.get('') || []) {
+    for (const g of byTex.get('')?.segs || []) {
       c.strokeStyle = shade(rc, 0.88); c.lineWidth = 1.2;
       for (const q of g.arms) {
         c.beginPath(); c.moveTo(g.ctr[0] - 2.5, g.ctr[1]); c.lineTo(q[0] - 2.5, q[1]); c.moveTo(g.ctr[0] + 2.5, g.ctr[1]); c.lineTo(q[0] + 2.5, q[1]); c.stroke();
@@ -3971,6 +4192,113 @@ function drawBridgeSprite(c, W, g) {
   return true;
 }
 
+// ---------------------------------------------------------------- Weiche Bodenübergänge
+// Jede Bodenart wird über eine Maske gezeichnet, deren Rand dort, wo eine andere Bodenart oder Wasser angrenzt, mit einem
+// durchgehenden Rauschen (in Weltkoordinaten, also ohne Nähte zwischen den Chunks) nach außen gewellt und leicht weich
+// gezeichnet ist. Die Bodenarten liegen in fester Reihenfolge übereinander (Wiese unten, Schnee oben). So gehen Wald,
+// Wiese, Heide, Sand und Fels in Bögen ineinander über, und Ufer verlaufen geschwungen statt in Rautentreppen.
+const LAYER_ORDER = [/^wiese/, /^acker|^feld/, /^heide/, /^waldboden/, /^schlamm/, /^kies/, /^sand/, /^fels/, /^klippe/, /^schnee/];
+const layerRank = (id) => { const k = LAYER_ORDER.findIndex((r) => r.test(id)); return k < 0 ? LAYER_ORDER.length : k; };
+let groundNoise = null, maskCv = null, layerCv = null;
+function softGround(c, cvs, W, x0, y0, ox, oy, cs, look) {
+  if (typeof c.filter !== 'string') return false;
+  const N = W.N, M = W.M, vh = W.vh, R = 2;
+  groundNoise = groundNoise || makeNoise(7717);
+  // Gemalter Boden der Kacheln im Chunk und im Rand (Wasser zählt nicht)
+  const tex = new Map(), ids = new Map();
+  for (let j = y0 - R; j < y0 + CHUNK + R; j++) for (let i = x0 - R; i < x0 + CHUNK + R; i++) {
+    if (i < 0 || j < 0 || i >= N || j >= N) continue;
+    const t = W.tiles[j * N + i];
+    if (t === T.WATER || t === T.BRIDGE) continue;
+    const id = groundTex(W, t, look, i, j);
+    if (!id || !ART[id]) continue;
+    tex.set(j * N + i, id);
+    if (!ids.has(id)) ids.set(id, []);
+    ids.get(id).push(i, j);
+  }
+  if (!ids.size) return true;
+  const w = cvs.width, h = cvs.height;
+  if (!maskCv || maskCv.width !== w || maskCv.height !== h) { maskCv = makeCanvas(w, h); layerCv = makeCanvas(w, h); }
+  const mc = maskCv.getContext('2d'), lc = layerCv.getContext('2d');
+  // Gezeichnet wird nur auf den Kacheln dieses Chunks (Land und Wasser)
+  c.save();
+  c.beginPath();
+  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) {
+    const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy, e = 0.6;
+    c.moveTo(sx, sy - vh[j * M + i] - e); c.lineTo(sx + HW + e, sy + HH - vh[j * M + i + 1]); c.lineTo(sx, sy + TH - vh[(j + 1) * M + i + 1] + e); c.lineTo(sx - HW - e, sy + HH - vh[(j + 1) * M + i]); c.closePath();
+  }
+  c.clip();
+  const order = [...ids.keys()].sort((a, b) => layerRank(a) - layerRank(b) || (a < b ? -1 : 1));
+  // Unter Land am Wasser liegt auch Wasser: Zieht sich das Ufer zurück, sieht man dort Wasser statt der Grundfarbe
+  const wet = (i, j) => { const t = i >= 0 && j >= 0 && i < N && j < N ? W.tiles[j * N + i] : T.WATER; return t === T.WATER || t === T.BRIDGE; };
+  // Wasserkacheln und Uferkacheln in einem Pfad je Wasserart: so bleiben zwischen ihnen keine Haarlinien
+  const wgroups = new Map();
+  for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) {
+    let wi = -1;
+    if (wet(i, j)) wi = j * N + i;
+    else for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) if (wet(i + dx, j + dy) && i + dx >= 0 && j + dy >= 0 && i + dx < N && j + dy < N) { wi = (j + dy) * N + i + dx; break; }
+    if (wi < 0) continue;
+    const wid = groundTex(W, T.WATER, look, wi % N, Math.floor(wi / N));
+    if (!wid || !ART[wid]) continue;
+    if (!wgroups.has(wid)) wgroups.set(wid, []);
+    wgroups.get(wid).push(i, j);
+  }
+  for (const [wid, list] of wgroups) {
+    const wpat = texPattern(c, wid, ox, oy);
+    if (!wpat) continue;
+    c.beginPath();
+    for (let k = 0; k < list.length; k += 2) {
+      const i = list[k], j = list[k + 1], sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
+      c.moveTo(sx, sy - vh[j * M + i]); c.lineTo(sx + HW, sy + HH - vh[j * M + i + 1]); c.lineTo(sx, sy + TH - vh[(j + 1) * M + i + 1]); c.lineTo(sx - HW, sy + HH - vh[(j + 1) * M + i]); c.closePath();
+    }
+    c.fillStyle = wpat; c.fill();
+  }
+  // Zugehörigkeit einer Kachel zur Ebene: Land dieser oder einer höheren Bodenart (die höhere liegt ohnehin darüber)
+  const rankAt = new Map();
+  for (const [k, id] of tex) rankAt.set(k, layerRank(id));
+  const member = (i, j, rank) => { const r = rankAt.get(j * N + i); return r !== undefined && r >= rank ? 1 : 0; };
+  for (const id of order) {
+    const rank = layerRank(id), field = /^acker|^feld/.test(id), amp = field ? 0.12 : 0.5;
+    mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, w, h); mc.setTransform(cs, 0, 0, cs, 0, 0);
+    mc.fillStyle = '#fff'; mc.beginPath();
+    for (let j = y0 - 1; j < y0 + CHUNK + 1; j++) for (let i = x0 - 1; i < x0 + CHUNK + 1; i++) {
+      if (i < 0 || j < 0 || i >= N || j >= N) continue;
+      // Werte an den vier Ecken: Anteil der vier Kacheln an dieser Ecke, die zur Ebene gehören
+      const m = (a, b) => member(i + a, j + b, rank);
+      const cT = (m(-1, -1) + m(0, -1) + m(-1, 0) + m(0, 0)) / 4, cR = (m(0, -1) + m(1, -1) + m(0, 0) + m(1, 0)) / 4;
+      const cB = (m(0, 0) + m(1, 0) + m(0, 1) + m(1, 1)) / 4, cL = (m(-1, 0) + m(0, 0) + m(-1, 1) + m(0, 1)) / 4;
+      const lo = Math.min(cT, cR, cB, cL), hi = Math.max(cT, cR, cB, cL);
+      if (hi + amp / 2 <= 0.5) continue;
+      const hT = vh[j * M + i], hR = vh[j * M + i + 1], hB = vh[(j + 1) * M + i + 1], hL = vh[(j + 1) * M + i];
+      const sx = isoX(i, j) + ox, sy = isoY(i, j) + oy;
+      const tp = (u, v) => [sx + (u - v) * HW, sy + (u + v) * HH - (hT + (hR - hT) * u + (hL - hT) * v + (hT - hR - hL + hB) * u * v)];
+      const quad = (u0, v0, u1, v1) => { const a = tp(u0, v0), b = tp(u1, v0), d = tp(u1, v1), e = tp(u0, v1); mc.moveTo(a[0], a[1]); mc.lineTo(b[0], b[1]); mc.lineTo(d[0], d[1]); mc.lineTo(e[0], e[1]); mc.closePath(); };
+      if (lo - amp / 2 > 0.5) { quad(-0.01, -0.01, 1.01, 1.01); continue; }
+      // Grenzkachel: in 6 × 6 Teilfelder, Wert bilinear aus den Ecken plus Rauschen; über der Hälfte gehört es dazu
+      const S = 6, e = 0.012;
+      for (let b = 0; b < S; b++) for (let a = 0; a < S; a++) {
+        const u = (a + 0.5) / S, v = (b + 0.5) / S;
+        const f = cT * (1 - u) * (1 - v) + cR * u * (1 - v) + cB * u * v + cL * (1 - u) * v;
+        const n = (fbm(groundNoise, (i + u) * 0.9, (j + v) * 0.9, 2) - 0.5) * amp;
+        if (f + n > 0.5) quad(a / S - e, b / S - e, (a + 1) / S + e, (b + 1) / S + e);
+      }
+    }
+    mc.fill();
+    // Ebene: Muster füllen, mit der weichgezeichneten Maske ausstanzen
+    lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalCompositeOperation = 'source-over'; lc.clearRect(0, 0, w, h);
+    lc.setTransform(cs, 0, 0, cs, 0, 0);
+    lc.fillStyle = texPattern(lc, id, ox, oy); lc.fillRect(-10, -10, w / cs + 20, h / cs + 20);
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.globalCompositeOperation = 'destination-in';
+    lc.filter = `blur(${(field ? 0.9 : 2.2) * cs}px)`;
+    lc.drawImage(maskCv, 0, 0);
+    lc.filter = 'none'; lc.globalCompositeOperation = 'source-over';
+    c.drawImage(layerCv, 0, 0, w / cs, h / cs);
+  }
+  c.restore();
+  return true;
+}
+
 function renderChunk(cx, cy, cs = 1) {
   const W = G.world;
   const season = lookSeason();
@@ -3984,10 +4312,12 @@ function renderChunk(cx, cy, cs = 1) {
   const noise = getPatchNoise();
   texBatch = new Map();
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise, 1);
-  for (const [id, q] of texBatch) {
-    c.beginPath();
-    for (let k = 0; k < q.length; k += 4) { c.moveTo(q[k][0], q[k][1]); c.lineTo(q[k + 1][0], q[k + 1][1]); c.lineTo(q[k + 2][0], q[k + 2][1]); c.lineTo(q[k + 3][0], q[k + 3][1]); c.closePath(); }
-    c.fillStyle = texPattern(c, id, ox, oy); c.fill();
+  if (!softGround(c, cvs, W, x0, y0, ox, oy, cs, season)) {
+    for (const [id, q] of texBatch) {
+      c.beginPath();
+      for (let k = 0; k < q.length; k += 4) { c.moveTo(q[k][0], q[k][1]); c.lineTo(q[k + 1][0], q[k + 1][1]); c.lineTo(q[k + 2][0], q[k + 2][1]); c.lineTo(q[k + 3][0], q[k + 3][1]); c.closePath(); }
+      c.fillStyle = texPattern(c, id, ox, oy); c.fill();
+    }
   }
   texBatch = null;
   for (let j = y0; j < y0 + CHUNK; j++) for (let i = x0; i < x0 + CHUNK; i++) drawTile(c, W, i, j, ox, oy, pal, season, noise, 2);
@@ -5342,7 +5672,7 @@ onArt((id) => {
   if (id.startsWith('burg_stein_mauer_')) mirrorWall(id);
   if (id.startsWith('burg_') || id.startsWith('eigen_')) { G.staticDirty = true; G.castleDirty = true; }
   // Gemalte Häuser: zwischengespeicherte Hausbilder neu zeichnen
-  if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_')) { partCache.clear(); G.staticDirty = true; }
+  if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_') || id.startsWith('ort_')) { partCache.clear(); G.staticDirty = true; }
   if (id.startsWith('york_bruecke') || id.startsWith('fl_steinbruecke') || id.startsWith('fl_kaimauer')) chunkCache.clear();
   if (id.startsWith('th_')) { G.staticDirty = true; if (id.startsWith('th_steg')) chunkCache.clear(); }
 });

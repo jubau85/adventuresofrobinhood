@@ -531,6 +531,7 @@ export function generateWorld(seed) {
   assignPlots(W);
   scaleBuildings(W);
   placeCamps(W);
+  placeWayside(W);
   computeHeights(W);
   flattenSites(W);
   placeTrees(W, rng);
@@ -615,6 +616,40 @@ function placeCamps(W) {
     push({ kind: 'prop', prop: 'sitzstamm', x: c.x - 0.9, y: c.y + 0.3, v: rng() });
     push({ kind: 'prop', prop: 'erzhaufen', x: c.x + 1.3, y: c.y - 0.5, v: rng() });
     push({ kind: 'prop', prop: 'erzhaufen', x: c.x - 1.2, y: c.y - 0.9, v: rng() });
+  }
+}
+
+// Kleinkram aus dem Paket Orte, nach allen nummerierten Gebäuden angehängt und ohne den Weltzufall (hash2), damit
+// sich nichts anderes verschiebt: Wegschreine und Steinkreuze an Wegkreuzungen über Land, ein Baumstumpf mit Axt im
+// Holzfällerlager, ein Votivbaum an heiligen Quellen
+function placeWayside(W) {
+  const N = W.N, tl = W.tiles;
+  const road = (x, y) => x >= 0 && y >= 0 && x < N && y < N && (tl[y * N + x] === T.ROAD || tl[y * N + x] === T.BRIDGE);
+  const push = (b) => { b.idx = W.buildings.length; W.buildings.push(b); };
+  const placed = [];
+  for (let y = 2; y < N - 2; y++) for (let x = 2; x < N - 2; x++) {
+    if (tl[y * N + x] !== T.ROAD) continue;
+    const deg = road(x - 1, y) + road(x + 1, y) + road(x, y - 1) + road(x, y + 1);
+    if (deg < 3 || hash2(x, y, 733) > 0.45) continue;
+    if (W.sites.some((s) => Math.hypot(s.x - x, s.y - y) < s.clear + 6)) continue;
+    if (W.camps.some((c) => Math.hypot(c.x - x, c.y - y) < 6) || placed.some(([px, py]) => Math.hypot(px - x, py - y) < 22)) continue;
+    // Eine freie Wiesenkachel neben der Kreuzung (nicht zwischen zwei Wegen)
+    let spot = null;
+    for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1], [1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      const qx = x + dx, qy = y + dy, t = tl[qy * N + qx];
+      if (t !== T.GRASS || W.solid[qy * N + qx] || road(qx + dx, qy) && road(qx, qy + dy)) continue;
+      spot = [qx + 0.5 - dx * 0.15, qy + 0.5 - dy * 0.15]; break;
+    }
+    if (!spot) continue;
+    placed.push([x, y]);
+    const cross = hash2(x, y, 734) < (W.sites.some((s) => (s.realm === 'ir' || s.realm === 'sc') && Math.hypot(s.x - x, s.y - y) < 90) ? 0.7 : 0.4);
+    push({ kind: 'prop', prop: cross ? 'steinkreuz' : 'wegschrein', x: spot[0], y: spot[1], v: hash2(x, y, 735), wayside: true });
+  }
+  for (const c of W.camps || []) {
+    if (c.camp === 'holzfaeller') push({ kind: 'prop', prop: 'baumstumpf_axt', x: c.x - 1.5, y: c.y - 0.4, v: hash2(c.tx, c.ty, 736), site: c.id });
+  }
+  for (const s of W.sites) {
+    if (s.type === 'einsiedelei' && s.feature === 'quelle') push({ kind: 'prop', prop: 'votivbaum', x: s.x + 3.0, y: s.y - 1.3, v: hash2(s.tx, s.ty, 737), site: s.id });
   }
 }
 
