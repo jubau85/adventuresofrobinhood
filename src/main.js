@@ -14,8 +14,8 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots, refreshRecruits } from './castle.js';
-import { applyHoldings, isHeld, grantHolding, grantSeat, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots, refreshRecruits, grantSeat, migrateSeat, isHomeBase, applyPeerCastles, startBuild, startTypeChange, castleOut, prepareSeatLayouts } from './castle.js';
+import { applyHoldings, isHeld, grantHolding, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
 import { callStorm } from './siege.js';
 import { startTrip, planTrip, updateTrips } from './travels.js';
 import { initWar, dailyWar, swearTo, takeSeat, war } from './war.js';
@@ -49,7 +49,8 @@ let viewCanvas, mini;
 function newGame(opts) {
   const { name, color, female, arms, difficulty, seat } = opts;
   const seed = (Math.random() * 2147483647) | 0;
-  G.world = generateWorld(seed, { mp: !!seat });
+  G.world = generateWorld(seed, { mp: !!seat, seats: Object.keys(SHIRES) });
+  prepareSeatLayouts();
   G.nextId = 1;
   const site = seat ? G.world.sites.find((s) => s.id === seat) : G.world.sites.find((s) => s.type === 'spieler');
   const castleName = seat ? site.name : opts.castleName;
@@ -90,9 +91,9 @@ function newGame(opts) {
   }
 }
 
-// Mehrspieler: Platz vor dem Tor der Grafschaftsburg, Burg samt Grafschaft, erste Anwärter im Rittersaal
+// Mehrspieler: Platz vor dem Tor der Grafschaftsburg, die Burg als Heimburg samt Grafschaft, erste Anwärter im Rittersaal
 function seatSpawn(site) {
-  const at = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
+  const at = nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.ringR || 4) + 2), 10) || { x: Math.floor(site.x), y: Math.floor(site.y + 8) };
   return { x: at.x + 0.5, y: at.y + 0.5 };
 }
 function lordStart(site) {
@@ -102,13 +103,14 @@ function lordStart(site) {
 function welcomeLord(site, name) {
   const sh = SHIRES[site.id];
   log(`Willkommen in ${site.name}, ${name}. Die Grafschaft ${sh.name} gehört dir: ${sh.text}`, 'gold');
-  log(`Deine Burg ${site.name} hat eine Besatzung von 16 Mann, einen Rittersaal und ein Lager (E an der Burg). Die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
+  log(`${site.name} ist deine Burg wie eine eigene: eine Steinburg mit Rittersaal, Unterkunft, Schmiede, Stall und Äckern. Tritt an die Burg (E) und baue sie aus, auf freien Plätzen im Hof und davor. Pacht, Marktgeld und die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
 }
 
 // Mehrspieler-Gast: Welt aus dem Startwert des Gastgebers, gemeinsamer Stand von ihm, eigener Held an der Burg des Platzes
 function startGuest(d, who) {
   const w = { ...d.world, shires: shiresIn(d.world.shires, d.seat) };
-  G.world = generateWorld(w.seed, { mp: true });
+  G.world = generateWorld(w.seed, { mp: true, seats: Object.keys(SHIRES) });
+  prepareSeatLayouts();
   G.nextId = 1;
   const site = G.world.sites.find((s) => s.id === d.seat);
   const spot = seatSpawn(site);
@@ -170,11 +172,13 @@ function startWorld() {
     G.s.cons = null;
     G.s.worldSig = sig;
   }
+  migrateSeat();
   refreshCastleBlock();
   // Die Barone: im neuen Spiel (oder einem Spielstand ohne sie) ihre Burgen anlegen, sonst Burgstufen übertragen
   if (!G.s.barons) initBarons(); else applyBarons();
   applyDamage();
   applyHoldings();
+  applyPeerCastles();
   initWar();
   applyCons();
   initWeather();
@@ -340,7 +344,7 @@ G.onWarEnd = (th, side, mine) => { if (mine) openPanel('victory', { th, side });
 G.animalTitle = animalTitle;
 
 // ---------------------------------------------------------------- Interaktion
-function interactRadius(s) { return s.type === 'spieler' ? 6.5 : s.type === 'burg' || s.type === 'stadt' ? 5 : 4; }
+function interactRadius(s) { return isHomeBase(s) ? 6.5 : s.type === 'burg' || s.type === 'stadt' ? 5 : 4; }
 
 // Sehenswürdigkeiten: beim ersten Besuch ein Satz dazu und etwas Ruhm
 let poiT = 0;
@@ -420,7 +424,7 @@ function enterSite(s) {
   if (!s) return;
   G.pendingSite = null;
   G.s.player.path = null;
-  if (s.type === 'spieler') openPanel('castle');
+  if (isHomeBase(s)) openPanel('castle');
   else openPanel('town', s);
 }
 
@@ -455,8 +459,8 @@ function checkNearSite() {
     const fc = nearestForestCamp();
     showPrompt(`<kbd>E</kbd> ${esc(fc.name)}: ${fc.camp === 'soeldner' ? 'Söldner anheuern, handeln' : 'handeln'}${G.s.freedAt && G.s.freedAt[fc.id] ? ' · <b>ein Geretteter wartet</b>' : ''}${battleText(' · ')}`);
   } else if (s && !inCombat()) {
-    const blocked = s.faction && isHostileFaction(s.faction) && !isHeld(s);
-    showPrompt(`<kbd>E</kbd> ${s.type === 'spieler' ? `Burg ${esc(homeName())} verwalten` : isHeld(s) ? `Deine Burg ${esc(s.name)} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
+    const blocked = s.faction && isHostileFaction(s.faction) && !isHeld(s) && !isHomeBase(s);
+    showPrompt(`<kbd>E</kbd> ${isHomeBase(s) ? `Burg ${esc(homeName())} verwalten` : isHeld(s) ? `Deine Burg ${esc(s.name)} verwalten` : `${esc(s.name)} betreten`}${blocked ? ' <span class="warn">(feindlich)</span>' : ''}${battleText(' · ')}`);
   } else if (inCombat()) {
     const cb = castleBonusAt(G.s.player.x, G.s.player.y);
     showPrompt(`<span class="warn">Kampf!</span> Klicke auf Gegner oder drücke <kbd>Leertaste</kbd>${cb ? ` · Mauerschutz +${Math.round(cb.atk * 100)} % Angriff, +${Math.round(cb.def * 100)} % Abwehr` : ''}${battleText(' · ')}`);
@@ -514,7 +518,7 @@ function clickUnit(u) {
     if (G.siege && G.siege.army === g && G.siege.lead) openPanel('siege');
     return true;
   }
-  if (isSiegeGroup(g) && G.siege.site.type !== 'spieler' && !G.siege.side && !g.engaged && !groupHostile(g)) {
+  if (isSiegeGroup(g) && !isHomeBase(G.siege.site) && !G.siege.side && !g.engaged && !groupHostile(g)) {
     if (Math.hypot(u.x - p.x, u.y - p.y) < 7 || nearSiegeCamp(7)) openPanel('siege');
     else if (setPlayerPath(G.siege.camp.x, G.siege.camp.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; }
     return true;
@@ -547,7 +551,7 @@ function startHunt(a) {
   const go = () => { p.huntTarget = a; p.attackTarget = null; p.path = null; G.pendingSite = null; log(`Du legst auf ${info.name === 'Ente' ? 'die' : info.name === 'Kuh' ? 'die' : 'den'} ${info.name} an.`); };
   if (info.farm) {
     const s = G.world.sites.find((x) => x.id === a.site);
-    if (s && s.type === 'spieler') { go(); return; }
+    if (s && isHomeBase(s)) { go(); return; }
     const who = s && s.faction ? `${s.name} (${FACTIONS[s.faction].short})` : 'einem Hof';
     confirmDialog(`Das Tier gehört ${who}. Viehdiebstahl kostet Ansehen (−6). Trotzdem schießen?`, 'Schießen', go);
     return;
@@ -573,9 +577,9 @@ function clickWorld(px, py, dbl = false) {
   if (ba && ba.castle) { goBuilding(ba); return; }
   // Der Boden der eigenen Burg ist zum Hingehen da (dort sucht man Schutz), nur Gebäude öffnen sich
   let site = null;
-  for (const s of G.world.sites) if (s.type !== 'spieler' && Math.hypot(s.x - wp.x, s.y - wp.y) < 2.5) site = s;
+  for (const s of G.world.sites) if (!isHomeBase(s) && Math.hypot(s.x - wp.x, s.y - wp.y) < 2.5) site = s;
   G.pendingCamp = false;
-  const sgc = G.siege && G.siege.stage !== 'anmarsch' && G.siege.site.type !== 'spieler' ? G.siege.camp : null;
+  const sgc = G.siege && G.siege.stage !== 'anmarsch' && !isHomeBase(G.siege.site) ? G.siege.camp : null;
   if (!site && sgc && Math.hypot(sgc.x - wp.x, sgc.y - wp.y) < 3.2) {
     if (nearSiegeCamp()) { openPanel('siege'); return; }
     if (setPlayerPath(sgc.x, sgc.y + 1.5)) { G.pendingCamp = true; G.pendingSite = null; G.clickMarker = { x: sgc.x, y: sgc.y + 1.5, t: 0 }; }
@@ -603,7 +607,7 @@ function toggleHomeGate() {
   const s = homeSite(), p = G.s.player;
   if (Math.hypot(s.x - p.x, s.y - p.y) > 16) { log(`Das Tor von ${homeName()} lässt sich nur vor Ort schließen oder öffnen.`); return; }
   const sg = G.siege;
-  if (homeGateClosed() && sg && sg.site.type === 'spieler' && sg.stage !== 'anmarsch') {
+  if (homeGateClosed() && sg && isHomeBase(sg.site) && sg.stage !== 'anmarsch') {
     confirmDialog('Das Tor mitten in der Belagerung öffnen? Dann können die Angreifer durchs Tor herein.', 'Öffnen', () => setHomeGate(false));
     return;
   }
@@ -1028,4 +1032,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, castlePlots, castleSite, startBuild, startTypeChange, castleOut, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };

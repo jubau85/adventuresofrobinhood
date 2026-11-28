@@ -1,6 +1,8 @@
 // Speichern und Laden: im Browser über localStorage, in der Desktop-App (desktop/) als Datei im Benutzerordner über die
 // Brücke window.ritterDesktop (dort später auch für die Steam Cloud). Die Welt wird aus dem Seed neu erzeugt.
 
+import { SHIRES } from './shires.js';
+import { prepareSeatLayouts } from './castle.js';
 import { G } from './state.js';
 import { SAVE_KEY, SAVE_VERSION } from './data.js';
 import { generateWorld } from './world.js';
@@ -36,7 +38,8 @@ export function deserialize(json) {
   const data = typeof json === 'string' ? JSON.parse(json) : json;
   if (!data || data.v !== SAVE_VERSION) throw new Error('Der Spielstand passt nicht zu dieser Version.');
   const s = data.s;
-  G.world = generateWorld(s.seed, { mp: !!s.mpWorld });
+  G.world = generateWorld(s.seed, { mp: !!s.mpWorld, seats: Object.keys(SHIRES) });
+  prepareSeatLayouts();
   G.nextId = 1;
   s.player = makeUnit(s.player);
   s.companions = s.companions.map((c) => makeUnit(c));

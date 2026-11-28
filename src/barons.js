@@ -11,13 +11,13 @@
 import { G, log, homeName } from './state.js';
 import { BUILDINGS, GOODS, FACTIONS, GROUP_TYPES, MAP_K } from './data.js';
 import { rand, randInt, pick } from './rng.js';
-import { SHIRES, shireOwner, claimShire, shireName } from './shires.js';
+import { SHIRES, shireOwner, claimShire, shireName, isHumanOwner } from './shires.js';
 import { OUTER_ONLY, STACKABLE, plotLayout } from './plots.js';
 import { addRenown } from './politics.js';
 import { spawnGroup } from './units.js';
 import { sideStrength } from './war.js';
 import { startSiege } from './siege.js';
-import { castleDefense, burnOuterPlots, plotRects } from './castle.js';
+import { castleDefense, burnOuterPlots, plotRects, castleSite } from './castle.js';
 import { setBaronRects, rebuildStaticWalls } from './world.js';
 import { isHeld, holdingOf, holdingDefense, loseHolding } from './holdings.js';
 
@@ -531,6 +531,7 @@ function baronEnemySeats(id) {
     const owner = shireOwner(o.id);
     if (owner === `b:${id}`) return false;
     if (owner === 'spieler') return false;              // dich greift er nur in einer Fehde an
+    if (isHumanOwner(owner)) return false;              // die Grafschaft eines Mitspielers ebenso
     if (isBaronOwner(owner)) { const ob = baron(ownerBaron(owner)); return ob && !ob.ally && ob.side !== mySide && Math.random() < 0.4; }
     if (mySide) return BARON_SIDE_FACTION[mySide] !== owner && (owner === 'normannen' || owner === 'sachsen' || owner === 'franken') && baronRivalOfSide(mySide, owner);
     // Ohne Seite: Rebellen gegen die Normannen, sonst gegen wen es sich lohnt
@@ -557,8 +558,8 @@ function baronPlanCampaign(id, say) {
   say(id, `${BARONS[id].name} zieht mit ${men} Mann gegen ${t.name} (${shireName(t.id)}).`, 'info', baronNearPlayer(id, 160) || Math.hypot(t.x - G.s.player.x, t.y - G.s.player.y) < 120 * MAP_K);
 }
 function baronPlanFeud(id, say) {
-  const b = baron(id), s = baronSite(id), home = G.world.sites.find((o) => o.type === 'spieler');
-  const held = G.world.sites.filter((o) => shireOwner(o.id) === 'spieler' && SHIRES[o.id] && o.land === s.land);
+  const b = baron(id), s = baronSite(id), home = castleSite();
+  const held = G.world.sites.filter((o) => o !== home && shireOwner(o.id) === 'spieler' && SHIRES[o.id] && o.land === s.land);
   const targets = [...(home && (home.land === s.land || Math.random() < 0.4) ? [home] : []), ...held];
   if (!targets.length) return;
   const t = pick(targets);
@@ -566,7 +567,7 @@ function baronPlanFeud(id, say) {
   const men = Math.floor(b.men * 0.75);
   b.march = { kind: 'fehde', target: t.id, men, arrive: G.s.day + days };
   b.lastRaid = G.s.day;
-  log(`Kundschafter melden: ${BARONS[id].name} zieht mit ${men} Mann gegen ${t.type === 'spieler' ? homeName() : t.name}. Ankunft in etwa ${days} ${days === 1 ? 'Tag' : 'Tagen'}.`, 'bad');
+  log(`Kundschafter melden: ${BARONS[id].name} zieht mit ${men} Mann gegen ${t === home ? homeName() : t.name}. Ankunft in etwa ${days} ${days === 1 ? 'Tag' : 'Tagen'}.`, 'bad');
 }
 function baronResolveMarch(id, say) {
   const b = baron(id), m = b.march, def = BARONS[id];
@@ -605,7 +606,7 @@ function baronResolveMarch(id, say) {
 // eine echte Belagerung; sonst entscheidet die Verteidigung gegen seine Stärke.
 function baronFeudRaid(id, t, A, men) {
   const b = baron(id), def = BARONS[id], p = G.s.player;
-  const home = t.type === 'spieler';
+  const home = t === castleSite();
   const near = Math.hypot(t.x - p.x, t.y - p.y) < 100 * MAP_K;
   if (near && !G.siege && !G.battle && startSiege(t, `heer_${id}`, Math.min(1.2, 0.5 + men / 60))) {
     if (home) G.s.lastHomeSiege = G.s.day;

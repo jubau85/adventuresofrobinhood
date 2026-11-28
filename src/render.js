@@ -6,7 +6,7 @@ import { TW, TH, CHUNK, HMAX, T, ITEMS, FACTIONS, CASTLE_LAYOUT, BUILDINGS, FERR
 import { isoX, isoY, HW, HH, screenToWorld } from './iso.js';
 import { hash2, mulberry32, makeNoise, rand, fbm } from './rng.js';
 import { groundZ, tileAt, PAL_GATE } from './world.js';
-import { conProgress, villageSpots, castlePlots, castleLayout, pastureOf } from './castle.js';
+import { conProgress, villageSpots, castlePlots, castleLayout, pastureOf, castleSite, peerCastle, peerLayout } from './castle.js';
 import { ringR, CASTLE_TYPES } from './plots.js';
 import { castlePasture } from './animals.js';
 import { ART, onArt, wantArt, wantArtPrefix, artKnown, artPending, ART_PENDING_MS, sheetOf, loadedSheets, releaseSheet } from './assets.js';
@@ -584,8 +584,8 @@ function siegeGateParts() {
   const painted = !!(ART.burg_stein_tor && ART.burg_holztor_zu);
   if (painted) { if (!sg || !sg.walls || !sg.gatesClosed || sg.walls.square) return []; return siegeGatePartsFor(sg); }
   // Deine Burg mit geschlossenem Tor, auch ohne Belagerung
-  if (homeGateClosed() && !(sg && sg.site.type === 'spieler' && sg.gatesClosed)) {
-    const s = homeSite(), lvl = G.s.castle.level, x = s.x, y = s.y + 4, h = lvl >= 2 ? (lvl >= 3 ? 36 : 26) : 22;
+  if (homeGateClosed() && !(sg && sg.site === homeSite() && sg.gatesClosed)) {
+    const s = homeSite(), lvl = G.s.castle.level, x = s.x, y = s.y + ringR(), h = lvl >= 2 ? (lvl >= 3 ? 36 : 26) : 22;
     const part = { x, y, d: x + y, z: groundZ(W, x, y), f: (c) => drawClosedGate(c, x, y, 1.7, 0.42, h), box: [x - 0.85, x + 0.85, y - 0.21, y + 0.21], big: true };
     if (!sg || !sg.walls || !sg.gatesClosed) return [part];
     return [part, ...siegeGatePartsFor(sg)];
@@ -2190,7 +2190,7 @@ const WALL_HALF = 0.14;
 function castleGateClosed(site) {
   const sg = G.siege;
   if (sg && sg.site === site && sg.gatesClosed && sg.walls && sg.walls.square) return true;
-  return site.type === 'spieler' && homeGateClosed();
+  return site === homeSite() && homeGateClosed();
 }
 
 function castlePieces(site, level, bannerCol, R = 4) {
@@ -2524,8 +2524,9 @@ function buildStaticParts() {
   }
   for (const s of W.sites) {
     if (s.cityWall) parts.push(...cityWallParts(s));
-    if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, siteColor(s)));
+    if (s.type === 'burg') parts.push(...castlePieces(s, s.castleLevel, siteColor(s), s.ringR || 4));
     if (s.baron) parts.push(...baronCastleParts(s));
+    if (s.mpHome === 'peer') parts.push(...peerCastleParts(s));
     if (s.palisade) parts.push(...palisadeRing(s, s.palisade));
     if (s.cemetery) {
       const cm = s.cemetery;
@@ -3269,6 +3270,38 @@ function baronCastleParts(s) {
   return parts;
 }
 
+// Mehrspieler: Burg eines Mitspielers (castle.js, peerCastle), mit seinen Gebäuden auf seinen Bauplätzen, in seiner
+// Farbe, dazu seine Baustelle. Mauern und Bergfried zeichnet castlePieces nach seiner Burgstufe und Burgart.
+function peerCastleParts(s) {
+  const b = peerCastle(s);
+  if (!b) return [];
+  const parts = [], z0 = groundZ(G.world, s.x, s.y), col = siteColor(s) || '#8a8070';
+  const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
+  const addFlat = (x, y, f) => parts.push({ x, y, d: x + y - 0.5, z: z0, f });
+  const lay = peerLayout(s, b), con = b.c;
+  const near = Math.hypot(s.x - G.s.player.x, s.y - G.s.player.y) < NEAR_BOGEN;
+  lay.forEach((p, i) => {
+    const q = (b.p || [])[i], building = con && con[0] !== 'burg' && con[1] === i;
+    if (!q && !building) return;
+    const bid = q ? q[0] : con[0], L = q ? q[1] : 0, dmg = q && q[2] ? 2 : 0;
+    if (!BUILDINGS[bid]) return;
+    const base = eigenBase(bid, L, p), sid = base && eigenPick(base, dmg, near);
+    if (L && sid) { add(p.x, p.y, (c) => drawEigen(c, sid, p, bid, dmg, col)); addCastleActors(add, bid, L, p, dmg); }
+    else if (L && eigenWaiting(base, dmg)) rebuildLater();
+    else if (L) { addCastleBuilding(add, bid, L, p, s); addNewCastleBuilding(add, addFlat, bid, L, p, s); }
+    if (dmg && !sid) addBurnt(add, p);
+    if (building) {
+      const hof = p.size < 3 ? '_hof' : '', b1 = !L && bid !== 'wehr' && eigenPick(`baustelle${hof}_1`, 0, near), b2 = b1 && eigenPick(`baustelle${hof}_2`, 0, near);
+      const prog = () => Math.max(0, Math.min(1, (G.s.day - (con[3] - con[4]) + G.s.time / DAY_LEN) / con[4]));
+      if (b1 && b2) add(p.x, p.y, (c) => p5(c, prog() < 0.5 ? b1 : b2, p.x, p.y, 1, false, col));
+      else add(p.x, p.y, (c) => drawScaffold(c, p.x, p.y, p.size * 0.7, p.size * 0.7, 30));
+      add(p.x + p.size * 0.4 + 0.4, p.y + p.size * 0.4, (c) => drawWorker(c, p.x + p.size * 0.4 + 0.4, p.y + p.size * 0.4, 'hammer', 0.5, { col: '#8a6e4b', flip: true, speed: 4.5 }));
+    }
+  });
+  if (con && con[0] === 'burg') add(s.x - 1.1, s.y - 0.2, (c) => { drawScaffold(c, s.x - 1.1, s.y - 1.1, 2.4, 2.4, 70); drawStones(c, s.x + 1.2, s.y + 1.4, 6); });
+  return parts;
+}
+
 // ---------------------------------------------------------------- Bildbögen vorausladen und freigeben
 // Die Bögen aus Paket 6 brauchen entpackt viel Speicher (alle zusammen rund 500 MB). Geladen werden die der eigenen
 // Burg (auch das Gebäude, das gerade gebaut wird) und die der Baronsburgen in deiner Nähe, bevor du ankommst.
@@ -3292,6 +3325,15 @@ export function prefetchArt(dt) {
   const plots = castlePlots(), lay = castleLayout(), con = G.s.castle.construction;
   plots.forEach((b, i) => { if (b && lay[i]) take(eigenBase(b.id, b.lv, lay[i]), b.dmg ? 2 : 0, true); });
   if (con && con.plot !== undefined && lay[con.plot] && BUILDINGS[con.id]) take(eigenBase(con.id, con.level, lay[con.plot]), 0, true);
+  // Burgen der Mitspieler wie die der Barone
+  for (const s of W.sites) {
+    const b = s.mpHome === 'peer' && peerCastle(s);
+    if (!b) continue;
+    const d = Math.hypot(s.x - pl.x, s.y - pl.y);
+    if (d > FAR_BOGEN) continue;
+    const lay = peerLayout(s, b);
+    (b.p || []).forEach((q, i) => { if (q && lay[i] && BUILDINGS[q[0]]) take(eigenBase(q[0], q[1], lay[i]), q[2] ? 2 : 0, d < NEAR_BOGEN); });
+  }
   // Baronsburgen: in der Nähe laden, in mittlerer Entfernung behalten
   for (const s of W.sites) {
     if (!s.baron) continue;
@@ -3311,10 +3353,13 @@ export function prefetchArt(dt) {
 }
 
 function buildPlayerCastle() {
-  const s = G.world.sites.find((x) => x.type === 'spieler');
+  const s = castleSite();
   if (!s) return [];
   const C = G.s.castle;
-  const parts = castlePieces(s, C.level, playerColor(), ringR());
+  // Die Grafschaftsburg (Mehrspieler) steht mit Mauern und Bergfried schon in der Welt (castlePieces bei den festen
+  // Teilen, nach ihrer Stufe und ihrem Mauerring); hier kommen Bauplätze, Gebäude und Baustellen dazu
+  const seat = s.type !== 'spieler';
+  const parts = seat ? [] : castlePieces(s, C.level, playerColor(), ringR());
   const z0 = groundZ(G.world, s.x, s.y);
   const add = (x, y, f) => parts.push({ x, y, d: x + y, z: z0, f });
   // Flache Dinge (Äcker, hintere Zäune) liegen unter allem, was auf ihnen steht
@@ -3350,8 +3395,8 @@ function buildPlayerCastle() {
     castleAnchors.push({ id: 'plot', plot: i, bid: id, castle: true, x: p.x, y: p.y, h: id === 'wehr' ? 60 : 40, label: `${BUILDINGS[id].name}${L ? ` · Stufe ${L}` : ''}${state}` });
   });
 
-  // Burgsiedlung
-  const spots = villageSpots(s);
+  // Burgsiedlung (nur Ashcombe: Die Grafschaftsburg hat ihre Häuser schon)
+  const spots = seat ? [] : villageSpots(s);
   const n = [0, 2, 5, 9][C.level];
   for (let k = 0; k < Math.min(n, spots.length); k++) {
     const b = spots[k];
@@ -3450,7 +3495,7 @@ export function buildingAtScreen(px, py) {
 function drawCelebration(c, dt) {
   const ce = G.celebrate;
   if (ce && G.time - ce.t0 < 45 && G.world) {
-    const s = G.world.sites.find((x) => x.type === 'spieler') || G.s.player;
+    const s = castleSite() || G.s.player;
     let px = s.x - 1, py = s.y - 1;
     if (ce.x !== undefined) { px = ce.x; py = ce.y; }
     else if (ce.plot !== undefined && castleLayout()[ce.plot]) { const q = castleLayout()[ce.plot]; px = q.x; py = q.y; }
@@ -6194,7 +6239,7 @@ export function drawMap(c, w, h, opts = {}) {
       placed.push(box);
       c.textAlign = al;
       c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,6,0.85)';
-      c.strokeText(label, lx, ly); c.fillStyle = s.type === 'spieler' ? '#ffe9a0' : '#f3ead2'; c.fillText(label, lx, ly);
+      c.strokeText(label, lx, ly); c.fillStyle = s === castleSite() ? '#ffe9a0' : '#f3ead2'; c.fillText(label, lx, ly);
       break;
     }
   }

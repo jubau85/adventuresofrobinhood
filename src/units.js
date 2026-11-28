@@ -547,7 +547,7 @@ function playerDefeated() {
   log(`Du wurdest niedergeschlagen. Bauern bringen dich nach ${homeName()}. Verloren: ${lost} Gold und die Hälfte der Ladung.`, 'bad');
   const site = homeBase();
   p.dead = false;
-  const spot = site.type === 'spieler' ? { x: site.x + 0.3, y: site.y + 2.6 } : (nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.clear || 6) + 1), 10) || { x: site.x, y: site.y + 8 });
+  const spot = site.type === 'spieler' ? { x: site.x + 0.3, y: site.y + 2.6 } : (nearestWalkable(G.world, Math.floor(site.x), Math.floor(site.y + (site.ringR || 4) + 2), 10) || { x: site.x, y: site.y + 8 });
   p.x = spot.x + (site.type === 'spieler' ? 0 : 0.5); p.y = spot.y + (site.type === 'spieler' ? 0 : 0.5);
   p.hp = Math.round(p.st.maxHp * 0.5);
   p.path = null; p.attackTarget = null; p.mounted = false;
@@ -828,7 +828,7 @@ function sitesFor(type) {
   // Prinz Johns Steuereintreiber: in England, Wales, der Normandie und im normannischen Irland
   if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && s.realm !== 'sc' && (s.faction === 'normannen' || (s.realm !== 'ir' && (s.type === 'dorf' || s.type === 'halle'))));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
-  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction)
+  if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s !== castleSite() && !s.mpHome && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction)
     && (!gt.realmFaction || !gt.realmFaction[s.realm] || s.faction === gt.realmFaction[s.realm]));
   return S.filter((s) => s.type !== 'einsiedelei');
 }

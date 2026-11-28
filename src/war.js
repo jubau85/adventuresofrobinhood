@@ -16,6 +16,7 @@ import { siteById } from './economy.js';
 import { startSiege } from './siege.js';
 import { isHeld, holdingOf, holdingDefense, loseHolding, applyHoldings } from './holdings.js';
 import { sideStrengthBonus, isBaronOwner, ownerBaron, baron } from './barons.js';
+import { isHomeBase } from './castle.js';
 
 export const THEATERS = {
   england: {
@@ -92,7 +93,9 @@ export function sideStrength(th, side) {
 function pickTarget(th, side) {
   const seats = theaterSeats(th), foe = enemyOf(th, side);
   const own = seats.filter((s) => sideOfSeat(th, s) === side);
-  const cand = seats.filter((s) => sideOfSeat(th, s) === foe && !(G.siege && G.siege.site === s) && !war().campaigns.some((c) => c.target === s.id));
+  // Die Heimburg eines Menschen (Mehrspieler: die Burg seiner Grafschaft) erobert kein Heer; sie wird wie Ashcombe
+  // nur überfallen oder belagert (castle.js, siege.js)
+  const cand = seats.filter((s) => sideOfSeat(th, s) === foe && !isHomeBase(s) && !s.mpHome && !(G.siege && G.siege.site === s) && !war().campaigns.some((c) => c.target === s.id));
   if (!cand.length) return null;
   // Ohne eigene Burg: von den Orten der eigenen Partei aus (Hallen, Städte)
   const fac = THEATERS[th].sides[side];
@@ -122,7 +125,7 @@ function launchCampaign(th) {
 // Das Heer ist vor der Burg: in deiner Nähe eine echte Belagerung, sonst nach Stärke ausgewürfelt
 function resolveCampaign(c) {
   const s = siteById(c.target), th = c.th, T = THEATERS[th];
-  if (!s || sideOfSeat(th, s) === c.side) return;
+  if (!s || sideOfSeat(th, s) === c.side || isHomeBase(s) || s.mpHome) return;
   const p = G.s.player;
   if (!G.siege && !G.battle && Math.hypot(s.x - p.x, s.y - p.y) < 100 * MAP_K && startSiege(s, c.army, Math.min(0.8, 0.45 + G.s.day * 0.01))) {
     warLog(`${GROUP_TYPES[c.army].nom} schlägt vor ${s.name} das Lager auf. Die Belagerung beginnt, ganz in deiner Nähe.`, 'bad', false);
@@ -150,6 +153,7 @@ function resolveCampaign(c) {
 
 // Eine Burg wechselt im Krieg den Herrn. Deine eigene verlierst du an den Sieger.
 export function takeSeat(s, faction, how) {
+  if (isHomeBase(s) || s.mpHome) return;
   if (isHeld(s)) { loseHolding(s, `Kriegsnachricht: ${how}! Deine Burg ${s.name} ist verloren, die Grafschaft ${shireName(s.id)} fällt an die ${FACTIONS[faction].short}.`, faction); checkEnds(); return; }
   if (s.faction === faction) return;
   (G.s.siteFaction || (G.s.siteFaction = {}))[s.id] = faction;

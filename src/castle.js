@@ -6,24 +6,32 @@ import { rand, randInt, pick, mulberry32 } from './rng.js';
 import { makeUnit, randomName, partyMembers, rebuildUnits, placeNear, computeStats, grantXp, spawnPeasants } from './units.js';
 import { isAlly, alliesCount, addRenown, changeRep, isHostileFaction } from './politics.js';
 import { cargoUsed } from './economy.js';
-import { setPlayerWalls, tileAt } from './world.js';
+import { setPlayerWalls, tileAt, rebuildStaticWalls, setPeerRects } from './world.js';
 import { seasonIndex } from './sim.js';
 import { refreshCastleHerd } from './animals.js';
 import { startSiege, homeGateClosed } from './siege.js';
 import { cheatOn } from './cheats.js';
-import { SHIRES, ownedShires, shireGoods, shireDef, shireRenown, ownsHomeShire } from './shires.js';
+import { SHIRES, ownedShires, shireGoods, shireDef, shireRenown, ownsHomeShire, claimShire } from './shires.js';
 import { holdingIncome, holdingCosts, holdingGoods } from './holdings.js';
-import { CASTLE_TYPES, OUTER_ONLY, STACKABLE, castleType, ringR, plotLayout } from './plots.js';
+import { CASTLE_TYPES, TYPE_IDS, OUTER_ONLY, STACKABLE, castleType, ringR, plotLayout } from './plots.js';
 import { artKnown } from './assets.js';
 
-export function castleSite() { return G.world.sites.find((s) => s.type === 'spieler'); }
-// Mehrspieler: Die Welt hat keine Heimburg; jeder sitzt auf der Burg seiner Grafschaft (G.s.seat). Dort sind Lager,
-// Rittersaal und Garnison. homeBase ist, wo du zu Hause bist: die Heimburg, sonst diese Burg.
-export function seatSite() { return (G.s && G.s.seat && G.world && G.world.sites.find((s) => s.id === G.s.seat)) || null; }
-export function homeBase() { return castleSite() || seatSite(); }
-export function isHomeBase(s) { return !!s && (s.type === 'spieler' || (s === seatSite() && !castleSite())); }
-// Was die Burg einer Grafschaft schon mitbringt (ohne Bauplätze)
-const SEAT_LEVELS = { halle: 2, kaserne: 2, schmiede: 1, stall: 1 };
+// Deine Heimburg: Ashcombe, im Mehrspieler die Burg deiner Grafschaft (G.s.seat). Beide sind dieselbe Burg mit
+// Bauplätzen, Bergfried, Burgart, Lager, Rittersaal, Pacht, Marktgeld und Überfällen. Die Grafschaftsburg steht schon als
+// Steinburg in der Welt; Mauern und Bergfried zeichnet und sperrt world.js nach ihrer Stufe und ihrem Mauerring
+// (castleLevel, ringR), wie bei den Burgen der Barone.
+let homeMemo = { W: null, seat: null, s: null };
+export function castleSite() {
+  const W = G.world;
+  if (!W) return null;
+  const seat = (G.s && G.s.seat) || null;
+  if (homeMemo.W !== W || homeMemo.seat !== seat) homeMemo = { W, seat, s: W.sites.find((s) => s.type === 'spieler') || (seat && W.sites.find((s) => s.id === seat)) || null };
+  return homeMemo.s;
+}
+// Die Grafschaftsburg als Heimburg (Mehrspieler), sonst null
+export function seatSite() { const s = castleSite(); return s && s.type !== 'spieler' ? s : null; }
+export function homeBase() { return castleSite(); }
+export function isHomeBase(s) { return !!s && s === castleSite(); }
 
 // ---------------------------------------------------------------- Bauplätze (plots.js)
 // Gebäude je Platz: { id, lv, dmg } oder null. Ein alter Spielstand (eine Stufe je Gebäude) zieht beim ersten Blick
@@ -55,12 +63,12 @@ export function castlePlots() {
 }
 export function castleLayout() { const s = castleSite(); return s ? plotLayout(s, castleType()) : []; }
 // Belagert? Dann ruht die Arbeit vor der Mauer
-export function homeBesieged() { return !!(G.siege && G.siege.site && G.siege.site.type === 'spieler' && G.siege.stage !== 'anmarsch'); }
+export function homeBesieged() { return !!(G.siege && G.siege.site && G.siege.site === castleSite() && G.siege.stage !== 'anmarsch'); }
 function working(p, lay) { return !!p && !p.dmg && !(homeBesieged() && !lay.inner); }
 // Höchste arbeitende Stufe eines Gebäudes (der Bergfried: Burgstufe)
 export function bLevel(id) {
   if (id === 'burg') return G.s.castle.level;
-  if (!castleSite()) return SEAT_LEVELS[id] || 0;
+  if (!castleSite()) return 0;
   const plots = castlePlots(), lay = castleLayout();
   let m = 0;
   for (let i = 0; i < plots.length; i++) { const p = plots[i]; if (p && p.id === id && working(p, lay[i]) && p.lv > m) m = p.lv; }
@@ -124,11 +132,12 @@ export function villageSpots(s) {
 export function castleObstacles() {
   const s = castleSite(), C = G.s.castle, out = [];
   if (!s) return out;
-  const k = CASTLE_KEEP[C.level];
-  out.push({ x: s.x + k.dx, y: s.y + k.dy, wx: k.w, wy: k.w, pen: false });
+  // Den Bergfried der Grafschaftsburg sperrt world.js schon; ihre Häuser stehen in der Welt
+  const seat = s.type !== 'spieler';
+  if (!seat) { const k = CASTLE_KEEP[C.level]; out.push({ x: s.x + k.dx, y: s.y + k.dy, wx: k.w, wy: k.w, pen: false }); }
   const plots = castlePlots(), lay = castleLayout();
   for (let i = 0; i < plots.length; i++) if (plots[i]) for (const [x, y, wx, wy, pen] of plotRects(plots[i].id, plots[i].lv, lay[i])) out.push({ x, y, wx, wy, pen: !!pen });
-  for (const b of villageSpots(s).slice(0, villageHouses())) out.push({ x: b.x, y: b.y, wx: b.wx, wy: b.wy, pen: false });
+  if (!seat) for (const b of villageSpots(s).slice(0, villageHouses())) out.push({ x: b.x, y: b.y, wx: b.wx, wy: b.wy, pen: false });
   return out;
 }
 
@@ -204,7 +213,92 @@ export function pastureOf(L, p) {
 
 // Mauern und Burggebäude neu eintragen (nach Ausbau, Laden, Schummeln)
 export function refreshCastleBlock() {
+  syncSeatSite();
   setPlayerWalls(G.world, G.s.castle.level >= 1, castleObstacles(), ringR());
+}
+
+// Die Grafschaftsburg zeigt Stufe und Mauerring deiner Burg: world.js zeichnet und sperrt danach Mauern und Bergfried
+export function syncSeatSite() {
+  const s = seatSite();
+  if (!s) return false;
+  s.mpHome = 'ich';
+  const lv = Math.max(1, G.s.castle.level), R = ringR();
+  if (s.castleLevel === lv && (s.ringR || 4) === R) return false;
+  s.castleLevel = lv; s.ringR = R;
+  rebuildStaticWalls(G.world);
+  G.staticDirty = true;
+  return true;
+}
+
+// Mehrspieler-Start: Die Burg deiner Grafschaft wird deine Heimburg wie Ashcombe. Sie steht schon als Steinburg (oder
+// Festung) mit Rittersaal, Unterkunft, Schmiede, Stall und Äckern; die Grafschaft gehört dir. Zwei Wochen lang lassen
+// dich Räuber und Heere in Ruhe.
+const SEAT_START = [['halle', 2], ['kaserne', 2], ['schmiede', 1], ['stall', 1], ['felder', 1]];
+export const SEAT_PEACE = 14;
+export function grantSeat(s) {
+  if (!s || !SHIRES[s.id] || s !== seatSite()) return false;
+  const C = G.s.castle;
+  C.level = Math.max(2, s.castleLevel || 2);
+  C.type = 'turm';
+  C.plots = null; C.b = {};
+  const lay = plotLayout(s, 'turm'), plots = castlePlots();
+  for (const [id, lv] of SEAT_START) { const i = freePlotFor(id, lay, plots); if (i >= 0) plots[i] = { id, lv }; }
+  C.peaceUntil = G.s.day + SEAT_PEACE;
+  claimShire(s.id, 'spieler', true);
+  refreshCastleBlock();
+  G.castleDirty = true;
+  return true;
+}
+// Mehrspieler: Die Bauplätze aller Grafschaftsburgen gleich nach dem Erzeugen der Welt festlegen. Später ändern Bauten
+// und Verfall die Sperrkarte, und jeder Teilnehmer käme zu anderer Zeit auf andere Plätze.
+export function prepareSeatLayouts() {
+  const W = G.world;
+  if (!W) return;
+  for (const s of W.sites) if (s.plotSeat) for (const t of TYPE_IDS) plotLayout(s, t);
+}
+// Mehrspieler: Stand deiner Burg für die anderen (mp.js): Stufe, Burgart, Gebäude [id, Stufe, abgebrannt] und
+// Baustelle [id, Platz (−1: Bergfried), Stufe, fertig an Tag, Tage]
+export function castleOut() {
+  const C = G.s && G.s.castle, s = seatSite();
+  if (!C || !s) return null;
+  const c = C.construction;
+  return {
+    lv: C.level, ty: castleType(), p: castlePlots().map((q) => (q ? [q.id, q.lv, q.dmg ? 1 : 0] : 0)),
+    c: c && (c.id === 'burg' || c.plot !== undefined) && c.id !== 'umbau' ? [c.id, c.id === 'burg' ? -1 : c.plot, c.level, c.done, c.days || 1] : null,
+  };
+}
+// Die Burgen deiner Mitspieler, so wie sie sie ausgebaut haben (G.s.mpCastles, gemeinsamer Stand): Stufe und Mauerring
+// für world.js, die Gebäude als Hindernis; gezeichnet werden sie in render.js wie die Burgen der Barone
+export function peerCastle(s) { const b = s && s.mpHome === 'peer' && G.s.mpCastles && G.s.mpCastles[s.id]; return b || null; }
+export function peerLayout(s, b) { return plotLayout(s, CASTLE_TYPES[b.ty] ? b.ty : 'turm'); }
+export function applyPeerCastles() {
+  const W = G.world, all = (G.s && G.s.mpCastles) || {};
+  if (!W) return;
+  const home = castleSite(), rects = [];
+  let walls = false;
+  for (const [seat, b] of Object.entries(all)) {
+    const s = W.sites.find((x) => x.id === seat);
+    if (!s || s === home || s.type !== 'burg' || !b) continue;
+    s.mpHome = 'peer';
+    const lv = Math.max(1, Math.min(3, b.lv | 0)), R = CASTLE_TYPES[b.ty] ? CASTLE_TYPES[b.ty].R : 4;
+    if (s.castleLevel !== lv || (s.ringR || 4) !== R) { s.castleLevel = lv; s.ringR = R; walls = true; }
+    const lay = peerLayout(s, b);
+    (b.p || []).forEach((q, i) => { if (q && lay[i] && BUILDINGS[q[0]]) for (const [x, y, wx, wy, pen] of plotRects(q[0], q[1], lay[i])) rects.push({ x, y, wx, wy, pen: !!pen }); });
+  }
+  if (walls) rebuildStaticWalls(W);
+  setPeerRects(W, rects);
+  G.staticDirty = true;
+}
+// Spielstand aus der Zeit, als die Grafschaftsburg eine gehaltene Burg mit Kastellan war (holdings.js): umziehen
+export function migrateSeat() {
+  const s = seatSite();
+  if (!s || !G.s.holdings || !G.s.holdings[s.id]) return false;
+  const h = G.s.holdings[s.id];
+  delete G.s.holdings[s.id];
+  const c = h.castellan && G.s.companions.find((u) => u.id === h.castellan);
+  if (c) { c.status = 'garnison'; c.seat = null; }
+  if (G.s.castle.level < 2) grantSeat(s);
+  return true;
 }
 
 export function levelName() { return BUILDINGS.burg.levels[G.s.castle.level].name; }
@@ -482,7 +576,7 @@ export function castleDefense() {
 
 export function dailyBalance() {
   const lvl = G.s.castle.level, home = !!castleSite();
-  // Ohne Heimburg (Mehrspieler) leben Herr und Gefolge allein von den Grafschaften
+  // Pacht und Marktgeld der Heimburg (Ashcombe oder, im Mehrspieler, die Burg deiner Grafschaft)
   const income = home ? [
     ['Pacht der Bauern', 20 + lvl * 15],
     ['Marktgeld', homeGateClosed() ? 0 : [0, 15, 35, 60][bLevel('markt')]],
@@ -496,8 +590,8 @@ export function dailyBalance() {
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
   costs.push(...holdingCosts());
-  // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil
-  if (home && !isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
+  // Solange Prinz Johns Vogt in Pontefract sitzt, will er seinen Anteil (nicht vom Herrn einer Grafschaft)
+  if (home && !seatSite() && !isAlly('normannen') && !ownsHomeShire()) costs.push(['Abgaben an den Vogt', 5 + lvl * 10]);
   // Erträge aller arbeitenden Gebäude zusammen (mehrere Holzfäller liefern mehrfach); vor der Mauer ruht bei
   // einer Belagerung die Arbeit, Abgebranntes liefert nichts
   const season = seasonIndex();
@@ -610,7 +704,7 @@ export function dailyCastle() {
 }
 
 function checkRaid() {
-  if (G.s.day < 5 || !castleSite()) return;
+  if (G.s.day < 5 || G.s.day < (G.s.castle.peaceUntil || 0) || !castleSite()) return;
   const threats = [];
   // Feindliche Fraktionen mit Heeren belagern die Burg. Ab −60 (sehr feindlich) kommen sie öfter.
   for (const [f, by, army] of [['normannen', 'Normannische Truppen', 'heer_john'], ['sachsen', 'Sächsische Aufgebote', 'heer_richard']]) {

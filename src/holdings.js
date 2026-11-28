@@ -20,11 +20,11 @@ import { siteById } from './economy.js';
 export function holdings() { return G.s.holdings || (G.s.holdings = {}); }
 export function holdingOf(s) { const id = typeof s === 'string' ? s : s && s.id; return id ? holdings()[id] || null : null; }
 export function isHeld(s) { return !!holdingOf(s); }
-// Deine Burg Ashcombe oder eine eroberte
-export function isOwnSite(s) { return !!s && (s.type === 'spieler' || isHeld(s)); }
+// Deine Heimburg (Ashcombe oder, im Mehrspieler, die Burg deiner Grafschaft) oder eine eroberte
+export function isOwnSite(s) { return !!s && (s.type === 'spieler' || (!!G.s && !!G.s.seat && s.id === G.s.seat) || isHeld(s)); }
 // Farbe der Herrschaft eines Ortes (Banner, Wachen, Kartenzeichen)
 export function siteColor(s) {
-  if (isHeld(s)) return playerColor();
+  if (isOwnSite(s)) return playerColor();
   // Mehrspieler: die Burg eines anderen Menschen in seiner Farbe
   const o = s && SHIRES[s.id] ? shireOwner(s.id) : null;
   if (isHumanOwner(o)) return ownerColor(o);
@@ -42,9 +42,10 @@ export function applyHoldings() {
   for (const [id, f] of Object.entries(G.s.siteFaction || {})) { const s = siteById(id); if (s && FACTIONS[f]) s.faction = f; }
   for (const [id, lv] of Object.entries(siteLevels())) {
     const s = siteById(id);
-    if (s && s.castleLevel !== lv) { s.castleLevel = lv; walls = true; }
+    // Die Burg eines Menschen (Mehrspieler) hat die Stufe, die er ausgebaut hat (castle.js, mp.js)
+    if (s && !s.mpHome && s.castleLevel !== lv) { s.castleLevel = lv; walls = true; }
   }
-  for (const s of G.world.sites) s.lord = isHeld(s) ? 'spieler' : null;
+  for (const s of G.world.sites) s.lord = isOwnSite(s) ? 'spieler' : null;
   if (walls) rebuildStaticWalls(G.world);
   recolorGuards();
   G.staticDirty = true;
@@ -212,7 +213,7 @@ export function siegeHelpers(s) {
 export function besiegeBlock(s, n = null) {
   if (!s || s.type !== 'burg' || (!SHIRES[s.id] && !s.baron)) return 'Belagern kannst du nur die Burgen, die eine Grafschaft beherrschen, und die Burgen der Barone.';
   if (s.baron) { const why = baronSiegeBlock(s); if (why) return why; }
-  if (isHeld(s)) return `${s.name} gehört dir schon.`;
+  if (isOwnSite(s)) return `${s.name} gehört dir schon.`;
   if (G.siege) return G.siege.site === s ? `${s.name} wird gerade belagert.` : `Gerade wird ${G.siege.site.type === 'spieler' ? 'deine Burg' : G.siege.site.name} belagert. Zwei Belagerungen zugleich gibt das Land nicht her.`;
   if (G.battle || inCombat()) return 'Erst muss der Kampf hier vorbei sein.';
   if (G.s.renown < SIEGE_RENOWN) return `Einem Ritter ohne Namen folgt niemand vor eine Burgmauer (Ruhm ${SIEGE_RENOWN} nötig, du hast ${G.s.renown}).`;
@@ -304,14 +305,6 @@ export function loseHolding(s, text, to = null) {
   rebuildUnits();
 }
 
-// Mehrspieler-Start: die Burg deiner Grafschaft samt Besatzung. Die früheren Herren lassen dich zwei Wochen in Ruhe.
-export function grantSeat(s) {
-  if (!s || !SHIRES[s.id]) return false;
-  holdings()[s.id] = { since: G.s.day, from: s.faction, seat: true, castellan: null, order: 'ausgewogen', garrison: 16, dmg: 0, works: 0, progress: 0, level: s.castleLevel || 2, lastAttack: G.s.day + 14 };
-  applyHoldings();
-  claimShire(s.id, 'spieler', true);
-  return true;
-}
 // Nur hier verloren (der Gastgeber hat die Grafschaft einem anderen zugesprochen): ohne den gemeinsamen Stand anzufassen
 export function dropHolding(s, text) {
   const h = holdingOf(s);

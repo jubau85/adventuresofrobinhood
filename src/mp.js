@@ -17,11 +17,12 @@ import { SHIRES, claimShire } from './shires.js';
 import { heldSites, holdingOf, dropHolding } from './holdings.js';
 import { applyDamage } from './siege.js';
 import { applyCons } from './dynamics.js';
+import { castleOut, applyPeerCastles } from './castle.js';
 
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 export const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
-  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState'];
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
 const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
@@ -121,8 +122,9 @@ export function mpUpdate(dt) {
   stallCredit(mp, now);
   for (const k of Object.keys(mp.t)) mp.t[k] += dt;
   if (mp.t.hero >= HERO_EVERY) { mp.t.hero = 0; mp.tr.broadcast('held', heroState()); }
-  if (mp.t.hello >= HELLO_EVERY) { mp.t.hello = 0; mp.tr.broadcast('da', { ...me(), seat: mp.seat, role: mp.role }); }
+  if (mp.t.hello >= HELLO_EVERY) { mp.t.hello = 0; mp.tr.broadcast('da', { ...me(), seat: mp.seat, role: mp.role, burg: castleOut() }); }
   if (mp.role === 'host') {
+    if (mp.t.hello === 0) storeCastle(mp.seat, castleOut());
     if (mp.t.clock >= CLOCK_EVERY) { mp.t.clock = 0; mp.tr.broadcast('uhr', { day: G.s.day, time: G.s.time, fast: !!G.fast }); }
     if (mp.t.world >= WORLD_EVERY) { mp.t.world = 0; sendWorld(mp, false); }
     if (mp.t.market >= MARKET_EVERY) { mp.t.market = 0; sendMarkets(mp, false); }
@@ -169,7 +171,7 @@ function onMessage(mp, env) {
   const p = peer(mp, from);
   if (from === mp.hostId) mp.lastHost = performance.now() / 1000;
   switch (type) {
-    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); remember(mp, p); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; if (mp.role === 'host') reseat(mp, from, p); break;
+    case 'da': Object.assign(p, { name: d.name, color: d.color, arms: d.arms, female: d.female, seat: d.seat }); remember(mp, p); if (d.role === 'host' && mp.role === 'guest') mp.hostId = from; if (mp.role === 'host') { reseat(mp, from, p); if (p.seat && mp.seats[p.seat] === from) storeCastle(p.seat, d.burg); } break;
     case 'held': p.hero = d; p.name = d.name || p.name; p.color = d.col || p.color; break;
     case 'uhr': if (mp.role === 'guest' && from === mp.hostId) applyClock(d); break;
     case 'welt': if (mp.role === 'guest' && from === mp.hostId) applyWorld(d); break;
@@ -251,15 +253,28 @@ function applyClock(d) {
   G.fast = !!d.fast;
 }
 
+// Gastgeber: Stand der Burg eines Menschen in den gemeinsamen Stand (so sehen alle, auch Spätere, seine Burg)
+function storeCastle(seat, b) {
+  if (!seat || !SHIRES[seat] || !b || typeof b !== 'object') return;
+  const clean = { lv: Math.max(0, Math.min(3, b.lv | 0)), ty: ['turm', 'ring', 'festung'].includes(b.ty) ? b.ty : 'turm',
+    p: Array.isArray(b.p) ? b.p.slice(0, 40).map((q) => (Array.isArray(q) && typeof q[0] === 'string' ? [q[0].slice(0, 16), Math.max(1, Math.min(3, q[1] | 0)), q[2] ? 1 : 0] : 0)) : [],
+    c: Array.isArray(b.c) && typeof b.c[0] === 'string' ? [b.c[0].slice(0, 16), b.c[1] | 0, Math.max(1, Math.min(3, b.c[2] | 0)), b.c[3] | 0, Math.max(1, b.c[4] | 0)] : null };
+  const all = G.s.mpCastles || (G.s.mpCastles = {});
+  if (JSON.stringify(all[seat] || null) === JSON.stringify(clean)) return;
+  all[seat] = clean;
+  if (seat !== G.s.seat) applyPeerCastles();
+}
+
 function applyWorld(w) {
   const s = G.s, mp = G.mp, before = { barons: JSON.stringify(s.barons || null), damage: JSON.stringify(s.damage || null), cons: JSON.stringify(s.cons || null) };
-  const day = s.day, time = s.time;
+  const day = s.day, time = s.time, castles = JSON.stringify(s.mpCastles || null);
   if (w.shires && mp) w.shires = shiresIn(w.shires, mp.seat);
   Object.assign(s, w);
   s.day = day; s.time = time;   // die Uhr kommt über 'uhr'
   if (JSON.stringify(s.barons || null) !== before.barons) applyBarons();
   if (JSON.stringify(s.damage || null) !== before.damage) applyDamage();
   if (JSON.stringify(s.cons || null) !== before.cons) applyCons();
+  if (JSON.stringify(s.mpCastles || null) !== castles) applyPeerCastles();
   G.shireTint = null;
   G.staticDirty = true;
   syncHoldings();

@@ -176,14 +176,26 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Änderung). Gäste schicken ihre Wahl (`wahl`: Grafschaft, Profil, bereit). „Spiel starten“ geht, wenn alle Gäste
   bereit sind (allein auch sofort); dann schickt er `start`, erschafft die Welt und begrüßt jeden Gast mit dem
   Weltstand und seiner Grafschaft. Wer nach dem Start dazukommt, bekommt eine freie Grafschaft.
-- **Grafschaften statt Heimburg:** Die Mehrspieler-Welt entsteht ohne Ashcombe (`generateWorld(seed, { mp: true })`,
-  für alle gleich). Jeder Mensch beginnt als Herr seiner Grafschaft: Ihre Burg ist ein Besitz (`grantSeat` in
-  `holdings.js`, 16 Mann, zwei Wochen Ruhe vor den früheren Herren) und zugleich sein Sitz mit Rittersaal, Gefolge,
-  Garnison und Lager (`homeBase()` in `castle.js`). Im gemeinsamen Stand heißen die Grafschaften eines Menschen
+- **Grafschaften statt Ashcombe:** Die Mehrspieler-Welt entsteht ohne Ashcombe (`generateWorld(seed, { mp: true,
+  seats })`, für alle gleich). Um jede Grafschaftsburg ist Platz wie um eine Baronsburg (`plotSeat`: Lichtung,
+  Häuser weit draußen, Abstand 26), damit dort Bauplätze liegen können. Jeder Mensch beginnt als Herr seiner
+  Grafschaft, und ihre Burg ist seine Heimburg wie Ashcombe: `castleSite()` in `castle.js` ist Ashcombe oder, im
+  Mehrspieler, die Burg von `G.s.seat`. Damit gilt alles aus Ashcombe auch dort: `G.s.castle` mit Bergfried-Stufe,
+  Burgart, Bauplätzen (`plotLayout` um die Grafschaftsburg, gleich nach dem Erzeugen der Welt für alle festgelegt),
+  Lager, Rittersaal, Tagesbilanz mit Pacht und Marktgeld (ohne Vogt), Überfällen und Belagerungen mit Tor, Pforte und
+  Burgwache, aber ohne Eroberung (Krieg und Barone nehmen keine Heimburg eines Menschen). `grantSeat` (castle.js)
+  stellt sie als Steinburg mit Rittersaal, Unterkunft, Schmiede, Stall und Acker hin, mit zwei Wochen Ruhe. Mauern und
+  Bergfried zeichnet und sperrt `world.js` nach `castleLevel` und `ringR` der Grafschaftsburg, die `syncSeatSite` aus
+  deiner Burg überträgt; Gebäude, Baustellen und freie Plätze zeichnet `render.js` wie in Ashcombe. Jeder schickt den
+  Stand seiner Burg mit (`castleOut`: Stufe, Burgart, Gebäude, Baustelle, im Lebenszeichen `da`); der Gastgeber legt
+  ihn in den gemeinsamen Stand (`mpCastles`), und alle zeichnen die Burgen der anderen danach (`applyPeerCastles`,
+  `peerCastleParts`) samt Hindernissen. Alte Spielstände, in denen die Grafschaftsburg noch ein Besitz mit Kastellan
+  war, ziehen beim Laden um (`migrateSeat`). Im gemeinsamen Stand heißen die Grafschaften eines Menschen
   `p:<seine Grafschaft>`; beim Senden und Empfangen wird übersetzt, so dass jeder die eigenen als `spieler` sieht.
   Gewinnt oder verliert ein Gast eine Grafschaft, meldet er es als Befehl `grafschaft`; schreibt der Gastgeber eine
-  Grafschaft einem anderen zu, verliert der Gast dort seine Burg (nicht am Tag der Eroberung selbst). Burg, Lager,
-  Abgaben, Sold und Verpflegung rechnet jeder selbst (`dailyCastle`, `dailyHoldings` ohne Angriffe beim Gast).
+  Grafschaft einem anderen zu, verliert der Gast dort eine eroberte Burg (nicht am Tag der Eroberung selbst); seine
+  Heimburg verliert er nie. Burg, Lager, Abgaben, Sold und Verpflegung rechnet jeder selbst (`dailyCastle`,
+  `dailyHoldings` ohne Angriffe beim Gast).
 - **Gastgeber-Modell:** Ein Spieler ist Gastgeber und rechnet die gemeinsame Welt allein: Uhrzeit und Tage, Märkte,
   Barone, Krieg, Grafschaften, Schäden, Bauten, Wetter, Turniere, Hinrichtungen (`SHARED_KEYS` in `mp.js`). Er schickt
   den ganzen Stand (nicht nur Änderungen), alle 3 s, wenn sich etwas geändert hat, die Märkte alle 8 s, die Uhr zweimal

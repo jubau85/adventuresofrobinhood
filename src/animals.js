@@ -3,7 +3,7 @@
 
 import { G, log } from './state.js';
 import { T, GOODS, CASTLE_LAYOUT } from './data.js';
-import { bLevel, workingPlots, pastureOf } from './castle.js';
+import { bLevel, workingPlots, pastureOf, castleSite } from './castle.js';
 import { isWalkable, tileAt } from './world.js';
 import { rand, randInt } from './rng.js';
 import { addCargo, cargoFree } from './economy.js';
@@ -71,7 +71,7 @@ export function castlePasture(s) {
 }
 
 function farmHerds(s) {
-  const pa = s.type === 'spieler' ? castlePasture(s) : null;
+  const pa = s === castleSite() ? castlePasture(s) : null;
   return {
     schaf: pa ? { n: pa.n, home: { x: pa.x, y: pa.y }, r: pa.r } : { n: { dorf: 5, halle: 4, abtei: 6, spieler: 3, markt: 3, burg: 2, hof: 3 }[s.type] || 0, rMin: s.clear - 1, rMax: s.clear + 4, r: 2.5 },
     kuh: { n: { dorf: 2, halle: 3, spieler: 2, hof: 1 }[s.type] || 0, rMin: s.clear - 2, rMax: s.clear + 3, r: 2.2 },
@@ -114,7 +114,7 @@ export function spawnAnimals() {
 // Täglicher Nachwuchs: Wild kehrt zurück, Höfe ziehen Tiere nach
 // Nach dem Ausbau der Schafzucht: die Herde zieht auf die neue Weide
 export function refreshCastleHerd() {
-  const s = G.world.sites.find((x) => x.type === 'spieler');
+  const s = castleSite();
   if (!s) return;
   const pa = castlePasture(s);
   G.animals = G.animals.filter((a) => !(a.kind === 'schaf' && a.site === s.id));
@@ -142,7 +142,7 @@ export function animalTitle(a) {
   const info = ANIMAL_INFO[a.kind];
   if (!info.farm) return `${info.name} · mit dem Bogen jagen`;
   const s = G.world.sites.find((x) => x.id === a.site);
-  if (s && s.type === 'spieler') return `${info.name} · dein Vieh`;
+  if (s && s === castleSite()) return `${info.name} · dein Vieh`;
   return `${info.name} · gehört ${s ? s.name : 'einem Hof'}`;
 }
 

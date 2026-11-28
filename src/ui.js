@@ -123,6 +123,8 @@ export function closeDialog(accept) {
 const DEFAULT_TAB = { town: 'info', castle: 'ausbau', party: 'gefolge', quests: 'list', politics: 'list', map: 'map', menu: 'menu', help: 'help', chronik: 'alle', victory: 'v', cheat: 'c', siege: 's', camp: 'c' };
 
 export function openPanel(kind, arg = null, tab = null) {
+  // Die Burg deiner Grafschaft (Mehrspieler) ist deine Heimburg: dieselbe Tafel wie in Ashcombe
+  if (kind === 'town' && arg && isHomeBase(arg)) { kind = 'castle'; arg = null; tab = null; }
   G.ui.panel = kind;
   G.ui.arg = arg;
   G.ui.tab = tab || DEFAULT_TAB[kind];
@@ -288,20 +290,13 @@ function besiegeActions(site) {
 // Eine eroberte Burg: Kastellan, Vorgabe, Besatzung, Ausbau
 function holdingPanel(site) {
   const h = holdingOf(site), sh = SHIRES[site.id];
-  // Mehrspieler: Die Burg deiner Grafschaft ist dein Sitz, mit Rittersaal, Gefolge und Lager
-  const seat = isHomeBase(site);
-  const tabs = seat ? [['info', 'Burg'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager'], ['markt', 'Markt'], ['waren', 'Ausrüster']]
-    : [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
+  const tabs = [['info', 'Burg'], ['markt', 'Markt'], ['waren', 'Ausrüster']];
   if (!tabs.some(([t]) => t === G.ui.tab)) G.ui.tab = 'info';
   let body = '';
   if (G.ui.tab === 'info') body = holdingInfo(site, h);
-  if (G.ui.tab === 'halle') body = castleHall();
-  if (G.ui.tab === 'gefolge') body = partyView(true);
-  if (G.ui.tab === 'lager') body = castleStore();
   if (G.ui.tab === 'markt') body = marketTable(site);
   if (G.ui.tab === 'waren') body = shopView(site);
-  const since = seat ? 'dein Sitz' : `erobert an Tag ${h.since}`;
-  return { title: site.name, sub: `${seat && G.s.arms ? `<span class="arms-mini">${armsSVG(G.s.arms, 22, 'Dein Wappen')}</span>` : ''}Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · ${since}`, tabs, body };
+  return { title: site.name, sub: `Deine Burg · ${ownerSwatch('spieler')}Grafschaft ${esc(sh.name)} · erobert an Tag ${h.since}`, tabs, body };
 }
 function holdingInfo(site, h) {
   const sh = SHIRES[site.id], c = castellanOf(h), eff = holdingEff(h), from = h.from;
@@ -322,7 +317,7 @@ function holdingInfo(site, h) {
   const rc = repairCostHolding(h), wc = workCost(h);
   return `${besieged}<div class="cols">
     <div>
-      <p class="lede">${h.seat ? `Dein Banner weht über ${esc(site.name)}, dem Sitz deiner Grafschaft. ${from ? `Bisher hielten die ${esc(FACTIONS[from].short)} die Burg; sie hätten sie gern zurück.` : ''}` : `Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}`}</p>
+      <p class="lede">Dein Banner weht über ${esc(site.name)}. ${from ? `Die ${esc(FACTIONS[from].short)} haben die Burg verloren und wollen sie zurück.` : ''}</p>
       <dl class="facts">
         <dt>Grafschaft</dt><dd>${esc(sh.name)}: ${esc(sh.text)}</dd>
         <dt>Abgaben</dt><dd>${fmt(shireTax(site.id))} Gold am Tag, davon an dich ${fmt(holdingIncome(site.id))}</dd>
@@ -626,8 +621,10 @@ function castlePanel() {
   const f = G.ui.arg && G.ui.arg.focus;
   if (f === 'plot') return plotPanel(G.ui.arg.plot);
   const tabs = [['ausbau', 'Ausbau'], ['halle', 'Rittersaal'], ['gefolge', 'Gefolge'], ['lager', 'Lager']];
-  if (bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', 'Rüstkammer']);
-  if (bLevel('markt')) tabs.push(['markt', 'Markt']);
+  // Die Grafschaftsburg hat Markt und Ausrüster ihrer Stadt; in Ashcombe kommen sie mit Schmiede, Stall und Markt
+  const seat = !!seatSite();
+  if (seat || bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', seat ? 'Ausrüster' : 'Rüstkammer']);
+  if (seat || bLevel('markt')) tabs.push(['markt', 'Markt']);
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
@@ -722,7 +719,8 @@ function castleBuild() {
   return `${conText}
     <div class="summary">
       <div><span class="label">Tagesbilanz</span><b class="${inc - cost >= 0 ? 'pos' : 'neg'}">${inc - cost >= 0 ? '+' : ''}${inc - cost} Gold</b><span class="muted">${bal.income.map(([n, v]) => `${n} +${v}`).join(', ')}${bal.costs.length ? '; ' + bal.costs.map(([n, v]) => `${n} −${v}`).join(', ') : ''}</span></div>
-      <div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach ${esc(homeName())}.` : `${esc(homeName())} ist ein blühender Ort.`}</span></div>
+      ${seatSite() ? `<div><span class="label">Grafschaft</span><b>${esc(SHIRES[seatSite().id].name)}</b><span class="muted">${fmt(shireTax(seatSite().id))} Gold Abgaben am Tag. ${esc(SHIRES[seatSite().id].text)}</span></div>`
+    : `<div><span class="label">Burgsiedlung</span><b>${villageHouses()} Häuser</b><span class="muted">${G.s.castle.level < 3 ? `Mit der nächsten Burgstufe ziehen weitere Familien nach ${esc(homeName())}.` : `${esc(homeName())} ist ein blühender Ort.`}</span></div>`}
       <div><span class="label">Burglager</span><b>${st.holz || 0} Holz · ${st.stein || 0} Stein · ${st.eisen || 0} Eisen</b><span class="muted">${prodText(bal.prod)} Baustoffe in deiner Ladung zählen mit.</span></div>
       <div><span class="label">Verpflegung</span><b class="${bal.food.short ? 'neg' : 'pos'}">${foodStock()} Rationen</b><span class="muted">${st.getreide || 0} Getreide, ${st.fleisch || 0} Fleisch im Lager. ${foodNeed()} ${foodNeed() === 1 ? 'Mund' : 'Münder'} am Tisch: Täglich ${foodNeed()} ${foodNeed() === 1 ? 'Ration' : 'Rationen'}.${bal.food.short ? ` Es fehlen ${bal.food.short}, die für je ${FOOD_PRICE} Gold zugekauft werden.` : ''} Felder, Schafzucht und Jagd füllen die Vorräte.</span></div>
       <div class="row"><button class="btn" data-act="rest">Rasten</button></div>
@@ -1090,13 +1088,13 @@ function shireCard(id, withSeat = false) {
   const seat = G.world.sites.find((s) => s.id === id), sh = SHIRES[id], own = shireOwner(id);
   const places = shireSites(id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const placeList = places.length ? places.map((s) => `${esc(s.name)} <span class="muted">(${esc(siteTypeName(s))})</span>`).join(', ') : 'keine weiteren Orte';
-  const home = id === HOME_SHIRE;
+  const home = id === ((G.s && G.s.seat) || HOME_SHIRE);
   return `<div class="shire${home ? ' home' : ''}${own === 'spieler' ? ' mine' : ''}">
     <div class="shire-head"><b>${esc(sh.name)}</b>${withSeat && seat ? `<span class="muted">Sitz: ${esc(seat.name)}</span>` : ''}<span>${ownerSwatch(own)}Herr: ${esc(ownerName(own))}</span></div>
     <p>${esc(sh.text)}</p>
     <p class="muted">Orte: ${placeList}. Abgaben für den Herrn: ${shireTax(id)} Gold am Tag.</p>
     ${seat && isHeld(seat) ? `<p class="goal">${esc(seat.name)}: ${esc(holdingLine(seat))}</p>` : ''}
-    ${home && own !== 'spieler' ? `<p class="goal">Dein Erbe ${esc(homeName())} liegt in dieser Grafschaft. Erobere ${esc(seat ? seat.name : 'den Sitz')} zurück, dann gehört das West Riding dir.</p>` : ''}
+    ${home && own !== 'spieler' && !G.s.seat ? `<p class="goal">Dein Erbe ${esc(homeName())} liegt in dieser Grafschaft. Erobere ${esc(seat ? seat.name : 'den Sitz')} zurück, dann gehört das West Riding dir.</p>` : ''}
   </div>`;
 }
 function shiresList() {
@@ -1107,6 +1105,9 @@ function shiresList() {
   return `<div class="shires">${ids.map((id) => shireCard(id, true)).join('')}</div>`;
 }
 function homeShireNote() {
+  // Mehrspieler: Die Grafschaft gehört dir mit ihrer Burg, einen Vogt gibt es nicht
+  const own = seatSite();
+  if (own) return SHIRES[own.id] ? shireCard(own.id) : '';
   if (shireOwner(HOME_SHIRE) === 'spieler') return '';
   const seat = G.world.sites.find((s) => s.id === HOME_SHIRE);
   return `<div class="notice"><p>${esc(homeName())} liegt in der Grafschaft <b>${esc(SHIRES[HOME_SHIRE].name)}</b>. Ihr Sitz ${esc(seat ? seat.name : '')} ist ${esc(ownerPhrase(shireOwner(HOME_SHIRE)))}, und Prinz Johns Vogt verlangt Abgaben von dir. Erobere die Burg zurück, dann gehören dir die Grafschaft, ihre Abgaben und ihre Wolle.</p></div>`;

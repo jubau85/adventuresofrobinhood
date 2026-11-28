@@ -156,7 +156,7 @@ export function ownedShires() { const st = shireState(); return Object.keys(SHIR
 export function isHumanOwner(o) { return typeof o === 'string' && o.startsWith('p:'); }
 function humanInfo(o) { return (G.mpSeatInfo && G.mpSeatInfo(o.slice(2))) || { name: `Herr von ${SHIRES[o.slice(2)] ? SHIRES[o.slice(2)].name : '?'}`, color: '#8a8070' }; }
 export function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isHumanOwner(o) ? `in der Hand von ${humanInfo(o).name}` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
-export function ownerName(o) { return o === 'spieler' ? `${homeName()} (du)` : isHumanOwner(o) ? humanInfo(o).name : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+export function ownerName(o) { return o === 'spieler' ? `${G.s && G.s.seat ? G.s.player.name : homeName()} (du)` : isHumanOwner(o) ? humanInfo(o).name : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
 export function ownerColor(o) { return o === 'spieler' ? playerColor() : isHumanOwner(o) ? humanInfo(o).color : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
 
 // Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)

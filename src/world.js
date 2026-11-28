@@ -160,7 +160,7 @@ function markWalls(W, arr) {
   for (const s of W.sites) {
     if (s.cityWall) blockTiles(W, arr, s.cityWall);
     if (s.type === 'burg') {
-      blockTiles(W, arr, wallRing(W, s, 4));
+      blockTiles(W, arr, wallRing(W, s, s.ringR || 4));
       const kw = s.castleLevel >= 3 ? 2.8 : 2.2;
       for (const [x, y] of obstacleTiles(W, makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw), false)) arr[y * W.N + x] = 1;
     }
@@ -369,9 +369,9 @@ export function setPlayerWalls(W, on, rects, R) {
   W.playerWalls = on;
   if (R) W.playerR = R;
   if (rects) W.playerRects = rects;
-  // Gebäude deiner Burg und der Burgen der Barone (barons.js) zusammen
+  // Gebäude deiner Burg, der Burgen der Barone (barons.js) und der Burgen deiner Mitspieler (castle.js) zusammen
   if (rects || W.baronDirty) {
-    W.castleObs = [...(W.playerRects || []), ...(W.baronRects || [])].map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
+    W.castleObs = [...(W.playerRects || []), ...(W.baronRects || []), ...(W.peerRects || [])].map((r) => makeObstacle(r.x, r.y, r.wx, r.wy, { pen: !!r.pen, castle: true }));
     W.cgrid = new Map();
     for (const o of W.castleObs) gridAdd(W.cgrid, N, o);
     W.baronDirty = false;
@@ -395,6 +395,12 @@ export function setPlayerWalls(W, on, rects, R) {
 // Gebäude auf den Bauplätzen der Barone als Hindernis (Rechtecke {x, y, wx, wy, pen})
 export function setBaronRects(W, rects) {
   W.baronRects = rects;
+  W.baronDirty = true;
+  if (W.blockStatic) setPlayerWalls(W, !!W.playerWalls);
+}
+// Mehrspieler: Gebäude auf den Bauplätzen der Burgen deiner Mitspieler
+export function setPeerRects(W, rects) {
+  W.peerRects = rects;
   W.baronDirty = true;
   if (W.blockStatic) setPlayerWalls(W, !!W.playerWalls);
 }
@@ -471,10 +477,12 @@ export function findPath(W, fx, fy, tx, ty, maxIter = 60000) {
 
 // ---------------------------------------------------------------- Generator
 // opts.mp: Mehrspieler-Welt ohne Heimburg (jeder Spieler sitzt auf der Burg seiner Grafschaft); alle Teilnehmer
-// erzeugen sie gleich
-let GEN_MP = false;
+// erzeugen sie gleich. opts.seats: die Burgen, auf denen ein Mensch sitzen kann. Um sie ist Platz für Bauplätze wie
+// um Ashcombe und die Burgen der Barone (plotSeat).
+let GEN_MP = false, GEN_SEATS = new Set();
 export function generateWorld(seed, opts = {}) {
   GEN_MP = !!opts.mp;
+  GEN_SEATS = new Set(GEN_MP ? opts.seats || [] : []);
   const N = MAP;
   const rng = mulberry32(seed);
   const tiles = new Uint8Array(N * N);
@@ -938,7 +946,7 @@ function waterDist(W, cx, cy, r) {
 function siteGap(a, b) {
   const lager = a.type === 'lager' || b.type === 'lager';
   // Die eigene Burg und die Burgen der Barone brauchen Platz für ihre Bauplätze
-  if (a.type === 'spieler' || b.type === 'spieler' || a.baron || b.baron) return lager ? 18 : 26;
+  if (a.type === 'spieler' || b.type === 'spieler' || a.baron || b.baron || a.plotSeat || b.plotSeat) return lager ? 18 : 26;
   if (lager) return 16;
   return a.clear + b.clear + 2;
 }
@@ -962,6 +970,8 @@ function placeSettlements(W, rng) {
   const order = defs.filter((d) => !REMOTE[d.type]).concat(defs.filter((d) => REMOTE[d.type]));
   for (const def0 of order) {
     const def = { ...def0, clear: siteRadius(def0) };
+    // Mehrspieler: Burgen, die ein Mensch halten kann, brauchen Platz wie eine Baronsburg
+    if (GEN_SEATS.has(def.id) && def.type === 'burg') { def.plotSeat = true; def.clear = Math.max(def.clear, siteRadius({ type: 'burg', clear: 9 })); }
     const g = geoToTile(def.lon, def.lat);
     const gx = Math.floor(g.x), gy = Math.floor(g.y);
     const near = nearestWalkableTile(W, gx, gy);
@@ -1225,7 +1235,7 @@ function addFields(W, s, rng) {
   const keepR = s.type === 'halle' ? PALISADE_R + 1.4 : 0;
   for (let k = 0; k < n; k++) {
     const a = rng() * Math.PI * 2;
-    const r = (s.type === 'spieler' || s.baron ? 11 : 5.5) + rng() * 3;
+    const r = (s.type === 'spieler' || s.baron || s.plotSeat ? 11 : 5.5) + rng() * 3;
     const cx = Math.floor(s.x + Math.cos(a) * r), cy = Math.floor(s.y + Math.sin(a) * r);
     const w = 2 + Math.floor(rng() * 3), h = 2 + Math.floor(rng() * 2);
     for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) {
@@ -1297,7 +1307,7 @@ const TAVERN_NAMES = ['Zum Goldenen Krug', 'Zur Krone', 'Zum Weißen Hirsch', 'Z
 
 // Friedhof neben der Kirche (oder am Ortsrand), umzäunt, mit Steinkreuz
 function placeCemetery(W, s) {
-  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei' || s.baron) return;
+  if (s.type === 'lager' || s.type === 'spieler' || s.type === 'mine' || s.type === 'einsiedelei' || s.baron || s.plotSeat) return;
   const church = W.buildings.find((b) => b.site === s.id && (b.kind === 'church' || (b.kind === 'landmark' && b.lm === 'kathedrale')));
   const pref = church ? { x: church.x + (church.wx || 2) / 2 + 1.6, y: church.y - 0.6 } : { x: s.x - 4.5, y: s.y - 2.5 };
   const wx = 2.6, wy = 2.0, N = W.N;
@@ -1558,7 +1568,8 @@ function genBuildings(W, s, rng) {
   };
   // Was später gezeichnet wird, aber nicht in der Gebäudeliste steht, als feste Felder vormerken:
   // die Burgmauer (8 × 8 Felder mit Ecktürmen), die Palisade der Halle, der Ring der Stadtmauer
-  if (s.type === 'burg') markSolid(W, s.x, s.y, 9.6, 9.6);
+  // Eine Grafschaftsburg im Mehrspieler kann zur Festung werden (Mauerring ±6)
+  if (s.type === 'burg') markSolid(W, s.x, s.y, s.plotSeat ? 13.6 : 9.6, s.plotSeat ? 13.6 : 9.6);
   if (s.type === 'halle') {
     for (let a = 0; a < Math.PI * 2; a += 0.12) markSolid(W, s.x + Math.cos(a) * 4.5, s.y + Math.sin(a) * 4.5, 0.4, 0.4);
   }
@@ -1598,7 +1609,8 @@ function genBuildings(W, s, rng) {
       return;
     }
   };
-  if (s.type !== 'stadt' && s.type !== 'halle' && !s.baron) tavern();
+  if (s.plotSeat) tavern(s.clear + 8, 3);
+  else if (s.type !== 'stadt' && s.type !== 'halle' && !s.baron) tavern();
   switch (s.type) {
     case 'stadt':
       genCity(W, s, rng, add, house, props, smithy, tavern, hasCathedral);
@@ -1641,7 +1653,7 @@ function genBuildings(W, s, rng) {
     case 'burg':
       s.castleLevel = s.castleLevel || (s.id === 'torquilstone' ? 3 : 2);
       // Burgen der Barone: Die Gebäude stehen auf Bauplätzen wie bei dir (barons.js), dazu nur ein paar Katen weiter draußen
-      if (s.baron) { ring(5, s.clear + 9, s.clear + 11, (x, y) => house(x, y)); break; }
+      if (s.baron || s.plotSeat) { ring(s.plotSeat ? 8 : 5, s.clear + 9, s.clear + 11, (x, y) => house(x, y)); break; }
       ring(12, 6.4, s.clear - 0.5, (x, y) => house(x, y));
       smithy();
       break;

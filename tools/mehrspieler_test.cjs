@@ -1,4 +1,5 @@
-// Mehrspieler-Test mit zwei Spielfenstern: Beitreten, Plätze, Uhr, Helden, Markt-Befehl, Chat, Gastgeber-Wechsel.
+// Mehrspieler-Test mit zwei Spielfenstern: Beitreten, Plätze, Uhr, Helden, Markt-Befehl, Chat, Gastgeber-Wechsel,
+// die Burg der eigenen Grafschaft als Heimburg wie Ashcombe (Bauplätze, Pacht, Ausbau, die anderen sehen ihn).
 //   node tools/mehrspieler_test.cjs [ausgabe-ordner] [ws://127.0.0.1:8765]
 // Ohne Relais-Adresse über den Browser-Kanal (ein Browser), mit Adresse über das Relais (zwei getrennte Browser;
 // vorher `node tools/relay.mjs` starten). Braucht Playwright mit Chromium.
@@ -91,14 +92,15 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await A.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.phase === 'game' && !window.__ritter.loadingArt, null, { timeout: 120000 });
   await B.waitForFunction(() => window.__ritter.started && window.__ritter.mp && window.__ritter.mp.welcomed && !window.__ritter.loadingArt, null, { timeout: 120000 });
   ok(true, 'A hat gestartet, beide sind im Spiel');
-  const sB = await ev(B, () => { const G = window.__ritter; return { seat: G.mp.seat, seed: G.s.seed, day: G.s.day, role: G.mp.role, name: G.s.player.name, female: G.s.player.female, arms: G.s.arms, pos: [G.s.player.x, G.s.player.y], held: Object.keys(G.s.holdings || {}), owner: G.s.shires.chester.owner, ownerA: G.s.shires[G.mp.peers.values().next().value.seat || 'nottingham'].owner, home: G.world.sites.some((s) => s.type === 'spieler'), castleName: G.s.castleName }; });
-  const sA = await ev(A, () => { const G = window.__ritter; return { seed: G.s.seed, day: G.s.day, seat: G.mp.seat, seats: G.mp.seats, held: Object.keys(G.s.holdings || {}), own: G.s.shires[G.mp.seat].owner, chester: G.s.shires.chester.owner, home: G.world.sites.some((s) => s.type === 'spieler'), sites: G.world.sites.length }; });
+  const sB = await ev(B, () => { const G = window.__ritter; return { seat: G.mp.seat, seed: G.s.seed, day: G.s.day, role: G.mp.role, name: G.s.player.name, female: G.s.player.female, arms: G.s.arms, pos: [G.s.player.x, G.s.player.y], held: Object.keys(G.s.holdings || {}), homeAt: (window.__ritterDebug.castleSite() || {}).id, lv: G.s.castle.level, built: window.__ritterDebug.castlePlots().filter(Boolean).map((p) => p.id), owner: G.s.shires.chester.owner, ownerA: G.s.shires[G.mp.peers.values().next().value.seat || 'nottingham'].owner, home: G.world.sites.some((s) => s.type === 'spieler'), castleName: G.s.castleName }; });
+  const sA = await ev(A, () => { const G = window.__ritter; return { seed: G.s.seed, day: G.s.day, seat: G.mp.seat, seats: G.mp.seats, held: Object.keys(G.s.holdings || {}), homeAt: (window.__ritterDebug.castleSite() || {}).id, lv: G.s.castle.level, built: window.__ritterDebug.castlePlots().filter(Boolean).map((p) => p.id), own: G.s.shires[G.mp.seat].owner, chester: G.s.shires.chester.owner, home: G.world.sites.some((s) => s.type === 'spieler'), sites: G.world.sites.length }; });
   const sitesB = await ev(B, () => window.__ritter.world.sites.length);
   console.log('B', JSON.stringify(sB)); console.log('A', JSON.stringify(sA));
   ok(sB.seed === sA.seed && sitesB === sA.sites, 'gleiche Welt (Startwert, gleiche Orte)');
   ok(!sA.home && !sB.home, 'keine Heimburg Ashcombe in der Mehrspieler-Welt');
-  ok(sA.held.includes(sA.seat) && sA.own === 'spieler', `A herrscht über seine Grafschaft (${sA.seat})`);
-  ok(sB.seat === 'chester' && sB.held.includes('chester') && sB.owner === 'spieler' && sB.castleName === 'Chester', `B herrscht über Cheshire, Burg ${sB.castleName}`);
+  ok(sA.homeAt === sA.seat && sA.own === 'spieler' && !sA.held.length, `A herrscht über seine Grafschaft (${sA.seat}), ihre Burg ist seine Heimburg`);
+  ok(sB.seat === 'chester' && sB.homeAt === 'chester' && !sB.held.length && sB.owner === 'spieler' && sB.castleName === 'Chester', `B herrscht über Cheshire, Heimburg ${sB.castleName}`);
+  ok(sB.lv >= 2 && ['halle', 'kaserne', 'schmiede', 'stall', 'felder'].every((id) => sB.built.includes(id)), `Die Grafschaftsburg ist eine Steinburg (Stufe ${sB.lv}) mit Gebäuden auf Bauplätzen (${sB.built.join(', ')})`);
   ok(sA.chester === 'p:chester' && sB.ownerA === `p:${sA.seat}`, `Jeder sieht die Grafschaft des anderen als dessen (${sA.chester}, ${sB.ownerA})`);
   ok(sB.female && sB.arms.charge === 'hirsch' && sB.arms.metal === 'silber', 'B spielt die Ritterin mit dem gewählten Wappen');
   const names = await ev(A, () => { const G = window.__ritter; return [G.mpSeatInfo('chester').name, G.world.sites.find((s) => s.id === 'chester')]; });
@@ -130,14 +132,35 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   const b1 = await ev(B, () => ({ gold: window.__ritter.s.gold, salz: window.__ritter.s.castle.storage.salz || 0 }));
   const dayA = await ev(A, () => { window.__ritterDebug.passHours(24); return window.__ritter.s.day; });
   await B.waitForTimeout(1500);
-  const b2 = await ev(B, () => ({ day: window.__ritter.s.day, gold: window.__ritter.s.gold, salz: window.__ritter.s.castle.storage.salz || 0, held: Object.keys(window.__ritter.s.holdings || {}) }));
+  const b2 = await ev(B, () => ({ day: window.__ritter.s.day, gold: window.__ritter.s.gold, salz: window.__ritter.s.castle.storage.salz || 0, home: (window.__ritterDebug.castleSite() || {}).id, inc: window.__ritterDebug.dailyBalance().income.map(([n]) => n) }));
   ok(b2.day === dayA, `B folgt dem Tag (${b2.day} = ${dayA})`);
-  ok(b2.gold > b1.gold && b2.salz > b1.salz && b2.held.includes('chester'), `B bekommt die Abgaben von Cheshire (${b1.gold} -> ${b2.gold} Gold, Salz ${b1.salz} -> ${b2.salz}) und hält die Burg`);
-  // Die Burg der eigenen Grafschaft: Tafel mit Rittersaal, Gefolge und Lager
-  const tabs = await ev(B, () => { window.__ritterDebug.openPanel('town', window.__ritter.world.sites.find((s) => s.id === 'chester')); return [...document.querySelectorAll('#panel-tabs button')].map((b) => b.textContent.trim()); });
-  ok(['Rittersaal', 'Gefolge', 'Lager'].every((t) => tabs.some((x) => x.startsWith(t))), `Burgtafel mit ${tabs.join(', ')}`);
+  ok(b2.gold > b1.gold && b2.salz > b1.salz && b2.home === 'chester', `B bekommt die Abgaben von Cheshire (${b1.gold} -> ${b2.gold} Gold, Salz ${b1.salz} -> ${b2.salz}) und hält die Burg`);
+  ok(b2.inc.includes('Pacht der Bauern') && b2.inc.some((n) => /Abgaben Cheshire/.test(n)), `Einnahmen wie in Ashcombe: ${b2.inc.join(', ')}`);
+  // Die Burg der eigenen Grafschaft: dieselbe Tafel wie Ashcombe (Ausbau, Rittersaal, Gefolge, Lager), dazu Markt und Ausrüster
+  const tabs = await ev(B, () => { window.__ritterDebug.openPanel('town', window.__ritter.world.sites.find((s) => s.id === 'chester')); return { panel: window.__ritter.ui.panel, tabs: [...document.querySelectorAll('#panel-tabs button')].map((b) => b.textContent.trim()), text: document.getElementById('panel-body').textContent }; });
+  ok(tabs.panel === 'castle' && ['Ausbau', 'Rittersaal', 'Gefolge', 'Lager', 'Ausrüster', 'Markt'].every((t) => tabs.tabs.some((x) => x.startsWith(t))), `Burgtafel wie in Ashcombe: ${tabs.tabs.join(', ')}`);
+  ok(!/Kastellan|Burgvogt/.test(tabs.text) && /Bergfried/.test(tabs.text) && /Im Hof/.test(tabs.text) && /Vor der Mauer/.test(tabs.text), 'Kein Kastellan, dafür Bergfried und Bauplätze im Hof und vor der Mauer');
   await B.screenshot({ path: `${OUT}/mp_B_burg.png` });
   await ev(B, () => { const b = document.querySelector('#panel [data-act="close"], #panel .close'); if (b) b.click(); });
+  // B baut eine Kapelle und macht aus seiner Burg eine Ringburg (sofort, mit dem Bau-Schummel); A sieht beides
+  const bb = await ev(B, () => {
+    const G = window.__ritter, D = window.__ritterDebug;
+    G.s.cheat = { ...(G.s.cheat || {}), build: true }; G.s.gold += 5000; G.s.castle.storage.holz = 500; G.s.castle.storage.stein = 500;
+    const lay = D.castleLayout(), free = lay.find((p) => !D.castlePlots()[p.i]);
+    const okB = D.startBuild('kapelle', free.i), okT = D.startTypeChange('ring');
+    const s = D.castleSite();
+    return { okB, okT, type: G.s.castle.type, ringR: s.ringR, kap: D.castlePlots().some((p) => p && p.id === 'kapelle'), out: D.castleOut() };
+  });
+  ok(bb.okB && bb.okT && bb.type === 'ring' && bb.ringR === 5 && bb.kap, `B baut eine Kapelle und eine Ringburg (Mauerring ${bb.ringR})`);
+  await A.waitForTimeout(7000);
+  const aSees = await ev(A, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.id === 'chester'), b = G.s.mpCastles && G.s.mpCastles.chester; return { peer: s.mpHome, ringR: s.ringR, lv: s.castleLevel, ty: b && b.ty, kap: !!b && b.p.some((q) => q && q[0] === 'kapelle'), rects: (G.world.peerRects || []).length }; });
+  ok(aSees.peer === 'peer' && aSees.ty === 'ring' && aSees.ringR === 5 && aSees.kap && aSees.rects > 0, `A sieht Bridas Burg so, wie sie sie ausgebaut hat (${JSON.stringify(aSees)})`);
+  await ev(A, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.id === 'chester'); G.s.player.x = s.x + 1; G.s.player.y = s.y + 9; G.s.player.path = null; G.cam.zoom = 1.4; });
+  await A.waitForTimeout(3000);
+  await A.screenshot({ path: `${OUT}/mp_A_sieht_burg_B.png` });
+  await ev(B, () => { const G = window.__ritter, s = window.__ritterDebug.castleSite(); G.s.player.x = s.x + 1; G.s.player.y = s.y + 9; G.s.player.path = null; G.cam.zoom = 1.4; });
+  await B.waitForTimeout(3000);
+  await B.screenshot({ path: `${OUT}/mp_B_eigene_burg.png` });
   // B gewinnt eine weitere Grafschaft (wie nach einer Eroberung): der Gastgeber trägt sie für B ein, B behält sie
   await ev(B, () => window.__ritterDebug.grantHolding(window.__ritter.world.sites.find((s) => s.id === 'warwick')));
   await A.waitForTimeout(1500);
