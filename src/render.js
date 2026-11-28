@@ -5222,6 +5222,44 @@ const TOOL3D = { hacke: 'hacke', sichel: 'sichel', axt: 'axt', hammer: 'hammer',
 // Blickrichtung je Bildrichtung auf dem Bildschirm (x nach rechts, y nach unten)
 const CAPE_DIR = [...Array(8)].map((_, d) => { const a = d * Math.PI / 4, sx = Math.sin(a) - Math.cos(a), sy = (Math.sin(a) + Math.cos(a)) / 2, n = Math.hypot(sx, sy) || 1; return { x: sx / n, y: sy / n }; });
 const wantsCape = (u) => u.kind === 'player' || u.kind === 'remote' || u.kind === 'preview';
+// Gemalte Umhänge (tools/umhang.py): je Körper, Bewegung und Ebene [Bilder, Zellbreite, Zellhöhe, Fußpunkt x, y, belegte
+// Zellen r0b0 r0b1 …]. Ein Bildpunkt = 26/120 Weltpixel wie bei den Heldenbögen. Ebene hinten: vor der Figur gemalt
+// (zu Pferd nach dem Pferd), vorn: nach ihr. Für Schlag und Treffer gibt es noch keine, dort der gezeichnete Umhang.
+const UMHANG = {"held_gehen_hinten":[8,83,83,45.0,109.0,"1111111111111111111111111111111100000000000000000000000011111111"],"held_gehen_vorn":[8,71,85,37.0,110.0,"1111111111111111111111111111111111111111111111111111111111111111"],"held_laufen_hinten":[8,82,82,45.0,108.0,"1111111111111111111111111111111100000000000000000000000011111111"],"held_laufen_vorn":[8,68,82,36.0,112.0,"1111111111111111111111111111111111111111111111111111111111111111"],"held_reiten_hinten":[1,64,67,32.0,108.0,"11110001"],"held_reiten_vorn":[1,70,68,36.0,108.0,"11111111"],"held_stehen_hinten":[4,74,81,41.0,103.0,"11011111101110110010011001001101"],"held_stehen_vorn":[4,64,84,34.0,108.0,"11111111111111111111111111111111"],"heldin_gehen_hinten":[8,87,98,44.0,102.0,"1111111111111111111111111111111100000000000000000000000011111111"],"heldin_gehen_vorn":[8,72,105,35.0,102.0,"1111111111111111111111111111111111111111111111111111111111111111"],"heldin_laufen_hinten":[8,86,96,44.0,103.0,"1111111111111111111111111111111100000000000000000000000011111111"],"heldin_laufen_vorn":[8,73,100,36.0,103.0,"1111111111111111111111111111111111111111111111111111111111111111"],"heldin_reiten_hinten":[1,65,64,32.0,101.0,"11110001"],"heldin_reiten_vorn":[1,71,71,36.0,104.0,"11111111"],"heldin_stehen_hinten":[4,75,94,40.0,97.0,"11011111101110110010011001001101"],"heldin_stehen_vorn":[4,63,105,33.0,100.0,"11111111111111111111111111111111"]};
+const CAPE_ANIM = { stehen: 'stehen', gehen: 'gehen', laufen: 'laufen', reiten: 'reiten', reiten_nah: 'reiten' };
+const capeCache = new Map();
+function capeCell(body, anim, layer, dir, frame, color) {
+  const key = `${body}_${anim}_${layer}`, m = UMHANG[key];
+  if (!m) return null;
+  const f = Math.min(frame, m[0] - 1), idx = dir * m[0] + f;
+  if (m[5][idx] !== '1') return { empty: true };
+  const ck = `${key}|${dir}|${f}|${color}`;
+  let cv = capeCache.get(ck);
+  if (cv) { capeCache.delete(ck); capeCache.set(ck, cv); return { cv, m }; }
+  const im = wantArt(`umhang_${key}`);
+  if (!im) return null;
+  cv = makeCanvas(m[1], m[2]);
+  const g = cv.getContext('2d');
+  g.drawImage(im, f * m[1], dir * m[2], m[1], m[2], 0, 0, m[1], m[2]);
+  tintMagenta(g, m[1], m[2], /^#[0-9a-f]{6}$/i.test(color) ? color : '#7a2a22', true);
+  capeCache.set(ck, cv);
+  while (capeCache.size > 600) capeCache.delete(capeCache.keys().next().value);
+  return { cv, m };
+}
+// Beide Ebenen eines Bildes bereit? Dann den gemalten Umhang, sonst den gezeichneten
+function paintedCape(u, anim, dir, frame, color) {
+  const a = CAPE_ANIM[anim];
+  if (!a) return null;
+  const body = u.female ? 'heldin' : 'held';
+  const back = capeCell(body, a, 'hinten', dir, frame, color), front = capeCell(body, a, 'vorn', dir, frame, color);
+  return back && front ? { back, front } : null;
+}
+const CAPE_K = FIG3D_H / 120;
+function drawCapeCell(c, part, ox, oy) {
+  if (!part || part.empty) return;
+  const { cv, m } = part;
+  c.drawImage(lodOf(cv, c, CAPE_K), ox - m[3] * CAPE_K, oy - m[4] * CAPE_K, m[1] * CAPE_K, m[2] * CAPE_K);
+}
 function drawCape(c, u, hip, ox, oy, dir, mounted, color) {
   const F = CAPE_DIR[dir], H = FIG3D_H, side = Math.abs(F.x);
   const col = /^#[0-9a-f]{6}$/i.test(color) ? color : '#7a2a22';
@@ -5297,11 +5335,15 @@ function drawModel3d(c, u, L, m, key) {
     }
     if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim, dir);
   };
-  const capeHip = wantsCape(u) && !u._noCape ? pt('Hips') : null, capeOver = dir >= 4 && dir <= 6;
+  // Umhang der Spielerhelden: gemalt (hinten, Figur, vorn), wo es die Bilder gibt, sonst gezeichnet
+  const capeOn = wantsCape(u) && !u._noCape, painted = capeOn ? paintedCape(u, anim, dir, frame, color) : null;
+  const capeHip = capeOn && !painted ? pt('Hips') : null, capeOver = dir >= 4 && dir <= 6;
   if (back) gear();
-  if (capeHip && !capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
+  if (painted) drawCapeCell(c, painted.back, ox, oy);
+  else if (capeHip && !capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
   c.drawImage(lodOf(near || cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
-  if (capeHip && capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
+  if (painted) drawCapeCell(c, painted.front, ox, oy);
+  else if (capeHip && capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
   if (!back) gear();
   if (horse) paintHorseHead(c, horse);
   c.restore();
@@ -5397,6 +5439,26 @@ function drawHeroShield(c, u, L, x, y, sgn, inner = false, dir = null) {
 const SPRITE_INFO = { fig_ritter: { ax: 85, ay: 182, top: 4 } };
 const spriteCache = new Map();
 function spriteRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+// Magenta (Farbton um 313°) auf einer Leinwand in eine Farbe umfärben, Licht und Schatten bleiben.
+// loose: auch sehr dunkles, wenig gesättigtes Magenta (das Futter der gemalten Umhänge)
+function tintMagenta(g, w, h, color, loose = false) {
+  const minV = loose ? 14 : 45, minC = loose ? 10 : 45, h0 = loose ? 290 : 285, h1 = loose ? 345 : 350;
+  try {
+    const d = g.getImageData(0, 0, w, h), a = d.data;
+    const [tr, tg, tb] = spriteRgb(color);
+    for (let i = 0; i < a.length; i += 4) {
+      if (a[i + 3] < 8) continue;
+      const r = a[i], gg = a[i + 1], b = a[i + 2];
+      const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      if (mx < minV || mx - mn < minC || mx === gg) continue;
+      const hue = mx === r ? (60 * ((gg - b) / (mx - mn)) + 360) % 360 : 60 * ((r - gg) / (mx - mn)) + 240;
+      if (hue < h0 || hue > h1) continue;
+      const f = Math.min(1.35, mx / 255 / 0.72);
+      a[i] = Math.min(255, tr * f); a[i + 1] = Math.min(255, tg * f); a[i + 2] = Math.min(255, tb * f);
+    }
+    g.putImageData(d, 0, 0);
+  } catch (e) { /* ohne Pixelzugriff bleibt Magenta stehen */ }
+}
 function figSprite(id, color) {
   const im = ART[id];
   if (!im) return null;
@@ -5405,21 +5467,7 @@ function figSprite(id, color) {
   if (s) return s;
   const cv = makeCanvas(im.width, im.height), g = cv.getContext('2d');
   g.drawImage(im, 0, 0);
-  try {
-    const d = g.getImageData(0, 0, cv.width, cv.height), a = d.data;
-    const [tr, tg, tb] = spriteRgb(color);
-    for (let i = 0; i < a.length; i += 4) {
-      if (a[i + 3] < 8) continue;
-      const r = a[i], gg = a[i + 1], b = a[i + 2];
-      const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
-      if (mx < 45 || mx - mn < 45 || mx === gg) continue;
-      const hue = mx === r ? (60 * ((gg - b) / (mx - mn)) + 360) % 360 : 60 * ((r - gg) / (mx - mn)) + 240;
-      if (hue < 285 || hue > 350) continue;
-      const f = Math.min(1.35, mx / 255 / 0.72);
-      a[i] = Math.min(255, tr * f); a[i + 1] = Math.min(255, tg * f); a[i + 2] = Math.min(255, tb * f);
-    }
-    g.putImageData(d, 0, 0);
-  } catch (e) { /* ohne Pixelzugriff bleibt Magenta stehen */ }
+  tintMagenta(g, cv.width, cv.height, color);
   const mips = [cv];
   let prev = cv;
   while (prev.width > 24) {

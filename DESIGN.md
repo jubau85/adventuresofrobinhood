@@ -238,8 +238,12 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Heimburgen der Gäste; der Gast bittet den Gastgeber darum (`heimBelagerung`), und alle sehen die Belagerung.
 - **Farben:** Auf der Karte tragen die Grafschaften der Menschen ihre Farbe kräftiger als die der Parteien, mit dem
   Namen des Herrn darunter; die Helden der Mitspieler sind Punkte in ihrer Farbe mit Namen, die Legende nennt alle
-  Spieler mit Diplomatie. Jeder Held trägt einen Umhang in seiner Wappenfarbe (`drawCape` in `render.js`, nach der
-  Hüfte des Modells und der Blickrichtung: von hinten über dem Rücken, sonst dahinter, beim Gehen weht er).
+  Spieler mit Diplomatie. Jeder Held trägt einen gemalten Umhang in seiner Wappenfarbe (`assets/umhang/`, `tools/umhang.py`):
+  je Körper (Held, Heldin), Bewegung (stehen, gehen, laufen, reiten) und Richtung ein Bild pro Laufbild, in zwei
+  Ebenen: hinten (vor der Figur gemalt, zu Pferd nach dem Pferd) und vorn (nach ihr). Der Stoff ist Magenta und wird
+  umgefärbt (`tintMagenta`, für das dunkle Futter mit lockerer Schwelle). Ein Umhang passt auf alle sechs Rüstungen
+  eines Körpers. Für Schlag und Treffer gibt es noch keine Bilder; dort zeichnet `drawCape` einen Umhang nach Hüfte
+  und Blickrichtung.
 - **Diplomatie zwischen Menschen (`pvp.js`):** Zwischen je zwei Plätzen gilt Frieden, Fehde oder Bündnis (`pvp` im
   gemeinsamen Stand, Befehl `diplo` an den Gastgeber). Eine Fehde gilt sofort; Frieden nach einer Fehde und ein Bündnis
   brauchen ein Angebot (`angebot`, der Gastgeber merkt es sich und reicht es weiter), das der andere annimmt (`diplo`)
