@@ -686,6 +686,14 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
             <label><input type="radio" name="schwierigkeit" value="schwer"><span>Schwer</span></label>
           </div>
         </fieldset>
+        <fieldset class="field">
+          <legend>Deine Burg zu Beginn <span id="burgstart-text" class="muted">Ein verfallener Burgstall. Alles baust du selbst auf, vom Holzfällerlager bis zum Bergfried.</span></legend>
+          <div class="seg" id="burgstart-pick">
+            <label><input type="radio" name="burgstart" value="ruine" checked><span>Ruine</span></label>
+            <label><input type="radio" name="burgstart" value="holzburg"><span>Holzburg</span></label>
+            <label><input type="radio" name="burgstart" value="steinburg"><span>Steinburg</span></label>
+          </div>
+        </fieldset>
         <div class="row">
           <button type="submit" class="btn primary" id="btn-new">Aufbrechen</button>
           <button type="button" class="btn" id="btn-continue" hidden>Weiterspielen</button>
@@ -703,7 +711,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 <input id="chat-input" hidden maxlength="200" placeholder="Zu allen in der Partie sprechen … (Enter schickt, Esc schließt)" autocomplete="off">
 <div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
 <script>
-window.__aktBuild = 'bf15625dc0';
+window.__aktBuild = '8d364fcb00';
 (function () {
 'use strict';
 
@@ -3081,19 +3089,22 @@ function buildStaticWalls(W) {
   W.wallStatic = new Uint8Array(W.N * W.N);
   markWalls(W, W.wallStatic);
   // Bergfriede der Burgen auch genau als Hindernis
-  W.keepObs = W.sites.filter((s) => s.type === 'burg').map((s) => { const kw = s.castleLevel >= 3 ? 2.8 : 2.2; return makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw); });
+  W.keepObs = W.sites.filter((s) => s.type === 'burg').map((s) => { const k = burgKeep(s); return makeObstacle(s.x + k.dx, s.y + k.dy, k.w, k.w); });
   W.ogrid = null;
   refreshBuildingBlocks(W);
 }
 
-// Stadtmauern, Burgmauern mit Bergfried (wie in render.js castlePieces gezeichnet) und Palisaden
+// Bergfried einer Burg je Stufe (wie bei deiner Burg): Stumpf der Ruine, Holzturm, Steinturm, Donjon
+function burgKeep(s) { return CASTLE_KEEP[Math.max(0, Math.min(3, s.castleLevel ?? 2))]; }
+// Stadtmauern, Burgmauern mit Bergfried (wie in render.js castlePieces gezeichnet) und Palisaden. Eine Ruine
+// (Grafschaftsburg eines Menschen im Mehrspieler) hat keinen geschlossenen Mauerring.
 function markWalls(W, arr) {
   for (const s of W.sites) {
     if (s.cityWall) blockTiles(W, arr, s.cityWall);
     if (s.type === 'burg') {
-      blockTiles(W, arr, wallRing(W, s, s.ringR || 4));
-      const kw = s.castleLevel >= 3 ? 2.8 : 2.2;
-      for (const [x, y] of obstacleTiles(W, makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw), false)) arr[y * W.N + x] = 1;
+      if ((s.castleLevel ?? 2) >= 1) blockTiles(W, arr, wallRing(W, s, s.ringR || 4));
+      const k = burgKeep(s);
+      for (const [x, y] of obstacleTiles(W, makeObstacle(s.x + k.dx, s.y + k.dy, k.w, k.w), false)) arr[y * W.N + x] = 1;
     }
     if (s.palisade) blockTiles(W, arr, palisadeBand(s, false));
   }
@@ -8045,7 +8056,7 @@ function startSiege(target = null, armyType = null, scale = null, opts = {}) {
 function wallBand(s) {
   const W = G.world;
   if (s.cityWall) return { band: s.cityWall, square: false };
-  if (s.type === 'burg' || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, s.type === 'spieler' ? ringR() : s.ringR || 4), square: true };
+  if ((s.type === 'burg' && (s.castleLevel ?? 2) >= 1) || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, s.type === 'spieler' ? ringR() : s.ringR || 4), square: true };
   if (s.palisade) return { band: palisadeBand(s, true), square: false };
   return null;
 }
@@ -10670,11 +10681,12 @@ function refreshCastleBlock() {
 }
 
 // Die Grafschaftsburg zeigt Stufe und Mauerring deiner Burg: world.js zeichnet und sperrt danach Mauern und Bergfried
+// (eine Ruine ohne Mauerring, wie Ashcombe am Anfang)
 function syncSeatSite() {
   const s = seatSite();
   if (!s) return false;
   s.mpHome = 'ich';
-  const lv = Math.max(1, G.s.castle.level), R = ringR();
+  const lv = G.s.castle.level, R = ringR();
   if (s.castleLevel === lv && (s.ringR || 4) === R) return false;
   s.castleLevel = lv; s.ringR = R;
   rebuildStaticWalls(G.world);
@@ -10682,19 +10694,32 @@ function syncSeatSite() {
   return true;
 }
 
-// Mehrspieler-Start: Die Burg deiner Grafschaft wird deine Heimburg wie Ashcombe. Sie steht schon als Steinburg (oder
-// Festung) mit Rittersaal, Unterkunft, Schmiede, Stall und Äckern; die Grafschaft gehört dir. Zwei Wochen lang lassen
-// dich Räuber und Heere in Ruhe.
-const SEAT_START = [['halle', 2], ['kaserne', 2], ['schmiede', 1], ['stall', 1], ['felder', 1]];
+// Wie die Heimburg anfängt (Wahl beim Spielstart, im Mehrspieler für alle gleich): als Ruine wie Ashcombe, als
+// Holzburg mit dem Nötigsten oder als ausgebaute Steinburg
+const START_CASTLES = {
+  ruine: { name: 'Ruine', level: 0, plots: [], text: 'Ein verfallener Burgstall. Alles baust du selbst auf, vom Holzfällerlager bis zum Bergfried.' },
+  holzburg: { name: 'Holzburg', level: 1, plots: [['halle', 1], ['holzfaeller', 1], ['felder', 1]], text: 'Palisade und hölzerner Bergfried, dazu ein Rittersaal, ein Holzfällerlager und ein Acker.' },
+  steinburg: { name: 'Steinburg', level: 2, plots: [['halle', 2], ['kaserne', 2], ['schmiede', 1], ['stall', 1], ['felder', 1]], text: 'Steinmauern und Bergfried, Rittersaal und Unterkunft auf Stufe 2, Schmiede, Stall und ein Acker.' },
+};
+const START_IDS = Object.keys(START_CASTLES);
+function startCastleKind(k) { return START_CASTLES[k] ? k : 'ruine'; }
+// Die Heimburg auf den gewählten Stand bringen (Burgstufe, Turmburg, Gebäude auf ihren Plätzen)
+function applyStartCastle(kind) {
+  const k = startCastleKind(kind), def = START_CASTLES[k], C = G.s.castle, s = castleSite();
+  G.s.startCastle = k;
+  C.level = def.level; C.type = 'turm'; C.plots = null; C.b = {};
+  if (!s) return;
+  const lay = plotLayout(s, 'turm'), plots = castlePlots();
+  for (const [id, lv] of def.plots) { const i = freePlotFor(id, lay, plots); if (i >= 0) plots[i] = { id, lv }; }
+}
+
+// Mehrspieler-Start: Die Burg deiner Grafschaft wird deine Heimburg wie Ashcombe, im Stand, den der Gastgeber für alle
+// gewählt hat (G.s.startCastle); die Grafschaft gehört dir. Zwei Wochen lang lassen dich Räuber und Heere in Ruhe.
 const SEAT_PEACE = 14;
 function grantSeat(s) {
   if (!s || !SHIRES[s.id] || s !== seatSite()) return false;
   const C = G.s.castle;
-  C.level = Math.max(2, s.castleLevel || 2);
-  C.type = 'turm';
-  C.plots = null; C.b = {};
-  const lay = plotLayout(s, 'turm'), plots = castlePlots();
-  for (const [id, lv] of SEAT_START) { const i = freePlotFor(id, lay, plots); if (i >= 0) plots[i] = { id, lv }; }
+  applyStartCastle(G.s.startCastle);
   C.peaceUntil = G.s.day + SEAT_PEACE;
   claimShire(s.id, 'spieler', true);
   refreshCastleBlock();
@@ -10732,7 +10757,7 @@ function applyPeerCastles() {
     const s = W.sites.find((x) => x.id === seat);
     if (!s || s === home || s.type !== 'burg' || !b) continue;
     s.mpHome = 'peer';
-    const lv = Math.max(1, Math.min(3, b.lv | 0)), R = CASTLE_TYPES[b.ty] ? CASTLE_TYPES[b.ty].R : 4;
+    const lv = Math.max(0, Math.min(3, b.lv | 0)), R = CASTLE_TYPES[b.ty] ? CASTLE_TYPES[b.ty].R : 4;
     if (s.castleLevel !== lv || (s.ringR || 4) !== R) { s.castleLevel = lv; s.ringR = R; walls = true; }
     const lay = peerLayout(s, b);
     (b.p || []).forEach((q, i) => { if (q && lay[i] && BUILDINGS[q[0]]) for (const [x, y, wx, wy, pen] of plotRects(q[0], q[1], lay[i])) rects.push({ x, y, wx, wy, pen: !!pen }); });
@@ -10749,7 +10774,7 @@ function migrateSeat() {
   delete G.s.holdings[s.id];
   const c = h.castellan && G.s.companions.find((u) => u.id === h.castellan);
   if (c) { c.status = 'garnison'; c.seat = null; }
-  if (G.s.castle.level < 2) grantSeat(s);
+  if (!G.s.castle.plots) { G.s.startCastle = 'steinburg'; grantSeat(s); }
   return true;
 }
 
@@ -13072,7 +13097,7 @@ function openTransport({ kind = 'kanal', room = 'burg', url = '', id = netId() }
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
-  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles'];
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles', 'startCastle'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
 const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
@@ -13534,7 +13559,7 @@ function mpLobbyHost(opts, profile, ev = {}) {
   mp.phase = 'lobby'; mp.ev = ev;
   mp.profile = { ...profile, ...cleanProfile(profile, profile) };
   mp.seat = freeSeat(mp, mp.id, profile.seat);
-  mp.lobby = { difficulty: profile.difficulty || 'leicht', chat: [] };
+  mp.lobby = { difficulty: profile.difficulty || 'leicht', start: START_CASTLES[profile.start] ? profile.start : 'ruine', chat: [] };
   mp.lan = opts.lan || null;
   G.mp = mp;
   lobbyChanged(mp);
@@ -13559,7 +13584,7 @@ function mpLobbyJoin(opts, profile, ev = {}) {
   return mp;
 }
 
-// Grafschaft, Profil, Bereit (Gast) oder Schwierigkeit (Gastgeber) ändern
+// Grafschaft, Profil, Bereit (Gast) oder Schwierigkeit und Anfangsburg (Gastgeber) ändern
 function mpLobbyChoose(patch) {
   const mp = G.mp;
   if (!mp || mp.phase !== 'lobby') return;
@@ -13569,6 +13594,7 @@ function mpLobbyChoose(patch) {
     return;
   }
   if (patch.difficulty && ['leicht', 'mittel', 'schwer'].includes(patch.difficulty)) mp.lobby.difficulty = patch.difficulty;
+  if (patch.start && START_CASTLES[patch.start]) mp.lobby.start = patch.start;
   if (patch.seat && freeSeat(mp, mp.id, patch.seat) === patch.seat) mp.seat = patch.seat;
   if (patch.profile) mp.profile = { ...mp.profile, ...takeProfile(mp, mp.id, patch.profile, mp.profile) };
   lobbyChanged(mp);
@@ -13578,8 +13604,8 @@ function mpLobbyChoose(patch) {
 function mpLobbyStart() {
   const mp = G.mp;
   if (!mp || mp.role !== 'host' || mp.phase !== 'lobby') return null;
-  mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty });
-  return { difficulty: mp.lobby.difficulty, seat: mp.seat, profile: { ...mp.profile } };
+  mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty, start: mp.lobby.start });
+  return { difficulty: mp.lobby.difficulty, start: mp.lobby.start, seat: mp.seat, profile: { ...mp.profile } };
 }
 function mpLobbyBegin() {
   const mp = G.mp;
@@ -13613,7 +13639,7 @@ function lobbyChat(mp, name, text) {
 function lobbyState(mp) {
   const players = [{ id: mp.id, ...me(), seat: mp.seat, ready: true, host: true }];
   for (const p of mp.peers.values()) players.push({ id: p.id, name: p.name, color: p.color, arms: p.arms, female: p.female, seat: p.seat, ready: !!p.ready, host: false });
-  return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, players, lan: mp.lan || null };
+  return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, start: mp.lobby.start, players, lan: mp.lan || null };
 }
 
 function lobbyChanged(mp) {
@@ -13695,7 +13721,7 @@ function lobbyView() {
   const others = st.players.filter((p) => p.id !== mp.id);
   const seatBy = new Map(others.map((p) => [p.seat, p.name])), colorBy = new Map(others.map((p) => [p.color, p.name]));
   return {
-    role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, players: st.players, me: mine,
+    role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, start: START_CASTLES[st.start] ? st.start : 'ruine', players: st.players, me: mine,
     seats: seatIds().map((id) => ({ id, free: !seatBy.has(id), by: seatBy.get(id) || null, ...lobbySeatInfo(id) })),
     colors: HERALDRY.map((h) => ({ ...h, by: colorBy.get(h.color) || null })),
     allReady: st.players.every((p) => p.ready), chat: mp.lobby.chat,
@@ -25306,6 +25332,7 @@ function lobbyMapSeatPos(cv, id) {
 
 
 
+
 let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null, lbHover = null, lbMapReq = 0, lbLanOn = false, lbLanGames = [];
 const LOBBY_DIFF = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']];
 const isDesktop = () => !!(window.ritterDesktop && window.ritterDesktop.relay);
@@ -25492,11 +25519,14 @@ function renderLobbyParts() {
   }
   drawLobbyMapNow(v);
   const seat = v.seats.find((x) => x.id === me.seat);
-  set('lb-seatinfo', seat ? `<p><b>${esc(seat.name)}</b>, Sitz auf der Burg ${esc(seat.castle)} (${esc(seat.realm)}).</p><p>${esc(seat.text)}</p><p class="lb-sub">Bisher halten ${esc(seat.lord)} die Burg. Du beginnst als ihr Herr mit Besatzung, Rittersaal und Lager; die Abgaben der Grafschaft gehören dir.</p>` : '');
+  const sc = START_CASTLES[v.start] || START_CASTLES.ruine;
+  set('lb-seatinfo', seat ? `<p><b>${esc(seat.name)}</b>, Sitz auf der Burg ${esc(seat.castle)} (${esc(seat.realm)}).</p><p>${esc(seat.text)}</p><p class="lb-sub">Bisher halten ${esc(seat.lord)} die Burg. Du beginnst als ihr Herr, die Abgaben der Grafschaft gehören dir. Die Burg ist zu Beginn eine ${esc(sc.name)}, und du baust sie aus wie eine eigene.</p>` : '');
   const diffName = (LOBBY_DIFF.find((d) => d[0] === v.difficulty) || LOBBY_DIFF[0])[1];
+  // Schwierigkeit und Anfangsburg stellt der Gastgeber für alle ein
   set('lb-diff', v.role === 'host'
-    ? `<div class="lb-field">Schwierigkeit der Barone <div class="seg">${LOBBY_DIFF.map(([k, n]) => `<button type="button" class="btn sm${v.difficulty === k ? ' primary' : ''}" data-lb="diff" data-v="${k}">${n}</button>`).join('')}</div></div>`
-    : `<p class="lb-note">Schwierigkeit der Barone: <b>${esc(diffName)}</b></p>`);
+    ? `<div class="lb-field">Schwierigkeit der Barone <div class="seg">${LOBBY_DIFF.map(([k, n]) => `<button type="button" class="btn sm${v.difficulty === k ? ' primary' : ''}" data-lb="diff" data-v="${k}">${n}</button>`).join('')}</div></div>
+      <div class="lb-field">Burg zu Beginn <div class="seg">${START_IDS.map((k) => `<button type="button" class="btn sm${v.start === k ? ' primary' : ''}" data-lb="burgstart" data-v="${k}">${esc(START_CASTLES[k].name)}</button>`).join('')}</div><p class="lb-sub">${esc(sc.text)}</p></div>`
+    : `<p class="lb-note">Schwierigkeit der Barone: <b>${esc(diffName)}</b> · Burg zu Beginn: <b>${esc(sc.name)}</b></p><p class="lb-sub">${esc(sc.text)}</p>`);
   // Spieler
   set('lb-players', v.players.map((p) => {
     const st = v.seats.find((x) => x.id === p.seat);
@@ -25571,11 +25601,12 @@ function onLobbyClick(e) {
   else if (act === 'metal') mpLobbyChoose({ profile: { arms: { metal: b.dataset.v } } });
   else if (act === 'charge') mpLobbyChoose({ profile: { arms: { charge: b.dataset.v } } });
   else if (act === 'diff') mpLobbyChoose({ difficulty: b.dataset.v });
+  else if (act === 'burgstart') mpLobbyChoose({ start: b.dataset.v });
   else if (act === 'start') {
     const r = mpLobbyStart();
     if (!r) return;
     closeLobby();
-    lbHooks.startHost({ ...lbProfile, ...r.profile, difficulty: r.difficulty, seat: r.seat });
+    lbHooks.startHost({ ...lbProfile, ...r.profile, difficulty: r.difficulty, start: r.start, seat: r.seat });
   } else if (act === 'leave') { mpLobbyLeave(); lbStep = 'wahl'; lbStatus = ''; renderLobby(); }
   else if (act === 'back') { if (G.mp && G.mp.phase === 'lobby') mpLobbyLeave(); closeLobby(); }
 }
@@ -25750,9 +25781,11 @@ const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
-// opts.seat (Mehrspieler): keine Heimburg, du beginnst als Herr dieser Grafschaft auf ihrer Burg
+// opts.seat (Mehrspieler): keine Heimburg Ashcombe, du beginnst als Herr dieser Grafschaft auf ihrer Burg.
+// opts.start: Stand der Burg zu Beginn (Ruine, Holzburg, Steinburg; castle.js START_CASTLES)
 function newGame(opts) {
   const { name, color, female, arms, difficulty, seat } = opts;
+  const start = startCastleKind(opts.start);
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed, { mp: !!seat, seats: Object.keys(SHIRES) });
   prepareSeatLayouts();
@@ -25766,7 +25799,7 @@ function newGame(opts) {
     x: at.x, y: at.y,
   });
   G.s = {
-    seed, castleName, color, seat: seat || null, mpWorld: !!seat, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
+    seed, castleName, color, seat: seat || null, mpWorld: !!seat, startCastle: start, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
@@ -25778,6 +25811,8 @@ function newGame(opts) {
   squire.wage = CLASSES.knecht.wage;
   placeNear(squire, player.x, player.y, 1);
   G.s.companions.push(squire);
+  // Ashcombe als Holzburg oder Steinburg (sonst bleibt es die Ruine)
+  if (!seat && start !== 'ruine') { applyStartCastle(start); refreshRecruits(); }
   initTowns();
   initDynamics();
   G.s.worldSig = worldSig(G.world);
@@ -25790,9 +25825,12 @@ function newGame(opts) {
   if (seat) lordStart(site);
   startWorld();
   if (seat) welcomeLord(site, name);
-  else {
+  else if (start === 'ruine') {
     log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
     log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
+  } else {
+    log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine ${START_CASTLES[start].name} und gehört dir.`, 'gold');
+    log(`${START_CASTLES[start].text} Tritt an die Burg (E) und baue sie weiter aus. Aufträge gibt es in den Siedlungen.`);
   }
 }
 
@@ -25806,9 +25844,9 @@ function lordStart(site) {
   refreshRecruits();
 }
 function welcomeLord(site, name) {
-  const sh = SHIRES[site.id];
+  const sh = SHIRES[site.id], sc = START_CASTLES[startCastleKind(G.s.startCastle)];
   log(`Willkommen in ${site.name}, ${name}. Die Grafschaft ${sh.name} gehört dir: ${sh.text}`, 'gold');
-  log(`${site.name} ist deine Burg wie eine eigene: eine Steinburg mit Rittersaal, Unterkunft, Schmiede, Stall und Äckern. Tritt an die Burg (E) und baue sie aus, auf freien Plätzen im Hof und davor. Pacht, Marktgeld und die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
+  log(`${site.name} ist deine Burg wie eine eigene, zu Beginn eine ${sc.name}: ${sc.text} Tritt an die Burg (E) und baue sie aus, auf freien Plätzen im Hof und davor. Pacht, Marktgeld und die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
 }
 
 // Mehrspieler-Gast: Welt aus dem Startwert des Gastgebers, gemeinsamer Stand von ihm, eigener Held an der Burg des Platzes
@@ -25957,11 +25995,15 @@ function buildSetupForm() {
   for (const r of document.querySelectorAll('input[name="schwierigkeit"]')) {
     r.addEventListener('change', () => { if (r.checked && DIFFICULTY[r.value]) byId('diff-text').textContent = DIFFICULTY[r.value].text; });
   }
+  for (const r of document.querySelectorAll('input[name="burgstart"]')) {
+    r.addEventListener('change', () => { if (r.checked && START_CASTLES[r.value]) byId('burgstart-text').textContent = START_CASTLES[r.value].text; });
+  }
+  const startPick = () => startCastleKind((document.querySelector('input[name="burgstart"]:checked') || {}).value);
   const formOpts = () => {
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
-    return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' };
+    return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht', start: startPick() };
   };
   // Mehrspieler-Lobby: eröffnen, beitreten, Burg wählen, bereit, gemeinsam starten
   initLobby({
@@ -25980,7 +26022,7 @@ function buildSetupForm() {
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
     // Erst die Ladetafel zeigen, dann die Welt erzeugen (das dauert einige Sekunden)
     showLoading('Die Welt wird erschaffen …');
-    setTimeout(() => newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' }), 50);
+    setTimeout(() => newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht', start: startPick() }), 50);
   });
 }
 

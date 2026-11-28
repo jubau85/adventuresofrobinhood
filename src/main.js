@@ -14,7 +14,7 @@ import {
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
-import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots, refreshRecruits, grantSeat, migrateSeat, isHomeBase, applyPeerCastles, startBuild, startTypeChange, castleOut, prepareSeatLayouts } from './castle.js';
+import { castleSite, castleBonusAt, dailyBalance, dailyCastle, refreshCastleBlock, castleObstacles, castleLayout, castlePlots, refreshRecruits, grantSeat, migrateSeat, isHomeBase, applyPeerCastles, startBuild, startTypeChange, castleOut, prepareSeatLayouts, applyStartCastle, startCastleKind, START_CASTLES } from './castle.js';
 import { applyHoldings, isHeld, grantHolding, holdingOf, startOwnSiege, dailyHoldings, loseHolding } from './holdings.js';
 import { callStorm } from './siege.js';
 import { startTrip, planTrip, updateTrips } from './travels.js';
@@ -45,9 +45,11 @@ const keys = new Set();
 let viewCanvas, mini;
 
 // ---------------------------------------------------------------- Spielstart
-// opts.seat (Mehrspieler): keine Heimburg, du beginnst als Herr dieser Grafschaft auf ihrer Burg
+// opts.seat (Mehrspieler): keine Heimburg Ashcombe, du beginnst als Herr dieser Grafschaft auf ihrer Burg.
+// opts.start: Stand der Burg zu Beginn (Ruine, Holzburg, Steinburg; castle.js START_CASTLES)
 function newGame(opts) {
   const { name, color, female, arms, difficulty, seat } = opts;
+  const start = startCastleKind(opts.start);
   const seed = (Math.random() * 2147483647) | 0;
   G.world = generateWorld(seed, { mp: !!seat, seats: Object.keys(SHIRES) });
   prepareSeatLayouts();
@@ -61,7 +63,7 @@ function newGame(opts) {
     x: at.x, y: at.y,
   });
   G.s = {
-    seed, castleName, color, seat: seat || null, mpWorld: !!seat, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
+    seed, castleName, color, seat: seat || null, mpWorld: !!seat, startCastle: start, arms: arms || { field: color, metal: 'gold', charge: 'loewe' }, day: 1, time: DAY_LEN * (2 / 24), gold: 300, renown: 0, difficulty: difficulty || 'leicht',
     rep: { sachsen: 10, normannen: -5, kirche: 0, gilde: 0, waldleute: -5, franken: -10, schotten: 0, iren: 0 },
     damage: {}, graves: {}, pendingDead: {}, deadDay: {}, buff: null, blight: {}, slain: {}, raided: {},
     cargo: {}, inventory: ['speer', 'gambeson', 'kurzbogen'],
@@ -73,6 +75,8 @@ function newGame(opts) {
   squire.wage = CLASSES.knecht.wage;
   placeNear(squire, player.x, player.y, 1);
   G.s.companions.push(squire);
+  // Ashcombe als Holzburg oder Steinburg (sonst bleibt es die Ruine)
+  if (!seat && start !== 'ruine') { applyStartCastle(start); refreshRecruits(); }
   initTowns();
   initDynamics();
   G.s.worldSig = worldSig(G.world);
@@ -85,9 +89,12 @@ function newGame(opts) {
   if (seat) lordStart(site);
   startWorld();
   if (seat) welcomeLord(site, name);
-  else {
+  else if (start === 'ruine') {
     log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine Ruine, aber sie gehört dir.`, 'gold');
     log('Tritt an die Ruine (E) und errichte ein Holzfällerlager und einen Rittersaal. Aufträge gibt es in den Siedlungen.');
+  } else {
+    log(`Willkommen in ${homeName()}, ${name}. Die Burg ist eine ${START_CASTLES[start].name} und gehört dir.`, 'gold');
+    log(`${START_CASTLES[start].text} Tritt an die Burg (E) und baue sie weiter aus. Aufträge gibt es in den Siedlungen.`);
   }
 }
 
@@ -101,9 +108,9 @@ function lordStart(site) {
   refreshRecruits();
 }
 function welcomeLord(site, name) {
-  const sh = SHIRES[site.id];
+  const sh = SHIRES[site.id], sc = START_CASTLES[startCastleKind(G.s.startCastle)];
   log(`Willkommen in ${site.name}, ${name}. Die Grafschaft ${sh.name} gehört dir: ${sh.text}`, 'gold');
-  log(`${site.name} ist deine Burg wie eine eigene: eine Steinburg mit Rittersaal, Unterkunft, Schmiede, Stall und Äckern. Tritt an die Burg (E) und baue sie aus, auf freien Plätzen im Hof und davor. Pacht, Marktgeld und die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
+  log(`${site.name} ist deine Burg wie eine eigene, zu Beginn eine ${sc.name}: ${sc.text} Tritt an die Burg (E) und baue sie aus, auf freien Plätzen im Hof und davor. Pacht, Marktgeld und die Abgaben der Grafschaft fließen jeden Tag in deine Kasse.`);
 }
 
 // Mehrspieler-Gast: Welt aus dem Startwert des Gastgebers, gemeinsamer Stand von ihm, eigener Held an der Burg des Platzes
@@ -252,11 +259,15 @@ function buildSetupForm() {
   for (const r of document.querySelectorAll('input[name="schwierigkeit"]')) {
     r.addEventListener('change', () => { if (r.checked && DIFFICULTY[r.value]) byId('diff-text').textContent = DIFFICULTY[r.value].text; });
   }
+  for (const r of document.querySelectorAll('input[name="burgstart"]')) {
+    r.addEventListener('change', () => { if (r.checked && START_CASTLES[r.value]) byId('burgstart-text').textContent = START_CASTLES[r.value].text; });
+  }
+  const startPick = () => startCastleKind((document.querySelector('input[name="burgstart"]:checked') || {}).value);
   const formOpts = () => {
     const name = byId('name-input').value.trim().slice(0, 24) || (titleFemale ? 'Aelfgifu' : 'Aldric');
     const castleName = byId('castle-input').value.trim().slice(0, 20) || 'Ashcombe';
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
-    return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' };
+    return { name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht', start: startPick() };
   };
   // Mehrspieler-Lobby: eröffnen, beitreten, Burg wählen, bereit, gemeinsam starten
   initLobby({
@@ -275,7 +286,7 @@ function buildSetupForm() {
     const diff = (document.querySelector('input[name="schwierigkeit"]:checked') || {}).value || 'leicht';
     // Erst die Ladetafel zeigen, dann die Welt erzeugen (das dauert einige Sekunden)
     showLoading('Die Welt wird erschaffen …');
-    setTimeout(() => newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht' }), 50);
+    setTimeout(() => newGame({ name, castleName, color: titleColor, female: titleFemale, arms: titleArms(), difficulty: DIFFICULTY[diff] ? diff : 'leicht', start: startPick() }), 50);
   });
 }
 

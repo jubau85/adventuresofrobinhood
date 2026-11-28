@@ -17,12 +17,12 @@ import { SHIRES, claimShire } from './shires.js';
 import { heldSites, holdingOf, dropHolding } from './holdings.js';
 import { applyDamage } from './siege.js';
 import { applyCons } from './dynamics.js';
-import { castleOut, applyPeerCastles } from './castle.js';
+import { castleOut, applyPeerCastles, START_CASTLES } from './castle.js';
 
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 export const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
-  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles'];
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles', 'startCastle'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
 const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
@@ -484,7 +484,7 @@ export function mpLobbyHost(opts, profile, ev = {}) {
   mp.phase = 'lobby'; mp.ev = ev;
   mp.profile = { ...profile, ...cleanProfile(profile, profile) };
   mp.seat = freeSeat(mp, mp.id, profile.seat);
-  mp.lobby = { difficulty: profile.difficulty || 'leicht', chat: [] };
+  mp.lobby = { difficulty: profile.difficulty || 'leicht', start: START_CASTLES[profile.start] ? profile.start : 'ruine', chat: [] };
   mp.lan = opts.lan || null;
   G.mp = mp;
   lobbyChanged(mp);
@@ -509,7 +509,7 @@ export function mpLobbyJoin(opts, profile, ev = {}) {
   return mp;
 }
 
-// Grafschaft, Profil, Bereit (Gast) oder Schwierigkeit (Gastgeber) ändern
+// Grafschaft, Profil, Bereit (Gast) oder Schwierigkeit und Anfangsburg (Gastgeber) ändern
 export function mpLobbyChoose(patch) {
   const mp = G.mp;
   if (!mp || mp.phase !== 'lobby') return;
@@ -519,6 +519,7 @@ export function mpLobbyChoose(patch) {
     return;
   }
   if (patch.difficulty && ['leicht', 'mittel', 'schwer'].includes(patch.difficulty)) mp.lobby.difficulty = patch.difficulty;
+  if (patch.start && START_CASTLES[patch.start]) mp.lobby.start = patch.start;
   if (patch.seat && freeSeat(mp, mp.id, patch.seat) === patch.seat) mp.seat = patch.seat;
   if (patch.profile) mp.profile = { ...mp.profile, ...takeProfile(mp, mp.id, patch.profile, mp.profile) };
   lobbyChanged(mp);
@@ -528,8 +529,8 @@ export function mpLobbyChoose(patch) {
 export function mpLobbyStart() {
   const mp = G.mp;
   if (!mp || mp.role !== 'host' || mp.phase !== 'lobby') return null;
-  mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty });
-  return { difficulty: mp.lobby.difficulty, seat: mp.seat, profile: { ...mp.profile } };
+  mp.tr.broadcast('start', { difficulty: mp.lobby.difficulty, start: mp.lobby.start });
+  return { difficulty: mp.lobby.difficulty, start: mp.lobby.start, seat: mp.seat, profile: { ...mp.profile } };
 }
 export function mpLobbyBegin() {
   const mp = G.mp;
@@ -563,7 +564,7 @@ function lobbyChat(mp, name, text) {
 function lobbyState(mp) {
   const players = [{ id: mp.id, ...me(), seat: mp.seat, ready: true, host: true }];
   for (const p of mp.peers.values()) players.push({ id: p.id, name: p.name, color: p.color, arms: p.arms, female: p.female, seat: p.seat, ready: !!p.ready, host: false });
-  return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, players, lan: mp.lan || null };
+  return { room: mp.room, hostId: mp.id, difficulty: mp.lobby.difficulty, start: mp.lobby.start, players, lan: mp.lan || null };
 }
 
 function lobbyChanged(mp) {
@@ -645,7 +646,7 @@ export function lobbyView() {
   const others = st.players.filter((p) => p.id !== mp.id);
   const seatBy = new Map(others.map((p) => [p.seat, p.name])), colorBy = new Map(others.map((p) => [p.color, p.name]));
   return {
-    role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, players: st.players, me: mine,
+    role: mp.role, room: mp.room, kind: mp.kind, lan: st.lan, difficulty: st.difficulty, start: START_CASTLES[st.start] ? st.start : 'ruine', players: st.players, me: mine,
     seats: seatIds().map((id) => ({ id, free: !seatBy.has(id), by: seatBy.get(id) || null, ...lobbySeatInfo(id) })),
     colors: HERALDRY.map((h) => ({ ...h, by: colorBy.get(h.color) || null })),
     allReady: st.players.every((p) => p.ready), chat: mp.lobby.chat,

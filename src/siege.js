@@ -171,7 +171,7 @@ export function startSiege(target = null, armyType = null, scale = null, opts = 
 function wallBand(s) {
   const W = G.world;
   if (s.cityWall) return { band: s.cityWall, square: false };
-  if (s.type === 'burg' || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, s.type === 'spieler' ? ringR() : s.ringR || 4), square: true };
+  if ((s.type === 'burg' && (s.castleLevel ?? 2) >= 1) || (s.type === 'spieler' && G.s.castle.level >= 1)) return { band: wallRing(W, s, s.type === 'spieler' ? ringR() : s.ringR || 4), square: true };
   if (s.palisade) return { band: palisadeBand(s, true), square: false };
   return null;
 }

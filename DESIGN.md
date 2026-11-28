@@ -184,8 +184,11 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Burgart, Bauplätzen (`plotLayout` um die Grafschaftsburg, gleich nach dem Erzeugen der Welt für alle festgelegt),
   Lager, Rittersaal, Tagesbilanz mit Pacht und Marktgeld (ohne Vogt), Überfällen und Belagerungen mit Tor, Pforte und
   Burgwache, aber ohne Eroberung (Krieg und Barone nehmen keine Heimburg eines Menschen). `grantSeat` (castle.js)
-  stellt sie als Steinburg mit Rittersaal, Unterkunft, Schmiede, Stall und Acker hin, mit zwei Wochen Ruhe. Mauern und
-  Bergfried zeichnet und sperrt `world.js` nach `castleLevel` und `ringR` der Grafschaftsburg, die `syncSeatSite` aus
+  stellt sie im Stand hin, den der Gastgeber in der Lobby für alle gewählt hat (`START_CASTLES`: Ruine, Holzburg,
+  Steinburg; `G.s.startCastle` im gemeinsamen Stand, damit auch Spätere ihn bekommen), mit zwei Wochen Ruhe. Dieselbe
+  Wahl gibt es im Startmenü für Ashcombe (`applyStartCastle`). Eroberte Burgen anderer Grafschaften bleiben Besitz mit
+  Kastellan (Absicht, fürs Gleichgewicht). Mauern und Bergfried (eine Ruine ohne geschlossenen Ring, Bergfried je Stufe
+  wie `CASTLE_KEEP`) zeichnet und sperrt `world.js` nach `castleLevel` und `ringR` der Grafschaftsburg, die `syncSeatSite` aus
   deiner Burg überträgt; Gebäude, Baustellen und freie Plätze zeichnet `render.js` wie in Ashcombe. Jeder schickt den
   Stand seiner Burg mit (`castleOut`: Stufe, Burgart, Gebäude, Baustelle, im Lebenszeichen `da`); der Gastgeber legt
   ihn in den gemeinsamen Stand (`mpCastles`), und alle zeichnen die Burgen der anderen danach (`applyPeerCastles`,

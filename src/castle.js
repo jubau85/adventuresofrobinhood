@@ -218,11 +218,12 @@ export function refreshCastleBlock() {
 }
 
 // Die Grafschaftsburg zeigt Stufe und Mauerring deiner Burg: world.js zeichnet und sperrt danach Mauern und Bergfried
+// (eine Ruine ohne Mauerring, wie Ashcombe am Anfang)
 export function syncSeatSite() {
   const s = seatSite();
   if (!s) return false;
   s.mpHome = 'ich';
-  const lv = Math.max(1, G.s.castle.level), R = ringR();
+  const lv = G.s.castle.level, R = ringR();
   if (s.castleLevel === lv && (s.ringR || 4) === R) return false;
   s.castleLevel = lv; s.ringR = R;
   rebuildStaticWalls(G.world);
@@ -230,19 +231,32 @@ export function syncSeatSite() {
   return true;
 }
 
-// Mehrspieler-Start: Die Burg deiner Grafschaft wird deine Heimburg wie Ashcombe. Sie steht schon als Steinburg (oder
-// Festung) mit Rittersaal, Unterkunft, Schmiede, Stall und Äckern; die Grafschaft gehört dir. Zwei Wochen lang lassen
-// dich Räuber und Heere in Ruhe.
-const SEAT_START = [['halle', 2], ['kaserne', 2], ['schmiede', 1], ['stall', 1], ['felder', 1]];
+// Wie die Heimburg anfängt (Wahl beim Spielstart, im Mehrspieler für alle gleich): als Ruine wie Ashcombe, als
+// Holzburg mit dem Nötigsten oder als ausgebaute Steinburg
+export const START_CASTLES = {
+  ruine: { name: 'Ruine', level: 0, plots: [], text: 'Ein verfallener Burgstall. Alles baust du selbst auf, vom Holzfällerlager bis zum Bergfried.' },
+  holzburg: { name: 'Holzburg', level: 1, plots: [['halle', 1], ['holzfaeller', 1], ['felder', 1]], text: 'Palisade und hölzerner Bergfried, dazu ein Rittersaal, ein Holzfällerlager und ein Acker.' },
+  steinburg: { name: 'Steinburg', level: 2, plots: [['halle', 2], ['kaserne', 2], ['schmiede', 1], ['stall', 1], ['felder', 1]], text: 'Steinmauern und Bergfried, Rittersaal und Unterkunft auf Stufe 2, Schmiede, Stall und ein Acker.' },
+};
+export const START_IDS = Object.keys(START_CASTLES);
+export function startCastleKind(k) { return START_CASTLES[k] ? k : 'ruine'; }
+// Die Heimburg auf den gewählten Stand bringen (Burgstufe, Turmburg, Gebäude auf ihren Plätzen)
+export function applyStartCastle(kind) {
+  const k = startCastleKind(kind), def = START_CASTLES[k], C = G.s.castle, s = castleSite();
+  G.s.startCastle = k;
+  C.level = def.level; C.type = 'turm'; C.plots = null; C.b = {};
+  if (!s) return;
+  const lay = plotLayout(s, 'turm'), plots = castlePlots();
+  for (const [id, lv] of def.plots) { const i = freePlotFor(id, lay, plots); if (i >= 0) plots[i] = { id, lv }; }
+}
+
+// Mehrspieler-Start: Die Burg deiner Grafschaft wird deine Heimburg wie Ashcombe, im Stand, den der Gastgeber für alle
+// gewählt hat (G.s.startCastle); die Grafschaft gehört dir. Zwei Wochen lang lassen dich Räuber und Heere in Ruhe.
 export const SEAT_PEACE = 14;
 export function grantSeat(s) {
   if (!s || !SHIRES[s.id] || s !== seatSite()) return false;
   const C = G.s.castle;
-  C.level = Math.max(2, s.castleLevel || 2);
-  C.type = 'turm';
-  C.plots = null; C.b = {};
-  const lay = plotLayout(s, 'turm'), plots = castlePlots();
-  for (const [id, lv] of SEAT_START) { const i = freePlotFor(id, lay, plots); if (i >= 0) plots[i] = { id, lv }; }
+  applyStartCastle(G.s.startCastle);
   C.peaceUntil = G.s.day + SEAT_PEACE;
   claimShire(s.id, 'spieler', true);
   refreshCastleBlock();
@@ -280,7 +294,7 @@ export function applyPeerCastles() {
     const s = W.sites.find((x) => x.id === seat);
     if (!s || s === home || s.type !== 'burg' || !b) continue;
     s.mpHome = 'peer';
-    const lv = Math.max(1, Math.min(3, b.lv | 0)), R = CASTLE_TYPES[b.ty] ? CASTLE_TYPES[b.ty].R : 4;
+    const lv = Math.max(0, Math.min(3, b.lv | 0)), R = CASTLE_TYPES[b.ty] ? CASTLE_TYPES[b.ty].R : 4;
     if (s.castleLevel !== lv || (s.ringR || 4) !== R) { s.castleLevel = lv; s.ringR = R; walls = true; }
     const lay = peerLayout(s, b);
     (b.p || []).forEach((q, i) => { if (q && lay[i] && BUILDINGS[q[0]]) for (const [x, y, wx, wy, pen] of plotRects(q[0], q[1], lay[i])) rects.push({ x, y, wx, wy, pen: !!pen }); });
@@ -297,7 +311,7 @@ export function migrateSeat() {
   delete G.s.holdings[s.id];
   const c = h.castellan && G.s.companions.find((u) => u.id === h.castellan);
   if (c) { c.status = 'garnison'; c.seat = null; }
-  if (G.s.castle.level < 2) grantSeat(s);
+  if (!G.s.castle.plots) { G.s.startCastle = 'steinburg'; grantSeat(s); }
   return true;
 }
 

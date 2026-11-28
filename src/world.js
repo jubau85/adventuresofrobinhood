@@ -1,7 +1,7 @@
 // Weltgenerator: Küsten, Flüsse, Bergland, Siedlungen, Straßen, Häfen, Felder, Bäume, Gebäude.
 // Alles ist deterministisch aus dem Seed, daher muss nur der Seed gespeichert werden.
 
-import { MAP, MAP_K, MAP_AREA, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE, POIS } from './data.js';
+import { MAP, MAP_K, MAP_AREA, CHUNK, HMAX, T, TERRAIN_COST, SETTLEMENTS, geoToTile, GEO_SCALE, POIS, CASTLE_KEEP } from './data.js';
 import { COAST_GB, COAST_IRELAND, COAST_CONTINENT, ISLANDS, RIVERS, UPLANDS, FORESTS } from './geo.js';
 import { mulberry32, makeNoise, fbm, rpick, hash2 } from './rng.js';
 
@@ -150,19 +150,22 @@ function buildStaticWalls(W) {
   W.wallStatic = new Uint8Array(W.N * W.N);
   markWalls(W, W.wallStatic);
   // Bergfriede der Burgen auch genau als Hindernis
-  W.keepObs = W.sites.filter((s) => s.type === 'burg').map((s) => { const kw = s.castleLevel >= 3 ? 2.8 : 2.2; return makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw); });
+  W.keepObs = W.sites.filter((s) => s.type === 'burg').map((s) => { const k = burgKeep(s); return makeObstacle(s.x + k.dx, s.y + k.dy, k.w, k.w); });
   W.ogrid = null;
   refreshBuildingBlocks(W);
 }
 
-// Stadtmauern, Burgmauern mit Bergfried (wie in render.js castlePieces gezeichnet) und Palisaden
+// Bergfried einer Burg je Stufe (wie bei deiner Burg): Stumpf der Ruine, Holzturm, Steinturm, Donjon
+function burgKeep(s) { return CASTLE_KEEP[Math.max(0, Math.min(3, s.castleLevel ?? 2))]; }
+// Stadtmauern, Burgmauern mit Bergfried (wie in render.js castlePieces gezeichnet) und Palisaden. Eine Ruine
+// (Grafschaftsburg eines Menschen im Mehrspieler) hat keinen geschlossenen Mauerring.
 function markWalls(W, arr) {
   for (const s of W.sites) {
     if (s.cityWall) blockTiles(W, arr, s.cityWall);
     if (s.type === 'burg') {
-      blockTiles(W, arr, wallRing(W, s, s.ringR || 4));
-      const kw = s.castleLevel >= 3 ? 2.8 : 2.2;
-      for (const [x, y] of obstacleTiles(W, makeObstacle(s.x - 1.1, s.y - 1.1, kw, kw), false)) arr[y * W.N + x] = 1;
+      if ((s.castleLevel ?? 2) >= 1) blockTiles(W, arr, wallRing(W, s, s.ringR || 4));
+      const k = burgKeep(s);
+      for (const [x, y] of obstacleTiles(W, makeObstacle(s.x + k.dx, s.y + k.dy, k.w, k.w), false)) arr[y * W.N + x] = 1;
     }
     if (s.palisade) blockTiles(W, arr, palisadeBand(s, false));
   }

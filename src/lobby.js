@@ -9,6 +9,7 @@ import { byId, esc } from './ui.js';
 import { CHARGES, CHARGE_IDS, armsSVG, chargeSVG } from './heraldry.js';
 import { mpLobbyHost, mpLobbyJoin, mpLobbyChoose, mpLobbyStart, mpLobbyLeave, mpChat, lobbyView } from './mp.js';
 import { drawLobbyMap, lobbyMapPick, lobbyMapSeatPos } from './shiremap.js';
+import { START_CASTLES, START_IDS } from './castle.js';
 
 let lbHooks = null, lbStep = 'wahl', lbStatus = '', lbProfile = null, lbSig = '', lbSigArms = '', lbNameT = null, lbHover = null, lbMapReq = 0, lbLanOn = false, lbLanGames = [];
 const LOBBY_DIFF = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']];
@@ -196,11 +197,14 @@ function renderLobbyParts() {
   }
   drawLobbyMapNow(v);
   const seat = v.seats.find((x) => x.id === me.seat);
-  set('lb-seatinfo', seat ? `<p><b>${esc(seat.name)}</b>, Sitz auf der Burg ${esc(seat.castle)} (${esc(seat.realm)}).</p><p>${esc(seat.text)}</p><p class="lb-sub">Bisher halten ${esc(seat.lord)} die Burg. Du beginnst als ihr Herr mit Besatzung, Rittersaal und Lager; die Abgaben der Grafschaft gehören dir.</p>` : '');
+  const sc = START_CASTLES[v.start] || START_CASTLES.ruine;
+  set('lb-seatinfo', seat ? `<p><b>${esc(seat.name)}</b>, Sitz auf der Burg ${esc(seat.castle)} (${esc(seat.realm)}).</p><p>${esc(seat.text)}</p><p class="lb-sub">Bisher halten ${esc(seat.lord)} die Burg. Du beginnst als ihr Herr, die Abgaben der Grafschaft gehören dir. Die Burg ist zu Beginn eine ${esc(sc.name)}, und du baust sie aus wie eine eigene.</p>` : '');
   const diffName = (LOBBY_DIFF.find((d) => d[0] === v.difficulty) || LOBBY_DIFF[0])[1];
+  // Schwierigkeit und Anfangsburg stellt der Gastgeber für alle ein
   set('lb-diff', v.role === 'host'
-    ? `<div class="lb-field">Schwierigkeit der Barone <div class="seg">${LOBBY_DIFF.map(([k, n]) => `<button type="button" class="btn sm${v.difficulty === k ? ' primary' : ''}" data-lb="diff" data-v="${k}">${n}</button>`).join('')}</div></div>`
-    : `<p class="lb-note">Schwierigkeit der Barone: <b>${esc(diffName)}</b></p>`);
+    ? `<div class="lb-field">Schwierigkeit der Barone <div class="seg">${LOBBY_DIFF.map(([k, n]) => `<button type="button" class="btn sm${v.difficulty === k ? ' primary' : ''}" data-lb="diff" data-v="${k}">${n}</button>`).join('')}</div></div>
+      <div class="lb-field">Burg zu Beginn <div class="seg">${START_IDS.map((k) => `<button type="button" class="btn sm${v.start === k ? ' primary' : ''}" data-lb="burgstart" data-v="${k}">${esc(START_CASTLES[k].name)}</button>`).join('')}</div><p class="lb-sub">${esc(sc.text)}</p></div>`
+    : `<p class="lb-note">Schwierigkeit der Barone: <b>${esc(diffName)}</b> · Burg zu Beginn: <b>${esc(sc.name)}</b></p><p class="lb-sub">${esc(sc.text)}</p>`);
   // Spieler
   set('lb-players', v.players.map((p) => {
     const st = v.seats.find((x) => x.id === p.seat);
@@ -275,11 +279,12 @@ function onLobbyClick(e) {
   else if (act === 'metal') mpLobbyChoose({ profile: { arms: { metal: b.dataset.v } } });
   else if (act === 'charge') mpLobbyChoose({ profile: { arms: { charge: b.dataset.v } } });
   else if (act === 'diff') mpLobbyChoose({ difficulty: b.dataset.v });
+  else if (act === 'burgstart') mpLobbyChoose({ start: b.dataset.v });
   else if (act === 'start') {
     const r = mpLobbyStart();
     if (!r) return;
     closeLobby();
-    lbHooks.startHost({ ...lbProfile, ...r.profile, difficulty: r.difficulty, seat: r.seat });
+    lbHooks.startHost({ ...lbProfile, ...r.profile, difficulty: r.difficulty, start: r.start, seat: r.seat });
   } else if (act === 'leave') { mpLobbyLeave(); lbStep = 'wahl'; lbStatus = ''; renderLobby(); }
   else if (act === 'back') { if (G.mp && G.mp.phase === 'lobby') mpLobbyLeave(); closeLobby(); }
 }

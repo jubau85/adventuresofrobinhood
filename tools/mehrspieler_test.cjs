@@ -86,6 +86,12 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   ok(profB && profB.female && profB.arms.charge === 'hirsch' && profB.arms.metal === 'silber' && profB.color !== colA, `A kennt Bridas Wappen (${JSON.stringify(profB)})`);
   ok(await A.evaluate(() => [...document.querySelectorAll('#lb-seat option')].some((o) => o.value === 'chester' && o.disabled)), 'Cheshire ist für A gesperrt');
   ok(/Brida: Bin bereit!/.test(lobbyA.chat), 'Chat in der Lobby kommt an');
+  // Burg zu Beginn: Vorgabe Ruine, der Gastgeber stellt für alle die Holzburg ein
+  const startDef = await A.evaluate(() => window.__ritter.mp.lobby.start);
+  await A.click('[data-lb="burgstart"][data-v="holzburg"]');
+  await B.waitForFunction(() => /Burg zu Beginn: Holzburg/.test(document.getElementById('lb-diff').textContent), null, { timeout: 10000 }).catch(() => {});
+  const startB = await B.evaluate(() => document.getElementById('lb-diff').textContent);
+  ok(startDef === 'ruine' && /Burg zu Beginn: Holzburg/.test(startB), `Burg zu Beginn: Vorgabe ${startDef}, der Gastgeber wählt die Holzburg, B sieht es`);
   await A.screenshot({ path: `${OUT}/lobby_A.png` });
   await B.screenshot({ path: `${OUT}/lobby_B.png` });
   await A.click('[data-lb="start"]');
@@ -100,7 +106,7 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   ok(!sA.home && !sB.home, 'keine Heimburg Ashcombe in der Mehrspieler-Welt');
   ok(sA.homeAt === sA.seat && sA.own === 'spieler' && !sA.held.length, `A herrscht über seine Grafschaft (${sA.seat}), ihre Burg ist seine Heimburg`);
   ok(sB.seat === 'chester' && sB.homeAt === 'chester' && !sB.held.length && sB.owner === 'spieler' && sB.castleName === 'Chester', `B herrscht über Cheshire, Heimburg ${sB.castleName}`);
-  ok(sB.lv >= 2 && ['halle', 'kaserne', 'schmiede', 'stall', 'felder'].every((id) => sB.built.includes(id)), `Die Grafschaftsburg ist eine Steinburg (Stufe ${sB.lv}) mit Gebäuden auf Bauplätzen (${sB.built.join(', ')})`);
+  ok(sA.lv === 1 && sB.lv === 1 && ['halle', 'holzfaeller', 'felder'].every((id) => sB.built.includes(id) && sA.built.includes(id)) && sB.built.length === 3, `Beide Grafschaftsburgen sind Holzburgen (Stufe ${sA.lv}, ${sB.lv}) mit Rittersaal, Holzfäller und Acker (${sB.built.join(', ')})`);
   ok(sA.chester === 'p:chester' && sB.ownerA === `p:${sA.seat}`, `Jeder sieht die Grafschaft des anderen als dessen (${sA.chester}, ${sB.ownerA})`);
   ok(sB.female && sB.arms.charge === 'hirsch' && sB.arms.metal === 'silber', 'B spielt die Ritterin mit dem gewählten Wappen');
   const names = await ev(A, () => { const G = window.__ritter; return [G.mpSeatInfo('chester').name, G.world.sites.find((s) => s.id === 'chester')]; });
