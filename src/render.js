@@ -2221,21 +2221,32 @@ function holzRing(site, R) {
     const has = (dx, dy) => set.has((y + dy) * N + x + dx);
     const nb = [has(-1, 0) && 'nw', has(1, 0) && 'so', has(0, -1) && 'no', has(0, 1) && 'sw'].filter(Boolean).join('+');
     const sel = HB_AUSWAHL[nb], tower = corner(x, y), gate = !tower && gk.has(y * N + x);
-    const name = tower ? 'palisadenturm' : gate ? (nb === 'no+sw' ? 'palisadentor_y' : 'palisadentor_x')
-      : sel ? (inside(x + sel[0][0], y + sel[0][1]) ? sel[1] : sel[2]) : 'palisade_x_aussen';
-    return { x: x + 0.5, y: y + 0.5, name, gate, tower, along: nb === 'no+sw' ? 'y' : 'x' };
+    const base = sel ? (inside(x + sel[0][0], y + sel[0][1]) ? sel[1] : sel[2]) : 'palisade_x_aussen';
+    const name = tower ? 'palisadenturm' : gate ? (nb === 'no+sw' ? 'palisadentor_y' : 'palisadentor_x') : base;
+    return { x: x + 0.5, y: y + 0.5, name, base, gate, tower, along: nb === 'no+sw' ? 'y' : 'x' };
   }).sort((a, b) => Math.atan2(a.y - site.y, a.x - site.x) - Math.atan2(b.y - site.y, b.x - site.x));   // einmal rundherum (für den Bau)
 }
 // Schadensstufe im Baukasten: 1 leicht, 2 schwer (die Bresche)
 const hbStage = (hit) => (!hit ? 0 : hit.gone || hit.dmg >= 0.55 ? 2 : hit.dmg >= 0.12 ? 1 : 0);
-function hbDraw(c, name, x, y, stage, col) {
+// Ecktürme und Tortürme etwas kleiner als gemalt, damit die Motte das höchste Bauwerk bleibt und die Burg überschaut.
+// Unter ihnen liegt das Palisadenstück ihres Feldes: So stößt die Palisade weiter an die (kleineren) Turmwände.
+const HB_TURM = 0.78, HB_TOR = 0.8;
+const hbScale = (p) => (p.tower ? HB_TURM : p.gate ? HB_TOR : 1);
+function hbDraw(c, name, x, y, stage, col, sc = 1) {
   const id = (stage && hbPick(`${name}_schaden_${stage}`)) || hbPick(name);
-  return id ? p5(c, id, x, y, 1, false, col) : false;
+  return id ? p5(c, id, x, y, sc, false, col) : false;
+}
+// Ein Teil des Rings: Türme und Tore verkleinert auf ihrem Palisadenstück
+function hbPiece(c, p, stage, col) {
+  const sc = hbScale(p);
+  if (sc !== 1 && !hbDraw(c, p.base, p.x, p.y, stage, col)) return false;
+  return hbDraw(c, p.name, p.x, p.y, stage, col, sc);
 }
 // Geschlossene Torflügel im gemalten Torturm der Holzburg (x: Durchfahrt nach links unten, y: nach rechts unten)
-function drawHolzGateDoors(c, x, y, gate) {
-  // u läuft auf der Torseite von links (x) bzw. von der vorderen Ecke (y); die Öffnung liegt zur vorderen Ecke hin
-  const pt = gate === 'x' ? (u, z) => P(x - 0.5 + u, y + 0.36, z) : (u, z) => P(x + 0.36, y + 0.5 - u, z);
+function drawHolzGateDoors(c, x, y, gate, sc = 1) {
+  // u läuft auf der Torseite von links (x) bzw. von der vorderen Ecke (y); die Öffnung liegt zur vorderen Ecke hin.
+  // sc: Maßstab des Torturms (um die Feldmitte)
+  const pt = gate === 'x' ? (u, z) => P(x + (u - 0.5) * sc, y + 0.36 * sc, z * sc) : (u, z) => P(x + 0.36 * sc, y + (0.5 - u) * sc, z * sc);
   const [u0, u1] = gate === 'x' ? [0.18, 0.76] : [0.24, 0.82], h = 28;
   c.fillStyle = '#6e4e30'; c.strokeStyle = '#3a2818'; c.lineWidth = 1;
   c.beginPath();
@@ -2292,9 +2303,9 @@ function castlePieces(site, level, bannerCol, R = 4) {
     for (const p of holzRing(site, R)) {
       add(p.x, p.y, (c) => {
         const hit = wallHit(site, p.x, p.y), st = hbStage(hit);
-        if (hbDraw(c, p.name, p.x, p.y, st, bannerCol)) {
-          if (p.gate && !st && castleGateClosed(site)) drawHolzGateDoors(c, p.x, p.y, p.name === 'palisadentor_y' ? 'y' : 'x');
-          if (hit && hit.repair && st) drawScaffold(c, p.x, p.y, 1.05, 1.05, p.gate || p.tower ? 46 : 30);
+        if (hbPiece(c, p, st, bannerCol)) {
+          if (p.gate && !st && castleGateClosed(site)) drawHolzGateDoors(c, p.x, p.y, p.name === 'palisadentor_y' ? 'y' : 'x', HB_TOR);
+          if (hit && hit.repair && st) drawScaffold(c, p.x, p.y, 1.05, 1.05, p.gate || p.tower ? 38 : 30);
           return;
         }
         if (artPending(`hb_${p.name}`)) return;
@@ -3500,7 +3511,7 @@ function buildPlayerCastle() {
         if (p.tower || p.gate) {
           if (pr < 0.9) { drawScaffold(c, p.x, p.y, 1.05, 1.05, 20 + 30 * pr); return; }
         }
-        if (!hbDraw(c, p.name, p.x, p.y, 0, playerColor())) for (let q = -1; q <= 1; q++) {
+        if (!hbPiece(c, p, 0, playerColor())) for (let q = -1; q <= 1; q++) {
           const px = p.along === 'x' ? p.x + q * 0.33 : p.x, py = p.along === 'y' ? p.y + q * 0.33 : p.y;
           drawBox(c, px, py, 0.24, 0.24, 24, '#9a7450'); drawPyramid(c, px, py, 0.24, 0.24, 24, 6, '#9a7450');
         }
