@@ -1,6 +1,6 @@
 // Einstieg: Spielstart, Hauptschleife, Eingabe, Kamera.
 
-import { G, log, homeName } from './state.js';
+import { G, log, homeName, versionText } from './state.js';
 import { DAY_LEN, CLASSES, GROUP_TYPES, FACTIONS, HERALDRY } from './data.js';
 import { CHARGES, CHARGE_IDS, chargeSVG, preloadChargeArt, PLATE_W, PLATE_H } from './heraldry.js';
 import { drawTitleArt } from './titleart.js';
@@ -1025,6 +1025,8 @@ function boot(hotData) {
   if (hotData && hotData.save) {
     try { deserialize(hotData.save); spawnAnimals(); startWorld(); resumed = true; } catch (e) { resumed = false; }
   }
+  const vt = byId('version-tag');
+  if (vt) vt.textContent = versionText();
   if (!resumed) { showTitle(); if (introWanted()) startIntro(); }
   try {
     if (window.claude && window.claude.hot && window.claude.hot.snapshot) {

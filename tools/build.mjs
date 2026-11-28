@@ -13,6 +13,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const VERSION = JSON.parse(readFileSync(join(ROOT, 'desktop', 'package.json'), 'utf8')).version;
+console.log(`Version ${VERSION}`);
 const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'tactics', 'shires', 'plots', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'holdings', 'travels', 'war', 'barons', 'net', 'mp', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'heraldry', 'render', 'titleart', 'audio', 'ui', 'pixelfont', 'intro', 'shiremap', 'lobby', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
@@ -80,9 +82,10 @@ function page(extern = []) {
   });
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   html = html.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}</style>`);
-  // Spielversion (aus dem Code): Partien im Heimnetz mit anderer Version lassen sich nicht betreten
+  // Spielversion (aus dem Code): Partien im Heimnetz mit anderer Version lassen sich nicht betreten. Dazu die
+  // Versionsnummer für Menschen (tools/version.mjs), im Startmenü und im Spielmenü zu sehen
   const build = createHash('sha1').update(js).digest('hex').slice(0, 10);
-  html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\nwindow.__aktBuild = '${build}';\n(function () {\n'use strict';\n${code}\n})();\n</script>`);
+  html = html.replace('<script type="module" src="src/main.js"></script>', () => `<script>\nwindow.__aktBuild = '${build}';\nwindow.__aktVersion = '${VERSION}';\n(function () {\n'use strict';\n${code}\n})();\n</script>`);
   return { html, artBytes, kept };
 }
 const { html, artBytes } = page();

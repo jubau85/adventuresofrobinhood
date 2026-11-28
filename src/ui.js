@@ -1,6 +1,6 @@
 // Oberfläche: Kopfleiste, Meldungen, Tafeln (Siedlung, Burg, Gefolge, Aufträge, Politik, Karte, Menü).
 
-import { G, log, homeName, playerColor } from './state.js';
+import { G, log, homeName, playerColor, versionText } from './state.js';
 import {
   FACTIONS, FACTION_IDS, GOODS, GOOD_IDS, ITEMS, SLOTS, SLOT_NAME, CLASSES, BUILDINGS, BUILDING_IDS,
   TYPE_NAME, siteTypeName, SEASONS, REGIONS, dirText, CASTLE_BONUS, FOOD_PRICE, FOOD_GOODS, GROUP_TYPES, DAY_LEN,
@@ -1341,7 +1341,8 @@ function menuPanel() {
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
-    <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>`,
+    <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>
+    <p class="hint">A Knight's Tale · ${esc(versionText())}</p>`,
   };
 }
 

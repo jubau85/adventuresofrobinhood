@@ -10,7 +10,7 @@ const lan = require('./lan.js');
 
 // Im fertigen Paket liegt das Spiel neben der App unter resources/game (electron-builder extraResources)
 const GAME = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, 'game');
-const TITLE = "A Knight's Tale";
+const TITLE = `A Knight's Tale ${app.getVersion()}`;
 
 // Der Vorspann spielt seine Musik gleich beim Start, ohne vorher auf einen Klick zu warten
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -67,6 +67,8 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, backgroundThrottling: false, spellcheck: false },
   });
   Menu.setApplicationMenu(null);
+  // Der Fenstertitel trägt die Versionsnummer (die Seite selbst heißt nur „A Knight's Tale“)
+  win.on('page-title-updated', (e) => e.preventDefault());
   win.once('ready-to-show', () => { win.show(); if (process.argv.includes('--vollbild')) win.setFullScreen(true); });
   // F11 und Alt+Enter: Vollbild; F12 öffnet die Entwicklerwerkzeuge nur mit --entwickler
   win.webContents.on('before-input-event', (ev, input) => {

@@ -38,6 +38,21 @@ und auf dem Desktop an und erscheint unter „Apps“ zum Deinstallieren; Spiels
 nicht eingerichtet (Windows warnt dann beim ersten Start; für Steam ist das nicht nötig, Steam startet die App selbst).
 Das Programmsymbol (`build/icon.png`) erzeugt `python3 -I ../tools/symbol.py build/icon.png`.
 
+### Versionsnummern
+
+Jedes Setup, das weitergegeben wird, hat eine eigene Versionsnummer (`Hauptversion.Neben.Build`, z. B. 0.8.0). Sie
+steht in `desktop/package.json`; `tools/version.mjs` zieht sie nach `package.json` und `desktop/package-lock.json`
+mit. `node build-setup.mjs` (`npm run dist:setup`) zählt vor dem Bauen die letzte Stelle hoch (0.8.0 → 0.8.1);
+`--version 0.9.0` setzt eine Nummer, `--gleiche-version` behält sie (nur zum Ausprobieren). Danach die geänderten
+package.json-Dateien einchecken. Die Nummer steht im Namen des Setups, im Fenstertitel der App, unten links im
+Startmenü und im Spielmenü (dort mit dem Build, dem Kurzzeichen des Codes). `tools/build.mjs` schreibt sie auch in die
+Browserfassung; aus den Quellen gestartet zeigt das Spiel „Entwicklungsstand“.
+
+```
+node ../tools/version.mjs          # zeigt die Nummer
+node ../tools/version.mjs minor    # 0.8.3 -> 0.9.0 (größere Neuerungen)
+```
+
 ## Mehrspieler im Heimnetz (vor Steam)
 
 Im Startmenü öffnet **Mehrspieler …** die Lobby. Wer **eröffnet**, startet in der App ein kleines Relais (Port 8765)

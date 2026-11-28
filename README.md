@@ -186,7 +186,8 @@ node tools/build.mjs --fragment seite.html --extern assets/held/,assets/pferde/,
 | `src/lobby.js` | Oberfläche der Mehrspieler-Lobby: eröffnen, beitreten, Ritter und Wappen, Grafschaft, Spielerliste, Chat, Start |
 | `src/shiremap.js` | Karte der Grafschaften für die Lobby, aus den Umrissen in `geo.js` (ohne Welt): Grenzen wie im Spiel, Wappen der Spieler, Klick wählt |
 | `src/main.js` | Start, Hauptschleife, Eingabe |
-| `tools/build.mjs` | Bündelt alles in eine HTML-Datei |
+| `tools/build.mjs` | Bündelt alles in eine HTML-Datei, mit Versionsnummer und Build |
+| `tools/version.mjs` | Versionsnummer zeigen, hochzählen oder setzen (jedes Setup bekommt eine eigene, siehe `desktop/README.md`) |
 | `tools/intro_bilder.py` | Bereitet die Bilder der Vorgeschichte von Oakgen vor: Zuschnitt auf das Bildfeld, 600 × 248, verlustfreies WebP nach `assets/intro/` |
 | `tools/pixelschrift.py` | Rendert die Pixelschrift der Vorgeschichte ohne Kantenglättung aus Liberation Serif (SIL Open Font License) nach `src/pixelfont.js` |
 | `tools/kollision.mjs` | Prüft für drei Welten, ob sich Gebäude, Stadtmauern, Burgmauern, Palisaden und Friedhöfe überschneiden (`node tools/kollision.mjs`) |

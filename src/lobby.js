@@ -40,7 +40,7 @@ function lanTick() {
     const v = mp.phase === 'lobby' ? lobbyView() : null;
     const players = v && v.players ? v.players.length : 1 + mp.peers.size;
     const host = G.s && G.started ? G.s.player.name : (mp.profile && mp.profile.name) || '';
-    L.announce({ room: mp.room, host, players, phase: mp.phase, port: 8765, build: window.__aktBuild || 'dev' });
+    L.announce({ room: mp.room, host, players, phase: mp.phase, port: 8765, build: window.__aktBuild || 'dev', version: window.__aktVersion || '' });
     lbLanOn = true;
   } else if (lbLanOn) { L.stop(); lbLanOn = false; }
   if (lbStep === 'wahl' && !byId('lobby').hidden) {
@@ -55,7 +55,7 @@ function renderLan(err) {
   const build = window.__aktBuild || 'dev';
   const html = lbLanGames.length ? lbLanGames.map((g, i) => {
     const same = !g.build || g.build === build;
-    return `<div class="lb-lanrow"><div><b>„${esc(g.room)}“</b> bei ${esc(g.host || '?')}<span class="lb-sub">${g.players} Spieler · ${g.phase === 'game' ? 'läuft schon' : 'in der Lobby'} · ${g.local ? 'auf diesem PC' : esc(g.from)}${same ? '' : ' · andere Spielversion'}</span></div>
+    return `<div class="lb-lanrow"><div><b>„${esc(g.room)}“</b> bei ${esc(g.host || '?')}<span class="lb-sub">${g.players} Spieler · ${g.phase === 'game' ? 'läuft schon' : 'in der Lobby'} · ${g.local ? 'auf diesem PC' : esc(g.from)}${same ? '' : ` · andere Spielversion${g.version ? ` (${esc(g.version)})` : ''}`}</span></div>
       <button type="button" class="btn sm primary" data-lb="lanjoin" data-i="${i}" ${same ? '' : 'disabled'}>Beitreten</button></div>`;
   }).join('') : `<p class="lb-sub">${err ? `Die Suche im Heimnetz geht gerade nicht (${esc(err)}).` : 'Suche nach Partien im Heimnetz …'}</p>`;
   if (el.innerHTML !== html) el.innerHTML = html;

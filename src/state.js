@@ -44,5 +44,11 @@ export function log(text, kind = 'info') {
 }
 
 // Name und Farben des Spielers (im Startmenü gewählt)
+// Versionsnummer (tools/build.mjs schreibt sie in die gebaute Seite; aus den Quellen gestartet: Entwicklungsstand)
+export function gameVersion() { return (typeof window !== 'undefined' && window.__aktVersion) || null; }
+export function versionText() {
+  const v = gameVersion(), b = typeof window !== 'undefined' && window.__aktBuild;
+  return v ? `Version ${v}${b ? ` · Build ${b.slice(0, 7)}` : ''}` : 'Entwicklungsstand (aus den Quellen)';
+}
 export function homeName() { return (G.s && G.s.castleName) || 'Ashcombe'; }
 export function playerColor() { return (G.s && G.s.color) || '#2c4f86'; }

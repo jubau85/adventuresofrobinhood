@@ -432,6 +432,13 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   font-family: var(--font-ui); font-weight: 600; font-size: 14px;
 }
 .music-toggle:hover { background: rgba(20,12,8,0.85); }
+/* Versionsnummer im Startmenü, unten links */
+.version-tag {
+  position: fixed; z-index: 31; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); margin: 0;
+  padding: 3px 10px; border-radius: 12px; background: rgba(20,12,8,0.55); color: #f3dcae;
+  font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.02em; pointer-events: none;
+}
+.version-tag:empty { display: none; }
 .music-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------- Schmal */
@@ -705,13 +712,15 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
     </div>
     <section id="lobby" hidden role="dialog" aria-modal="true" aria-label="Mehrspieler"><div class="title-card lobby-card" id="lobby-card"></div></section>
     <button type="button" class="music-toggle" id="btn-music-title" aria-pressed="true">♪ Musik an</button>
+    <p class="version-tag" id="version-tag"></p>
   </section>
   <section id="intro" hidden aria-label="Vorspann"><canvas id="intro-cv"></canvas><p class="intro-hint" id="intro-hint"></p><p class="sr-only" id="intro-text" aria-live="polite"></p></section>
 </div>
 <input id="chat-input" hidden maxlength="200" placeholder="Zu allen in der Partie sprechen … (Enter schickt, Esc schließt)" autocomplete="off">
 <div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
 <script>
-window.__aktBuild = '8d364fcb00';
+window.__aktBuild = 'eebe70b15f';
+window.__aktVersion = '0.8.0';
 (function () {
 'use strict';
 
@@ -2933,6 +2942,12 @@ function log(text, kind = 'info') {
 }
 
 // Name und Farben des Spielers (im Startmenü gewählt)
+// Versionsnummer (tools/build.mjs schreibt sie in die gebaute Seite; aus den Quellen gestartet: Entwicklungsstand)
+function gameVersion() { return (typeof window !== 'undefined' && window.__aktVersion) || null; }
+function versionText() {
+  const v = gameVersion(), b = typeof window !== 'undefined' && window.__aktBuild;
+  return v ? `Version ${v}${b ? ` · Build ${b.slice(0, 7)}` : ''}` : 'Entwicklungsstand (aus den Quellen)';
+}
 function homeName() { return (G.s && G.s.castleName) || 'Ashcombe'; }
 function playerColor() { return (G.s && G.s.color) || '#2c4f86'; }
 
@@ -23280,7 +23295,8 @@ function menuPanel() {
       <button class="btn" data-act="cheats">Testmodus (Cheats)</button>
       <button class="btn danger" data-act="newgame">Neues Spiel</button>
     </div>
-    <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>`,
+    <p class="hint">Das Spiel speichert jeden Morgen von selbst, aber nur in diesem Browser.</p>
+    <p class="hint">A Knight's Tale · ${esc(versionText())}</p>`,
   };
 }
 
@@ -25362,7 +25378,7 @@ function lanTick() {
     const v = mp.phase === 'lobby' ? lobbyView() : null;
     const players = v && v.players ? v.players.length : 1 + mp.peers.size;
     const host = G.s && G.started ? G.s.player.name : (mp.profile && mp.profile.name) || '';
-    L.announce({ room: mp.room, host, players, phase: mp.phase, port: 8765, build: window.__aktBuild || 'dev' });
+    L.announce({ room: mp.room, host, players, phase: mp.phase, port: 8765, build: window.__aktBuild || 'dev', version: window.__aktVersion || '' });
     lbLanOn = true;
   } else if (lbLanOn) { L.stop(); lbLanOn = false; }
   if (lbStep === 'wahl' && !byId('lobby').hidden) {
@@ -25377,7 +25393,7 @@ function renderLan(err) {
   const build = window.__aktBuild || 'dev';
   const html = lbLanGames.length ? lbLanGames.map((g, i) => {
     const same = !g.build || g.build === build;
-    return `<div class="lb-lanrow"><div><b>„${esc(g.room)}“</b> bei ${esc(g.host || '?')}<span class="lb-sub">${g.players} Spieler · ${g.phase === 'game' ? 'läuft schon' : 'in der Lobby'} · ${g.local ? 'auf diesem PC' : esc(g.from)}${same ? '' : ' · andere Spielversion'}</span></div>
+    return `<div class="lb-lanrow"><div><b>„${esc(g.room)}“</b> bei ${esc(g.host || '?')}<span class="lb-sub">${g.players} Spieler · ${g.phase === 'game' ? 'läuft schon' : 'in der Lobby'} · ${g.local ? 'auf diesem PC' : esc(g.from)}${same ? '' : ` · andere Spielversion${g.version ? ` (${esc(g.version)})` : ''}`}</span></div>
       <button type="button" class="btn sm primary" data-lb="lanjoin" data-i="${i}" ${same ? '' : 'disabled'}>Beitreten</button></div>`;
   }).join('') : `<p class="lb-sub">${err ? `Die Suche im Heimnetz geht gerade nicht (${esc(err)}).` : 'Suche nach Partien im Heimnetz …'}</p>`;
   if (el.innerHTML !== html) el.innerHTML = html;
@@ -26761,6 +26777,8 @@ function boot(hotData) {
   if (hotData && hotData.save) {
     try { deserialize(hotData.save); spawnAnimals(); startWorld(); resumed = true; } catch (e) { resumed = false; }
   }
+  const vt = byId('version-tag');
+  if (vt) vt.textContent = versionText();
   if (!resumed) { showTitle(); if (introWanted()) startIntro(); }
   try {
     if (window.claude && window.claude.hot && window.claude.hot.snapshot) {

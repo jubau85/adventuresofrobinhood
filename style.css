@@ -424,6 +424,13 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   font-family: var(--font-ui); font-weight: 600; font-size: 14px;
 }
 .music-toggle:hover { background: rgba(20,12,8,0.85); }
+/* Versionsnummer im Startmenü, unten links */
+.version-tag {
+  position: fixed; z-index: 31; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); margin: 0;
+  padding: 3px 10px; border-radius: 12px; background: rgba(20,12,8,0.55); color: #f3dcae;
+  font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.02em; pointer-events: none;
+}
+.version-tag:empty { display: none; }
 .music-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------- Schmal */

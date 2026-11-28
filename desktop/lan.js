@@ -1,6 +1,6 @@
 // Partien im Heimnetz finden (LAN): Wer in der App eine Partie eröffnet, ruft sie jede Sekunde per UDP-Broadcast aus
 // (Port 8766); wer in der Lobby auf „Mehrspieler …“ steht, hört zu und sieht sie in einer Liste. Ausgerufen werden nur
-// Name der Partie, Gastgeber, Spielerzahl, Stand (Lobby oder Spiel), Port des Relais und die Spielversion. Die Adresse
+// Name der Partie, Gastgeber, Spielerzahl, Stand (Lobby oder Spiel), Port des Relais, Spielversion und Versionsnummer. Die Adresse
 // zum Beitreten ist die, von der der Ruf kam.
 const dgram = require('node:dgram');
 const os = require('node:os');
@@ -28,7 +28,7 @@ function announce(info) {
     sock.on('error', () => { /* kein Netz: dann eben nicht */ });
     sock.bind(0, () => { try { sock.setBroadcast(true); beacon.ready = true; send(); } catch (e) { /* ohne Broadcast */ } });
   }
-  beacon.info = { room: String(info.room || '').slice(0, 32), host: String(info.host || '').slice(0, 24), players: info.players | 0, phase: info.phase === 'game' ? 'game' : 'lobby', port: info.port | 0 || 8765, build: String(info.build || '') };
+  beacon.info = { room: String(info.room || '').slice(0, 32), host: String(info.host || '').slice(0, 24), players: info.players | 0, phase: info.phase === 'game' ? 'game' : 'lobby', port: info.port | 0 || 8765, build: String(info.build || ''), version: String(info.version || '').slice(0, 16) };
 }
 function send() {
   if (!beacon || !beacon.ready || !beacon.info) return;
@@ -62,7 +62,7 @@ function search() {
     if (!d || d.magic !== MAGIC || d.id === SELF) return;
     found.set(`${d.id}:${d.room}`, {
       id: String(d.id), room: String(d.room || '').slice(0, 32), host: String(d.host || '').slice(0, 24), players: d.players | 0,
-      phase: d.phase === 'game' ? 'game' : 'lobby', port: d.port | 0 || 8765, build: String(d.build || ''), from: r.address,
+      phase: d.phase === 'game' ? 'game' : 'lobby', port: d.port | 0 || 8765, build: String(d.build || ''), version: String(d.version || '').slice(0, 16), from: r.address,
       local: ownAddrs().has(r.address), seen: Date.now(),
     });
   });
