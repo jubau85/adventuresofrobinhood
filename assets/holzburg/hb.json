@@ -1,0 +1,1532 @@
+{
+ "motte_treppe_so": {
+  "anker": [
+   86.0,
+   192.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   612,
+   0,
+   516,
+   657
+  ]
+ },
+ "motte_treppe_so_schaden_1": {
+  "anker": [
+   86.0,
+   192.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1224,
+   0,
+   516,
+   657
+  ]
+ },
+ "motte_treppe_so_schaden_1_winter": {
+  "anker": [
+   86.0,
+   192.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1224,
+   0,
+   516,
+   657
+  ]
+ },
+ "motte_treppe_so_schaden_2": {
+  "anker": [
+   86.0,
+   192.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   690,
+   516,
+   657
+  ]
+ },
+ "motte_treppe_so_schaden_2_winter": {
+  "anker": [
+   86.0,
+   192.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   690,
+   516,
+   657
+  ]
+ },
+ "motte_treppe_so_winter": {
+  "anker": [
+   86.0,
+   192.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   612,
+   0,
+   516,
+   657
+  ]
+ },
+ "motte_treppe_sw": {
+  "anker": [
+   102.0,
+   202.5,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   0,
+   0,
+   612,
+   690
+  ]
+ },
+ "motte_treppe_sw_schaden_1": {
+  "anker": [
+   102.0,
+   202.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   0,
+   612,
+   690
+  ]
+ },
+ "motte_treppe_sw_schaden_1_winter": {
+  "anker": [
+   102.0,
+   202.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   0,
+   612,
+   690
+  ]
+ },
+ "motte_treppe_sw_schaden_2": {
+  "anker": [
+   102.0,
+   202.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   612,
+   0,
+   612,
+   690
+  ]
+ },
+ "motte_treppe_sw_schaden_2_winter": {
+  "anker": [
+   102.0,
+   202.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   612,
+   0,
+   612,
+   690
+  ]
+ },
+ "motte_treppe_sw_winter": {
+  "anker": [
+   102.0,
+   202.5,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   0,
+   0,
+   612,
+   690
+  ]
+ },
+ "palisade_ecke_nw_no_aussen_aussen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   0,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_aussen_aussen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   282,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_aussen_aussen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   282,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_aussen_aussen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1578,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_aussen_aussen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1578,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_aussen_aussen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   0,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_innen_innen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   108,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_innen_innen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   390,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_innen_innen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   390,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_innen_innen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1686,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_innen_innen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1686,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_no_innen_innen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   108,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_aussen_innen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   216,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_aussen_innen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   498,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_aussen_innen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   498,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_aussen_innen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1794,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_aussen_innen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1794,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_aussen_innen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   216,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_innen_aussen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   324,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_innen_aussen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   606,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_innen_aussen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   606,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_innen_aussen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1902,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_innen_aussen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1902,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_nw_sw_innen_aussen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   324,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_aussen_innen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   432,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_aussen_innen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   714,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_aussen_innen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   714,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_aussen_innen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_aussen_innen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_aussen_innen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   432,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_innen_aussen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   540,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_innen_aussen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   822,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_innen_aussen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   822,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_innen_aussen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   108,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_innen_aussen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   108,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_no_innen_aussen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   540,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_aussen_aussen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   648,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_aussen_aussen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   930,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_aussen_aussen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   930,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_aussen_aussen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   216,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_aussen_aussen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   216,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_aussen_aussen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   648,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_innen_innen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   756,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_innen_innen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1038,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_innen_innen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1038,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_innen_innen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   324,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_innen_innen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   324,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_ecke_so_sw_innen_innen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   756,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_x_aussen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   864,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_x_aussen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1146,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_x_aussen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1146,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_x_aussen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   432,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_x_aussen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   432,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_x_aussen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   864,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_x_innen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   972,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_x_innen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1254,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_x_innen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1254,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_x_innen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   540,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_x_innen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   540,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_x_innen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   972,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_y_aussen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1080,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_y_aussen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1362,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_y_aussen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1362,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_y_aussen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   648,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_y_aussen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   648,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_y_aussen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1080,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_y_innen": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1188,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisade_y_innen_schaden_1": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1470,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_y_innen_schaden_1_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1470,
+   1347,
+   108,
+   177
+  ]
+ },
+ "palisade_y_innen_schaden_2": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   756,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_y_innen_schaden_2_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   756,
+   1776,
+   108,
+   177
+  ]
+ },
+ "palisade_y_innen_winter": {
+  "anker": [
+   18.0,
+   40.0,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1188,
+   690,
+   108,
+   177
+  ]
+ },
+ "palisadentor_x": {
+  "anker": [
+   47.0,
+   116.75,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1716,
+   0,
+   282,
+   429
+  ]
+ },
+ "palisadentor_x_schaden_1": {
+  "anker": [
+   47.0,
+   116.75,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1692,
+   690,
+   282,
+   429
+  ]
+ },
+ "palisadentor_x_schaden_1_winter": {
+  "anker": [
+   47.0,
+   116.75,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1692,
+   690,
+   282,
+   429
+  ]
+ },
+ "palisadentor_x_schaden_2": {
+  "anker": [
+   47.0,
+   116.75,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   0,
+   1347,
+   282,
+   429
+  ]
+ },
+ "palisadentor_x_schaden_2_winter": {
+  "anker": [
+   47.0,
+   116.75,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   0,
+   1347,
+   282,
+   429
+  ]
+ },
+ "palisadentor_x_winter": {
+  "anker": [
+   47.0,
+   116.75,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1716,
+   0,
+   282,
+   429
+  ]
+ },
+ "palisadentor_y": {
+  "anker": [
+   50.0,
+   121.5,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1416,
+   0,
+   300,
+   444
+  ]
+ },
+ "palisadentor_y_schaden_1": {
+  "anker": [
+   50.0,
+   121.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1092,
+   690,
+   300,
+   444
+  ]
+ },
+ "palisadentor_y_schaden_1_winter": {
+  "anker": [
+   50.0,
+   121.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1092,
+   690,
+   300,
+   444
+  ]
+ },
+ "palisadentor_y_schaden_2": {
+  "anker": [
+   50.0,
+   121.5,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   1392,
+   690,
+   300,
+   444
+  ]
+ },
+ "palisadentor_y_schaden_2_winter": {
+  "anker": [
+   50.0,
+   121.5,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   1392,
+   690,
+   300,
+   444
+  ]
+ },
+ "palisadentor_y_winter": {
+  "anker": [
+   50.0,
+   121.5,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1416,
+   0,
+   300,
+   444
+  ]
+ },
+ "palisadenturm": {
+  "anker": [
+   48.0,
+   137.25,
+   0.3333
+  ],
+  "bogen": "heil",
+  "zelle": [
+   "heil",
+   1128,
+   0,
+   288,
+   486
+  ]
+ },
+ "palisadenturm_schaden_1": {
+  "anker": [
+   48.0,
+   137.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   516,
+   690,
+   288,
+   486
+  ]
+ },
+ "palisadenturm_schaden_1_winter": {
+  "anker": [
+   48.0,
+   137.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   516,
+   690,
+   288,
+   486
+  ]
+ },
+ "palisadenturm_schaden_2": {
+  "anker": [
+   48.0,
+   137.25,
+   0.3333
+  ],
+  "bogen": "schaden",
+  "zelle": [
+   "schaden",
+   804,
+   690,
+   288,
+   486
+  ]
+ },
+ "palisadenturm_schaden_2_winter": {
+  "anker": [
+   48.0,
+   137.25,
+   0.3333
+  ],
+  "bogen": "schaden_winter",
+  "zelle": [
+   "schaden_winter",
+   804,
+   690,
+   288,
+   486
+  ]
+ },
+ "palisadenturm_winter": {
+  "anker": [
+   48.0,
+   137.25,
+   0.3333
+  ],
+  "bogen": "heil_winter",
+  "zelle": [
+   "heil_winter",
+   1128,
+   0,
+   288,
+   486
+  ]
+ }
+}

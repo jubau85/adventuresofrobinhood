@@ -731,6 +731,9 @@ const ORTE_P5 = {"ort_baumstumpf_axt":[17.39,31.8,0.3333],"ort_baumstumpf_axt_wi
 function ortPick(n) { const w = `ort_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `ort_${n}`; if (!P5[id] && ORTE_P5[id]) P5[id] = ORTE_P5[id]; return ORTE_P5[id] && wantArt(id) ? id : null; }
 // Stadtmauer-Baukasten (tools/stadtmauer.py): Anker auf der Feldmitte, Weltpixel
 const SM_P5 = {"sm_stadtmauer_ecke_nw_no":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_no_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_nw_sw_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_no_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_ecke_so_sw_winter":[28.5,44.25,0.3333],"sm_stadtmauer_x":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_x_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_x_winter":[28.5,44.25,0.3333],"sm_stadtmauer_y":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_1":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_1_winter":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_2":[28.5,44.25,0.3333],"sm_stadtmauer_y_schaden_2_winter":[28.5,44.25,0.3333],"sm_stadtmauer_y_winter":[28.5,44.25,0.3333],"sm_stadttor_x":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_1":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_1_winter":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_2":[44.0,94.5,0.3333],"sm_stadttor_x_schaden_2_winter":[44.0,94.5,0.3333],"sm_stadttor_x_winter":[44.0,94.5,0.3333],"sm_stadttor_y":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_1":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_1_winter":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_2":[43.5,98.75,0.3333],"sm_stadttor_y_schaden_2_winter":[43.5,98.75,0.3333],"sm_stadttor_y_winter":[43.5,98.75,0.3333],"sm_stadtturm":[35.0,84.0,0.3333],"sm_stadtturm_dach":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_1":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_1_winter":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_2":[35.5,103.5,0.3333],"sm_stadtturm_dach_schaden_2_winter":[35.5,103.5,0.3333],"sm_stadtturm_dach_winter":[35.5,103.5,0.3333],"sm_stadtturm_schaden_1":[35.0,84.0,0.3333],"sm_stadtturm_schaden_1_winter":[35.0,84.0,0.3333],"sm_stadtturm_schaden_2":[35.0,84.0,0.3333],"sm_stadtturm_schaden_2_winter":[35.0,84.0,0.3333],"sm_stadtturm_winter":[35.0,84.0,0.3333]};
+// Holzburg-Baukasten (tools/holzburg.py): Anker auf der Mitte des (unteren) Feldes, Weltpixel
+const HB_P5 = {"hb_motte_treppe_so":[86.0,192.0,0.3333],"hb_motte_treppe_so_schaden_1":[86.0,192.0,0.3333],"hb_motte_treppe_so_schaden_1_winter":[86.0,192.0,0.3333],"hb_motte_treppe_so_schaden_2":[86.0,192.0,0.3333],"hb_motte_treppe_so_schaden_2_winter":[86.0,192.0,0.3333],"hb_motte_treppe_so_winter":[86.0,192.0,0.3333],"hb_motte_treppe_sw":[102.0,202.5,0.3333],"hb_motte_treppe_sw_schaden_1":[102.0,202.5,0.3333],"hb_motte_treppe_sw_schaden_1_winter":[102.0,202.5,0.3333],"hb_motte_treppe_sw_schaden_2":[102.0,202.5,0.3333],"hb_motte_treppe_sw_schaden_2_winter":[102.0,202.5,0.3333],"hb_motte_treppe_sw_winter":[102.0,202.5,0.3333],"hb_palisade_ecke_nw_no_aussen_aussen":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_aussen_aussen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_aussen_aussen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_aussen_aussen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_aussen_aussen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_aussen_aussen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_innen_innen":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_innen_innen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_innen_innen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_innen_innen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_innen_innen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_no_innen_innen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_aussen_innen":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_aussen_innen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_aussen_innen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_aussen_innen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_aussen_innen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_aussen_innen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_innen_aussen":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_innen_aussen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_innen_aussen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_innen_aussen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_innen_aussen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_nw_sw_innen_aussen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_aussen_innen":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_aussen_innen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_aussen_innen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_aussen_innen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_aussen_innen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_aussen_innen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_innen_aussen":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_innen_aussen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_innen_aussen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_innen_aussen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_innen_aussen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_no_innen_aussen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_aussen_aussen":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_aussen_aussen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_aussen_aussen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_aussen_aussen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_aussen_aussen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_aussen_aussen_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_innen_innen":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_innen_innen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_innen_innen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_innen_innen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_innen_innen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_ecke_so_sw_innen_innen_winter":[18.0,40.0,0.3333],"hb_palisade_x_aussen":[18.0,40.0,0.3333],"hb_palisade_x_aussen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_x_aussen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_x_aussen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_x_aussen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_x_aussen_winter":[18.0,40.0,0.3333],"hb_palisade_x_innen":[18.0,40.0,0.3333],"hb_palisade_x_innen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_x_innen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_x_innen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_x_innen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_x_innen_winter":[18.0,40.0,0.3333],"hb_palisade_y_aussen":[18.0,40.0,0.3333],"hb_palisade_y_aussen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_y_aussen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_y_aussen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_y_aussen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_y_aussen_winter":[18.0,40.0,0.3333],"hb_palisade_y_innen":[18.0,40.0,0.3333],"hb_palisade_y_innen_schaden_1":[18.0,40.0,0.3333],"hb_palisade_y_innen_schaden_1_winter":[18.0,40.0,0.3333],"hb_palisade_y_innen_schaden_2":[18.0,40.0,0.3333],"hb_palisade_y_innen_schaden_2_winter":[18.0,40.0,0.3333],"hb_palisade_y_innen_winter":[18.0,40.0,0.3333],"hb_palisadentor_x":[47.0,116.75,0.3333],"hb_palisadentor_x_schaden_1":[47.0,116.75,0.3333],"hb_palisadentor_x_schaden_1_winter":[47.0,116.75,0.3333],"hb_palisadentor_x_schaden_2":[47.0,116.75,0.3333],"hb_palisadentor_x_schaden_2_winter":[47.0,116.75,0.3333],"hb_palisadentor_x_winter":[47.0,116.75,0.3333],"hb_palisadentor_y":[50.0,121.5,0.3333],"hb_palisadentor_y_schaden_1":[50.0,121.5,0.3333],"hb_palisadentor_y_schaden_1_winter":[50.0,121.5,0.3333],"hb_palisadentor_y_schaden_2":[50.0,121.5,0.3333],"hb_palisadentor_y_schaden_2_winter":[50.0,121.5,0.3333],"hb_palisadentor_y_winter":[50.0,121.5,0.3333],"hb_palisadenturm":[48.0,137.25,0.3333],"hb_palisadenturm_schaden_1":[48.0,137.25,0.3333],"hb_palisadenturm_schaden_1_winter":[48.0,137.25,0.3333],"hb_palisadenturm_schaden_2":[48.0,137.25,0.3333],"hb_palisadenturm_schaden_2_winter":[48.0,137.25,0.3333],"hb_palisadenturm_winter":[48.0,137.25,0.3333]};
+function hbPick(n) { const w = `hb_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `hb_${n}`; if (!P5[id] && HB_P5[id]) P5[id] = HB_P5[id]; return HB_P5[id] && wantArt(id) ? id : null; }
 function smPick(n) { const w = `sm_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `sm_${n}`; if (!P5[id] && SM_P5[id]) P5[id] = SM_P5[id]; return SM_P5[id] && wantArt(id) ? id : null; }
 function thPick(n) { const w = `th_${n}_winter`, id = lookSeason() === 3 && artKnown(w) ? w : `th_${n}`; if (!P5[id] && TH_P5[id]) P5[id] = TH_P5[id]; return wantArt(id) ? id : null; }
 // Tribüne: das Bild längs x, Zuschauer auf drei Bankreihen
@@ -2193,6 +2196,59 @@ function castleGateClosed(site) {
   return site === homeSite() && homeGateClosed();
 }
 
+// Holzburg aus dem Baukasten (tools/holzburg.py): je Feld des Rings ein Teil nach seinen Nachbarn im Ring und danach,
+// ob man von innen oder außen draufschaut (hinten sieht man den Wehrgang, vorn die Spitzen; Regel aus der Anleitung des
+// Baukastens: ein Prüf-Feld neben dem Teil liegt im Hof oder nicht), Holztürme auf den Ecken, Tortürme auf den
+// Wegfeldern des Rings (ohne Weg vorn in der Mitte), die Motte im freien 4 × 4-Block des Hofs (Felder −3 … 0).
+// Wimpel und Banner in der Farbe des Herrn, Schaden der Belagerung in zwei Stufen, im Schnee die Winterbilder.
+const HB_AUSWAHL = {
+  'nw+so': [[0, 1], 'palisade_x_innen', 'palisade_x_aussen'], 'no+sw': [[1, 0], 'palisade_y_innen', 'palisade_y_aussen'],
+  'nw+no': [[-1, -1], 'palisade_ecke_nw_no_aussen_aussen', 'palisade_ecke_nw_no_innen_innen'], 'so+sw': [[1, 1], 'palisade_ecke_so_sw_innen_innen', 'palisade_ecke_so_sw_aussen_aussen'],
+  'nw+sw': [[-1, 1], 'palisade_ecke_nw_sw_innen_aussen', 'palisade_ecke_nw_sw_aussen_innen'], 'so+no': [[1, -1], 'palisade_ecke_so_no_aussen_innen', 'palisade_ecke_so_no_innen_aussen'],
+};
+function holzRing(site, R) {
+  const W = G.world, N = W.N, tx = Math.floor(site.x), ty = Math.floor(site.y);
+  const ring = [];
+  for (let k = -R; k <= R; k++) ring.push([tx + k, ty - R], [tx + k, ty + R]);
+  for (let k = -R + 1; k < R; k++) ring.push([tx - R, ty + k], [tx + R, ty + k]);
+  const set = new Set(ring.map(([x, y]) => y * N + x)), tileAt = (x, y) => W.tiles[y * N + x];
+  const inside = (x, y) => Math.abs(x - tx) < R && Math.abs(y - ty) < R;
+  const corner = (x, y) => Math.abs(x - tx) === R && Math.abs(y - ty) === R;
+  let gates = ring.filter(([x, y]) => !corner(x, y) && (tileAt(x, y) === T.ROAD || tileAt(x, y) === T.BRIDGE));
+  if (!gates.length) gates = [[tx, ty + R]];
+  const gk = new Set(gates.map(([x, y]) => y * N + x));
+  return ring.filter(([x, y]) => tileAt(x, y) !== T.WATER).map(([x, y]) => {
+    const has = (dx, dy) => set.has((y + dy) * N + x + dx);
+    const nb = [has(-1, 0) && 'nw', has(1, 0) && 'so', has(0, -1) && 'no', has(0, 1) && 'sw'].filter(Boolean).join('+');
+    const sel = HB_AUSWAHL[nb], tower = corner(x, y), gate = !tower && gk.has(y * N + x);
+    const name = tower ? 'palisadenturm' : gate ? (nb === 'no+sw' ? 'palisadentor_y' : 'palisadentor_x')
+      : sel ? (inside(x + sel[0][0], y + sel[0][1]) ? sel[1] : sel[2]) : 'palisade_x_aussen';
+    return { x: x + 0.5, y: y + 0.5, name, gate, tower, along: nb === 'no+sw' ? 'y' : 'x' };
+  }).sort((a, b) => Math.atan2(a.y - site.y, a.x - site.x) - Math.atan2(b.y - site.y, b.x - site.x));   // einmal rundherum (für den Bau)
+}
+// Schadensstufe im Baukasten: 1 leicht, 2 schwer (die Bresche)
+const hbStage = (hit) => (!hit ? 0 : hit.gone || hit.dmg >= 0.55 ? 2 : hit.dmg >= 0.12 ? 1 : 0);
+function hbDraw(c, name, x, y, stage, col) {
+  const id = (stage && hbPick(`${name}_schaden_${stage}`)) || hbPick(name);
+  return id ? p5(c, id, x, y, 1, false, col) : false;
+}
+// Geschlossene Torflügel im gemalten Torturm der Holzburg (x: Durchfahrt nach links unten, y: nach rechts unten)
+function drawHolzGateDoors(c, x, y, gate) {
+  // u läuft auf der Torseite von links (x) bzw. von der vorderen Ecke (y); die Öffnung liegt zur vorderen Ecke hin
+  const pt = gate === 'x' ? (u, z) => P(x - 0.5 + u, y + 0.36, z) : (u, z) => P(x + 0.36, y + 0.5 - u, z);
+  const [u0, u1] = gate === 'x' ? [0.18, 0.76] : [0.24, 0.82], h = 28;
+  c.fillStyle = '#6e4e30'; c.strokeStyle = '#3a2818'; c.lineWidth = 1;
+  c.beginPath();
+  for (const [u, z] of [[u0, 0], [u0, h], [u1, h], [u1, 0]]) { const q = pt(u, z); c.lineTo(q[0], q[1]); }
+  c.closePath(); c.fill(); c.stroke();
+  c.beginPath();
+  for (let k = 1; k < 5; k++) { const u = u0 + (u1 - u0) * (k / 5), q0 = pt(u, 0), q1 = pt(u, h); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); }
+  c.stroke();
+  c.strokeStyle = '#2c2622'; c.lineWidth = 1.6; c.beginPath();
+  for (const z of [6, 19]) { const q0 = pt(u0, z), q1 = pt(u1, z); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); }
+  const m0 = pt((u0 + u1) / 2, 0), m1 = pt((u0 + u1) / 2, h); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]);
+  c.stroke();
+}
 function castlePieces(site, level, bannerCol, R = 4) {
   const parts = [];
   const cx = site.x, cy = site.y;
@@ -2229,6 +2285,35 @@ function castlePieces(site, level, bannerCol, R = 4) {
     add(cx + 1.4, cy + 1.2, (c) => drawTent(c, { x: cx + 1.4, y: cy + 1.2, wx: 1.1, wy: 1.0, color: '#d8ccb0' }));
     add(cx + 2.4, cy + 2.4, (c) => drawFire(c, { x: cx + 2.4, y: cy + 2.4 }));
     add(cx - 2.2, cy + 2.4, (c) => { if (!p5(c, 'burg_schutt', cx - 2.2, cy + 2.4)) drawStones(c, cx - 2.2, cy + 2.4, 5); });
+    return parts;
+  }
+
+  if (level === 1 && artKnown('hb_palisade_x_aussen')) {
+    for (const p of holzRing(site, R)) {
+      add(p.x, p.y, (c) => {
+        const hit = wallHit(site, p.x, p.y), st = hbStage(hit);
+        if (hbDraw(c, p.name, p.x, p.y, st, bannerCol)) {
+          if (p.gate && !st && castleGateClosed(site)) drawHolzGateDoors(c, p.x, p.y, p.name === 'palisadentor_y' ? 'y' : 'x');
+          if (hit && hit.repair && st) drawScaffold(c, p.x, p.y, 1.05, 1.05, p.gate || p.tower ? 46 : 30);
+          return;
+        }
+        if (artPending(`hb_${p.name}`)) return;
+        if (p.tower) { p5(c, p5dmg('burg_holzturm', dmgStage(hit)), p.x, p.y, 1.25); return; }
+        if (p.gate) return;
+        for (let k = -1; k <= 1; k++) {
+          const px = p.along === 'x' ? p.x + k * 0.33 : p.x, py = p.along === 'y' ? p.y + k * 0.33 : p.y;
+          drawBox(c, px, py, 0.24, 0.24, 24, wood); drawPyramid(c, px, py, 0.24, 0.24, 24, 6, wood);
+        }
+      }, p.tower ? 0.4 : p.gate ? 0.3 : 0);
+    }
+    // Motte: Holzturm auf dem Erdhügel, Treppe zum Tor hin; sie steht im freien Block des Hofs, gezeichnet nach ihrem
+    // unteren Feld (Mitte der Burg)
+    add(cx, cy, (c) => {
+      const id = hbPick('motte_treppe_sw');
+      if (id && p5(c, id, cx, cy, 1, false, bannerCol)) { if (darkness() > 0.2) addLight(cx - 1.5, cy - 1.5, 62, 30, 0.75); return; }
+      if (artPending('hb_motte_treppe_sw')) return;
+      if (p5(c, 'burg_holzhalle', cx - 1.2, cy - 1.2, 0.85)) banner(c, cx - 1.2, cy - 1.2, 58, bannerCol);
+    }, 0.2);
     return parts;
   }
 
@@ -3406,7 +3491,21 @@ function buildPlayerCastle() {
 
   // Burg im Ausbau
   if (con && con.id === 'burg') {
-    if (con.level === 1) {
+    if (con.level === 1 && artKnown('hb_palisade_x_aussen')) {
+      // Die Palisade wächst Stück für Stück rund um den Hof, Türme und Tor zuletzt im Gerüst
+      const ring = holzRing(s, R);
+      ring.forEach((p, i) => add(p.x, p.y, (c) => {
+        const pr = conProgress(), k = i / ring.length;
+        if (k > pr) return;
+        if (p.tower || p.gate) {
+          if (pr < 0.9) { drawScaffold(c, p.x, p.y, 1.05, 1.05, 20 + 30 * pr); return; }
+        }
+        if (!hbDraw(c, p.name, p.x, p.y, 0, playerColor())) for (let q = -1; q <= 1; q++) {
+          const px = p.along === 'x' ? p.x + q * 0.33 : p.x, py = p.along === 'y' ? p.y + q * 0.33 : p.y;
+          drawBox(c, px, py, 0.24, 0.24, 24, '#9a7450'); drawPyramid(c, px, py, 0.24, 0.24, 24, 6, '#9a7450');
+        }
+      }, p.tower ? 0.4 : p.gate ? 0.3 : 0));
+    } else if (con.level === 1) {
       // Die Palisade wächst Stück für Stück
       const sides = [];
       for (let k = -R; k < R; k++) {
@@ -5853,6 +5952,7 @@ onArt((id) => {
   if (id.startsWith('bau_') || id.startsWith('pal_') || id.startsWith('york_') || id.startsWith('fl_') || id.startsWith('ort_')) { partCache.clear(); G.staticDirty = true; }
   if (id.startsWith('york_bruecke') || id.startsWith('fl_steinbruecke') || id.startsWith('fl_kaimauer')) chunkCache.clear();
   if (id.startsWith('sm_')) G.staticDirty = true;
+  if (id.startsWith('hb_')) { G.staticDirty = true; G.castleDirty = true; }
   if (id.startsWith('th_')) { G.staticDirty = true; if (id.startsWith('th_steg')) chunkCache.clear(); }
 });
 

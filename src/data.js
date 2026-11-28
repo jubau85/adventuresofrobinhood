@@ -417,7 +417,8 @@ export const CASTLE_PLOT = { halle: [1.5, 2.9], kaserne: [2.6, 1.2], schmiede: [
 // Gebäude, die man nicht durchschreiten kann (Markt, Weide und Äcker bleiben begehbar)
 export const CASTLE_SOLID = ['halle', 'kaserne', 'schmiede', 'stall', 'holzfaeller', 'steinbruch', 'kapelle', 'hospiz'];
 // Bergfried je Burgstufe: Mitte relativ zur Burgmitte und Kantenlänge
-export const CASTLE_KEEP = [{ dx: -1.2, dy: -1.2, w: 2.1 }, { dx: -1.2, dy: -1.2, w: 1.6 }, { dx: -1.1, dy: -1.1, w: 2.2 }, { dx: -1.1, dy: -1.1, w: 2.8 }];
+// Stufe 1: die Motte (Erdhügel mit Holzturm) mitten im freien 4 × 4-Block des Hofs
+export const CASTLE_KEEP = [{ dx: -1.2, dy: -1.2, w: 2.1 }, { dx: -1.5, dy: -1.5, w: 2.6 }, { dx: -1.1, dy: -1.1, w: 2.2 }, { dx: -1.1, dy: -1.1, w: 2.8 }];
 // Kampfbonus innerhalb der eigenen Mauern je Burgstufe (Anteil an Angriff und Abwehr)
 export const CASTLE_BONUS = [{ atk: 0, def: 0.1 }, { atk: 0.1, def: 0.25 }, { atk: 0.2, def: 0.5 }, { atk: 0.3, def: 0.8 }];
 // Verpflegung: Waren, die als Nahrung zählen, und Preis für Zukauf je Ration
