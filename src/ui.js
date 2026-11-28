@@ -1263,7 +1263,12 @@ function pvpView() {
     </div>`;
   }).join('');
   return `<div class="barons">${rows}</div>
-    <p class="hint">Eine Fehde erklärst du allein, sie gilt sofort. Frieden nach einer Fehde und ein Bündnis bietest du an; der andere nimmt an oder lehnt ab. Banden aus Aufträgen sehen alle und greifen jeden an; ihr könnt sie gemeinsam schlagen, Beute und Auftrag gehören dem, der ihn angenommen hat.</p>`;
+    <p class="hint">Eine Fehde erklärst du allein, sie gilt sofort. Frieden nach einer Fehde und ein Bündnis bietest du an; der andere nimmt an oder lehnt ab. In einer Fehde darfst du seine Burgen belagern: eine eroberte wird deine, seine Heimburg plünderst du. Banden, Heere und Belagerungen sehen alle gleich; Beute bekommt, wer den letzten Schlag führt, ein Auftrag gehört dem, der ihn angenommen hat.</p>`;
+}
+// Mehrspieler: du und die Mitspieler in ihren Farben (Ländereien, Helden, Gefolge)
+function mpLegend() {
+  const me = `<span><span class="swatch" style="--c:${esc(playerColor())}"></span><b>${esc(G.s.player.name)} (du)</b></span>`;
+  return me + pvpPlayers().map((p) => `<span><span class="swatch" style="--c:${esc(p.color || '#888')}"></span><b>${esc(p.name)}</b> · ${esc(PVP_NAMES[p.st] || '')}</span>`).join('');
 }
 function mapPanel() {
   if (G.ui.tab === 'mitspieler' && G.mp) return { title: 'Mitspieler', sub: 'Frieden, Fehde und Bündnis mit den anderen Herren der Partie.', tabs: mapTabs(), body: pvpView() };
@@ -1276,7 +1281,7 @@ function mapPanel() {
     title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: mapTabs(),
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
-      <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
+      <p class="legend">${G.mp ? mpLegend() : ''}${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
     after: () => {
       const cv = byId('bigmap');
       const wrap = cv.closest('.mapwrap');

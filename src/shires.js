@@ -157,6 +157,14 @@ export function isHumanOwner(o) { return typeof o === 'string' && o.startsWith('
 function humanInfo(o) { return (G.mpSeatInfo && G.mpSeatInfo(o.slice(2))) || { name: `Herr von ${SHIRES[o.slice(2)] ? SHIRES[o.slice(2)].name : '?'}`, color: '#8a8070' }; }
 export function ownerPhrase(o) { return o === 'spieler' ? 'in deiner Hand' : isHumanOwner(o) ? `in der Hand von ${humanInfo(o).name}` : isBaronOwner(o) && BARONS[ownerBaron(o)] ? `in der Hand von ${BARONS[ownerBaron(o)].name}` : o && FACTIONS[o] ? `in der Hand der ${FACTIONS[o].short}` : 'herrenlos'; }
 export function ownerName(o) { return o === 'spieler' ? `${G.s && G.s.seat ? G.s.player.name : homeName()} (du)` : isHumanOwner(o) ? humanInfo(o).name : isBaronOwner(o) && BARONS[ownerBaron(o)] ? BARONS[ownerBaron(o)].name : o && FACTIONS[o] ? FACTIONS[o].short : 'niemand'; }
+// Eine Farbe abdunkeln, bis sie auf hellem Grund lesbar ist
+function darken(col) {
+  const h = String(col || '#666').replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b, k = lum > 110 ? 110 / lum : 1;
+  r = Math.round(r * k); g = Math.round(g * k); b = Math.round(b * k);
+  return `rgb(${r},${g},${b})`;
+}
 export function ownerColor(o) { return o === 'spieler' ? playerColor() : isHumanOwner(o) ? humanInfo(o).color : isBaronOwner(o) ? baronColor(ownerBaron(o)) : o && FACTIONS[o] ? FACTIONS[o].color : '#8a8070'; }
 
 // Abgaben einer Grafschaft am Tag (Grundbetrag und je Ort)
@@ -192,18 +200,20 @@ export function claimShire(id, who = 'spieler', quiet = false) {
 
 // ---------------------------------------------------------------- Karte
 // Farbe der Herren als zarte Fläche, Grenzen als Linie, Namen in der Mitte. v: Ausschnitt aus drawMap.
+// Die Grafschaften der Menschen (deine und im Mehrspieler die der Mitspieler) kräftiger als die der Parteien und Barone
+const humanLand = (o) => o === 'spieler' || isHumanOwner(o);
 function tintCanvas(W) {
-  const key = Object.keys(SHIRES).map((id) => shireOwner(id)).join(',') + playerColor();
+  const key = Object.keys(SHIRES).map((id) => { const o = shireOwner(id); return o + (humanLand(o) ? ownerColor(o) : ''); }).join(',') + playerColor();
   if (G.shireTint && G.shireTint.key === key) return G.shireTint.cv;
   const S = W.shireS, cv = document.createElement('canvas');
   cv.width = S; cv.height = S;
   const c = cv.getContext('2d'), img = c.createImageData(S, S);
-  const cols = W.shireSeats.map((id) => { const h = ownerColor(shireOwner(id)).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  const cols = W.shireSeats.map((id) => { const o = shireOwner(id), h = ownerColor(o).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255, humanLand(o) ? 135 : 75]; });
   for (let v = 0; v < S * S; v++) {
     const k = W.shireGrid[v];
     if (!k) continue;
-    const [r, g, b] = cols[k - 1];
-    img.data[v * 4] = r; img.data[v * 4 + 1] = g; img.data[v * 4 + 2] = b; img.data[v * 4 + 3] = 75;
+    const [r, g, b, a] = cols[k - 1];
+    img.data[v * 4] = r; img.data[v * 4 + 1] = g; img.data[v * 4 + 2] = b; img.data[v * 4 + 3] = a;
   }
   c.putImageData(img, 0, 0);
   G.shireTint = { key, cv };
@@ -253,7 +263,13 @@ export function drawShires(c, v) {
     const x = x0 + ox, y = y0 + oy;
     const own = shireOwner(id);
     c.lineWidth = 3.5; c.strokeStyle = 'rgba(248,238,214,0.9)'; c.strokeText(name, x, y);
-    c.fillStyle = own === 'spieler' ? '#1f3f7a' : '#6a1f12'; c.fillText(name, x, y);
+    // Menschen: Name in ihrer Farbe (abgedunkelt, damit er lesbar bleibt), darunter klein, wem sie gehört
+    c.fillStyle = humanLand(own) ? darken(ownerColor(own)) : '#6a1f12'; c.fillText(name, x, y);
+    if (G.mp && humanLand(own) && v.s > 1.1) {
+      const who = own === 'spieler' ? 'deine' : humanInfo(own).name;
+      c.save(); c.font = `italic 600 ${Math.round(fs * 0.78)}px "Alegreya", Georgia, serif`;
+      c.strokeText(who, x, y + fs); c.fillText(who, x, y + fs); c.restore();
+    }
   }
   c.restore();
 }

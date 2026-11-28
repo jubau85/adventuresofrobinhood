@@ -5035,6 +5035,43 @@ function horse3dFor(u, L) {
 // an die gerenderten Handpunkte, zu Pferd sitzt die Hüfte auf dem Sattelpunkt.
 const heroK = (M) => FIG3D_H / (M.figur_px || 60);
 const TOOL3D = { hacke: 'hacke', sichel: 'sichel', axt: 'axt', hammer: 'hammer', gabel: 'gabel', besen: 'besen' };
+// Umhang in der Wappenfarbe für die Helden der Spieler (du, die Mitspieler, die Vorschau): so erkennt man jeden in jeder
+// Rüstung an seiner Farbe. Er hängt von den Schultern bis zu den Waden (zu Pferd bis zum Sattel) und weht beim Gehen nach
+// hinten. Schaut der Held vom Betrachter weg, liegt er über dem Rücken, sonst hinter dem Körper.
+// Blickrichtung je Bildrichtung auf dem Bildschirm (x nach rechts, y nach unten)
+const CAPE_DIR = [...Array(8)].map((_, d) => { const a = d * Math.PI / 4, sx = Math.sin(a) - Math.cos(a), sy = (Math.sin(a) + Math.cos(a)) / 2, n = Math.hypot(sx, sy) || 1; return { x: sx / n, y: sy / n }; });
+const wantsCape = (u) => u.kind === 'player' || u.kind === 'remote' || u.kind === 'preview';
+function drawCape(c, u, hip, ox, oy, dir, mounted, color) {
+  const F = CAPE_DIR[dir], H = FIG3D_H, side = Math.abs(F.x);
+  const col = /^#[0-9a-f]{6}$/i.test(color) ? color : '#7a2a22';
+  // Schultern gut ein Viertel der Figur über der Hüfte, Saum an den Waden (zu Pferd knapp unter der Hüfte, auf der Kruppe)
+  const top = oy + hip.y - H * 0.265, hem = oy + hip.y + H * (mounted ? 0.07 : 0.42);
+  const mv = u.moving ? (u.run ? 1 : 0.55) : 0, t = G.time * (u.run ? 9 : 5.5) + (u.id || 0);
+  const cx = ox + hip.x - F.x * H * 0.05;
+  const ws = H * (0.1 + 0.035 * (1 - side)), wh = H * (0.13 + 0.07 * (1 - side) + 0.04 * mv);
+  const drift = -F.x * H * (0.025 + 0.14 * mv) + Math.sin(t) * H * 0.012 * (0.3 + mv);
+  const hx = cx + drift, hy = hem - mv * H * 0.05 * (0.6 + 0.4 * Math.sin(t * 0.7)), mid = (top + hy) / 2;
+  c.save();
+  const gr = c.createLinearGradient(0, top, 0, hy);
+  gr.addColorStop(0, shade(col, 1.08)); gr.addColorStop(0.5, col); gr.addColorStop(1, shade(col, 0.6));
+  c.fillStyle = gr; c.strokeStyle = 'rgba(20,12,8,0.7)'; c.lineWidth = 0.6;
+  // Von der Mitte des Nackens über die runden Schultern nach unten, Saum leicht gewellt
+  const sh = top + H * 0.05;
+  c.beginPath();
+  c.moveTo(cx - ws * 0.45, top);
+  c.quadraticCurveTo(cx - ws * 1.05, top + H * 0.005, cx - ws * 1.08, sh);
+  c.quadraticCurveTo(cx - ws * 1.12 + drift * 0.35, mid, hx - wh, hy);
+  c.quadraticCurveTo(hx - wh * 0.5, hy + H * 0.025, hx, hy);
+  c.quadraticCurveTo(hx + wh * 0.5, hy + H * 0.025, hx + wh, hy);
+  c.quadraticCurveTo(cx + ws * 1.12 + drift * 0.35, mid, cx + ws * 1.08, sh);
+  c.quadraticCurveTo(cx + ws * 1.05, top + H * 0.005, cx + ws * 0.45, top);
+  c.closePath(); c.fill(); c.stroke();
+  // Falten, und oben ein Kragen in dunklerem Ton
+  c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 0.55;
+  for (const f of [-0.5, 0.05, 0.55]) { c.beginPath(); c.moveTo(cx + ws * f * 0.7, sh + H * 0.02); c.quadraticCurveTo(cx + (ws + wh) * f * 0.5 + drift * 0.5, mid, hx + wh * f * 0.9, hy - H * 0.005); c.stroke(); }
+  c.fillStyle = shade(col, 0.7); c.beginPath(); c.ellipse(cx, top + H * 0.012, ws * 0.6, H * 0.016, 0, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
 function drawModel3d(c, u, L, m, key) {
   const { M } = model3d(key);
   const { anim, frame } = modelAnim(u, key, m);
@@ -5077,8 +5114,11 @@ function drawModel3d(c, u, L, m, key) {
     }
     if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim, dir);
   };
+  const capeHip = wantsCape(u) ? pt('Hips') : null, capeOver = dir >= 4 && dir <= 6;
   if (back) gear();
+  if (capeHip && !capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
   c.drawImage(lodOf(near || cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
+  if (capeHip && capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
   if (!back) gear();
   if (horse) paintHorseHead(c, horse);
   c.restore();
@@ -6256,7 +6296,22 @@ export function drawMap(c, w, h, opts = {}) {
       c.fillStyle = mk.col; c.fillText(mk.label, cap.x, cap.y);
     }
   }
+  // Mehrspieler: die Helden der Mitspieler als Punkt in ihrer Farbe, auf der großen Karte mit Namen
+  for (const u of G.remoteUnits || []) {
+    if (u.team !== 'remote' || u.rk !== 'held') continue;
+    const qq = miniPos(u.x, u.y, v);
+    if (qq.x < -10 || qq.y < -10 || qq.x > w + 10 || qq.y > h + 10) continue;
+    c.fillStyle = u.tunic || '#888'; c.strokeStyle = '#f3ead2'; c.lineWidth = 2;
+    c.beginPath(); c.arc(qq.x, qq.y, big ? 5.5 : 3.6, 0, Math.PI * 2); c.fill(); c.stroke();
+    if (big && u.name) {
+      c.font = '700 12px "Alegreya Sans", sans-serif'; c.textAlign = 'center';
+      c.lineWidth = 3; c.strokeStyle = 'rgba(20,12,6,0.9)'; c.strokeText(u.name, qq.x, qq.y - 9);
+      c.fillStyle = '#f3ead2'; c.fillText(u.name, qq.x, qq.y - 9);
+    }
+  }
   const q = miniPos(p.x, p.y, v);
+  // Du: weißer Punkt, im Mehrspieler mit einem Ring in deiner Farbe
+  if (G.mp) { c.strokeStyle = playerColor(); c.lineWidth = 3; c.beginPath(); c.arc(q.x, q.y, big ? 8 : 5.6, 0, Math.PI * 2); c.stroke(); }
   c.fillStyle = '#ffffff'; c.strokeStyle = '#1d140c'; c.lineWidth = 2;
   c.beginPath(); c.arc(q.x, q.y, big ? 5 : 3.4, 0, Math.PI * 2); c.stroke(); c.fill();
   if (!big) {

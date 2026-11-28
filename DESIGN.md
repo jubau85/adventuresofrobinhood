@@ -203,19 +203,43 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Barone, Krieg, Grafschaften, Schäden, Bauten, Wetter, Turniere, Hinrichtungen (`SHARED_KEYS` in `mp.js`). Er schickt
   den ganzen Stand (nicht nur Änderungen), alle 3 s, wenn sich etwas geändert hat, die Märkte alle 8 s, die Uhr zweimal
   je Sekunde. Gäste rechnen täglich nur Persönliches (Sold, Aufträge, eigene Begegnungen; `guestDay` in `sim.js`).
-  Dorfleben, Tiere und Gruppen unterwegs rechnet jeder für sich.
-- **Befehle:** Was ein Gast an der gemeinsamen Welt ändert, geht als Befehl an den Gastgeber (bisher: Markt-Lager nach
-  Kauf und Verkauf, gewonnene und verlorene Grafschaften). Weitere folgen mit 7b.
+  Dorfleben und Tiere rechnet jeder für sich; alle Gruppen der Welt und die Belagerungen rechnet der Gastgeber
+  (`mpwelt.js`, siehe unten).
+- **Befehle:** Was ein Gast an der gemeinsamen Welt ändert, geht als Befehl an den Gastgeber: Markt-Lager nach Kauf
+  und Verkauf, gewonnene und verlorene Grafschaften, Diplomatie (`diplo`), angenommene und aufgegebene Aufträge
+  (`auftrag`, `auftragWeg`), eigene Belagerungen (`belagern`) und Heere vor seiner Heimburg (`heimBelagerung`).
 - **Helden der anderen:** jeder schickt 10-mal je Sekunde Position, Pferd, Ausrüstung und Farbe; die anderen zeigen ihn
   als 3D-Figur mit Namen und Ring in seiner Farbe, weich zwischen den Meldungen.
-- **Gefolge und Auftrags-Banden der anderen (`pvp.js`):** jeder schickt viermal je Sekunde sein Gefolge und die
-  Banden seiner Aufträge (`trupp`: Kennung, Art, Klasse, Ort, Leben, Ausrüstung, Farben), dazu Schadenszahlen, Schüsse
-  und Gefallene. Die anderen zeigen sie als Figuren (`G.remoteUnits`), weich zwischen den Meldungen. Wer eine fremde
-  Figur trifft, schickt den Schlag ihrem Besitzer (`treffer`: Angriff, Pferd, Ort, Fern, Ansturm); der rechnet den
-  Schaden mit den echten Werten aus (`applyRemoteHit` in `units.js`). Wer gegen wen kämpft, entscheidet `G.remoteFoe`:
-  Banden aus Aufträgen greifen jeden Menschen an, ein Ziel (Steuerzug) erst, wenn man es angegriffen hat; Helden und
-  Gefolge zweier Spieler nur in einer Fehde. Eine Bande wird bei ihrem Besitzer auch in der Nähe der anderen bewegt
-  und greift sie an (`humanDist`). Nimmt jemand einen Auftrag an, nimmt der Gastgeber ihn vom Brett (`auftrag`).
+- **Gefolge der anderen (`pvp.js`):** jeder schickt viermal je Sekunde sein Gefolge (`trupp`: Kennung, Art, Klasse,
+  Ort, Leben, Ausrüstung, Farben), dazu Schadenszahlen, Schüsse und Gefallene. Die anderen zeigen es als Figuren
+  (`G.remoteUnits`), weich zwischen den Meldungen. Wer eine fremde Figur trifft, schickt den Schlag ihrem Besitzer
+  (`treffer`: Angriff, Pferd, Ort, Fern, Ansturm); der rechnet den Schaden mit den echten Werten aus (`applyRemoteHit`
+  in `units.js`). Helden und Gefolge zweier Spieler kämpfen nur in einer Fehde gegeneinander (`G.remoteFoe`).
+- **Gemeinsame Welt (`mpwelt.js`):** Der Gastgeber rechnet alle Gruppen (Banden, Heere, Händler, Streifen, Züge der
+  Barone, Söldner, Aufgebote, Burgwachen, die Banden aus Aufträgen) und die Belagerung; Gäste erzeugen selbst keine.
+  Jeder Gast bekommt viermal je Sekunde, was im Umkreis von 100 Feldern um seinen Helden unterwegs ist (`gruppen`,
+  dazu der Stand der Belagerung: Lager, Trebuchet, Steine, Tore, Bresche, Seiten), und zeigt es als Spiegel
+  (`g.mirror`): Die Figuren laufen weich zwischen den Meldungen, rechnen aber nichts selbst. Ein Schlag eines Gastes
+  auf einen Spiegel geht an den Gastgeber (Kennung `w<id>`). Gegen wen eine Gruppe kämpft, merkt sie sich (`foes`:
+  `ich` für den Gastgeber, sonst Plätze der Gäste; `engageGroup`); sie greift von sich aus an, wen sie feindlich sieht
+  (`worldFoe`: Banden jeden außer Freunden der Waldleute, Parteien die, mit denen sie verfeindet sind, Aufgebote und
+  Burgwachen eines Menschen die, mit denen er in Fehde liegt, die Heere einer Belagerung die, die sich der anderen
+  Seite angeschlossen haben). Das Lebenszeichen jedes Helden trägt dafür seine Feinde unter den Parteien (`fe`) und die
+  Freundschaft der Waldleute (`wa`). Erfahrung (`erlegt`), Beute und Ehre (`sieg`) bekommt, wer den letzten Schlag
+  führt; einen erledigten Auftrag (`auftragFertig`) der, der ihn angenommen hat. Belagerungen rechnet der Gastgeber
+  ausführlich, solange irgendein Held in der Nähe ist (`humanDist`), sonst würfelt er sie aus. Geht der Gastgeber, rechnet
+  der neue Gastgeber die Spiegel als eigene Gruppen weiter (`onBecomeHost`).
+- **Krieg unter Menschen:** In einer Fehde lassen sich die eroberten Burgen eines Mitspielers belagern
+  (`besiegeBlock` prüft die Fehde); ein Gast führt sein Aufgebot über den Gastgeber (`belagern`, Söldner in seiner
+  Farbe, `leadSeat`). Der Herr der Burg steht von selbst auf der Seite der Verteidiger und bekommt eine Warnung
+  (`angriff`); die Besatzung trägt seine Farbe und hält zu ihm (`ownerSeat`). Fällt die Burg, geht sie an den Anführer
+  (`feldzug`), der andere verliert sie. Die Heimburg eines Menschen wird nicht erobert, sondern geplündert
+  (`gepluendert`: ein Fünftel des Goldes und Vorräte, der Anführer bekommt Beute). Heere der Welt ziehen auch vor die
+  Heimburgen der Gäste; der Gast bittet den Gastgeber darum (`heimBelagerung`), und alle sehen die Belagerung.
+- **Farben:** Auf der Karte tragen die Grafschaften der Menschen ihre Farbe kräftiger als die der Parteien, mit dem
+  Namen des Herrn darunter; die Helden der Mitspieler sind Punkte in ihrer Farbe mit Namen, die Legende nennt alle
+  Spieler mit Diplomatie. Jeder Held trägt einen Umhang in seiner Wappenfarbe (`drawCape` in `render.js`, nach der
+  Hüfte des Modells und der Blickrichtung: von hinten über dem Rücken, sonst dahinter, beim Gehen weht er).
 - **Diplomatie zwischen Menschen (`pvp.js`):** Zwischen je zwei Plätzen gilt Frieden, Fehde oder Bündnis (`pvp` im
   gemeinsamen Stand, Befehl `diplo` an den Gastgeber). Eine Fehde gilt sofort; Frieden nach einer Fehde und ein Bündnis
   brauchen ein Angebot (`angebot`, der Gastgeber merkt es sich und reicht es weiter), das der andere annimmt (`diplo`)
@@ -228,9 +252,8 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
 - **Verbindung (`net.js`):** Browser-Kanal (zwei Fenster auf einem Rechner), WebSocket-Relais (`desktop/relay.js`,
   in der Desktop-App beim Eröffnen eingebaut, sonst `node tools/relay.mjs`), später Steam. Chrome verlangt für Seiten
   aus dem Netz eine Freigabe für Verbindungen ins Heimnetz; die Desktop-App ist davon nicht betroffen.
-- **Noch offen (7b/7c):** Angriffe der KI auf die Burgen der Gäste sichtbar für alle, Belagerungen und Feldschlachten
-  zwischen Menschen und deren Anzeige bei allen, Diplomatie zwischen Menschen, Gruppen auf der Karte gemeinsam,
-  Speichern einer Mehrspieler-Partie für alle, Steam-Lobby.
+- **Noch offen (7c):** Feldschlachten zwischen Menschen, Dorfleben und Tiere gemeinsam (bisher rechnet sie jeder für
+  sich, sie sehen also bei jedem etwas anders aus), Speichern einer Mehrspieler-Partie für alle, Steam-Lobby.
 
 ## Ausbauplan
 

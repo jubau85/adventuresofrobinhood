@@ -1,6 +1,8 @@
 // Mehrspieler-Test mit zwei Spielfenstern: Beitreten, Plätze, Uhr, Helden, Markt-Befehl, Chat, Gastgeber-Wechsel,
 // die Burg der eigenen Grafschaft als Heimburg wie Ashcombe (Bauplätze, Pacht, Ausbau, die anderen sehen ihn),
-// Gefolge und Auftrags-Banden der anderen, Fehde, Frieden, Bündnis, Geschenk, Treffer über die Rechner, Auftragsbrett.
+// Gefolge der anderen, Fehde, Frieden, Bündnis, Geschenk, Treffer über die Rechner, gemeinsame Welt (Banden des
+// Gastgebers beim Gast, Beute und Erfahrung für den Gast, Aufträge über den Gastgeber), Belagerung unter Spielern
+// (eroberte Burg fällt an den Angreifer, Heimburg wird geplündert, ein Gast führt sein Aufgebot über den Gastgeber).
 //   node tools/mehrspieler_test.cjs [ausgabe-ordner] [ws://127.0.0.1:8765]
 // Ohne Relais-Adresse über den Browser-Kanal (ein Browser), mit Adresse über das Relais (zwei getrennte Browser;
 // vorher `node tools/relay.mjs` starten). Braucht Playwright mit Chromium.
@@ -263,7 +265,7 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
     if (hostG) {
       // B reitet hin und schlägt die Bande
       await ev(B, (q) => { const p = window.__ritter.s.player; p.x = q.tx + 2; p.y = q.ty + 2; p.path = null; }, mineQ);
-      await B.waitForTimeout(1500);
+      await B.waitForFunction((id) => !!window.__ritter.groups.find((g) => g.id === id && g.mirror), hostG.id, { timeout: 10000 }).catch(() => {});
       const seenQ = await ev(B, (id) => !!window.__ritter.groups.find((g) => g.id === id && g.mirror), hostG.id);
       ok(seenQ, 'B sieht die Bande seines Auftrags am Ziel');
       for (let k = 0; k < 12; k++) {
@@ -324,6 +326,12 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   const plA = await ev(A, () => ({ gold: window.__ritter.s.gold, owner: window.__ritter.s.shires.nottingham.owner }));
   const plB = await ev(B, () => ({ gold: window.__ritter.s.gold, siege: !!window.__ritter.siege }));
   ok(plA.gold < goldA0 && plA.owner === 'spieler' && plB.gold > goldB0 - 450 && !plB.siege, `Nottingham geplündert: A ${goldA0} -> ${plA.gold} (bleibt Herr), B ${goldB0} -> ${plB.gold}`);
+  // Karte: Ländereien in den Farben der Spieler, der andere Held als Punkt, Legende mit allen Spielern
+  const karte = await ev(B, () => { const G = window.__ritter; window.__ritterDebug.openPanel('map'); const lg = document.querySelector('#panel-body .legend'); return { legend: lg ? lg.textContent : '', tint: !!G.shireTint, key: G.shireTint ? G.shireTint.key.includes('p:nottingham') : false }; });
+  ok(/Brida \(du\)/.test(karte.legend) && /Aldric/.test(karte.legend) && /Fehde/.test(karte.legend) && karte.tint && karte.key, `Karte bei B: Legende „${karte.legend.slice(0, 60)}…“, Tönung mit As Ländereien`);
+  await B.waitForTimeout(500);
+  await B.screenshot({ path: `${OUT}/mp_karte_B.png` });
+  await ev(B, () => { const b = document.querySelector('#panel [data-act="close"], #panel .close'); if (b) b.click(); });
   // Chat
   await ev(A, () => window.__ritter.mpChat('Seid gegrüßt!'));
   await B.waitForTimeout(800);
