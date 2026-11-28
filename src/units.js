@@ -316,6 +316,8 @@ export function groupHostile(g) {
 
 export function isEnemy(a, b) {
   if (b.dead || a.dead) return false;
+  // Mehrspieler: Figuren der Mitspieler (pvp.js entscheidet nach Fehde, Bande oder Ziel)
+  if (a.team === 'remote' || b.team === 'remote') return !!G.remoteFoe && G.remoteFoe(a, b);
   if (a.team === 'player') return !!(b.group && b.group.engaged) || raidVictim(b);
   const ga = a.group;
   if (!ga) return false;
@@ -383,6 +385,8 @@ export function attack(u, t) {
   if (u.st.ranged) {
     sfxAt(ITEMS[u.eq.waffe].kind === 'armbrust' ? 'armbrust' : 'bogen', u.x, u.y, 0.8);
     G.projectiles.push({ x: u.x, y: u.y, tx: t.x, ty: t.y, target: t, att: u, t: 0, dur: Math.max(0.18, d / 15), bolt: ITEMS[u.eq.waffe].kind === 'armbrust' });
+    // Mehrspieler: Die anderen sehen den Pfeil fliegen
+    if (G.onShot) G.onShot(u, t);
   } else {
     sfxAt('hieb', u.x, u.y, 0.6);
     // Ansturm: Wer zu Pferd mit Anlauf zuschlägt, trifft mit voller Wucht
@@ -394,6 +398,13 @@ export function attack(u, t) {
 
 function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
   if (t.dead) return;
+  // Eine Figur eines Mitspielers: Den Schaden rechnet ihr Besitzer mit den echten Werten (pvp.js), hier nur der Schlag
+  if (t.team === 'remote') {
+    t.flash = 0.18; t.combatT = 5;
+    sfxAt(ranged ? 'pfeil' : 'treffer', t.x, t.y, 0.8);
+    if (G.onRemoteHit) G.onRemoteHit(a, t, ranged, ox, oy, charge);
+    return;
+  }
   if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
   const face = shieldFacing(t, ox, oy), sh = t.st.shield || 0;
   // Zählung für die Auswertung (Testmodus): Treffer von vorn, von der Seite, von hinten, Ansturm, abgefangen
@@ -418,6 +429,7 @@ function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
   t.combatT = 5;
   const col = t.team === 'player' ? '#ff8a6a' : crit || charge ? '#ffd84a' : face === 0 ? '#ffb070' : '#fff4d8';
   G.fx.push({ kind: 'text', x: t.x, y: t.y, text: crit || charge ? `${dmg}!` : String(dmg), color: col, t: 0, dur: 1.0 });
+  if (G.onHit) G.onHit(t, dmg, crit || charge);
   if (charge && (a.team === 'player' || t.team === 'player')) G.fx.push({ kind: 'text', x: t.x, y: t.y - 0.6, text: 'Ansturm!', color: '#ffd84a', t: 0, dur: 1.2 });
   if (t.hp <= 0) unitDown(t, a);
 }
@@ -449,11 +461,30 @@ export function updateProjectiles(dt) {
         if (p.npcHunt) { if (!tg.dead) takeAnimal(tg); }
         else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) { sfxAt('pfeil', tg.x, tg.y, 0.7); hitAnimal(tg, p.dmg, p.att); }
         else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
-      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true, p.x, p.y);
+      } else if (p.visual) { /* nur zu sehen: der Pfeil eines Mitspielers */ }
+      else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true, p.x, p.y);
       else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
       G.projectiles.splice(i, 1);
     }
   }
+}
+
+// Mehrspieler: Ein Mitspieler hat eine deiner Figuren getroffen (pvp.js). Der Schaden wird hier mit den Werten deiner
+// Figur gerechnet; eine Bande aus deinem Auftrag wehrt sich dann.
+export function applyRemoteHit(t, info) {
+  if (!t || t.dead) return;
+  const a = { st: { atk: Math.max(1, +info.atk || 1), horse: info.hatk ? { atk: +info.hatk } : null }, mounted: !!info.hatk, team: 'remote', x: +info.x, y: +info.y };
+  if (t.group) { t.group.engaged = true; t.group.byRemote = true; }
+  t.lastRemote = info.by || null;
+  applyHit(a, t, !!info.r, a.x, a.y, !!info.c);
+}
+
+// Mehrspieler: Abstand der nächsten Menschen (du, die Helden und Gefährten der Mitspieler) zu einem Punkt
+export function humanDist(x, y) {
+  const p = G.s.player;
+  let d = p.dead ? Infinity : Math.hypot(p.x - x, p.y - y);
+  for (const o of G.remoteUnits || []) if (!o.dead && (o.rk === 'held' || o.rk === 'gefaehrte')) d = Math.min(d, Math.hypot(o.x - x, o.y - y));
+  return d;
 }
 
 export function grantXp(u, amount) {
@@ -582,6 +613,8 @@ export function updateUnits(dt) {
   const p = G.s.player;
   // Alle, die gerade kämpfen können: nur sie kommen als Gegner in Frage
   G.combatants = G.units.filter((o) => !o.dead && (o.team === 'player' || (o.group && (o.group.engaged || o.group.feud))));
+  // Helden, Gefolge und Auftrags-Banden der Mitspieler (pvp.js)
+  if (G.remoteUnits && G.remoteUnits.length) for (const o of G.remoteUnits) if (!o.dead && !o.hidden) G.combatants.push(o);
   for (const u of G.units) {
     u.moving = false;
     if (u.cd > 0) u.cd -= dt;
@@ -613,7 +646,8 @@ export function updateUnits(dt) {
   const party = partyMembers();
   party.forEach((c, k) => { if (!c.dead) updateCompanion(c, k, dt); });
   for (const g of G.groups) {
-    const near = Math.hypot(g.x - p.x, g.y - p.y) < 55;
+    // Banden aus Aufträgen kämpfen auch mit den Mitspielern (pvp.js spiegelt sie zu ihnen)
+    const near = Math.hypot(g.x - p.x, g.y - p.y) < 55 || (g.questId && G.remoteUnits && G.remoteUnits.length && humanDist(g.x, g.y) < 55);
     for (let k = 0; k < g.members.length; k++) {
       const m = g.members[k];
       if (near || g.engaged || g.feud) updateGroupMember(m, g, k, dt);
@@ -662,7 +696,7 @@ function updatePlayer(p, dt) {
   if (G.tour && G.tour.lock) return;
   const inp = G.input;
   const at = p.attackTarget;
-  if (at && (at.dead || ((!at.group || !at.group.engaged) && !raidVictim(at)))) p.attackTarget = null;
+  if (at && (at.dead || (at.team === 'remote' ? !isEnemy(p, at) : (!at.group || !at.group.engaged) && !raidVictim(at)))) p.attackTarget = null;
   if (p.huntTarget && (p.huntTarget.dead || !p.st.ranged)) p.huntTarget = null;
   if (inp.dx || inp.dy) {
     p.path = null; p.attackTarget = null; p.huntTarget = null; G.pendingSite = null;
@@ -992,8 +1026,9 @@ export function updateGroups(dt) {
     }
     if (g.engaged) {
       let minD = Infinity;
-      for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
-      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || p.dead) {
+      const mp = g.questId && G.remoteUnits && G.remoteUnits.length;
+      for (const m of g.members) minD = Math.min(minD, mp ? humanDist(m.x, m.y) : Math.hypot(m.x - p.x, m.y - p.y));
+      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || (p.dead && !mp)) {
         g.engaged = false;
         g.path = null; g.wait = g.defender ? 99999 : 2;
         g.x = lead.x; g.y = lead.y;
@@ -1003,7 +1038,7 @@ export function updateGroups(dt) {
     }
     const hostile = groupHostile(g);
     if (hostile && !(G.s.safeTime > 0)) {
-      const dP = Math.hypot(p.x - lead.x, p.y - lead.y);
+      const dP = g.questId && G.remoteUnits && G.remoteUnits.length ? humanDist(lead.x, lead.y) : Math.hypot(p.x - lead.x, p.y - lead.y);
       if (dP < g.aggro) {
         g.engaged = true;
         log(`${gt.nom} ${gt.pl ? 'greifen' : 'greift'} an!`, 'bad');

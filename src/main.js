@@ -10,7 +10,7 @@ import { generateWorld, groundZ, worldSig } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
-  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus, spawnGroup,
+  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus, spawnGroup, isEnemy,
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
@@ -32,6 +32,7 @@ import {
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, mpLobbyBegin, mpLobbyUpdate, shiresIn } from './mp.js';
+import { pvpProvoke } from './pvp.js';
 import { initLobby } from './lobby.js';
 import { introWanted, startIntro } from './intro.js';
 import { nearestWalkable } from './world.js';
@@ -512,6 +513,13 @@ function attackNearest() {
 function clickUnit(u) {
   const p = G.s.player;
   const g = u.group;
+  // Figuren der Mitspieler: angreifen, wenn sie Feinde sind (Bande, Ziel, Fehde), sonst zur Diplomatie
+  if (u.team === 'remote') {
+    if (u.rk === 'ziel') pvpProvoke(u);
+    if (isEnemy(p, u)) { p.attackTarget = u; p.path = null; return true; }
+    openPanel('map', null, 'mitspieler');
+    return true;
+  }
   if (raidVictim(u)) { p.attackTarget = u; p.path = null; return true; }
   if (u.role === 'bettler') {
     if (Math.hypot(u.x - p.x, u.y - p.y) < 2.6) giveAlms(u);

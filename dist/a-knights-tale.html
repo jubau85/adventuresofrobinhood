@@ -719,8 +719,8 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 <input id="chat-input" hidden maxlength="200" placeholder="Zu allen in der Partie sprechen … (Enter schickt, Esc schließt)" autocomplete="off">
 <div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
 <script>
-window.__aktBuild = 'eebe70b15f';
-window.__aktVersion = '0.8.0';
+window.__aktBuild = 'b6fc7621c0';
+window.__aktVersion = '0.8.1';
 (function () {
 'use strict';
 
@@ -5191,6 +5191,8 @@ function groupHostile(g) {
 
 function isEnemy(a, b) {
   if (b.dead || a.dead) return false;
+  // Mehrspieler: Figuren der Mitspieler (pvp.js entscheidet nach Fehde, Bande oder Ziel)
+  if (a.team === 'remote' || b.team === 'remote') return !!G.remoteFoe && G.remoteFoe(a, b);
   if (a.team === 'player') return !!(b.group && b.group.engaged) || raidVictim(b);
   const ga = a.group;
   if (!ga) return false;
@@ -5258,6 +5260,8 @@ function attack(u, t) {
   if (u.st.ranged) {
     sfxAt(ITEMS[u.eq.waffe].kind === 'armbrust' ? 'armbrust' : 'bogen', u.x, u.y, 0.8);
     G.projectiles.push({ x: u.x, y: u.y, tx: t.x, ty: t.y, target: t, att: u, t: 0, dur: Math.max(0.18, d / 15), bolt: ITEMS[u.eq.waffe].kind === 'armbrust' });
+    // Mehrspieler: Die anderen sehen den Pfeil fliegen
+    if (G.onShot) G.onShot(u, t);
   } else {
     sfxAt('hieb', u.x, u.y, 0.6);
     // Ansturm: Wer zu Pferd mit Anlauf zuschlägt, trifft mit voller Wucht
@@ -5269,6 +5273,13 @@ function attack(u, t) {
 
 function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
   if (t.dead) return;
+  // Eine Figur eines Mitspielers: Den Schaden rechnet ihr Besitzer mit den echten Werten (pvp.js), hier nur der Schlag
+  if (t.team === 'remote') {
+    t.flash = 0.18; t.combatT = 5;
+    sfxAt(ranged ? 'pfeil' : 'treffer', t.x, t.y, 0.8);
+    if (G.onRemoteHit) G.onRemoteHit(a, t, ranged, ox, oy, charge);
+    return;
+  }
   if (t.team === 'player' && cheatOn('god')) { t.flash = 0.12; G.fx.push({ kind: 'text', x: t.x, y: t.y, text: '0', color: '#c8d8e8', t: 0, dur: 0.8 }); return; }
   const face = shieldFacing(t, ox, oy), sh = t.st.shield || 0;
   // Zählung für die Auswertung (Testmodus): Treffer von vorn, von der Seite, von hinten, Ansturm, abgefangen
@@ -5293,6 +5304,7 @@ function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
   t.combatT = 5;
   const col = t.team === 'player' ? '#ff8a6a' : crit || charge ? '#ffd84a' : face === 0 ? '#ffb070' : '#fff4d8';
   G.fx.push({ kind: 'text', x: t.x, y: t.y, text: crit || charge ? `${dmg}!` : String(dmg), color: col, t: 0, dur: 1.0 });
+  if (G.onHit) G.onHit(t, dmg, crit || charge);
   if (charge && (a.team === 'player' || t.team === 'player')) G.fx.push({ kind: 'text', x: t.x, y: t.y - 0.6, text: 'Ansturm!', color: '#ffd84a', t: 0, dur: 1.2 });
   if (t.hp <= 0) unitDown(t, a);
 }
@@ -5324,11 +5336,30 @@ function updateProjectiles(dt) {
         if (p.npcHunt) { if (!tg.dead) takeAnimal(tg); }
         else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.1) { sfxAt('pfeil', tg.x, tg.y, 0.7); hitAnimal(tg, p.dmg, p.att); }
         else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
-      } else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true, p.x, p.y);
+      } else if (p.visual) { /* nur zu sehen: der Pfeil eines Mitspielers */ }
+      else if (!tg.dead && Math.hypot(tg.x - p.tx, tg.y - p.ty) < 1.2) applyHit(p.att, tg, true, p.x, p.y);
       else sfxAt('pfeilboden', p.tx, p.ty, 0.6);
       G.projectiles.splice(i, 1);
     }
   }
+}
+
+// Mehrspieler: Ein Mitspieler hat eine deiner Figuren getroffen (pvp.js). Der Schaden wird hier mit den Werten deiner
+// Figur gerechnet; eine Bande aus deinem Auftrag wehrt sich dann.
+function applyRemoteHit(t, info) {
+  if (!t || t.dead) return;
+  const a = { st: { atk: Math.max(1, +info.atk || 1), horse: info.hatk ? { atk: +info.hatk } : null }, mounted: !!info.hatk, team: 'remote', x: +info.x, y: +info.y };
+  if (t.group) { t.group.engaged = true; t.group.byRemote = true; }
+  t.lastRemote = info.by || null;
+  applyHit(a, t, !!info.r, a.x, a.y, !!info.c);
+}
+
+// Mehrspieler: Abstand der nächsten Menschen (du, die Helden und Gefährten der Mitspieler) zu einem Punkt
+function humanDist(x, y) {
+  const p = G.s.player;
+  let d = p.dead ? Infinity : Math.hypot(p.x - x, p.y - y);
+  for (const o of G.remoteUnits || []) if (!o.dead && (o.rk === 'held' || o.rk === 'gefaehrte')) d = Math.min(d, Math.hypot(o.x - x, o.y - y));
+  return d;
 }
 
 function grantXp(u, amount) {
@@ -5457,6 +5488,8 @@ function updateUnits(dt) {
   const p = G.s.player;
   // Alle, die gerade kämpfen können: nur sie kommen als Gegner in Frage
   G.combatants = G.units.filter((o) => !o.dead && (o.team === 'player' || (o.group && (o.group.engaged || o.group.feud))));
+  // Helden, Gefolge und Auftrags-Banden der Mitspieler (pvp.js)
+  if (G.remoteUnits && G.remoteUnits.length) for (const o of G.remoteUnits) if (!o.dead && !o.hidden) G.combatants.push(o);
   for (const u of G.units) {
     u.moving = false;
     if (u.cd > 0) u.cd -= dt;
@@ -5488,7 +5521,8 @@ function updateUnits(dt) {
   const party = partyMembers();
   party.forEach((c, k) => { if (!c.dead) updateCompanion(c, k, dt); });
   for (const g of G.groups) {
-    const near = Math.hypot(g.x - p.x, g.y - p.y) < 55;
+    // Banden aus Aufträgen kämpfen auch mit den Mitspielern (pvp.js spiegelt sie zu ihnen)
+    const near = Math.hypot(g.x - p.x, g.y - p.y) < 55 || (g.questId && G.remoteUnits && G.remoteUnits.length && humanDist(g.x, g.y) < 55);
     for (let k = 0; k < g.members.length; k++) {
       const m = g.members[k];
       if (near || g.engaged || g.feud) updateGroupMember(m, g, k, dt);
@@ -5537,7 +5571,7 @@ function updatePlayer(p, dt) {
   if (G.tour && G.tour.lock) return;
   const inp = G.input;
   const at = p.attackTarget;
-  if (at && (at.dead || ((!at.group || !at.group.engaged) && !raidVictim(at)))) p.attackTarget = null;
+  if (at && (at.dead || (at.team === 'remote' ? !isEnemy(p, at) : (!at.group || !at.group.engaged) && !raidVictim(at)))) p.attackTarget = null;
   if (p.huntTarget && (p.huntTarget.dead || !p.st.ranged)) p.huntTarget = null;
   if (inp.dx || inp.dy) {
     p.path = null; p.attackTarget = null; p.huntTarget = null; G.pendingSite = null;
@@ -5867,8 +5901,9 @@ function updateGroups(dt) {
     }
     if (g.engaged) {
       let minD = Infinity;
-      for (const m of g.members) minD = Math.min(minD, Math.hypot(m.x - p.x, m.y - p.y));
-      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || p.dead) {
+      const mp = g.questId && G.remoteUnits && G.remoteUnits.length;
+      for (const m of g.members) minD = Math.min(minD, mp ? humanDist(m.x, m.y) : Math.hypot(m.x - p.x, m.y - p.y));
+      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || (p.dead && !mp)) {
         g.engaged = false;
         g.path = null; g.wait = g.defender ? 99999 : 2;
         g.x = lead.x; g.y = lead.y;
@@ -5878,7 +5913,7 @@ function updateGroups(dt) {
     }
     const hostile = groupHostile(g);
     if (hostile && !(G.s.safeTime > 0)) {
-      const dP = Math.hypot(p.x - lead.x, p.y - lead.y);
+      const dP = g.questId && G.remoteUnits && G.remoteUnits.length ? humanDist(lead.x, lead.y) : Math.hypot(p.x - lead.x, p.y - lead.y);
       if (dP < g.aggro) {
         g.engaged = true;
         log(`${gt.nom} ${gt.pl ? 'greifen' : 'greift'} an!`, 'bad');
@@ -10378,6 +10413,8 @@ function acceptQuest(siteId, qid) {
   if (!q) return;
   if (G.s.quests.length >= 6) { log('Du hast schon zu viele Aufträge angenommen.', 'bad'); return; }
   town.quests = town.quests.filter((x) => x !== q);
+  // Mehrspieler: für alle vom Brett nehmen (pvp.js)
+  if (G.onQuestTaken) G.onQuestTaken(siteId, q.id);
   q.state = 'aktiv';
   q.deadline = G.s.day + q.days;
   const site = siteById(siteId);
@@ -13112,7 +13149,7 @@ function openTransport({ kind = 'kanal', room = 'burg', url = '', id = netId() }
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
-  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles', 'startCastle'];
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles', 'startCastle', 'pvp'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
 const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
@@ -13219,6 +13256,7 @@ function mpUpdate(dt) {
     if (mp.t.world >= WORLD_EVERY) { mp.t.world = 0; sendWorld(mp, false); }
     if (mp.t.market >= MARKET_EVERY) { mp.t.market = 0; sendMarkets(mp, false); }
   } else if (now - mp.lastHost > HOST_TIMEOUT) migrate(mp);
+  for (const f of TICKS) f(mp, dt);
   // Mitspieler, von denen nichts mehr kommt, verschwinden
   for (const [id, p] of mp.peers) if (now - p.last > PEER_TIMEOUT && !(p.joinUntil > now && !p.hero)) peerGone(mp, id, 'ist nicht mehr zu erreichen');
   moveHeroes(dt);
@@ -13227,7 +13265,8 @@ function mpUpdate(dt) {
 function heroState() {
   const p = G.s.player;
   return { x: +p.x.toFixed(2), y: +p.y.toFixed(2), m: !!p.mounted, run: !!p.run, sw: p.swing > 0 ? 1 : 0, dead: !!p.dead,
-    eq: { waffe: p.eq.waffe, ruestung: p.eq.ruestung, schild: p.eq.schild, pferd: p.eq.pferd }, fem: !!p.female, col: G.s.color, name: p.name };
+    eq: { waffe: p.eq.waffe, ruestung: p.eq.ruestung, schild: p.eq.schild, pferd: p.eq.pferd }, fem: !!p.female, col: G.s.color, name: p.name,
+    hp: Math.round(p.hp), mhp: Math.round(p.st.maxHp), lv: p.level };
 }
 
 function sendWorld(mp, force, to = null) {
@@ -13273,8 +13312,23 @@ function onMessage(mp, env) {
     case 'antwort': { const cb = mp.pending.get(d.n); if (cb) { mp.pending.delete(d.n); cb(d); } break; }
     case 'gastgeber': mp.hostId = from; if (mp.role === 'host' && from !== mp.id) mp.role = 'guest'; log(`${p.name} ist jetzt Gastgeber der Partie.`, 'gold'); break;
     case 'tschuess': peerGone(mp, from, 'hat die Partie verlassen'); break;
+    default: if (EXTRA[type]) EXTRA[type](mp, from, d, p);
   }
 }
+
+// ---------------------------------------------------------------- Anschlüsse für andere Module (pvp.js)
+// Weitere Nachrichten, Befehle an den Gastgeber und ein Aufruf je Bild; dazu Senden an einen oder an alle
+const EXTRA = {}, TICKS = [];
+function mpOn(type, fn) { EXTRA[type] = fn; }
+function mpAddCommand(name, fn) { COMMANDS[name] = fn; }
+function mpOnTick(fn) { TICKS.push(fn); }
+function mpSendTo(id, type, d) { const mp = G.mp; if (mp && id) { if (id === mp.id) { if (EXTRA[type]) EXTRA[type](mp, mp.id, d, null); } else mp.tr.send(id, type, d); } }
+function mpBroadcast(type, d) { const mp = G.mp; if (mp) mp.tr.broadcast(type, d); }
+// Wer sitzt auf einem Platz (Kennung), welcher Platz gehört einer Kennung
+function mpPeerOfSeat(seat) { const mp = G.mp; return mp && mp.seats ? mp.seats[seat] || null : null; }
+function mpSeatOf(id) { const mp = G.mp; if (!mp) return null; if (id === mp.id) return mp.seat; const s = Object.keys(mp.seats || {}).find((k) => mp.seats[k] === id); return s || (mp.peers.get(id) || {}).seat || null; }
+// Gastgeber: den gemeinsamen Stand bald schicken (nach einer Änderung durch einen Befehl)
+function mpWorldSoon(markets = false) { const mp = G.mp; if (mp && mp.role === 'host') { mp.hash.world = ''; mp.t.world = WORLD_EVERY; if (markets) { mp.hash.market = ''; mp.t.market = MARKET_EVERY; } } }
 
 // Gastgeber: ein neuer Mitspieler klopft an. Er bekommt eine freie Grafschaft (die gewünschte, wenn sie frei ist) und
 // den ganzen Weltstand. Frei ist, was keinem Menschen und keinem Baron gehört; eine verwaiste Grafschaft
@@ -13479,8 +13533,10 @@ function migrate(mp) {
 
 // ---------------------------------------------------------------- Helden der Mitspieler
 function dropHero(p) {
-  if (p.unit && G.remoteUnits) G.remoteUnits = G.remoteUnits.filter((u) => u !== p.unit);
+  // Held, Gefolge und Auftrags-Banden des Mitspielers verschwinden (pvp.js)
+  if (G.remoteUnits) G.remoteUnits = G.remoteUnits.filter((u) => u !== p.unit && u.peer !== p.id);
   p.unit = null;
+  if (p.troops) p.troops.clear();
 }
 function moveHeroes(dt) {
   const mp = G.mp;
@@ -13491,11 +13547,15 @@ function moveHeroes(dt) {
     let u = p.unit;
     if (!u) {
       u = makeUnit({ kind: 'remote', cls: 'ritter', name: h.name || p.name, eq: h.eq, female: h.fem, x: h.x, y: h.y, tunic: h.col });
-      u.team = 'remote'; u.peer = p.id;
+      u.team = 'remote'; u.peer = p.id; u.rid = 'h'; u.rk = 'held';
       p.unit = u;
       G.remoteUnits.push(u);
     }
-    u.name = h.name || p.name; u.tunic = h.col || p.color; u.female = !!h.fem; u.eq = { ...u.eq, ...h.eq }; u.mounted = !!h.m; u.run = !!h.run; u.dead = !!h.dead;
+    u.seat = p.seat;
+    const eqKey = JSON.stringify(h.eq || {});
+    if (u._eqKey !== eqKey || u.level !== (h.lv || 1)) { u._eqKey = eqKey; u.eq = { ...u.eq, ...h.eq }; u.level = h.lv || 1; computeStats(u); }
+    u.name = h.name || p.name; u.tunic = h.col || p.color; u.female = !!h.fem; u.mounted = !!h.m; u.run = !!h.run; u.dead = !!h.dead;
+    if (h.mhp) { u.st.maxHp = h.mhp; u.hp = Math.max(0, Math.min(h.mhp, h.hp ?? h.mhp)); }
     if (h.sw && !(u.swing > 0)) u.swing = 0.3;
     if (u.swing > 0) u.swing -= dt;
     const dx = h.x - u.x, dy = h.y - u.y, d = Math.hypot(dx, dy);
@@ -13749,6 +13809,312 @@ function lobbySeatInfo(seat) {
   return { name: sh ? sh.name : seat, castle: site.name || seat, realm: REALM_NAME[site.realm] || 'Anderswo', text: sh ? sh.text : '', lord: site.faction && FACTIONS[site.faction] ? FACTIONS[site.faction].name : 'niemand' };
 }
 function lobbySeatLabel(seat) { const i = lobbySeatInfo(seat); return `${i.name} · Burg ${i.castle}`; }
+
+// ===== pvp.js =====
+// Mehrspieler zwischen Menschen: Diplomatie, die Truppen der anderen in der eigenen Welt und Kämpfe über die Rechner
+// hinweg.
+// 1) Diplomatie: Zwischen je zwei Grafschaften (Plätzen) gilt Frieden, Fehde oder Bündnis (G.s.pvp im gemeinsamen
+//    Stand, nur der Gastgeber trägt ein). Eine Fehde erklärt man allein; Frieden (nach einer Fehde) und ein Bündnis
+//    bietet man an, der andere nimmt an oder lehnt ab. Ein Bündnis kündigt man allein. Gold schickt man als Geschenk.
+// 2) Truppen: Jeder schickt viermal je Sekunde sein Gefolge und die Banden seiner Aufträge (trupp). Die anderen zeigen
+//    sie als Figuren (G.remoteUnits) mit Schüssen, Treffern und Gefallenen.
+// 3) Treffer: Wer eine fremde Figur trifft, schickt den Schlag ihrem Besitzer (treffer). Der rechnet den Schaden mit den
+//    echten Werten (Rüstung, Schild, Burg), und alle sehen die Zahl. Banden aus Aufträgen greifen jeden Menschen an;
+//    Helden und Gefolge zweier Spieler kämpfen nur in einer Fehde gegeneinander.
+
+
+
+
+
+
+
+// ---------------------------------------------------------------- Diplomatie
+const PVP_NAMES = { frieden: 'Frieden', fehde: 'Fehde', buendnis: 'Bündnis' };
+const pairKey = (a, b) => [a, b].sort().join('|');
+function pvpState(a, b) { const v = G.s && G.s.pvp && G.s.pvp[pairKey(a, b)]; return v && PVP_NAMES[v.st] ? v.st : 'frieden'; }
+function pvpWith(seat) { const mp = G.mp; return mp && mp.seat && seat && seat !== mp.seat ? pvpState(mp.seat, seat) : 'frieden'; }
+function pvpSince(seat) { const mp = G.mp, v = mp && G.s.pvp && G.s.pvp[pairKey(mp.seat, seat)]; return v ? v.since : null; }
+function humanName(seat) { const i = G.mpSeatInfo && G.mpSeatInfo(seat); return i ? i.name : seatName(seat); }
+// Offene Angebote an dich: Platz -> 'frieden' | 'buendnis'
+function pvpOffers() { return G.pvpOffers || (G.pvpOffers = {}); }
+
+// Die anderen Menschen der Partie (online), für die Tafel
+function pvpPlayers() {
+  const mp = G.mp;
+  if (!mp) return [];
+  return [...mp.peers.values()].filter((p) => p.seat && p.seat !== mp.seat).map((p) => ({ id: p.id, seat: p.seat, name: p.name, color: p.color, arms: p.arms, st: pvpWith(p.seat), since: pvpSince(p.seat), offer: pvpOffers()[p.seat] || null }));
+}
+
+const pending = new Map();   // Gastgeber: offene Angebote 'von>an' -> Art
+function setPvp(a, b, st, was) {
+  (G.s.pvp || (G.s.pvp = {}))[pairKey(a, b)] = { st, since: G.s.day };
+  mpBroadcast('diplo', { a, b, st, was, day: G.s.day });
+  diploNews(a, b, st, was);
+  mpWorldSoon();
+}
+mpAddCommand('diplo', (mp, from, a) => {
+  const me = mpSeatOf(from), to = a && a.to;
+  if (!me || !SHIRES[to] || to === me || !PVP_NAMES[a.st]) return { ok: false };
+  const cur = pvpState(me, to);
+  if (a.st === cur) return { ok: false, msg: `Zwischen euch gilt schon ${PVP_NAMES[cur]}.` };
+  // Frieden nach einer Fehde und ein Bündnis gelten nur, wenn der andere sie angeboten hat
+  if ((a.st === 'frieden' && cur === 'fehde') || a.st === 'buendnis') {
+    if (pending.get(`${to}>${me}`) !== a.st) return { ok: false, msg: 'Das Angebot gilt nicht mehr.' };
+    pending.delete(`${to}>${me}`);
+  }
+  pending.delete(`${me}>${to}`);
+  setPvp(me, to, a.st, cur);
+  return { ok: true };
+});
+mpAddCommand('angebot', (mp, from, a) => {
+  const me = mpSeatOf(from), to = a && a.to;
+  if (!me || !SHIRES[to] || to === me) return { ok: false };
+  const cur = pvpState(me, to);
+  if (!((a.st === 'frieden' && cur === 'fehde') || (a.st === 'buendnis' && cur === 'frieden'))) return { ok: false, msg: 'Dieses Angebot passt nicht zu eurem Stand.' };
+  const pid = mpPeerOfSeat(to);
+  if (!pid) return { ok: false, msg: `${humanName(to)} ist gerade nicht in der Partie.` };
+  pending.set(`${me}>${to}`, a.st);
+  mpSendTo(pid, 'angebot', { from: me, st: a.st });
+  return { ok: true };
+});
+mpAddCommand('absage', (mp, from, a) => {
+  const me = mpSeatOf(from);
+  if (!me || !a || !SHIRES[a.to]) return { ok: false };
+  pending.delete(`${a.to}>${me}`);
+  const pid = mpPeerOfSeat(a.to);
+  if (pid) mpSendTo(pid, 'absage', { from: me, st: a.st });
+  return { ok: true };
+});
+// Ein Auftrag ist vergeben: vom Brett der Stadt nehmen, für alle
+mpAddCommand('auftrag', (mp, from, a) => {
+  const town = G.s.towns && a && G.s.towns[a.site];
+  if (!town) return { ok: false };
+  town.quests = town.quests.filter((q) => q.id !== a.id);
+  mpWorldSoon(true);
+  return { ok: true };
+});
+
+mpOn('diplo', (mp, from, d) => {
+  if (from !== mp.hostId || !d || !SHIRES[d.a] || !SHIRES[d.b] || !PVP_NAMES[d.st]) return;
+  (G.s.pvp || (G.s.pvp = {}))[pairKey(d.a, d.b)] = { st: d.st, since: d.day || G.s.day };
+  const me = mp.seat;
+  if (d.a === me || d.b === me) delete pvpOffers()[d.a === me ? d.b : d.a];
+  diploNews(d.a, d.b, d.st, d.was);
+});
+mpOn('angebot', (mp, from, d) => {
+  if (!d || !SHIRES[d.from] || (d.st !== 'frieden' && d.st !== 'buendnis')) return;
+  pvpOffers()[d.from] = d.st;
+  const who = humanName(d.from), what = d.st === 'frieden' ? 'Frieden' : 'ein Bündnis';
+  log(`${who} bietet dir ${what} an. Annehmen oder ablehnen kannst du auf der Karte unter „Mitspieler“ (M).`, 'gold');
+  if (G.started && !dialogOpen()) confirmDialog(`${who} bietet dir ${what} an.`, 'Annehmen', () => pvpAccept(d.from), () => pvpDecline(d.from));
+  if (G.uiRefresh) G.uiRefresh();
+});
+mpOn('absage', (mp, from, d) => {
+  if (!d || !SHIRES[d.from]) return;
+  log(`${humanName(d.from)} lehnt dein Angebot ab (${d.st === 'frieden' ? 'Frieden' : 'Bündnis'}).`, 'bad');
+});
+mpOn('geschenk', (mp, from, d) => {
+  const g = Math.max(0, Math.min(5000, (d && d.gold) | 0));
+  if (!g || !G.s) return;
+  G.s.gold += g;
+  log(`${humanName(mpSeatOf(from)) || d.name} schickt dir ${g} Gold als Geschenk.`, 'gold');
+});
+
+function diploNews(a, b, st, was) {
+  const mp = G.mp, me = mp && mp.seat;
+  const na = a === me ? 'du' : humanName(a), nb = b === me ? 'dich' : humanName(b), nbD = b === me ? 'dir' : humanName(b);
+  const mine = a === me || b === me;
+  let text;
+  if (st === 'fehde') text = a === me ? `Du erklärst ${humanName(b)} die Fehde! Ihr dürft euch und eure Gefährten jetzt angreifen.` : b === me ? `${humanName(a)} erklärt dir die Fehde! Ihr dürft einander jetzt angreifen, auch euer Gefolge.` : `${na} erklärt ${nbD} die Fehde.`;
+  else if (st === 'buendnis') text = mine ? `Bündnis mit ${humanName(a === me ? b : a)} geschlossen.` : `${na} und ${humanName(b)} schließen ein Bündnis.`;
+  else if (was === 'buendnis') text = a === me ? `Du kündigst das Bündnis mit ${humanName(b)}.` : b === me ? `${humanName(a)} kündigt das Bündnis mit dir.` : `${na} kündigt das Bündnis mit ${humanName(b)}.`;
+  else text = mine ? `Frieden mit ${humanName(a === me ? b : a)}: Die Fehde ist beendet.` : `${na} und ${humanName(b)} schließen Frieden.`;
+  log(text, st === 'fehde' && mine ? 'bad' : mine ? 'gold' : 'info');
+  if (G.uiRefresh) G.uiRefresh();
+}
+
+const done = (r) => { if (r && !r.ok && r.msg) log(r.msg, 'bad'); };
+function pvpDeclareFeud(seat) { mpCommand('diplo', { to: seat, st: 'fehde' }, done); }
+function pvpOffer(seat, st) {
+  mpCommand('angebot', { to: seat, st }, (r) => { if (r && r.ok) log(`Du bietest ${humanName(seat)} ${st === 'frieden' ? 'Frieden' : 'ein Bündnis'} an. Jetzt liegt es an ${humanName(seat)}.`, 'gold'); else done(r); });
+}
+function pvpAccept(seat) {
+  const st = pvpOffers()[seat];
+  if (!st) return;
+  delete pvpOffers()[seat];
+  mpCommand('diplo', { to: seat, st }, done);
+}
+function pvpDecline(seat) {
+  const st = pvpOffers()[seat];
+  if (!st) return;
+  delete pvpOffers()[seat];
+  mpCommand('absage', { to: seat, st }, done);
+  log(`Du lehnst das Angebot von ${humanName(seat)} ab.`);
+  if (G.uiRefresh) G.uiRefresh();
+}
+function pvpEndAlliance(seat) { if (pvpWith(seat) === 'buendnis') mpCommand('diplo', { to: seat, st: 'frieden' }, done); }
+const GIFTS = [50, 200, 500];
+function pvpGift(seat, gold) {
+  const pid = mpPeerOfSeat(seat);
+  if (!pid) { log(`${humanName(seat)} ist gerade nicht in der Partie.`, 'bad'); return; }
+  if (G.s.gold < gold) { log('Nicht genug Gold.', 'bad'); return; }
+  G.s.gold -= gold;
+  mpSendTo(pid, 'geschenk', { gold, name: G.s.player.name });
+  log(`Du schickst ${humanName(seat)} ${gold} Gold.`, 'gold');
+}
+
+// Aufträge: Wer einen annimmt, nimmt ihn für alle vom Brett (der Gastgeber führt die Bretter)
+G.onQuestTaken = (site, id) => { if (!G.mp) return; if (mpGuest()) mpCommand('auftrag', { site, id }); else mpWorldSoon(true); };
+
+// ---------------------------------------------------------------- Truppen der Mitspieler
+// Kennung einer eigenen Figur für die anderen: 'h' der Held, 'c…' Gefolge, 'g…' Banden deiner Aufträge
+function ridOf(u) {
+  if (!u) return null;
+  if (u === G.s.player) return 'h';
+  if (u.kind === 'companion' && u.status === 'party') return `c${u.id}`;
+  if (u.group && u.group.questId) return `g${u.id}`;
+  return null;
+}
+function localByRid(rid) {
+  if (rid === 'h') return G.s.player;
+  const id = Number(String(rid).slice(1));
+  if (rid[0] === 'c') return G.s.companions.find((c) => c.id === id && c.status === 'party' && !c.dead) || null;
+  if (rid[0] === 'g') { for (const g of G.groups) if (g.questId) for (const m of g.members) if (m.id === id) return m; }
+  return null;
+}
+// Kind der Figur für die anderen: Gefolge, Bande (greift an) oder Ziel (wehrt sich erst, wenn man es angreift)
+function troopKind(u) {
+  if (u.group) return groupHostile(u.group) || u.group.engaged ? 'feind' : 'ziel';
+  return 'gefaehrte';
+}
+function enc(u) {
+  const fl = (u.mounted ? 1 : 0) | (u.swing > 0 ? 2 : 0) | (u.run ? 4 : 0) | (u.female ? 8 : 0);
+  return [ridOf(u), troopKind(u), u.cls, +u.x.toFixed(2), +u.y.toFixed(2), Math.max(0, Math.round(u.hp)), Math.round(u.st.maxHp), fl,
+    u.eq.waffe || null, u.eq.ruestung || null, u.eq.schild || null, u.eq.pferd || null, u.tunic || null, u.livery || null, u.look || null, u.level || 1,
+    u.group ? u.group.id : 0, u.name || ''];
+}
+
+let troopT = 0, sentEmpty = true;
+const hitFx = [], shots = [], deaths = [];
+G.onHit = (t, dmg, crit) => { if (!G.mp) return; const rid = ridOf(t); if (!rid) return; hitFx.push([rid, dmg, crit ? 1 : 0]); if (t.hp <= 0) deaths.push(rid); };
+G.onShot = (u, t) => { if (!G.mp) return; const rid = ridOf(u); if (rid) shots.push([rid, +t.x.toFixed(1), +t.y.toFixed(1), ITEMS[u.eq.waffe] && ITEMS[u.eq.waffe].kind === 'armbrust' ? 1 : 0]); };
+
+mpOnTick((mp, dt) => {
+  if (!G.started || !G.s) return;
+  smoothTroops(mp, dt);
+  for (const u of G.remoteUnits || []) if (u.team === 'remote') u.friendly = u.rk !== 'feind' && u.rk !== 'ziel' && pvpWith(u.seat) !== 'fehde';
+  troopT += dt;
+  if (troopT < 0.25) return;
+  troopT = 0;
+  const list = [];
+  for (const c of partyMembers()) if (!c.dead && !c.hidden) list.push(enc(c));
+  for (const g of G.groups) if (g.questId) for (const m of g.members) if (!m.dead) list.push(enc(m));
+  if (!list.length && sentEmpty && !hitFx.length && !shots.length && !deaths.length) return;
+  sentEmpty = !list.length;
+  mpBroadcast('trupp', { u: list, fx: hitFx.splice(0), sh: shots.splice(0), tot: deaths.splice(0) });
+});
+
+const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
+mpOn('trupp', (mp, from, d, p) => {
+  if (!p || !d || !Array.isArray(d.u)) return;
+  const T = p.troops || (p.troops = new Map()), seen = new Set();
+  if (!G.remoteUnits) G.remoteUnits = [];
+  for (const r of d.u.slice(0, 80)) {
+    if (!Array.isArray(r) || typeof r[0] !== 'string' || !CLASSES[r[2]]) continue;
+    const [rid, rk, cls, x, y, hp, mhp, fl, w, ru, sc, pf, tunic, livery, look, lv, gid, name] = r;
+    seen.add(rid);
+    let u = T.get(rid);
+    const eq = { waffe: ITEMS[w] ? w : null, ruestung: ITEMS[ru] ? ru : null, schild: ITEMS[sc] ? sc : null, pferd: ITEMS[pf] ? pf : null };
+    if (!u) {
+      u = makeUnit({ kind: 'npc', cls, level: Math.max(1, num(lv, 1)), eq, x: num(x), y: num(y), name: String(name || '').slice(0, 24) || undefined, female: !!(fl & 8) });
+      u.team = 'remote'; u.peer = from; u.rid = rid; u.mirror = true; u.tx = u.x; u.ty = u.y;
+      T.set(rid, u);
+      G.remoteUnits.push(u);
+    }
+    const eqKey = JSON.stringify(eq);
+    if (u._eqKey !== eqKey) { u._eqKey = eqKey; u.eq = eq; computeStats(u); }
+    u.rk = rk === 'feind' || rk === 'ziel' ? rk : 'gefaehrte'; u.seat = p.seat; u.gid = gid | 0;
+    u.tx = num(x, u.x); u.ty = num(y, u.y);
+    u.st.maxHp = Math.max(1, num(mhp, 1)); u.hp = Math.max(0, Math.min(u.st.maxHp, num(hp, 1)));
+    u.mounted = !!(fl & 1); u.run = !!(fl & 4); u.female = !!(fl & 8);
+    if ((fl & 2) && !(u.swing > 0)) u.swing = 0.3;
+    u.look = typeof look === 'string' ? look : null;
+    // Gefolge in der Farbe seines Herrn (Ring und Wappenrock), Banden wie sie sind
+    u.livery = u.rk === 'gefaehrte' ? p.color || livery : typeof livery === 'string' ? livery : null;
+    u.tunic = typeof tunic === 'string' ? tunic : u.rk === 'gefaehrte' ? p.color : null;
+  }
+  for (const [rid, u] of T) if (!seen.has(rid)) { T.delete(rid); G.remoteUnits = G.remoteUnits.filter((o) => o !== u); }
+  const byRid = (rid) => (rid === 'h' ? p.unit : T.get(rid));
+  for (const [rid, dmg, crit] of Array.isArray(d.fx) ? d.fx.slice(0, 40) : []) {
+    const u = byRid(rid);
+    if (u) { u.flash = 0.18; u.combatT = 5; G.fx.push({ kind: 'text', x: u.x, y: u.y, text: crit ? `${dmg | 0}!` : String(dmg | 0), color: crit ? '#ffd84a' : '#fff4d8', t: 0, dur: 1.0 }); }
+  }
+  for (const [rid, tx, ty, bolt] of Array.isArray(d.sh) ? d.sh.slice(0, 40) : []) {
+    const u = byRid(rid);
+    if (u) G.projectiles.push({ x: u.x, y: u.y, tx: num(tx), ty: num(ty), target: null, visual: true, t: 0, dur: Math.max(0.18, Math.hypot(num(tx) - u.x, num(ty) - u.y) / 15), bolt: !!bolt });
+  }
+  for (const rid of Array.isArray(d.tot) ? d.tot.slice(0, 40) : []) {
+    const u = byRid(rid);
+    if (u && rid !== 'h') G.fx.push({ kind: 'corpse', x: u.x, y: u.y, look: unitLook(u), t: 0, dur: 25, typ: u.rk === 'feind' ? 'gruen' : 'rot', v: 1 + Math.floor(Math.random() * 4), flip: Math.random() < 0.5 });
+  }
+});
+// Weich zwischen den Meldungen bewegen (wie die Helden der Mitspieler, mp.js)
+function smoothTroops(mp, dt) {
+  for (const p of mp.peers.values()) {
+    if (!p.troops) continue;
+    for (const u of p.troops.values()) {
+      if (u.swing > 0) u.swing -= dt;
+      if (u.flash > 0) u.flash -= dt;
+      if (u.combatT > 0) u.combatT -= dt;
+      const dx = u.tx - u.x, dy = u.ty - u.y, dd = Math.hypot(dx, dy);
+      if (dd > 6) { u.x = u.tx; u.y = u.ty; }
+      else if (dd > 0.01) {
+        const k = Math.min(1, dt * 8);
+        u.x += dx * k; u.y += dy * k;
+        u.dirX = dx / dd; u.dirY = dy / dd;
+        const sx = dx - dy;
+        if (Math.abs(sx) > 0.02) u.facing = sx >= 0 ? 1 : -1;
+      }
+      u.moving = dd > 0.03;
+      if (u.moving) u.anim += dt;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Kämpfe über die Rechner
+// Wer gegen wen: Banden aus Aufträgen der anderen greifen dich und dein Gefolge an; ein Ziel (etwa ein Steuerzug) erst,
+// wenn du es angegriffen hast; Helden und Gefolge der anderen nur in einer Fehde; deine Auftrags-Banden jeden Menschen
+const provoked = new Set();
+function pvpProvoke(u) { if (u && u.team === 'remote' && u.rk === 'ziel') provoked.add(`${u.peer}:${u.gid}`); }
+G.remoteFoe = (a, b) => {
+  const r = a.team === 'remote' ? a : b, l = r === a ? b : a;
+  if (l.team === 'remote' || r.dead) return false;
+  const human = l.team === 'player';
+  if (r.rk === 'feind') return human;
+  if (r.rk === 'ziel') return human && provoked.has(`${r.peer}:${r.gid}`);
+  if (human) return pvpWith(r.seat) === 'fehde';
+  const g = l.group;
+  return !!(g && g.questId && (g.engaged || groupHostile(g)));
+};
+// Ein Schlag auf eine fremde Figur geht an ihren Besitzer
+G.onRemoteHit = (a, t, ranged, ox, oy, charge) => {
+  if (!G.mp || !t.peer) return;
+  const ak = a === G.s.player ? 'held' : a.kind === 'companion' ? 'gefaehrte' : 'bande';
+  mpSendTo(t.peer, 'treffer', { rid: t.rid, atk: Math.round(a.st.atk * 10) / 10, hatk: a.mounted && a.st.horse ? a.st.horse.atk : 0, x: +ox.toFixed(2), y: +oy.toFixed(2), r: ranged ? 1 : 0, c: charge ? 1 : 0, ak, by: G.s.player.name });
+};
+mpOn('treffer', (mp, from, d) => {
+  if (!d || typeof d.rid !== 'string' || !G.s) return;
+  const t = localByRid(d.rid);
+  if (!t || t.dead) return;
+  // Held und Gefolge treffen nur Feinde in einer Fehde (alte Meldungen nach einem Friedensschluss zählen nicht)
+  const seat = mpSeatOf(from);
+  if (d.ak !== 'bande' && !t.group && pvpWith(seat) !== 'fehde') return;
+  applyRemoteHit(t, d);
+  if (t === G.s.player && t.dead) log(`${String(d.by || humanName(seat)).slice(0, 24)} hat dich niedergeschlagen.`, 'bad');
+});
+
+// Für Tests
+if (typeof window !== 'undefined') window.__ritterPvp = { pvpWith, pvpOffers, pvpDeclareFeud, pvpOffer, pvpAccept, pvpDecline, pvpEndAlliance, pvpGift, pvpPlayers };
 
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
@@ -19407,7 +19773,7 @@ function drawFigure(c, u, x, y) {
   if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999) && u.kind !== 'peasant') {
     const w = 18, top = y + (m ? -44 : -32) * FIG;
     c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
-    c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
+    c.fillStyle = u.team === 'player' || u.friendly ? '#7bc15a' : '#d9533f';
     c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
   }
   // Name über dem Helden eines Mitspielers
@@ -21120,7 +21486,7 @@ function drawMapDecor(c, v) {
 // Treffer-Test für Klicks auf Einheiten (Bildschirmkoordinaten)
 function unitAtScreen(px, py) {
   let best = null, bd = 18 * G.cam.zoom + 6;
-  for (const u of G.units) {
+  for (const u of G.units.concat(G.remoteUnits || [])) {
     if (u.dead || u.hidden || u.kind === 'player') continue;
     const sp = toScreen(u.x, u.y);
     const d = Math.hypot(sp.x - px, sp.y - (u.mounted ? 22 : 14) * FIG * G.cam.zoom - py);
@@ -22006,6 +22372,7 @@ function tick() {
 
 
 
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -22057,20 +22424,21 @@ function showPrompt(text) {
 }
 
 // ---------------------------------------------------------------- Dialog
-let dialogYes = null;
-function confirmDialog(text, yesLabel, onYes) {
+let dialogYes = null, dialogNo = null;
+function confirmDialog(text, yesLabel, onYes, onNo = null) {
   byId('dialog-text').textContent = text;
   byId('dialog-yes').textContent = yesLabel;
-  dialogYes = onYes;
+  dialogYes = onYes; dialogNo = onNo;
   byId('dialog').hidden = false;
   byId('dialog-yes').focus();
 }
 function dialogOpen() { return !byId('dialog').hidden; }
 function closeDialog(accept) {
   byId('dialog').hidden = true;
-  const f = dialogYes;
-  dialogYes = null;
+  const f = dialogYes, n = dialogNo;
+  dialogYes = null; dialogNo = null;
   if (accept && f) f();
+  else if (!accept && n) n();
 }
 
 // ---------------------------------------------------------------- Tafeln
@@ -22097,6 +22465,8 @@ function closePanel() {
 
 function panelOpen() { return !!G.ui.panel; }
 
+// Aus anderen Modulen (pvp.js): offene Tafel neu zeichnen
+G.uiRefresh = () => { if (G.ui && G.ui.panel) refreshPanel(); };
 function refreshPanel() {
   if (!G.ui.panel) return;
   const body = byId('panel-body');
@@ -23183,14 +23553,47 @@ function warView() {
 }
 
 const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften'], ['barone', 'Barone']];
+const mapTabs = () => (G.mp ? [...MAP_TABS, ['mitspieler', 'Mitspieler']] : MAP_TABS);
+// Mehrspieler: Diplomatie mit den anderen Menschen (pvp.js)
+const PVP_TEXT = {
+  frieden: 'Ihr lasst einander in Ruhe. Weder ihr noch euer Gefolge greift den anderen an.',
+  fehde: 'Ihr dürft einander angreifen, Held gegen Held und Gefolge gegen Gefolge. Wer fällt, verliert einen Teil seines Goldes und erwacht in seiner Burg.',
+  buendnis: 'Ihr seid verbündet. Kündigt einer das Bündnis, gilt wieder Frieden.',
+};
+function pvpView() {
+  const list = pvpPlayers();
+  if (!list.length) return '<p class="muted">Gerade ist niemand sonst in der Partie.</p>';
+  const rows = list.map((p) => {
+    const btn = (act, label, cls = '', extra = '') => `<button class="btn sm ${cls}" data-act="${act}" data-seat="${esc(p.seat)}"${extra}>${esc(label)}</button>`;
+    const acts = [];
+    if (p.offer) acts.push(btn('pvpja', p.offer === 'frieden' ? 'Frieden annehmen' : 'Bündnis annehmen', 'primary'), btn('pvpnein', 'Ablehnen'));
+    if (p.st === 'fehde') acts.push(btn('pvpfrieden', 'Frieden anbieten', 'primary'));
+    else acts.push(btn('pvpfehde', 'Fehde erklären', 'danger'));
+    if (p.st === 'frieden' && p.offer !== 'buendnis') acts.push(btn('pvpbund', 'Bündnis anbieten'));
+    if (p.st === 'buendnis') acts.push(btn('pvplos', 'Bündnis kündigen'));
+    const gifts = GIFTS.map((g) => `<button class="btn sm" data-act="pvpgold" data-seat="${esc(p.seat)}" data-g="${g}" ${G.s.gold >= g ? '' : 'disabled'}>${g} Gold</button>`).join('');
+    return `<div class="baron pvp ${p.st}">
+      <span class="arms-mini">${p.arms ? armsSVG(p.arms, 28, p.name) : `<span class="dot" style="background:${esc(p.color || '#888')}"></span>`}</span>
+      <div class="baron-main">
+        <div class="baron-head"><b>${esc(p.name)}</b><span class="muted">${esc(seatName(p.seat))}</span><span class="baronrel ${p.st === 'fehde' ? 'bad' : p.st === 'buendnis' ? 'good' : ''}">${esc(PVP_NAMES[p.st])}${p.since ? ` seit Tag ${p.since}` : ''}</span></div>
+        <div class="baron-facts">${esc(PVP_TEXT[p.st])}${p.offer ? ` <b>${esc(p.name)} bietet dir ${p.offer === 'frieden' ? 'Frieden' : 'ein Bündnis'} an.</b>` : ''}</div>
+        <div class="row">${acts.join('')}</div>
+        <div class="row"><span class="label">Geschenk</span>${gifts}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="barons">${rows}</div>
+    <p class="hint">Eine Fehde erklärst du allein, sie gilt sofort. Frieden nach einer Fehde und ein Bündnis bietest du an; der andere nimmt an oder lehnt ab. Banden aus Aufträgen sehen alle und greifen jeden an; ihr könnt sie gemeinsam schlagen, Beute und Auftrag gehören dem, der ihn angenommen hat.</p>`;
+}
 function mapPanel() {
+  if (G.ui.tab === 'mitspieler' && G.mp) return { title: 'Mitspieler', sub: 'Frieden, Fehde und Bündnis mit den anderen Herren der Partie.', tabs: mapTabs(), body: pvpView() };
   if (G.ui.tab === 'grafschaften') {
-    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: MAP_TABS, body: shiresList() };
+    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: mapTabs(), body: shiresList() };
   }
-  if (G.ui.tab === 'barone') return { title: 'Die Barone', sub: `Sieben Herren ringen um Macht und Land, du bist einer davon. Schwierigkeit: ${esc(difficulty().name)}.`, tabs: MAP_TABS, body: baronsView() };
-  if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: MAP_TABS, body: warView() };
+  if (G.ui.tab === 'barone') return { title: 'Die Barone', sub: `Sieben Herren ringen um Macht und Land, du bist einer davon. Schwierigkeit: ${esc(difficulty().name)}.`, tabs: mapTabs(), body: baronsView() };
+  if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: mapTabs(), body: warView() };
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: MAP_TABS,
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: mapTabs(),
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
@@ -23309,7 +23712,7 @@ function mpMenu() {
   return `<div class="mp-box"><span class="label">Partie „${esc(mp.room)}“ (${mp.kind === 'relais' ? 'Relais' : 'dieser Rechner'})</span>
       <ul class="mp-roster">${rows}</ul>
       <p class="hint">Mit <kbd>Enter</kbd> sprichst du zu allen in der Partie.</p>
-      <button class="btn sm danger" data-act="mpleave">Partie verlassen</button></div>`;
+      <div class="row"><button class="btn sm" data-act="pvpopen">Diplomatie</button><button class="btn sm danger" data-act="mpleave">Partie verlassen</button></div></div>`;
 }
 
 // Testmodus: Schalter und Knöpfe für Ereignisse
@@ -23431,6 +23834,14 @@ const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
   mpleave: () => { if (G.mpLeaveNow) G.mpLeaveNow(); refreshPanel(); },
+  pvpopen: () => openPanel('map', null, 'mitspieler'),
+  pvpfehde: (d) => confirmDialog(`${(pvpPlayers().find((p) => p.seat === d.seat) || {}).name || 'Ihm'} die Fehde erklären? Dann dürft ihr einander angreifen, auch euer Gefolge.`, 'Fehde', () => pvpDeclareFeud(d.seat)),
+  pvpfrieden: (d) => pvpOffer(d.seat, 'frieden'),
+  pvpbund: (d) => pvpOffer(d.seat, 'buendnis'),
+  pvplos: (d) => { pvpEndAlliance(d.seat); },
+  pvpja: (d) => { pvpAccept(d.seat); refreshPanel(); },
+  pvpnein: (d) => { pvpDecline(d.seat); refreshPanel(); },
+  pvpgold: (d) => { pvpGift(d.seat, Number(d.g)); refreshPanel(); },
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),
@@ -25793,6 +26204,7 @@ function saveSummary(data = readSave()) {
 
 
 
+
 const keys = new Set();
 let viewCanvas, mini;
 
@@ -26264,6 +26676,13 @@ function attackNearest() {
 function clickUnit(u) {
   const p = G.s.player;
   const g = u.group;
+  // Figuren der Mitspieler: angreifen, wenn sie Feinde sind (Bande, Ziel, Fehde), sonst zur Diplomatie
+  if (u.team === 'remote') {
+    if (u.rk === 'ziel') pvpProvoke(u);
+    if (isEnemy(p, u)) { p.attackTarget = u; p.path = null; return true; }
+    openPanel('map', null, 'mitspieler');
+    return true;
+  }
   if (raidVictim(u)) { p.attackTarget = u; p.path = null; return true; }
   if (u.role === 'bettler') {
     if (Math.hypot(u.x - p.x, u.y - p.y) < 2.6) giveAlms(u);

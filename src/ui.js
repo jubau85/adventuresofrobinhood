@@ -46,6 +46,7 @@ import { CHEATS, cheatOn, anyCheat, toggleCheat, cheatDo, teleport } from './che
 import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, hireInTown } from './camps.js';
 import { armsSVG } from './heraldry.js';
 import { mpRoster, seatName } from './mp.js';
+import { PVP_NAMES, pvpPlayers, pvpDeclareFeud, pvpOffer, pvpAccept, pvpDecline, pvpEndAlliance, pvpGift, GIFTS } from './pvp.js';
 import {
   BARONS, baron, ranking, baronStatus, baronNews, traitName, SIDE_NAME, difficulty, BARON_GIFT, giftBlock, baronGiveGift, allianceBlock, offerAlliance,
   feudBlock, declareFeud, peaceBlock, peaceCost, makePeace, baronIncome, baronUpkeep, baronShires, baronStrength, baronDefense, menCap, baronSiegeBlock,
@@ -103,20 +104,21 @@ export function showPrompt(text) {
 }
 
 // ---------------------------------------------------------------- Dialog
-let dialogYes = null;
-export function confirmDialog(text, yesLabel, onYes) {
+let dialogYes = null, dialogNo = null;
+export function confirmDialog(text, yesLabel, onYes, onNo = null) {
   byId('dialog-text').textContent = text;
   byId('dialog-yes').textContent = yesLabel;
-  dialogYes = onYes;
+  dialogYes = onYes; dialogNo = onNo;
   byId('dialog').hidden = false;
   byId('dialog-yes').focus();
 }
 export function dialogOpen() { return !byId('dialog').hidden; }
 export function closeDialog(accept) {
   byId('dialog').hidden = true;
-  const f = dialogYes;
-  dialogYes = null;
+  const f = dialogYes, n = dialogNo;
+  dialogYes = null; dialogNo = null;
   if (accept && f) f();
+  else if (!accept && n) n();
 }
 
 // ---------------------------------------------------------------- Tafeln
@@ -143,6 +145,8 @@ export function closePanel() {
 
 export function panelOpen() { return !!G.ui.panel; }
 
+// Aus anderen Modulen (pvp.js): offene Tafel neu zeichnen
+G.uiRefresh = () => { if (G.ui && G.ui.panel) refreshPanel(); };
 export function refreshPanel() {
   if (!G.ui.panel) return;
   const body = byId('panel-body');
@@ -1229,14 +1233,47 @@ function warView() {
 }
 
 const MAP_TABS = [['map', 'Karte'], ['krieg', 'Krieg'], ['grafschaften', 'Grafschaften'], ['barone', 'Barone']];
+const mapTabs = () => (G.mp ? [...MAP_TABS, ['mitspieler', 'Mitspieler']] : MAP_TABS);
+// Mehrspieler: Diplomatie mit den anderen Menschen (pvp.js)
+const PVP_TEXT = {
+  frieden: 'Ihr lasst einander in Ruhe. Weder ihr noch euer Gefolge greift den anderen an.',
+  fehde: 'Ihr dürft einander angreifen, Held gegen Held und Gefolge gegen Gefolge. Wer fällt, verliert einen Teil seines Goldes und erwacht in seiner Burg.',
+  buendnis: 'Ihr seid verbündet. Kündigt einer das Bündnis, gilt wieder Frieden.',
+};
+function pvpView() {
+  const list = pvpPlayers();
+  if (!list.length) return '<p class="muted">Gerade ist niemand sonst in der Partie.</p>';
+  const rows = list.map((p) => {
+    const btn = (act, label, cls = '', extra = '') => `<button class="btn sm ${cls}" data-act="${act}" data-seat="${esc(p.seat)}"${extra}>${esc(label)}</button>`;
+    const acts = [];
+    if (p.offer) acts.push(btn('pvpja', p.offer === 'frieden' ? 'Frieden annehmen' : 'Bündnis annehmen', 'primary'), btn('pvpnein', 'Ablehnen'));
+    if (p.st === 'fehde') acts.push(btn('pvpfrieden', 'Frieden anbieten', 'primary'));
+    else acts.push(btn('pvpfehde', 'Fehde erklären', 'danger'));
+    if (p.st === 'frieden' && p.offer !== 'buendnis') acts.push(btn('pvpbund', 'Bündnis anbieten'));
+    if (p.st === 'buendnis') acts.push(btn('pvplos', 'Bündnis kündigen'));
+    const gifts = GIFTS.map((g) => `<button class="btn sm" data-act="pvpgold" data-seat="${esc(p.seat)}" data-g="${g}" ${G.s.gold >= g ? '' : 'disabled'}>${g} Gold</button>`).join('');
+    return `<div class="baron pvp ${p.st}">
+      <span class="arms-mini">${p.arms ? armsSVG(p.arms, 28, p.name) : `<span class="dot" style="background:${esc(p.color || '#888')}"></span>`}</span>
+      <div class="baron-main">
+        <div class="baron-head"><b>${esc(p.name)}</b><span class="muted">${esc(seatName(p.seat))}</span><span class="baronrel ${p.st === 'fehde' ? 'bad' : p.st === 'buendnis' ? 'good' : ''}">${esc(PVP_NAMES[p.st])}${p.since ? ` seit Tag ${p.since}` : ''}</span></div>
+        <div class="baron-facts">${esc(PVP_TEXT[p.st])}${p.offer ? ` <b>${esc(p.name)} bietet dir ${p.offer === 'frieden' ? 'Frieden' : 'ein Bündnis'} an.</b>` : ''}</div>
+        <div class="row">${acts.join('')}</div>
+        <div class="row"><span class="label">Geschenk</span>${gifts}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="barons">${rows}</div>
+    <p class="hint">Eine Fehde erklärst du allein, sie gilt sofort. Frieden nach einer Fehde und ein Bündnis bietest du an; der andere nimmt an oder lehnt ab. Banden aus Aufträgen sehen alle und greifen jeden an; ihr könnt sie gemeinsam schlagen, Beute und Auftrag gehören dem, der ihn angenommen hat.</p>`;
+}
 function mapPanel() {
+  if (G.ui.tab === 'mitspieler' && G.mp) return { title: 'Mitspieler', sub: 'Frieden, Fehde und Bündnis mit den anderen Herren der Partie.', tabs: mapTabs(), body: pvpView() };
   if (G.ui.tab === 'grafschaften') {
-    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: MAP_TABS, body: shiresList() };
+    return { title: 'Grafschaften', sub: 'Wer die Burg einer Grafschaft hält, beherrscht sie: Abgaben ihrer Orte und ein Vorzug, der zu ihrer Geschichte passt.', tabs: mapTabs(), body: shiresList() };
   }
-  if (G.ui.tab === 'barone') return { title: 'Die Barone', sub: `Sieben Herren ringen um Macht und Land, du bist einer davon. Schwierigkeit: ${esc(difficulty().name)}.`, tabs: MAP_TABS, body: baronsView() };
-  if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: MAP_TABS, body: warView() };
+  if (G.ui.tab === 'barone') return { title: 'Die Barone', sub: `Sieben Herren ringen um Macht und Land, du bist einer davon. Schwierigkeit: ${esc(difficulty().name)}.`, tabs: mapTabs(), body: baronsView() };
+  if (G.ui.tab === 'krieg') return { title: 'Der Krieg um England und die Normandie', sub: 'Die Parteien erobern einander die Grafschaften. Auf der Karte zeigen Pfeile die Heere, die gerade ausgezogen sind.', tabs: mapTabs(), body: warView() };
   return {
-    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: MAP_TABS,
+    title: 'England und Frankreich', sub: 'Klicke auf einen Ort, um dorthin zu reisen. Mausrad oder + und − zoomen, Ziehen verschiebt. Übers Meer geht es nur mit dem Schiff. Gestrichelt: Grenzen der Grafschaften, getönt in der Farbe ihres Herrn. Pfeile: Heere im Krieg.', tabs: mapTabs(),
     body: `<div class="mapwrap"><div class="mapbox"><canvas id="bigmap" width="720" height="720" aria-label="Karte von England und Frankreich"></canvas>
       <div class="mapzoom"><button class="btn sm" data-act="mapzoom" data-d="1" aria-label="Hineinzoomen">+</button><button class="btn sm" data-act="mapzoom" data-d="-1" aria-label="Herauszoomen">−</button><button class="btn sm" data-act="mapzoom" data-d="home" aria-label="Zu dir springen">◎</button></div></div></div>
       <p class="legend">${FACTION_IDS.map((f) => `<span>${swatch(f)}${FACTIONS[f].short}</span>`).join('')}<span><span class="swatch" style="--c:#ffd65a"></span>${esc(homeName())}</span><span><span class="ring"></span>Auftrag</span><span><span class="ev"></span>Belagerung, Schlacht</span><span><span class="ev gold"></span>Turnier</span>${trips().length ? `<span><span class="swatch" style="--c:${esc(playerColor())};border-radius:50%"></span>Gefährten unterwegs</span>` : ''}<span><span class="dash"></span>Fähre</span></p>${eventList()}`,
@@ -1355,7 +1392,7 @@ function mpMenu() {
   return `<div class="mp-box"><span class="label">Partie „${esc(mp.room)}“ (${mp.kind === 'relais' ? 'Relais' : 'dieser Rechner'})</span>
       <ul class="mp-roster">${rows}</ul>
       <p class="hint">Mit <kbd>Enter</kbd> sprichst du zu allen in der Partie.</p>
-      <button class="btn sm danger" data-act="mpleave">Partie verlassen</button></div>`;
+      <div class="row"><button class="btn sm" data-act="pvpopen">Diplomatie</button><button class="btn sm danger" data-act="mpleave">Partie verlassen</button></div></div>`;
 }
 
 // Testmodus: Schalter und Knöpfe für Ereignisse
@@ -1477,6 +1514,14 @@ const ACTIONS = {
   close: () => closePanel(),
   resume: () => closePanel(),
   mpleave: () => { if (G.mpLeaveNow) G.mpLeaveNow(); refreshPanel(); },
+  pvpopen: () => openPanel('map', null, 'mitspieler'),
+  pvpfehde: (d) => confirmDialog(`${(pvpPlayers().find((p) => p.seat === d.seat) || {}).name || 'Ihm'} die Fehde erklären? Dann dürft ihr einander angreifen, auch euer Gefolge.`, 'Fehde', () => pvpDeclareFeud(d.seat)),
+  pvpfrieden: (d) => pvpOffer(d.seat, 'frieden'),
+  pvpbund: (d) => pvpOffer(d.seat, 'buendnis'),
+  pvplos: (d) => { pvpEndAlliance(d.seat); },
+  pvpja: (d) => { pvpAccept(d.seat); refreshPanel(); },
+  pvpnein: (d) => { pvpDecline(d.seat); refreshPanel(); },
+  pvpgold: (d) => { pvpGift(d.seat, Number(d.g)); refreshPanel(); },
   tab: (d) => { G.ui.tab = d.tab; refreshPanel(); byId('panel-body').scrollTop = 0; },
   chronik: () => openPanel('chronik'),
   gift: () => giveGift(G.ui.arg),

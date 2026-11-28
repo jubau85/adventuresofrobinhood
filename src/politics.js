@@ -123,6 +123,8 @@ export function acceptQuest(siteId, qid) {
   if (!q) return;
   if (G.s.quests.length >= 6) { log('Du hast schon zu viele Aufträge angenommen.', 'bad'); return; }
   town.quests = town.quests.filter((x) => x !== q);
+  // Mehrspieler: für alle vom Brett nehmen (pvp.js)
+  if (G.onQuestTaken) G.onQuestTaken(siteId, q.id);
   q.state = 'aktiv';
   q.deadline = G.s.day + q.days;
   const site = siteById(siteId);

@@ -1,5 +1,6 @@
 // Mehrspieler-Test mit zwei Spielfenstern: Beitreten, Plätze, Uhr, Helden, Markt-Befehl, Chat, Gastgeber-Wechsel,
-// die Burg der eigenen Grafschaft als Heimburg wie Ashcombe (Bauplätze, Pacht, Ausbau, die anderen sehen ihn).
+// die Burg der eigenen Grafschaft als Heimburg wie Ashcombe (Bauplätze, Pacht, Ausbau, die anderen sehen ihn),
+// Gefolge und Auftrags-Banden der anderen, Fehde, Frieden, Bündnis, Geschenk, Treffer über die Rechner, Auftragsbrett.
 //   node tools/mehrspieler_test.cjs [ausgabe-ordner] [ws://127.0.0.1:8765]
 // Ohne Relais-Adresse über den Browser-Kanal (ein Browser), mit Adresse über das Relais (zwei getrennte Browser;
 // vorher `node tools/relay.mjs` starten). Braucht Playwright mit Chromium.
@@ -115,7 +116,7 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await B.waitForTimeout(1500);
   await ev(B, () => { const p = window.__ritter.s.player; p.x += 3; p.y += 1; });
   await A.waitForTimeout(1500);
-  const seen = await ev(A, () => { const G = window.__ritter; return (G.remoteUnits || []).map((u) => ({ name: u.name, x: +u.x.toFixed(1), y: +u.y.toFixed(1) })); });
+  const seen = await ev(A, () => { const G = window.__ritter; return (G.remoteUnits || []).filter((u) => u.kind === 'remote').map((u) => ({ name: u.name, x: +u.x.toFixed(1), y: +u.y.toFixed(1) })); });
   const posB = await ev(B, () => [window.__ritter.s.player.x, window.__ritter.s.player.y]);
   console.log('A sieht', JSON.stringify(seen), 'B ist bei', JSON.stringify(posB.map((v) => +v.toFixed(1))));
   ok(seen.length === 1 && seen[0].name === 'Brida' && Math.hypot(seen[0].x - posB[0], seen[0].y - posB[1]) < 0.6, 'A sieht Bridas Helden an der richtigen Stelle');
@@ -167,6 +168,80 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await ev(B, () => { const G = window.__ritter, s = window.__ritterDebug.castleSite(); G.s.player.x = s.x + 1; G.s.player.y = s.y + 9; G.s.player.path = null; G.cam.zoom = 1.4; });
   await B.waitForTimeout(3000);
   await B.screenshot({ path: `${OUT}/mp_B_eigene_burg.png` });
+  // --- Gefolge und Diplomatie zwischen den Spielern (pvp.js)
+  // A und B stehen nebeneinander; jeder sieht das Gefolge des anderen
+  await ev(B, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.type === 'stadt'); G.s.player.x = s.x + 14; G.s.player.y = s.y + 14; G.s.player.path = null; for (const c of G.s.companions) if (c.status === 'party') { c.x = G.s.player.x + 1; c.y = G.s.player.y + 0.5; } });
+  await ev(A, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.type === 'stadt'); G.s.player.x = s.x + 15.5; G.s.player.y = s.y + 14; G.s.player.path = null; for (const c of G.s.companions) if (c.status === 'party') { c.x = G.s.player.x + 1; c.y = G.s.player.y - 0.5; } });
+  await A.waitForTimeout(2500);
+  const gefA = await ev(A, () => (window.__ritter.remoteUnits || []).filter((u) => u.rk === 'gefaehrte').map((u) => ({ name: u.name, seat: u.seat, x: +u.x.toFixed(1) })));
+  const gefB = await ev(B, () => (window.__ritter.remoteUnits || []).filter((u) => u.rk === 'gefaehrte').map((u) => u.name));
+  ok(gefA.length >= 1 && gefA[0].seat === 'chester' && gefB.length >= 1, `Jeder sieht das Gefolge des anderen (A sieht ${JSON.stringify(gefA)}, B sieht ${gefB.join(', ')})`);
+  const peace0 = await ev(A, () => { const G = window.__ritter, b = G.remoteUnits.find((u) => u.rk === 'held'); return { st: window.__ritterPvp.pvpWith('chester'), foe: b ? G.remoteFoe(G.s.player, b) : null }; });
+  ok(peace0.st === 'frieden' && peace0.foe === false, 'Zu Beginn gilt Frieden: Bridas Held ist kein Feind');
+  // A erklärt B die Fehde
+  await ev(A, () => window.__ritterPvp.pvpDeclareFeud('chester'));
+  await B.waitForTimeout(1200);
+  const feud = { A: await ev(A, () => window.__ritterPvp.pvpWith('chester')), B: await ev(B, () => window.__ritterPvp.pvpWith('nottingham')), msgB: await ev(B, () => window.__ritter.messages.slice(-3).map((m) => m.text).join(' | ')) };
+  ok(feud.A === 'fehde' && feud.B === 'fehde' && /Fehde/.test(feud.msgB), `Fehde gilt bei beiden (${feud.A}, ${feud.B}): ${feud.msgB.slice(0, 120)}`);
+  // In der Fehde: A schlägt Bridas Helden, B verliert Leben (der Schaden wird bei B gerechnet)
+  const hp0 = await ev(B, () => window.__ritter.s.player.hp);
+  await ev(A, () => { const G = window.__ritter, b = G.remoteUnits.find((u) => u.rk === 'held'); return G.remoteFoe(G.s.player, b) && (G.onRemoteHit(G.s.player, b, false, b.x - 0.8, b.y, false), true); });
+  await B.waitForTimeout(800);
+  const hp1 = await ev(B, () => window.__ritter.s.player.hp);
+  ok(hp1 < hp0, `Ein Schlag von Aldric trifft Brida (Leben ${Math.round(hp0)} -> ${Math.round(hp1)})`);
+  // A bietet Frieden an, B nimmt an
+  await ev(A, () => window.__ritterPvp.pvpOffer('chester', 'frieden'));
+  await B.waitForTimeout(1000);
+  const offB = await ev(B, () => ({ offers: { ...window.__ritterPvp.pvpOffers() }, dialog: !document.getElementById('dialog').hidden, text: document.getElementById('dialog-text').textContent }));
+  ok(offB.offers.nottingham === 'frieden' && offB.dialog && /Frieden/.test(offB.text), `B bekommt das Friedensangebot (${offB.text})`);
+  await B.click('#dialog-yes');
+  await A.waitForTimeout(1200);
+  const pz = { A: await ev(A, () => window.__ritterPvp.pvpWith('chester')), B: await ev(B, () => window.__ritterPvp.pvpWith('nottingham')) };
+  ok(pz.A === 'frieden' && pz.B === 'frieden', `Frieden geschlossen (${pz.A}, ${pz.B})`);
+  // Ein Schlag im Frieden zählt nicht
+  const hp2 = await ev(B, () => window.__ritter.s.player.hp);
+  await ev(A, () => { const G = window.__ritter, b = G.remoteUnits.find((u) => u.rk === 'held'); G.onRemoteHit(G.s.player, b, false, b.x - 0.8, b.y, false); });
+  await B.waitForTimeout(800);
+  ok((await ev(B, () => window.__ritter.s.player.hp)) >= hp2, 'Im Frieden trifft kein Schlag');
+  // B bietet ein Bündnis an, A nimmt über die Tafel „Mitspieler“ an
+  await ev(B, () => window.__ritterPvp.pvpOffer('nottingham', 'buendnis'));
+  await A.waitForTimeout(1000);
+  const dlgA = await ev(A, () => { const d = document.getElementById('dialog'), t = document.getElementById('dialog-text').textContent; d.hidden = true; window.__ritterDebug.openPanel('map', null, 'mitspieler'); return t; });
+  ok(/Bündnis/.test(dlgA), `A wird gefragt: ${dlgA}`);
+  const tafel = await ev(A, () => ({ tabs: [...document.querySelectorAll('#panel-tabs button')].map((b) => b.textContent.trim()), acts: [...document.querySelectorAll('#panel-body [data-act]')].map((b) => b.dataset.act) }));
+  ok(tafel.tabs.includes('Mitspieler') && tafel.acts.includes('pvpja') && tafel.acts.includes('pvpfehde') && tafel.acts.includes('pvpgold'), `Tafel „Mitspieler“ mit ${[...new Set(tafel.acts)].join(', ')}`);
+  await A.screenshot({ path: `${OUT}/mp_diplomatie.png` });
+  await ev(A, () => document.querySelector('#panel-body [data-act="pvpja"]').click());
+  await B.waitForTimeout(1200);
+  const bund = { A: await ev(A, () => window.__ritterPvp.pvpWith('chester')), B: await ev(B, () => window.__ritterPvp.pvpWith('nottingham')) };
+  ok(bund.A === 'buendnis' && bund.B === 'buendnis', `Bündnis geschlossen (${bund.A}, ${bund.B})`);
+  // Geschenk: A schickt B 50 Gold
+  const g0 = await ev(B, () => window.__ritter.s.gold);
+  await ev(A, () => window.__ritterPvp.pvpGift('chester', 50));
+  await B.waitForTimeout(800);
+  ok((await ev(B, () => window.__ritter.s.gold)) === g0 + 50, 'Geschenk kommt an (50 Gold)');
+  // Eine Bande aus As Auftrag: B sieht sie und schlägt zu, bei A verliert sie Leben und wehrt sich
+  const band = await ev(A, () => { const G = window.__ritter, p = G.s.player; const g = window.__ritterDebug.spawnGroup('banditen', { pos: { x: p.x + 3, y: p.y + 3 }, questId: 4711 }); return g && { id: g.id, n: g.members.length, hp: g.members[0].hp }; });
+  await B.waitForTimeout(1500);
+  const bandB = await ev(B, () => (window.__ritter.remoteUnits || []).filter((u) => u.rk === 'feind').map((u) => ({ rid: u.rid, foe: window.__ritter.remoteFoe(window.__ritter.s.player, u) })));
+  ok(band && bandB.length === band.n && bandB.every((x) => x.foe), `B sieht die Bande aus As Auftrag (${bandB.length} Mann) als Feinde`);
+  await ev(B, () => { const G = window.__ritter, u = G.remoteUnits.find((x) => x.rk === 'feind'); G.onRemoteHit(G.s.player, u, false, u.x - 0.8, u.y, false); });
+  await A.waitForTimeout(800);
+  const bandA = await ev(A, (id) => { const g = window.__ritter.groups.find((x) => x.id === id); return g && { hp: Math.min(...g.members.map((m) => m.hp)), engaged: g.engaged }; }, band.id);
+  ok(bandA && bandA.hp < band.hp && bandA.engaged, `Bridas Schlag trifft die Bande bei A (Leben ${Math.round(band.hp)} -> ${Math.round(bandA.hp)}), sie wehrt sich`);
+  await A.screenshot({ path: `${OUT}/mp_bande_A.png` });
+  await B.screenshot({ path: `${OUT}/mp_bande_B.png` });
+  // Ein Auftrag vom Brett: Nimmt B ihn an, ist er auch bei A weg
+  const qb = await ev(B, () => { const G = window.__ritter; for (const s of G.world.sites) { const t = G.s.towns[s.id]; if (t && t.quests && t.quests.length && !['spieler'].includes(s.type)) return { site: s.id, q: t.quests[0].id }; } return null; });
+  if (qb) {
+    await ev(B, (x) => { const G = window.__ritter, s = G.world.sites.find((y) => y.id === x.site); window.__ritterDebug.openPanel('town', s, 'auftraege'); const b = document.querySelector(`#panel-body [data-act="accept"][data-q="${x.q}"]`); if (b) b.click(); }, qb);
+    await A.waitForTimeout(1500);
+    const still = await ev(A, (x) => window.__ritter.s.towns[x.site].quests.some((q) => q.id === x.q), qb);
+    const mine = await ev(B, (x) => window.__ritter.s.quests.some((q) => q.id === x.q), qb);
+    ok(mine && !still, `Auftrag ${qb.q} in ${qb.site}: B hat ihn, bei A ist er vom Brett`);
+  } else ok(true, 'Kein Auftrag auf einem Brett zum Prüfen');
+  await ev(B, () => { const b = document.querySelector('#panel [data-act="close"], #panel .close'); if (b) b.click(); });
+
   // B gewinnt eine weitere Grafschaft (wie nach einer Eroberung): der Gastgeber trägt sie für B ein, B behält sie
   await ev(B, () => window.__ritterDebug.grantHolding(window.__ritter.world.sites.find((s) => s.id === 'warwick')));
   await A.waitForTimeout(1500);

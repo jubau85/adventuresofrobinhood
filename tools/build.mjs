@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VERSION = JSON.parse(readFileSync(join(ROOT, 'desktop', 'package.json'), 'utf8')).version;
 console.log(`Version ${VERSION}`);
-const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'tactics', 'shires', 'plots', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'holdings', 'travels', 'war', 'barons', 'net', 'mp', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'heraldry', 'render', 'titleart', 'audio', 'ui', 'pixelfont', 'intro', 'shiremap', 'lobby', 'save', 'main'];
+const ORDER = ['data', 'geo', 'assets', 'rng', 'iso', 'state', 'world', 'units', 'tactics', 'shires', 'plots', 'animals', 'life', 'siege', 'dynamics', 'tournament', 'justice', 'mines', 'cheats', 'economy', 'politics', 'castle', 'holdings', 'travels', 'war', 'barons', 'net', 'mp', 'pvp', 'camps', 'sim', 'weather', 'pferde', 'figuren', 'heraldry', 'render', 'titleart', 'audio', 'ui', 'pixelfont', 'intro', 'shiremap', 'lobby', 'save', 'main'];
 
 // Alle Namen, die ein Modul auf oberster Ebene deklariert (auch „let a = 1, b = 2;“)
 function topLevelNames(src) {

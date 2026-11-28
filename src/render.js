@@ -4713,7 +4713,7 @@ function drawFigure(c, u, x, y) {
   if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999) && u.kind !== 'peasant') {
     const w = 18, top = y + (m ? -44 : -32) * FIG;
     c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(x - w / 2 - 1, top - 1, w + 2, 4);
-    c.fillStyle = u.team === 'player' ? '#7bc15a' : '#d9533f';
+    c.fillStyle = u.team === 'player' || u.friendly ? '#7bc15a' : '#d9533f';
     c.fillRect(x - w / 2, top, w * Math.max(0, u.hp / u.st.maxHp), 2);
   }
   // Name über dem Helden eines Mitspielers
@@ -6426,7 +6426,7 @@ function drawMapDecor(c, v) {
 // Treffer-Test für Klicks auf Einheiten (Bildschirmkoordinaten)
 export function unitAtScreen(px, py) {
   let best = null, bd = 18 * G.cam.zoom + 6;
-  for (const u of G.units) {
+  for (const u of G.units.concat(G.remoteUnits || [])) {
     if (u.dead || u.hidden || u.kind === 'player') continue;
     const sp = toScreen(u.x, u.y);
     const d = Math.hypot(sp.x - px, sp.y - (u.mounted ? 22 : 14) * FIG * G.cam.zoom - py);

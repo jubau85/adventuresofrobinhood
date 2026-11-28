@@ -208,6 +208,19 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
   Kauf und Verkauf, gewonnene und verlorene Grafschaften). Weitere folgen mit 7b.
 - **Helden der anderen:** jeder schickt 10-mal je Sekunde Position, Pferd, Ausrüstung und Farbe; die anderen zeigen ihn
   als 3D-Figur mit Namen und Ring in seiner Farbe, weich zwischen den Meldungen.
+- **Gefolge und Auftrags-Banden der anderen (`pvp.js`):** jeder schickt viermal je Sekunde sein Gefolge und die
+  Banden seiner Aufträge (`trupp`: Kennung, Art, Klasse, Ort, Leben, Ausrüstung, Farben), dazu Schadenszahlen, Schüsse
+  und Gefallene. Die anderen zeigen sie als Figuren (`G.remoteUnits`), weich zwischen den Meldungen. Wer eine fremde
+  Figur trifft, schickt den Schlag ihrem Besitzer (`treffer`: Angriff, Pferd, Ort, Fern, Ansturm); der rechnet den
+  Schaden mit den echten Werten aus (`applyRemoteHit` in `units.js`). Wer gegen wen kämpft, entscheidet `G.remoteFoe`:
+  Banden aus Aufträgen greifen jeden Menschen an, ein Ziel (Steuerzug) erst, wenn man es angegriffen hat; Helden und
+  Gefolge zweier Spieler nur in einer Fehde. Eine Bande wird bei ihrem Besitzer auch in der Nähe der anderen bewegt
+  und greift sie an (`humanDist`). Nimmt jemand einen Auftrag an, nimmt der Gastgeber ihn vom Brett (`auftrag`).
+- **Diplomatie zwischen Menschen (`pvp.js`):** Zwischen je zwei Plätzen gilt Frieden, Fehde oder Bündnis (`pvp` im
+  gemeinsamen Stand, Befehl `diplo` an den Gastgeber). Eine Fehde gilt sofort; Frieden nach einer Fehde und ein Bündnis
+  brauchen ein Angebot (`angebot`, der Gastgeber merkt es sich und reicht es weiter), das der andere annimmt (`diplo`)
+  oder ablehnt (`absage`). Ein Bündnis kündigt man allein. Gold geht als `geschenk` direkt an den anderen. Tafel:
+  Karte, Reiter „Mitspieler“; ein Klick auf einen fremden Helden öffnet sie (in einer Fehde greift er an).
 - **Gastgeber-Wechsel:** Kommt vom Gastgeber 15 s nichts (oder verabschiedet er sich beim Schließen des Fensters),
   übernimmt der Gast mit der kleinsten Kennung mit dem zuletzt empfangenen Weltstand. Neu Beitretende haben eine
   Schonfrist, solange sie die Welt erzeugen. Hing ein Fenster selbst (Tageswechsel, Bilder laden), zählt die Pause

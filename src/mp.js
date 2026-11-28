@@ -10,7 +10,7 @@
 
 import { G, log } from './state.js';
 import { openTransport, netId } from './net.js';
-import { makeUnit } from './units.js';
+import { makeUnit, computeStats } from './units.js';
 import { applyBarons } from './barons.js';
 import { SETTLEMENTS, FACTIONS, HERALDRY } from './data.js';
 import { SHIRES, claimShire } from './shires.js';
@@ -22,7 +22,7 @@ import { castleOut, applyPeerCastles, START_CASTLES } from './castle.js';
 // Was zur gemeinsamen Welt gehört; alles andere im Spielstand gehört dem einzelnen Spieler
 export const SHARED_KEYS = ['seed', 'difficulty', 'day', 'time', 'weather', 'snow', 'damage', 'blight', 'abandoned', 'slain', 'raided',
   'graves', 'pendingDead', 'deadDay', 'freedAt', 'cons', 'worldSig', 'barons', 'baronLog', 'war', 'shires', 'walls', 'siteLevel',
-  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles', 'startCastle'];
+  'siteFaction', 'mines', 'tourney', 'lastTourney', 'hanging', 'campState', 'mpCastles', 'startCastle', 'pvp'];
 const MARKET_KEYS = ['towns'];
 // Wer neu beitritt, erzeugt erst die Welt (das dauert einige Sekunden, in denen er nichts sendet): so lange Schonfrist
 const HERO_EVERY = 0.1, CLOCK_EVERY = 0.5, WORLD_EVERY = 3, MARKET_EVERY = 8, HELLO_EVERY = 2, PEER_TIMEOUT = 15, HOST_TIMEOUT = 15, JOIN_GRACE = 120;
@@ -129,6 +129,7 @@ export function mpUpdate(dt) {
     if (mp.t.world >= WORLD_EVERY) { mp.t.world = 0; sendWorld(mp, false); }
     if (mp.t.market >= MARKET_EVERY) { mp.t.market = 0; sendMarkets(mp, false); }
   } else if (now - mp.lastHost > HOST_TIMEOUT) migrate(mp);
+  for (const f of TICKS) f(mp, dt);
   // Mitspieler, von denen nichts mehr kommt, verschwinden
   for (const [id, p] of mp.peers) if (now - p.last > PEER_TIMEOUT && !(p.joinUntil > now && !p.hero)) peerGone(mp, id, 'ist nicht mehr zu erreichen');
   moveHeroes(dt);
@@ -137,7 +138,8 @@ export function mpUpdate(dt) {
 function heroState() {
   const p = G.s.player;
   return { x: +p.x.toFixed(2), y: +p.y.toFixed(2), m: !!p.mounted, run: !!p.run, sw: p.swing > 0 ? 1 : 0, dead: !!p.dead,
-    eq: { waffe: p.eq.waffe, ruestung: p.eq.ruestung, schild: p.eq.schild, pferd: p.eq.pferd }, fem: !!p.female, col: G.s.color, name: p.name };
+    eq: { waffe: p.eq.waffe, ruestung: p.eq.ruestung, schild: p.eq.schild, pferd: p.eq.pferd }, fem: !!p.female, col: G.s.color, name: p.name,
+    hp: Math.round(p.hp), mhp: Math.round(p.st.maxHp), lv: p.level };
 }
 
 function sendWorld(mp, force, to = null) {
@@ -183,8 +185,23 @@ function onMessage(mp, env) {
     case 'antwort': { const cb = mp.pending.get(d.n); if (cb) { mp.pending.delete(d.n); cb(d); } break; }
     case 'gastgeber': mp.hostId = from; if (mp.role === 'host' && from !== mp.id) mp.role = 'guest'; log(`${p.name} ist jetzt Gastgeber der Partie.`, 'gold'); break;
     case 'tschuess': peerGone(mp, from, 'hat die Partie verlassen'); break;
+    default: if (EXTRA[type]) EXTRA[type](mp, from, d, p);
   }
 }
+
+// ---------------------------------------------------------------- Anschlüsse für andere Module (pvp.js)
+// Weitere Nachrichten, Befehle an den Gastgeber und ein Aufruf je Bild; dazu Senden an einen oder an alle
+const EXTRA = {}, TICKS = [];
+export function mpOn(type, fn) { EXTRA[type] = fn; }
+export function mpAddCommand(name, fn) { COMMANDS[name] = fn; }
+export function mpOnTick(fn) { TICKS.push(fn); }
+export function mpSendTo(id, type, d) { const mp = G.mp; if (mp && id) { if (id === mp.id) { if (EXTRA[type]) EXTRA[type](mp, mp.id, d, null); } else mp.tr.send(id, type, d); } }
+export function mpBroadcast(type, d) { const mp = G.mp; if (mp) mp.tr.broadcast(type, d); }
+// Wer sitzt auf einem Platz (Kennung), welcher Platz gehört einer Kennung
+export function mpPeerOfSeat(seat) { const mp = G.mp; return mp && mp.seats ? mp.seats[seat] || null : null; }
+export function mpSeatOf(id) { const mp = G.mp; if (!mp) return null; if (id === mp.id) return mp.seat; const s = Object.keys(mp.seats || {}).find((k) => mp.seats[k] === id); return s || (mp.peers.get(id) || {}).seat || null; }
+// Gastgeber: den gemeinsamen Stand bald schicken (nach einer Änderung durch einen Befehl)
+export function mpWorldSoon(markets = false) { const mp = G.mp; if (mp && mp.role === 'host') { mp.hash.world = ''; mp.t.world = WORLD_EVERY; if (markets) { mp.hash.market = ''; mp.t.market = MARKET_EVERY; } } }
 
 // Gastgeber: ein neuer Mitspieler klopft an. Er bekommt eine freie Grafschaft (die gewünschte, wenn sie frei ist) und
 // den ganzen Weltstand. Frei ist, was keinem Menschen und keinem Baron gehört; eine verwaiste Grafschaft
@@ -389,8 +406,10 @@ function migrate(mp) {
 
 // ---------------------------------------------------------------- Helden der Mitspieler
 function dropHero(p) {
-  if (p.unit && G.remoteUnits) G.remoteUnits = G.remoteUnits.filter((u) => u !== p.unit);
+  // Held, Gefolge und Auftrags-Banden des Mitspielers verschwinden (pvp.js)
+  if (G.remoteUnits) G.remoteUnits = G.remoteUnits.filter((u) => u !== p.unit && u.peer !== p.id);
   p.unit = null;
+  if (p.troops) p.troops.clear();
 }
 function moveHeroes(dt) {
   const mp = G.mp;
@@ -401,11 +420,15 @@ function moveHeroes(dt) {
     let u = p.unit;
     if (!u) {
       u = makeUnit({ kind: 'remote', cls: 'ritter', name: h.name || p.name, eq: h.eq, female: h.fem, x: h.x, y: h.y, tunic: h.col });
-      u.team = 'remote'; u.peer = p.id;
+      u.team = 'remote'; u.peer = p.id; u.rid = 'h'; u.rk = 'held';
       p.unit = u;
       G.remoteUnits.push(u);
     }
-    u.name = h.name || p.name; u.tunic = h.col || p.color; u.female = !!h.fem; u.eq = { ...u.eq, ...h.eq }; u.mounted = !!h.m; u.run = !!h.run; u.dead = !!h.dead;
+    u.seat = p.seat;
+    const eqKey = JSON.stringify(h.eq || {});
+    if (u._eqKey !== eqKey || u.level !== (h.lv || 1)) { u._eqKey = eqKey; u.eq = { ...u.eq, ...h.eq }; u.level = h.lv || 1; computeStats(u); }
+    u.name = h.name || p.name; u.tunic = h.col || p.color; u.female = !!h.fem; u.mounted = !!h.m; u.run = !!h.run; u.dead = !!h.dead;
+    if (h.mhp) { u.st.maxHp = h.mhp; u.hp = Math.max(0, Math.min(h.mhp, h.hp ?? h.mhp)); }
     if (h.sw && !(u.swing > 0)) u.swing = 0.3;
     if (u.swing > 0) u.swing -= dt;
     const dx = h.x - u.x, dy = h.y - u.y, d = Math.hypot(dx, dy);
