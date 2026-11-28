@@ -255,6 +255,27 @@ zurückgewonnene Normandie, später mit mehreren Spielern.
 - **Noch offen (7c):** Feldschlachten zwischen Menschen, Dorfleben und Tiere gemeinsam (bisher rechnet sie jeder für
   sich, sie sehen also bei jedem etwas anders aus), Speichern einer Mehrspieler-Partie für alle, Steam-Lobby.
 
+## Burg in drei Ringen, Familie und Fahrende (0.8.4)
+- **Drei Ringe:** Die Burg wächst nach dem Vorbild des Donjons von Rochester in drei Ringen: der **Donjon** mit Räumen
+  (`bergfried.js`), die **Kernburg** (Bauplätze im Hof, `plots.js`) und die **Vorburg** (Bauplätze vor der Mauer;
+  für die Festung ist ein zweiter Mauerring geplant). Das ausführliche Konzept mit Bilderliste steht im Dokument
+  „Burgkonzept: Rochester als Vorbild“.
+- **Bergfried von innen (`bergfried.js`):** 13 Räume auf fünf Ebenen (Keller, Eingangsgeschoss, Saalgeschoss,
+  Obergeschoss, Wehrgang), je Burgstufe freigeschaltet (Holzturm 2, Bergfried 7, großer Donjon 13). Ein Raum zur Zeit
+  (`G.s.castle.roomCon`), bezahlt mit Gold und Burglager, fertig nach Tagen (`dailyKeep`). Wirkungen über Haken:
+  `G.keepDefense` (castleDefense), `G.keepFood` (Rationen), `G.keepIncome` (Schreibstube), `G.keepPlunder`
+  (Schatzkammer), `G.keepSiegeMen` (Waffenkammer), `G.keepGift` (Großer Saal); Kemenate, Kinderstube und Hauskapelle
+  wirken auf die Familie. Burgtafel, Reiter „Bergfried“ (Text); später zeigt ein Klick den gemalten Schnitt.
+- **Familie (`familie.js`, `G.s.family`):** Heirat mit einem Kind eines Barons (Audienz, ab Verhältnis 25) oder mit
+  einem Haus der Sachsen oder Normannen (ab Ansehen 20), Brautgabe und Mitgift. Kinder (ein Jahr = 24 Tage). Ein Kind
+  als Pfand am Hof eines Barons (Verhältnis +20 und weiter steigend, er hält Frieden), Verlobung mit seinem Haus.
+  Verschwägert (`kinWith`): keine Fehde vom Baron, Bündnis ab 25. Fehde trotz Pfand: das Kind wird Geisel
+  (`G.familyFeud`), Frieden oder Eroberung bringen es heim (`G.familyFree`). Im Mehrspieler gehört die Familie dem
+  eigenen Helden; die Barone rechnet weiter der Gastgeber.
+- **Fahrende (`reisende.js`):** Gaukler (Planwagen, spielen auf, Fest auf der Burg über `g.forced`), Postkutsche
+  (Nachrichten oder Überfall), Steuereintreiber in der Kutsche. Wagen als gezeichnete Platzhalter (`drawWagon`), im
+  Mehrspieler über `wagon` in den Gruppenmeldungen gespiegelt. Ankunft einer Gruppe: `G.onGroupArrive`.
+
 ## Ausbauplan
 
 ### Nächste Schritte

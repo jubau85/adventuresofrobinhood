@@ -30,7 +30,7 @@ const WORLD_VIEW = 100;       // so weit um einen Gast schickt der Gastgeber die
 function encMember(m) {
   const fl = (m.mounted ? 1 : 0) | (m.swing > 0 ? 2 : 0) | (m.run ? 4 : 0) | (m.female ? 8 : 0);
   return [m.id, m.cls, +m.x.toFixed(2), +m.y.toFixed(2), Math.max(0, Math.round(m.hp)), Math.round(m.st.maxHp), fl,
-    m.eq.waffe || null, m.eq.ruestung || null, m.eq.schild || null, m.eq.pferd || null, m.tunic || null, m.livery || null, m.look || null, m.level || 1, m.name || ''];
+    m.eq.waffe || null, m.eq.ruestung || null, m.eq.schild || null, m.eq.pferd || null, m.tunic || null, m.livery || null, m.look || null, m.level || 1, m.name || '', m.wagon || 0];
 }
 // seat: für wen; im Kampf heißt die Gruppe nur für den, gegen den sie kämpft (foes)
 function encGroup(g, seat) {
@@ -99,7 +99,7 @@ mpOn('gruppen', (mp, from, d) => {
     const was = new Map(g.members.map((m) => [m.id, m])), keep = [];
     for (const q of ms.slice(0, 80)) {
       if (!Array.isArray(q) || !CLASSES[q[1]]) continue;
-      const [mid, cls, mx, my, hp, mhp, mfl, w, ru, sc, pf, tunic, livery, look, lv, name] = q;
+      const [mid, cls, mx, my, hp, mhp, mfl, w, ru, sc, pf, tunic, livery, look, lv, name, wagon] = q;
       const eq = { waffe: ITEMS[w] ? w : null, ruestung: ITEMS[ru] ? ru : null, schild: ITEMS[sc] ? sc : null, pferd: ITEMS[pf] ? pf : null };
       let m = was.get(mid);
       if (!m) {
@@ -114,6 +114,7 @@ mpOn('gruppen', (mp, from, d) => {
       m.mounted = !!(mfl & 1); m.run = !!(mfl & 4); m.female = !!(mfl & 8);
       if ((mfl & 2) && !(m.swing > 0)) m.swing = 0.3;
       m.tunic = typeof tunic === 'string' ? tunic : null; m.livery = typeof livery === 'string' ? livery : null; m.look = typeof look === 'string' ? look : null;
+      m.wagon = typeof wagon === 'string' ? wagon : null;
       keep.push(m);
     }
     if (keep.length !== g.members.length) changed = true;
@@ -405,7 +406,7 @@ mpOn('feldzug', (mp, from, d) => {
 });
 // Deine Heimburg ist gestürmt: Gold und Vorräte sind zum Teil fort, die Burg bleibt deine
 function plundered(s, by) {
-  const lost = Math.floor(G.s.gold * 0.2);
+  const lost = Math.floor(G.s.gold * 0.2 * (G.keepPlunder ? G.keepPlunder() : 1));
   G.s.gold -= lost;
   for (const k of Object.keys(G.s.castle.storage)) G.s.castle.storage[k] = Math.floor(G.s.castle.storage[k] * 0.6);
   log(`${by} hat ${s.name} gestürmt und geplündert! Verloren: ${lost} Gold und ein Teil der Vorräte. Die Burg bleibt deine.`, 'bad');

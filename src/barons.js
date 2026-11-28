@@ -257,7 +257,8 @@ export function baronGiveGift(id) {
   if (giftBlock(id)) return false;
   const b = baron(id);
   G.s.gold -= BARON_GIFT; b.gold += BARON_GIFT; b.lastGift = G.s.day;
-  changeBaronRel(id, b.feud ? 4 : 10, 'Er nimmt dein Geschenk an');
+  // Großer Saal im Bergfried: Empfang mit Bankett (bergfried.js)
+  changeBaronRel(id, b.feud ? 4 : 10 + (G.keepGift ? G.keepGift() : 0), 'Er nimmt dein Geschenk an');
   return true;
 }
 export function allianceBlock(id) {
@@ -265,7 +266,9 @@ export function allianceBlock(id) {
   if (!b || b.gone) return 'Der Baron ist nicht mehr Herr seiner Burg.';
   if (b.ally) return 'Ihr seid schon verbündet.';
   if (b.feud) return 'Erst muss die Fehde beigelegt sein.';
-  if (b.rel < 40) return `Er traut dir noch nicht genug (Verhältnis ${b.rel}, nötig 40).`;
+  // Verschwägert (familie.js): schon ab 25
+  const need = G.familyKin && G.familyKin(id) ? 25 : 40;
+  if (b.rel < need) return `Er traut dir noch nicht genug (Verhältnis ${b.rel}, nötig ${need}).`;
   return null;
 }
 export function offerAlliance(id) {
@@ -288,6 +291,8 @@ export function declareFeud(id, byBaron = false) {
   const b = baron(id);
   b.feud = true; b.ally = false; b.feudSince = G.s.day;
   b.rel = Math.min(b.rel, -50);
+  // Lebt dein Kind als Pfand an seinem Hof, wird es seine Geisel (familie.js)
+  if (G.familyFeud) G.familyFeud(id);
   if (byBaron) log(`${BARONS[id].name} sagt dir die Fehde an! Seine Männer werden gegen ${homeName()} und deine Burgen ziehen. Du darfst nun auch seine Burg belagern.`, 'bad');
   else { log(`Du sagst ${BARONS[id].name} die Fehde an. Ab jetzt darfst du seine Burg ${baronSite(id).name} belagern, und er wird sich wehren.`, 'bad'); }
   return true;
@@ -305,6 +310,7 @@ export function makePeace(id) {
   G.s.gold -= peaceCost(id); b.gold += peaceCost(id);
   b.feud = false; b.march = null; b.rel = Math.max(b.rel, -15);
   log(`Du zahlst ${BARONS[id].name} Sühne. Die Fehde ist beigelegt.`, 'good');
+  if (G.familyFree) G.familyFree(id, 'Frieden mit dem Baron');
   return true;
 }
 // Darfst du seine Burg belagern? Nur in einer Fehde
@@ -328,6 +334,7 @@ export function baronConquered(id) {
   addRenown(30);
   for (const sid of baronShires(id)) claimShire(sid, 'spieler');
   log(`${baronSite(id).name} ist gefallen! ${def.name} beugt das Knie: Er zahlt ${ransom} Gold Lösegeld, wird dein Vasall und gibt dir seine Grafschaften. Jeden Tag zahlt er dir Tribut.`, 'gold');
+  if (G.familyFree) G.familyFree(id, 'seine Burg ist gefallen');
   applyBarons();
 }
 
@@ -402,7 +409,9 @@ export function dailyBarons() {
     // Seite im Krieg prüfen (alle paar Tage)
     if ((G.s.day + id.length) % 6 === 0) baronReconsiderSide(id, say);
     // Fehde gegen dich
-    if (!b.feud && !b.vassal && !b.ally && b.rel <= D.feudAt && G.s.day >= D.feudDay && Math.random() < 0.15 * tr.war) declareFeud(id, true);
+    // Verschwägert oder mit deinem Kind als Pfand an seinem Hof: keine Fehde (familie.js)
+    const kin = !!(G.familyKin && G.familyKin(id));
+    if (!b.feud && !b.vassal && !b.ally && !kin && b.rel <= D.feudAt && G.s.day >= D.feudDay && Math.random() < 0.15 * tr.war) declareFeud(id, true);
     if (b.feud && !b.march && b.men >= 14 && G.s.day - b.lastRaid >= 5 && Math.random() < 0.3 * tr.war) baronPlanFeud(id, say);
     // Das Verhältnis kühlt ab oder erholt sich langsam
     if (!b.feud && b.rel < 0 && Math.random() < 0.3) b.rel++;

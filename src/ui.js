@@ -47,8 +47,10 @@ import { campGoods, buyAtCamp, campRecruits, hireAtCamp, CAMP_TEXT, townMercs, h
 import { armsSVG } from './heraldry.js';
 import { mpRoster, seatName } from './mp.js';
 import { PVP_NAMES, pvpPlayers, pvpDeclareFeud, pvpOffer, pvpAccept, pvpDecline, pvpEndAlliance, pvpGift, GIFTS } from './pvp.js';
+import { family, married, ageText, childAge, kinWith, baronMatch, baronMarryBlock, marryBaron, dowryOf, houseMatch, houseMarryBlock, marryHouse, wardBlock, sendWard, recallWard, betrothBlock, betroth, BRAUTGABE, WARD_AGE, YEAR_DAYS } from './familie.js';
+import { KEEP_FLOORS, ROOMS, hasRoom, roomCon, roomBlock, startRoom, keepName } from './bergfried.js';
 import {
-  BARONS, baron, ranking, baronStatus, baronNews, traitName, SIDE_NAME, difficulty, BARON_GIFT, giftBlock, baronGiveGift, allianceBlock, offerAlliance,
+  BARONS, BARON_IDS, baron, ranking, baronStatus, baronNews, traitName, SIDE_NAME, difficulty, BARON_GIFT, giftBlock, baronGiveGift, allianceBlock, offerAlliance,
   feudBlock, declareFeud, peaceBlock, peaceCost, makePeace, baronIncome, baronUpkeep, baronShires, baronStrength, baronDefense, menCap, baronSiegeBlock,
 } from './barons.js';
 import { SHIRES, HOME_SHIRE, shireOfSite, shireName, shireSites, shireOwner, ownerName, ownerPhrase, ownerColor, shireTax } from './shires.js';
@@ -105,10 +107,14 @@ export function showPrompt(text) {
 
 // ---------------------------------------------------------------- Dialog
 let dialogYes = null, dialogNo = null;
-export function confirmDialog(text, yesLabel, onYes, onNo = null) {
+// alt: eine dritte Wahl { label, fn } (etwa: Gaukler aufspielen lassen oder auf die Burg einladen)
+let dialogAlt = null;
+export function confirmDialog(text, yesLabel, onYes, onNo = null, alt = null) {
   byId('dialog-text').textContent = text;
   byId('dialog-yes').textContent = yesLabel;
-  dialogYes = onYes; dialogNo = onNo;
+  dialogYes = onYes; dialogNo = onNo; dialogAlt = alt;
+  const ab = byId('dialog-alt');
+  if (ab) { ab.hidden = !alt; if (alt) ab.textContent = alt.label; }
   byId('dialog').hidden = false;
   byId('dialog-yes').focus();
 }
@@ -531,7 +537,7 @@ function tavernAction(site) {
 }
 
 // Gerüchte des Wirts: echte Hinweise aus der Spielwelt
-function rumor(site) {
+export function rumor(site) {
   const opts = [];
   const bandit = G.groups.filter((g) => g.type === 'banditen' && g.members.length).sort((a, b) => Math.hypot(a.x - site.x, a.y - site.y) - Math.hypot(b.x - site.x, b.y - site.y))[0];
   if (bandit) opts.push(`Eine Bande Wegelagerer treibt sich ${dirText(site, bandit)} herum.`);
@@ -620,6 +626,59 @@ function townQuests(site) {
     ${offers ? `<div class="quests">${offers}</div>` : '<p class="muted">Im Moment gibt es hier nichts zu tun. Schau in ein paar Tagen wieder vorbei.</p>'}`;
 }
 
+// ---------------------------------------------------------------- Bergfried von innen (bergfried.js)
+// Erst als Text: Geschosse von oben nach unten, je Raum, was er bringt und was er kostet. Später zeigt ein Klick auf
+// den Bergfried das Innere als Schnitt durch die Geschosse.
+function keepView() {
+  const C = G.s.castle, con = roomCon();
+  const costText = (c) => Object.entries(c).map(([k, n]) => `${fmt(n)} ${k === 'gold' ? 'Gold' : GOODS[k] ? GOODS[k].name : k}`).join(', ');
+  const floors = KEEP_FLOORS.map((f) => {
+    const ids = Object.keys(ROOMS).filter((id) => ROOMS[id].floor === f.id);
+    const rows = ids.map((id) => {
+      const r = ROOMS[id], built = hasRoom(id), busy = con && con.id === id, locked = C.level < r.lv;
+      const state = built ? '<span class="good">eingerichtet</span>' : busy ? `<span class="gold">im Bau, fertig an Tag ${con.done}</span>` : locked ? `<span class="muted">ab ${['', 'Holzburg', 'Steinburg', 'Festung'][r.lv]}</span>` : '';
+      const why = !built && !busy && !locked ? roomBlock(id) : null;
+      return `<div class="action${locked ? ' muted' : ''}"><div><b>${esc(r.name)}</b> ${state}<p>${esc(r.eff)}${!built && !busy ? ` <span class="muted">Kosten: ${esc(costText(r.cost))}, ${r.days} ${r.days === 1 ? 'Tag' : 'Tage'}.</span>` : ''}</p></div>${!built && !busy && !locked ? `<button class="btn" data-act="room" data-r="${id}" ${why ? `disabled title="${esc(why)}"` : ''}>Einrichten</button>` : ''}</div>`;
+    }).join('');
+    return `<h3>${esc(f.name)}</h3><p class="muted">${esc(f.text)}</p>${rows}`;
+  }).join('');
+  const n = Object.keys(ROOMS).filter((id) => hasRoom(id)).length;
+  return `<div class="notice"><p><b>${esc(keepName())}</b> · ${n} von ${Object.keys(ROOMS).length} Räumen. Vorbild ist der normannische Donjon von Rochester: Keller, Eingangsgeschoss hinter dem Vorbau, ein Saal über zwei Geschosse mit Galerie, darüber die Gemächer der Familie, oben Wehrgang und Ecktürme. Mit jeder Burgstufe kommen Räume dazu; gebaut wird ein Raum zur Zeit, aus Gold und dem Burglager.</p></div>${floors}`;
+}
+
+// ---------------------------------------------------------------- Familie (familie.js)
+const STATE_TEXT = { daheim: 'daheim', pfand: 'als Pfand am Hof von', verlobt: 'verlobt mit dem Haus von', geisel: 'Geisel bei' };
+function familyView() {
+  const f = family(), p = G.s.player;
+  const sp = f.spouse;
+  const spouse = sp ? `<div class="notice good"><p><b>${esc(sp.name)}</b>, ${esc(sp.house)} · verheiratet seit Tag ${sp.day}${sp.from ? ` · ${esc(BARONS[sp.from].short)} ist dein Schwiegervater und sagt dir keine Fehde an` : ''}.</p></div>`
+    : `<div class="notice"><p>Du bist noch nicht verheiratet. Eine Heirat bindet Häuser aneinander: Um ein Kind eines Barons wirbst du an seinem Hof (Audienz in seiner Burg, ab einem Verhältnis von 25). Hier kannst du um eine Braut oder einen Bräutigam aus einem der großen Häuser werben. Brautgabe ${BRAUTGABE} Gold, die andere Seite gibt eine Mitgift.</p></div>
+      ${['sachsen', 'normannen'].map((fid) => { const m = houseMatch(fid), why = houseMarryBlock(fid); return `<div class="action"><div><b>${esc(m.name)} ${esc(m.house)}</b><p>Ansehen bei den ${esc(FACTIONS[fid].name)} +15, Ruhm +4.</p></div><button class="btn" data-act="fmarry" data-f="${fid}" ${why ? `disabled title="${esc(why)}"` : ''}>Werben</button></div>`; }).join('')}`;
+  const kids = f.children.length ? f.children.map((c) => {
+    const where = c.at ? ` ${esc(BARONS[c.at].name)}` : '';
+    const act = c.state === 'pfand' ? `<button class="btn sm" data-act="frecall" data-c="${c.id}">Heimholen</button>` : '';
+    return `<div class="action"><div><b>${esc(c.name)}</b> <span class="muted">${c.female ? 'Tochter' : 'Sohn'}, ${esc(ageText(c))}</span><p>${esc(STATE_TEXT[c.state] || c.state)}${where}${c.state === 'daheim' && childAge(c) < WARD_AGE ? ` (als Pfand ab einem halben Jahr)` : ''}</p></div>${act}</div>`;
+  }).join('') : `<p class="muted">${sp ? 'Noch keine Kinder. Sie kommen mit der Zeit (in der Kemenate des Bergfrieds öfter).' : 'Kinder kommen, wenn du verheiratet bist.'}</p>`;
+  const kin = BARON_IDS.filter((id) => kinWith(id)).map((id) => BARONS[id].short);
+  return `${spouse}<h3>Kinder</h3>${kids}
+    <p class="hint">Ein Jahr hat ${YEAR_DAYS} Tage. Ein Kind kann als Pfand des Friedens an den Hof eines Barons gehen oder mit seinem Haus verlobt werden (Audienz in seiner Burg). Verschwägerte Barone sagen dir keine Fehde an und schließen schon ab einem Verhältnis von 25 ein Bündnis. Sagst du einem Baron die Fehde an, während dein Kind als Pfand bei ihm lebt, wird es seine Geisel.${kin.length ? ` Verschwägert mit: ${esc(kin.join(', '))}.` : ''}</p>`;
+}
+function baronFamilyBox(id) {
+  const b = baron(id), def = BARONS[id], f = family();
+  if (!b || b.human) return '';
+  const btn = (act, label, why, extra = '') => `<button class="btn" data-act="${act}" data-b="${id}" ${extra} ${why ? `disabled title="${esc(why)}"` : ''}>${esc(label)}</button>`;
+  let h = '';
+  const m = baronMatch(id);
+  if (f.spouse && f.spouse.from === id) h += `<p class="good">${esc(f.spouse.name)} ist deine ${f.spouse.female ? 'Frau' : 'Mann'}: Ihr seid verschwägert.</p>`;
+  else if (!married() && m) h += `<div class="action"><div><b>Um ${esc(m.name)} werben</b><p>${esc(m.house)}. Brautgabe ${BRAUTGABE} Gold, Mitgift etwa ${fmt(dowryOf(id))} Gold. Verhältnis +25, Ruhm +6; verschwägert sagt er dir keine Fehde an.</p></div>${btn('bmarry', 'Werben', baronMarryBlock(id))}</div>`;
+  const home = f.children.filter((c) => c.state === 'daheim');
+  for (const c of home) {
+    h += `<div class="action"><div><b>${esc(c.name)}</b> <span class="muted">${c.female ? 'Tochter' : 'Sohn'}, ${esc(ageText(c))}</span><p>Als Pfand an seinen Hof: Verhältnis +20 und weiter steigend, er hält Frieden. Oder mit seinem Haus verloben: Verhältnis +25, ihr seid verschwägert.</p></div>${btn('bward', 'Als Pfand', wardBlock(c, id), `data-c="${c.id}"`)}${btn('bbetroth', 'Verloben', betrothBlock(c, id), `data-c="${c.id}"`)}</div>`;
+  }
+  for (const c of f.children.filter((x) => x.at === id && x.state !== 'daheim')) h += `<p class="muted">${esc(c.name)}: ${esc(STATE_TEXT[c.state])} ${esc(def.short)}.</p>`;
+  return h ? `<h3>Familie</h3>${h}` : '';
+}
+
 // ---------------------------------------------------------------- Burg
 function castlePanel() {
   const f = G.ui.arg && G.ui.arg.focus;
@@ -629,10 +688,14 @@ function castlePanel() {
   const seat = !!seatSite();
   if (seat || bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', seat ? 'Ausrüster' : 'Rüstkammer']);
   if (seat || bLevel('markt')) tabs.push(['markt', 'Markt']);
+  if (G.s.castle.level >= 1) tabs.push(['bergfried', 'Bergfried']);
+  tabs.push(['familie', 'Familie']);
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
     case 'ausbau': body = homeShireNote() + gateAction() + castleBuild(); break;
+    case 'bergfried': body = keepView(); break;
+    case 'familie': body = familyView(); break;
     case 'halle': body = castleHall(); break;
     case 'gefolge': body = partyView(true); break;
     case 'lager': body = castleStore(); break;
@@ -1181,6 +1244,7 @@ function baronAudience(site) {
     ${b.ally || b.vassal ? '' : `<div class="action"><div><b>Bündnis anbieten</b><p>Ab einem Verhältnis von 40: Er schickt Männer, wenn du eine Burg belagerst, steht dir gegen Angreifer bei und greift dich nicht an.</p></div>${btn('bally', 'Bündnis', allianceBlock(id))}</div>`}
     ${b.feud ? `<div class="action"><div><b>Frieden schließen</b><p>Er verlangt ${fmt(peaceCost(id))} Gold Sühne. Oder du belagerst seine Burg: Fällt sie, zahlt er Lösegeld und wird dein Vasall.</p></div>${btn('bpeace', 'Sühne zahlen', peaceBlock(id))}</div>`
       : b.vassal ? '' : `<div class="action"><div><b>Fehde ansagen</b><p>Dann darfst du seine Burg belagern (das Aufgebot findest du unten). Er wird seinerseits gegen deine Burgen ziehen.</p></div>${btn('bfeud', 'Fehde', feudBlock(id), 'danger')}</div>`}
+    ${baronFamilyBox(id)}
     ${b.feud ? baronSiegeBox(site) : ''}`;
 }
 function baronSiegeBox(site) {
@@ -1532,6 +1596,12 @@ const ACTIONS = {
   gift: () => giveGift(G.ui.arg),
   bgift: (d) => { baronGiveGift(d.b); refreshPanel(); },
   bally: (d) => { offerAlliance(d.b); refreshPanel(); },
+  bmarry: (d) => { marryBaron(d.b); refreshPanel(); },
+  bward: (d) => { sendWard(Number(d.c), d.b); refreshPanel(); },
+  bbetroth: (d) => { betroth(Number(d.c), d.b); refreshPanel(); },
+  fmarry: (d) => { marryHouse(d.f); refreshPanel(); },
+  frecall: (d) => { recallWard(Number(d.c)); refreshPanel(); },
+  room: (d) => { startRoom(d.r); refreshPanel(); },
   bfeud: (d) => confirmDialog(`${BARONS[d.b].name} die Fehde ansagen? Er wird gegen deine Burgen ziehen, und seine Freunde sehen das ungern.`, 'Fehde', () => { declareFeud(d.b); refreshPanel(); }),
   bpeace: (d) => { makePeace(d.b); refreshPanel(); },
   barongo: (d) => { const s = G.world.sites.find((x) => x.baron === d.b); if (s) { closePanel(); travelTo({ x: s.x, y: s.y + 6 }, null); } },
@@ -1708,5 +1778,6 @@ export function initUI() {
   });
   byId('dialog-yes').addEventListener('click', () => closeDialog(true));
   byId('dialog-no').addEventListener('click', () => closeDialog(false));
+  byId('dialog-alt').addEventListener('click', () => { const a = dialogAlt; dialogAlt = null; dialogYes = null; dialogNo = null; byId('dialog').hidden = true; if (a && a.fn) a.fn(); });
 }
 

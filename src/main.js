@@ -35,6 +35,7 @@ import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.
 import { mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, mpLobbyBegin, mpLobbyUpdate, shiresIn } from './mp.js';
 import './pvp.js';
 import './mpwelt.js';
+import './reisende.js';
 import { initLobby } from './lobby.js';
 import { introWanted, startIntro } from './intro.js';
 import { nearestWalkable } from './world.js';
@@ -550,6 +551,11 @@ function clickUnit(u) {
     return true;
   }
   const gt = GROUP_TYPES[g.type];
+  // Fahrende (Gaukler, Postkutsche): erst hingehen, dann reden (reisende.js)
+  if ((gt.entertain || gt.post) && G.onTravelerClick) {
+    if (Math.hypot(u.x - p.x, u.y - p.y) > 5) { if (setPlayerPath(u.x, u.y)) G.pendingSite = null; return true; }
+    if (G.onTravelerClick(g, u)) return true;
+  }
   const conseq = gt.kill ? Object.entries(gt.kill).map(([f, v]) => `${FACTIONS[f].short} ${v > 0 ? '+' : ''}${v}`).join(', ') : '';
   const who = gt.acc[0].toUpperCase() + gt.acc.slice(1);
   confirmDialog(`${who} angreifen? Sie sind dir nicht feindlich gesinnt.${conseq ? ` Folgen bei einem Sieg: ${conseq}.` : ''}`, 'Angreifen', () => {

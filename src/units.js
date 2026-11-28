@@ -75,6 +75,8 @@ export function randomName() {
   return { name: Math.random() < 0.7 ? `${first} ${pick(EPITHETS)}` : first, female };
 }
 
+// Bunte Kleider der Gaukler
+const MOTLEY = ['#c8402e', '#e0b030', '#3a7a3a', '#2e5aa8', '#8a3a8a', '#d86a2a'];
 export function makeNpc(typeId, x, y, levelBonus = 0) {
   const d = NPC_TYPES[typeId];
   const u = makeUnit({
@@ -82,6 +84,8 @@ export function makeNpc(typeId, x, y, levelBonus = 0) {
     eq: { ...d.eq }, x, y, look: d.look, npcType: typeId,
   });
   u.mounted = !!u.st.horse;
+  if (d.wagon) u.wagon = d.wagon;
+  if (d.motley) u.tunic = pick(MOTLEY);
   return u;
 }
 
@@ -888,6 +892,8 @@ function sitesFor(type) {
   // Prinz Johns Steuereintreiber: in England, Wales, der Normandie und im normannischen Irland
   if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && s.realm !== 'sc' && (s.faction === 'normannen' || (s.realm !== 'ir' && (s.type === 'dorf' || s.type === 'halle'))));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
+  if (type === 'gaukler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'halle', 'burg'].includes(s.type));
+  if (type === 'post') return S.filter((s) => ['stadt', 'markt', 'abtei', 'burg'].includes(s.type));
   if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s !== castleSite() && !s.mpHome && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction)
     && (!gt.realmFaction || !gt.realmFaction[s.realm] || s.faction === gt.realmFaction[s.realm]));
   return S.filter((s) => s.type !== 'einsiedelei');
@@ -1011,9 +1017,12 @@ function chooseDest(g) {
   } else if (gt.spawn === 'patrol') {
     const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 10, 120));
     if (s) dest = { x: s.x + rand(-2, 2), y: s.y + rand(-2, 2) };
+  } else if (g.forced) {
+    // Ein fester Auftrag (Gaukler auf dem Weg zu deiner Burg, reisende.js)
+    dest = g.forced;
   } else {
     const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 20, 150));
-    if (s) dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
+    if (s) { dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) }; g.destSite = s.id; }
   }
   if (!dest) { g.wait = 3; return; }
   g.path = findPath(W, g.x, g.y, dest.x, dest.y, 90000);
@@ -1095,7 +1104,7 @@ export function updateGroups(dt) {
     const dx = target.x - g.x, dy = target.y - g.y, d = Math.hypot(dx, dy);
     if (d <= sp + 0.02) {
       g.x = target.x; g.y = target.y; g.pathI++;
-      if (g.pathI >= g.path.length) { g.path = null; g.wait = rand(3, 9); }
+      if (g.pathI >= g.path.length) { g.path = null; g.wait = rand(3, 9); if (G.onGroupArrive) G.onGroupArrive(g); }
     } else {
       g.x += (dx / d) * sp; g.y += (dy / d) * sp;
     }

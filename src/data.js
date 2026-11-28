@@ -171,7 +171,12 @@ export const NPC_TYPES = {
   soeldner: { cls: 'soldat', name: 'Söldner', eq: { waffe: 'streitaxt', ruestung: 'lederwams' }, lv: [2, 3], look: 'raubritter' },
   soldat: { cls: 'soldat', name: 'Soldat', eq: { waffe: 'speer', ruestung: 'kettenhemd', schild: 'drachenschild' }, lv: [1, 3], look: 'soldat' },
   armbrust: { cls: 'soldat', name: 'Armbrustschütze', eq: { waffe: 'armbrust', ruestung: 'gambeson' }, lv: [1, 3], look: 'soldat' },
-  vogt: { cls: 'zivil', name: 'Steuereintreiber', eq: { waffe: 'knueppel', pferd: 'klepper' }, lv: [1, 1], look: 'vogt' },
+  // wagon: fährt in einem Wagen (Platzhalter gezeichnet, render.js drawWagon); motley: bunte Kleider
+  vogt: { cls: 'zivil', name: 'Steuereintreiber', eq: { waffe: 'knueppel', pferd: 'klepper' }, lv: [1, 1], look: 'vogt', wagon: 'kutsche' },
+  gaukler: { cls: 'zivil', name: 'Gaukler', eq: {}, lv: [1, 1], look: 'gaukler', motley: true },
+  gauklerwagen: { cls: 'zivil', name: 'Prinzipal der Gaukler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'gaukler', wagon: 'gaukler', motley: true },
+  postkutscher: { cls: 'zivil', name: 'Postkutscher', eq: { pferd: 'zelter' }, lv: [1, 1], look: 'post', wagon: 'post' },
+  postreiter: { cls: 'soldat', name: 'Postreiter', eq: { waffe: 'kurzschwert', ruestung: 'gambeson', pferd: 'zelter' }, lv: [1, 2], look: 'post' },
   haendler: { cls: 'zivil', name: 'Händler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'haendler' },
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
@@ -199,6 +204,17 @@ export const GROUP_TYPES = {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
     gold: [25, 50], itemChance: 0.3, renown: 2, count: 10, spawn: 'patrol', realms: ['en', 'nd', 'wa', 'ir'], realmFaction: { ir: 'normannen' }, speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
+  },
+  // Fahrende: Gaukler ziehen von Ort zu Ort und spielen auf, die Postkutsche bringt Briefe und Nachrichten (reisende.js)
+  gaukler: {
+    name: 'Fahrende Gaukler', nom: 'Die fahrenden Gaukler', acc: 'die Gaukler', pl: true, faction: null, members: [['gauklerwagen', 1, 1], ['gaukler', 2, 3]],
+    gold: [10, 30], renown: 0, count: 4, spawn: 'route', speed: 0.95, entertain: true,
+    kill: { kirche: -8, sachsen: -6, gilde: -4 },
+  },
+  post: {
+    name: 'Postkutsche', nom: 'Die Postkutsche', acc: 'die Postkutsche', pl: false, faction: 'gilde', members: [['postkutscher', 1, 1], ['postreiter', 1, 2]],
+    gold: [40, 90], renown: 0, count: 5, spawn: 'route', speed: 1.3, post: true,
+    kill: { gilde: -15, normannen: -6 },
   },
   steuer: {
     name: 'Steuereintreiber', nom: 'Der Steuereintreiber und seine Wache', acc: 'den Steuereintreiber', pl: true, faction: 'normannen', members: [['vogt', 1, 1], ['soldat', 2, 3]],
@@ -762,6 +778,8 @@ export const LOOKS = {
   raubritter: { tunic: '#2d2a28', trim: '#8c2f2a' },
   soldat: { tunic: '#a33b32', trim: '#e0d6c0' },
   vogt: { tunic: '#7d2a52', trim: '#d8b54a' },
+  gaukler: { tunic: '#c8402e', trim: '#e8d070' },
+  post: { tunic: '#23402e', trim: '#d8b84a' },
   haendler: { tunic: '#3d6fa3', trim: '#e0c070' },
   wache: { tunic: '#556b7d', trim: '#c9c2b0' },
   wald: { tunic: '#3f6b2f', trim: '#2c4a20', hood: '#355a28' },

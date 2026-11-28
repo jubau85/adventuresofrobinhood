@@ -18,6 +18,8 @@ import { dailyHoldings } from './holdings.js';
 import { updateTrips } from './travels.js';
 import { dailyWar } from './war.js';
 import { dailyBarons } from './barons.js';
+import { dailyFamily } from './familie.js';
+import { dailyKeep } from './bergfried.js';
 
 export function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
@@ -68,8 +70,10 @@ export function passHours(h) {
 function guestDay() {
   const before = seasonIndex();
   G.s.day++;
-  // Eigene Grafschaften, Burgen, Lager, Sold und Verpflegung rechnet jeder selbst
+  // Eigene Grafschaften, Burgen, Lager, Sold und Verpflegung rechnet jeder selbst, ebenso Familie und Bergfried
   dailyCastle();
+  dailyKeep();
+  dailyFamily();
   dailyHoldings(false);
   dailyQuests();
   // Gruppen der Welt kommen vom Gastgeber (mpwelt.js)
@@ -85,6 +89,8 @@ function newDay() {
   G.s.day++;
   dailyEconomy();
   dailyCastle();
+  dailyKeep();
+  dailyFamily();
   dailyHoldings();
   dailyWar();
   dailyBarons();

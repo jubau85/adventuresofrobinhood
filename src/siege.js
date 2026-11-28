@@ -385,7 +385,7 @@ function raiseDefenders(sg) {
   let types = home ? ['wache'] : held ? ['soldat', 'armbrust'] : DEFENDER_NPC[s.faction] || ['wache'];
   // Mehrspieler (beim Gastgeber): die Heimburg eines Gastes mit Wachen nach ihrem Ausbau
   const pc = !own && peerCastle(s);
-  const n = home ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + bSum('wehr') * 2
+  const n = home ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + bSum('wehr') * 2 + (G.keepSiegeMen ? G.keepSiegeMen() : 0)
     : held ? Math.max(3, Math.min(30, holdingOf(s).garrison))
       : pc ? 6 + (pc.lv | 0) * 3
         : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
@@ -593,7 +593,7 @@ function endSiege(sg, how, quiet = false) {
   } else if (how === 'gefallen') {
     for (const b of siteBuildings(s.id)) if (Math.random() < 0.4) damageBuilding(b, rand(0.2, 0.45));
     if (isHome(s)) {
-      const lost = Math.floor(G.s.gold * 0.2);
+      const lost = Math.floor(G.s.gold * 0.2 * (G.keepPlunder ? G.keepPlunder() : 1));
       G.s.gold -= lost;
       for (const g of Object.keys(G.s.castle.storage)) G.s.castle.storage[g] = Math.floor(G.s.castle.storage[g] * 0.6);
       log(`${name} wurde gestürmt und geplündert! Verloren: ${lost} Gold und ein Teil der Vorräte.`, 'bad');

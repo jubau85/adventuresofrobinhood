@@ -585,6 +585,8 @@ export function castleDefense() {
   if (isAlly('schotten')) d += 15;
   if (isAlly('iren')) d += 10;
   if (homeGateClosed()) d += 10;
+  // Räume im Bergfried (bergfried.js): Brunnen, Wachstube, Vorbau, Wehrgang
+  if (G.keepDefense) d += G.keepDefense();
   return Math.round(d);
 }
 
@@ -600,6 +602,9 @@ export function dailyBalance() {
   if (mills) income.push([mills > 1 ? `Mahlgeld der ${mills} Windmühlen` : 'Mahlgeld der Windmühle', 10 * mills]);
   // Eigene Grafschaften: Abgaben ihrer Orte, abzüglich dessen, was die Kastellane für ihre Burgen behalten
   for (const id of ownedShires()) income.push([`Abgaben ${SHIRES[id].name}`, holdingIncome(id)]);
+  // Schreibstube im Bergfried: ein Zehntel mehr auf alle Einnahmen
+  const scribe = G.keepIncome ? G.keepIncome() : 0;
+  if (scribe) { const sum = income.reduce((a, [, v]) => a + v, 0); if (sum > 0) income.push(['Buchführung der Schreibstube', Math.round(sum * scribe)]); }
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
@@ -623,7 +628,8 @@ export function dailyBalance() {
   // Holz aus den Forsten eroberter Grafschaften (Vorgabe „Holz erzeugen“)
   for (const [g, n] of Object.entries(holdingGoods())) prod[g] = (prod[g] || 0) + n;
   // Verpflegung: was fehlt, kaufen die Knechte teuer zu
-  const need = foodNeed();
+  // Vorratskeller im Bergfried: weniger verdirbt
+  const need = Math.ceil(foodNeed() * (G.keepFood ? G.keepFood() : 1));
   const avail = foodStock() + prod.getreide + prod.fleisch;
   const short = Math.max(0, need - avail);
   if (short) costs.push(['Zukauf von Nahrung', short * FOOD_PRICE]);
@@ -741,7 +747,7 @@ function checkRaid() {
       addRenown(2);
       for (const c of G.s.companions) if (c.status === 'garnison') grantXp(c, 15);
     } else {
-      const lostGold = Math.floor(G.s.gold * 0.15);
+      const lostGold = Math.floor(G.s.gold * 0.15 * (G.keepPlunder ? G.keepPlunder() : 1));
       G.s.gold -= lostGold;
       const lost = [];
       for (const g of GOOD_IDS) {

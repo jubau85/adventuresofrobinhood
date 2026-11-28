@@ -4782,7 +4782,78 @@ function drawWeapon(c, u, by) {
   c.restore();
 }
 
+// ---------------------------------------------------------------- Wagen (Platzhalter, bis es gemalte Bilder gibt)
+// Kutsche des Steuereintreibers, Postkutsche, Planwagen der Gaukler: ein Pferd vorn (3D, wie beim Reiter), dahinter der
+// Wagenkasten auf vier Rädern, längs der Fahrtrichtung. Wer im Wagen sitzt, ist die Figur selbst (Treffer, Auswahl).
+const WAGONS = {
+  kutsche: { body: '#5e2620', top: '#2a1a14', trim: '#c9a54a', len: 1.0, w: 0.56, h: 13, chest: true },
+  post: { body: '#24442f', top: '#1d1d1b', trim: '#d8b84a', len: 1.0, w: 0.56, h: 14, horn: true },
+  gaukler: { body: '#7a522c', top: null, stripes: ['#c8402e', '#ecd9a0'], len: 1.1, w: 0.6, h: 10 },
+};
+function drawWagon(c, u, x, y) {
+  const Wg = WAGONS[u.wagon] || WAGONS.kutsche, z = zAt(u.x, u.y);
+  const dx = u.dirX ?? 0, dy = u.dirY ?? 1, n = Math.hypot(dx, dy) || 1, fx = dx / n, fy = dy / n;
+  const alongX = Math.abs(fx) >= Math.abs(fy);
+  const cx = u.x - fx * 0.5, cy = u.y - fy * 0.5;             // Wagenkasten hinter dem Pferd
+  const wx = alongX ? Wg.len : Wg.w, wy = alongX ? Wg.w : Wg.len, z0 = z + 4;
+  const coach = () => {
+    drawShadow(c, cx, cy, wx, wy, 10, 0.18);
+    // Deichsel: zwei Stangen vom Kasten nach vorn zum Pferd
+    c.strokeStyle = '#4a3422'; c.lineWidth = 1.2; c.beginPath();
+    for (const s of [-0.16, 0.16]) {
+      const sx = alongX ? 0 : s, sy = alongX ? s : 0;
+      const [a0, a1] = P(cx + fx * Wg.len * 0.5 + sx, cy + fy * Wg.len * 0.5 + sy, z + 6), [b0, b1] = P(u.x + fx * 0.3 + sx, u.y + fy * 0.3 + sy, z + 9);
+      c.moveTo(a0, a1); c.lineTo(b0, b1);
+    }
+    c.stroke();
+    // Räder an den Längsseiten, vorn und hinten
+    c.fillStyle = '#3a2a1c'; c.strokeStyle = '#1d140c'; c.lineWidth = 0.8;
+    for (const a of [-0.36, 0.36]) for (const b of [-0.5, 0.5]) {
+      const ux = alongX ? cx + a * Wg.len : cx + b * Wg.w * 1.02, uy = alongX ? cy + b * Wg.w * 1.02 : cy + a * Wg.len;
+      const [px, py] = P(ux, uy, z + 3.5);
+      c.beginPath(); c.ellipse(px, py, alongX ? 3.4 : 2.0, 3.6, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+    drawBox(c, cx, cy, wx, wy, 2, '#4a3422', z0 - 1);         // Fahrgestell
+    if (Wg.stripes) {
+      // Planwagen: niedriger Kasten, darüber die gestreifte Plane
+      drawBox(c, cx, cy, wx, wy, Wg.h * 0.45, Wg.body, z0, 'plank');
+      const k = 5;
+      for (let i = 0; i < k; i++) {
+        const t0 = -0.5 + i / k, t1 = t0 + 1 / k, col = Wg.stripes[i % 2];
+        const sx = alongX ? cx + (t0 + t1) / 2 * wx : cx, sy = alongX ? cy : cy + (t0 + t1) / 2 * wy;
+        drawBox(c, sx, sy, alongX ? wx / k : wx * 0.96, alongX ? wy * 0.96 : wy / k, Wg.h * 0.75, col, z0 + Wg.h * 0.45);
+      }
+    } else {
+      drawBox(c, cx, cy, wx, wy, Wg.h, Wg.body, z0, 'plank');
+      drawBox(c, cx, cy, wx + 0.06, wy + 0.06, 1.6, Wg.top, z0 + Wg.h);   // Dach
+      // Fenster und Zierleiste
+      const [a0, a1] = P(cx - wx / 2, cy + wy / 2, z0 + Wg.h * 0.55), [b0, b1] = P(cx + wx / 2, cy + wy / 2, z0 + Wg.h * 0.55);
+      c.strokeStyle = Wg.trim; c.lineWidth = 1; c.beginPath(); c.moveTo(a0, a1); c.lineTo(b0, b1); c.stroke();
+      if (Wg.chest) drawBox(c, cx, cy, wx * 0.45, wy * 0.6, 3.2, '#6b4a2a', z0 + Wg.h + 1.6);    // Geldtruhe auf dem Dach
+      if (Wg.horn) { const [hx, hy] = P(cx, cy, z0 + Wg.h + 3); c.fillStyle = Wg.trim; c.beginPath(); c.arc(hx, hy, 1.8, 0, Math.PI * 2); c.fill(); }
+    }
+  };
+  const horse = () => {
+    const hx = u.x + fx * 0.35, hy = u.y + fy * 0.35;
+    const H = u.eq && u.eq.pferd ? horse3dFor(u, unitLook(u)) : null;
+    c.save();
+    c.translate(isoX(hx, hy), isoY(hx, hy) - zAt(hx, hy));
+    c.scale(FIG * 1.14 * (u.facing || 1), FIG * 1.14);
+    if (H) H.paint(c);
+    else { c.fillStyle = '#6b4a2a'; c.beginPath(); c.ellipse(0, -10, 8, 4, 0, 0, Math.PI * 2); c.fill(); }
+    c.restore();
+  };
+  // Was weiter hinten liegt (kleineres x + y), zuerst
+  if (u.x + fx * 0.35 + u.y + fy * 0.35 < cx + cy) { horse(); coach(); } else { coach(); horse(); }
+  if (u.flash > 0) { const [px, py] = P(cx, cy, z0 + Wg.h); c.globalAlpha = Math.min(1, u.flash * 5); c.fillStyle = '#fff'; c.beginPath(); c.ellipse(px, py - 4, 9, 6, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; }
+  if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999)) {
+    const [px, py] = P(cx, cy, z0 + Wg.h + 10), w = 18;
+    c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(px - w / 2 - 1, py - 1, w + 2, 4);
+    c.fillStyle = u.friendly ? '#7bc15a' : '#d9533f'; c.fillRect(px - w / 2, py, w * Math.max(0, u.hp / u.st.maxHp), 2);
+  }
+}
 function drawFigure(c, u, x, y) {
+  if (u.wagon && !u.dead) { drawWagon(c, u, x, y); return; }
   const L = unitLook(u);
   const m = u.mounted && u.st.horse;
   c.save();
