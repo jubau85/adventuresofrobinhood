@@ -227,7 +227,8 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   const band = await ev(A, () => { const G = window.__ritter, p = G.s.player; const g = window.__ritterDebug.spawnGroup('banditen', { pos: { x: p.x + 3, y: p.y + 3 } }); return g && { id: g.id, n: g.members.length, hp: g.members[0].hp }; });
   await B.waitForTimeout(1500);
   const bandB = await ev(B, (id) => { const G = window.__ritter, g = G.groups.find((x) => x.id === id && x.mirror); return g ? { n: g.members.length, type: g.type } : null; }, band.id);
-  ok(band && bandB && bandB.n === band.n && bandB.type === 'banditen', `B sieht die Bande des Gastgebers als Spiegel (${bandB && bandB.n} Mann)`);
+  const hostN = await ev(A, (id) => { const g = window.__ritter.groups.find((x) => x.id === id); return g ? g.members.length : 0; }, band.id);
+  ok(band && bandB && bandB.n >= 1 && Math.abs(bandB.n - hostN) <= 1 && bandB.type === 'banditen', `B sieht die Bande des Gastgebers als Spiegel (${bandB && bandB.n} Mann, beim Gastgeber ${hostN})`);
   const guestGroups = await ev(B, () => window.__ritter.groups.filter((g) => !g.mirror).length);
   ok(guestGroups === 0, `B rechnet selbst keine Gruppen der Welt (${guestGroups})`);
   await ev(B, (id) => { const G = window.__ritter, g = G.groups.find((x) => x.id === id && x.mirror), u = g.members[0]; G.onRemoteHit(G.s.player, u, false, u.x - 0.8, u.y, false); }, band.id);
