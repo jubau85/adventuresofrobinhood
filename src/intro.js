@@ -16,7 +16,7 @@ const IV_STORY = [
   { bild: 'kerker', text: 'Im Jahre des Herrn 1194. Auf der Heimkehr vom Kreuzzug fiel König Richard Löwenherz in die Hand seiner Feinde. Über ein Jahr lag er in fremden Kerkern, fern von England.' },
   { bild: 'krone', text: 'Derweil griff sein Bruder Johann nach der Krone. Seine Barone besetzten die Burgen, und seine Vögte pressten das Land aus bis auf den letzten Pfennig.' },
   { bild: 'banner', text: 'Nun ist der König frei. Doch noch wehen Johanns Banner über den Burgen, die Sachsen murren gegen die normannischen Herren, und das Land findet keine Ruhe.' },
-  { bild: 'wald', text: 'In den Wäldern sammeln sich die Geächteten. Jenseits des Kanals greift König Philipp nach der Normandie, und von Wales bis Irland rüsten sechs Barone zum Krieg.' },
+  { bild: 'wald', text: 'In den Wäldern sammeln sich die Geächteten. Jenseits des Kanals greift König Philipp nach der Normandie, und von Wales bis Irland rüsten die Barone zum Krieg.' },
   { bild: 'heimkehr', text: 'Du aber kehrst heim aus dem Heiligen Land, mit nichts als deinem Schwert, deinem Pferd und deinem Namen.' },
   { bild: 'burgstall', text: 'Von deinem Erbe ist nur ein verfallener Burgstall geblieben. Sammle Gefolge, baue deine Burg, gewinne Ruhm und Land. England wartet auf seinen Ritter.' },
 ];
@@ -126,8 +126,8 @@ function ivLoop(now) {
     if (I.phase === 'warte') {
       const c = I.ctx; c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, I.cv.width, I.cv.height);
       const can = audioRunning() || !musicEnabled();
-      // Die Fanfare von Oakgen ist gleich geladen; länger als zweieinhalb Sekunden wird nicht gewartet
-      const ready = !can || !musicEnabled() || I.storyOnly || audioBuffer('intro_studio') || I.pt > 2.5;
+      // Die Aufnahmen von Oakgen sind gleich geladen; länger als zweieinhalb Sekunden wird nicht gewartet
+      const ready = !can || !musicEnabled() || audioBuffer(I.storyOnly ? 'intro_geschichte' : 'intro_studio') || I.pt > 2.5;
       if (I.fonts && ((can && ready) || (!can && I.pt > 0.4))) ivBegin(I, can ? (I.storyOnly ? 'story' : 'studio') : 'tor');
     } else if (I.phase === 'tor') ivGate(I);
     else if (I.phase === 'studio') { ivStudio(I, dt); if (I.pt > I.T.end && !I.ending) ivBegin(I, 'story'); }
@@ -1064,8 +1064,8 @@ function ivStartStory(I) {
   I.F = ivFrame(IV_LW, IV_LH);
   I.lo = document.createElement('canvas'); I.lo.width = IV_LW; I.lo.height = IV_LH;
   I.loc = I.lo.getContext('2d');
-  const A = introOut();
-  if (A && !I.tracker) I.tracker = ivTracker(A);
+  const A = introOut(), buf = audioBuffer('intro_geschichte');
+  if (A && !I.tracker) I.tracker = buf ? ivStoryFile(A, buf) : ivTracker(A);
   I.pics = [];
   ivSlide(I, 0);
 }
@@ -1169,7 +1169,7 @@ function ivStartFinale(I) {
   I.fin.lo.width = lw; I.fin.lo.height = lh; I.fin.loc = I.fin.lo.getContext('2d');
   ivFinaleSnapshot(I);
   ivFinaleLogo(I);
-  if (I.tracker) { I.tracker.stop(2.4); I.tracker.finale(); }
+  if (I.tracker) I.tracker.schluss();
 }
 
 function ivFinaleSnapshot(I) {
@@ -1343,7 +1343,48 @@ function ivInstruments(ac) {
   return I;
 }
 
-function ivTracker(A) {
+// Die Musik der Vorgeschichte als Aufnahme (Oakgen, assets/intro/geschichte.mp3): d-Moll, 110 Schläge je Minute, der
+// erste Takt beginnt bei 1,601 s. Die Schleife läuft über 32 Takte von 32,146 s bis 101,965 s: An dieser Stelle passen
+// die Takte davor zusammen, und der leise Anfang kommt nicht wieder.
+const IV_STORY_FILE = { gain: 1.5, d0: 1.601, loopStart: 32.146, loopEnd: 101.965 };
+function ivStoryFile(A, buf) {
+  const { ac } = A, M = IV_STORY_FILE, t0 = ac.currentTime + 0.08, bar = 4 * IV_BEAT;
+  const src = ac.createBufferSource(); src.buffer = buf;
+  src.loop = true; src.loopStart = M.loopStart; src.loopEnd = Math.min(M.loopEnd, buf.duration);
+  const g = ac.createGain(); g.gain.value = M.gain;
+  src.connect(g); g.connect(A.dry); src.start(t0);
+  const syn = ivTracker(A, false);   // nur für den Schlussakkord
+  let stopped = false;
+  const fade = (at, tc, after) => {
+    const now = ac.currentTime;
+    g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(g.gain.value, now); g.gain.setTargetAtTime(0, Math.max(now, at), tc);
+    setTimeout(() => { try { src.stop(); } catch (e) { /* schon aus */ } g.disconnect(); }, (Math.max(0, at - now) + after) * 1000);
+  };
+  // Wo die Aufnahme gerade steht (mit Schleife)
+  const pos = () => {
+    let p = ac.currentTime - t0;
+    if (p > src.loopEnd) p = src.loopStart + ((p - src.loopEnd) % (src.loopEnd - src.loopStart));
+    return p;
+  };
+  return {
+    stop(tc = 1) { if (stopped) return; stopped = true; fade(ac.currentTime, tc / 3, tc + 1.5); syn.stop(tc); },
+    // Schluss: Der große Schlag des Schlussakkords (0,75 s nach seinem Anlauf) fällt auf einen halben Takt der Aufnahme,
+    // und die Aufnahme klingt im Anlauf aus
+    schluss() {
+      if (stopped) return;
+      stopped = true;
+      const hb = bar / 2, p = pos();
+      let wait = M.d0 + Math.ceil((p - M.d0) / hb) * hb - p - 0.75;
+      while (wait < 0.1) wait += hb;
+      const at = ac.currentTime + wait;
+      fade(at, 0.25, 3);
+      syn.finale(at);
+      syn.stop(2.4);
+    },
+  };
+}
+
+function ivTracker(A, bars = true) {
   const { ac } = A;
   const bus = ac.createGain(); bus.gain.value = 1.05; bus.connect(A.dry);
   const send = ac.createGain(); send.gain.value = 0.3; bus.connect(send); send.connect(A.wet);
@@ -1372,8 +1413,8 @@ function ivTracker(A) {
       setTimeout(() => { for (const s of live) { try { s.stop(); } catch (e) { /* schon aus */ } } bus.disconnect(); fb.disconnect(); }, tc * 1000 + 6500);
     },
     // Schlussakkord in D-Dur mit Fanfare, eigener Ausgang, klingt aus, während der Titel erscheint
-    finale() {
-      const t = ac.currentTime + 0.08;
+    finale(at) {
+      const t = Math.max(at || 0, ac.currentTime + 0.08);
       [[69, 0], [74, 0.25], [78, 0.5], [81, 0.75]].forEach(([m, d], k) => { fbNote('lead', m, t + d, k === 3 ? 3.2 : 0.22, 0.16, -0.4); fbNote('blech', m - 12, t + d, k === 3 ? 2.6 : 0.2, 0.06, -0.2); });
       for (const m of [57, 62, 66, 69]) { fbNote('str', m, t, 4.2, 0.11, m % 2 ? -0.3 : 0.3); fbNote('chor', m, t + 0.2, 4.0, 0.12, m % 2 ? 0.3 : -0.3); }
       for (let k = 0; k < 12; k++) fbNote(k % 2 ? 'tom' : 'taiko', k % 2 ? 66 - k : 60, t + k * 0.06, 0.1, 0.2 + k * 0.04, k % 2 ? 0.35 : -0.35);
@@ -1383,7 +1424,7 @@ function ivTracker(A) {
     },
   };
   // Eigener Bus für den Schluss, damit er nicht mit dem Tracker ausgeblendet wird
-  const fb = ac.createGain(); fb.gain.value = 1.1; fb.connect(A.dry); const fs = ac.createGain(); fs.gain.value = 0.4; fb.connect(fs); fs.connect(A.wet);
+  const fb = ac.createGain(); fb.gain.value = 0.85; fb.connect(A.dry); const fs = ac.createGain(); fs.gain.value = 0.4; fb.connect(fs); fs.connect(A.wet);
   const fbNote = (id, m, t, dur, vol, pan) => {
     const S = I[id], src = ac.createBufferSource(); src.buffer = S.buf; src.loop = S.loop; src.playbackRate.value = Math.pow(2, (m - S.base) / 12);
     const g = ac.createGain(), p = ac.createStereoPanner(); p.pan.value = pan;
@@ -1391,8 +1432,8 @@ function ivTracker(A) {
     src.connect(g); g.connect(p); p.connect(fb); src.start(t); src.stop(S.one ? t + S.buf.duration / src.playbackRate.value + 0.05 : t + dur + 2.5);
   };
   const tick = () => { while (!T.stopped && T.next < ac.currentTime + 0.7) { ivBar(T, T.n++, T.next); T.next += 4 * IV_BEAT; } };
-  T.timer = setInterval(tick, 120);
-  tick();
+  T.schluss = () => { T.stop(2.4); T.finale(); };
+  if (bars) { T.timer = setInterval(tick, 120); tick(); }
   return T;
 }
 

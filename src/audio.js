@@ -282,6 +282,7 @@ const FILES = {
   welt_sommer: 'assets/musik/welt_sommer.mp3',
   wiese_tag: 'assets/sound/ambiente/wiese_tag.mp3',
   intro_studio: 'assets/intro/studio.mp3',
+  intro_geschichte: 'assets/intro/geschichte.mp3',
 };
 const buffers = {};
 let fileBus = null, want = { music: null, amb: null }, track = null, ambTrack = null, restUntil = 0;
