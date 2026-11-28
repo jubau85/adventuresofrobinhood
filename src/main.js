@@ -27,7 +27,7 @@ import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, fi
 import { initWeather, updateWeather, precip } from './weather.js';
 import { updateCheats } from './cheats.js';
 import { updateTime, passHours } from './sim.js';
-import { initRender, resetRender, releaseRender, render, prefetchArt, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen, fieldSpots, birdsNow } from './render.js';
+import { initRender, resetRender, releaseRender, render, prefetchArt, onSeasonChanged, unitAtScreen, drawMap, screenToGround, buildingAtScreen, animalAtScreen, drawHeroPreview, workEmitters, tileToScreen, fieldSpots, birdsNow, figureSnapshot } from './render.js';
 import {
   initUI, updateHUD, openPanel, closePanel, panelOpen, confirmDialog, dialogOpen, closeDialog, showPrompt, byId, esc, renderLog, castleFocusTab,
 } from './ui.js';
@@ -1054,4 +1054,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, castlePlots, castleSite, startBuild, startTypeChange, castleOut, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, endSiegeNow, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { figureSnapshot, birdsNow, castleObstacles, castleLayout, castlePlots, castleSite, startBuild, startTypeChange, castleOut, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, endSiegeNow, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };

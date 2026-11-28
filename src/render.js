@@ -5173,8 +5173,9 @@ function drawCape(c, u, hip, ox, oy, dir, mounted, color) {
 }
 function drawModel3d(c, u, L, m, key) {
   const { M } = model3d(key);
-  const { anim, frame } = modelAnim(u, key, m);
-  const dir = dirIndex(u.dirX ?? 0, u.dirY ?? 1);
+  // _pose und _dir: feste Bewegung, Bild und Richtung (Vorlagen, figureSnapshot)
+  const { anim, frame } = u._pose || modelAnim(u, key, m);
+  const dir = u._dir ?? dirIndex(u.dirX ?? 0, u.dirY ?? 1);
   const color = u.tunic || L.tunic || (u.kind === 'player' || u.kind === 'preview' ? playerColor() : '#8a6e4b');
   const cell = modelCell(key, anim, dir, frame, color);
   if (!cell) return null;
@@ -5195,6 +5196,7 @@ function drawModel3d(c, u, L, m, key) {
       const hip = pt('Hips') || { x: 0, y: -22 };
       // Das Hüftgelenk liegt rund 9 cm über der Sitzfläche
       ox = horse.sx - hip.x; oy = horse.sy - hip.y - 0.09 * FIG3D_H / 1.8;
+      if (u._snap) c.translate(-ox, -oy);   // Vorlage: der Fußpunkt des Reiters bleibt am Ursprung
       // Das abgewandte Bein hängt hinter dem Pferdeleib: erst den ganzen Reiter, dann das Pferd, darüber den Reiter
       // ohne dieses Bein (reiten_nah). So schaut es nur unter dem Bauch hervor, wie es sein soll.
       near = modelHas(key, 'reiten_nah') ? modelCell(key, 'reiten_nah', dir, frame, color) : null;
@@ -5213,7 +5215,7 @@ function drawModel3d(c, u, L, m, key) {
     }
     if (u.kind === 'peasant') drawHandGear(c, u, rh && { x: ox + rh.x, y: oy + rh.y }, lh && { x: ox + lh.x, y: oy + lh.y }, sgn, anim, dir);
   };
-  const capeHip = wantsCape(u) ? pt('Hips') : null, capeOver = dir >= 4 && dir <= 6;
+  const capeHip = wantsCape(u) && !u._noCape ? pt('Hips') : null, capeOver = dir >= 4 && dir <= 6;
   if (back) gear();
   if (capeHip && !capeOver) drawCape(c, u, capeHip, ox, oy, dir, !!horse, color);
   c.drawImage(lodOf(near || cell, c, k), ox - M.fusspunkt[0] * k, oy - M.fusspunkt[1] * k, CW * k, CH * k);
@@ -5223,6 +5225,21 @@ function drawModel3d(c, u, L, m, key) {
   c.restore();
   const head = pt('Hips');
   return (head ? oy + head.y : -10) - 2;
+}
+// Werkzeug (tools/umhang_vorlagen.cjs): eine Figur freigestellt auf eine eigene Leinwand, wie im Spiel gemalt.
+// o: unit, mounted, anim, frame, dir, w, h (Leinwand), ax, ay (Fußpunkt auf der Leinwand), s (Bildpunkte je Weltpixel),
+// cape (gezeichneter Umhang an oder aus). Gibt null zurück, solange die Bilder noch laden.
+export function figureSnapshot(o) {
+  const u = o.unit, m = !!o.mounted;
+  const key = modelFor(u, m);
+  if (!key || (m && !horseReady(u.eq.pferd === 'schlachtross' ? 'ross' : 'pferd'))) return null;
+  u._pose = { anim: o.anim, frame: o.frame }; u._dir = o.dir; u._snap = true; u._noCape = !o.cape;
+  u.facing = 1; u.moving = false; u.mounted = m;
+  const cv = makeCanvas(o.w, o.h), c = cv.getContext('2d');
+  c.setTransform(o.s, 0, 0, o.s, o.ax, o.ay);
+  const hips = modelPoint(key, o.anim, o.dir, o.frame, 'Hips');
+  const ok = drawModel3d(c, u, unitLook(u), m, key);
+  return ok === null ? null : { cv, key, hips };
 }
 // Werkzeug in der rechten Hand, Bogen, Eimer, Korb oder Stab bei den Dorfleuten
 function drawHandGear(c, u, rh, lh, sgn, anim, dir = null) {
