@@ -12,7 +12,7 @@ import { G, log } from './state.js';
 import { SHIRES } from './shires.js';
 import { CLASSES, ITEMS } from './data.js';
 import { makeUnit, computeStats, applyRemoteHit, partyMembers, groupHostile, unitLook } from './units.js';
-import { mpOn, mpAddCommand, mpOnTick, mpSendTo, mpBroadcast, mpPeerOfSeat, mpSeatOf, mpWorldSoon, mpCommand, seatName, mpGuest } from './mp.js';
+import { mpOn, mpAddCommand, mpOnTick, mpSendTo, mpBroadcast, mpPeerOfSeat, mpSeatOf, mpWorldSoon, mpCommand, seatName, mpGuest, mpHostRole } from './mp.js';
 import { confirmDialog, dialogOpen } from './ui.js';
 
 // ---------------------------------------------------------------- Diplomatie
@@ -70,14 +70,6 @@ mpAddCommand('absage', (mp, from, a) => {
   pending.delete(`${a.to}>${me}`);
   const pid = mpPeerOfSeat(a.to);
   if (pid) mpSendTo(pid, 'absage', { from: me, st: a.st });
-  return { ok: true };
-});
-// Ein Auftrag ist vergeben: vom Brett der Stadt nehmen, für alle
-mpAddCommand('auftrag', (mp, from, a) => {
-  const town = G.s.towns && a && G.s.towns[a.site];
-  if (!town) return { ok: false };
-  town.quests = town.quests.filter((q) => q.id !== a.id);
-  mpWorldSoon(true);
   return { ok: true };
 });
 
@@ -150,30 +142,27 @@ export function pvpGift(seat, gold) {
   log(`Du schickst ${humanName(seat)} ${gold} Gold.`, 'gold');
 }
 
-// Aufträge: Wer einen annimmt, nimmt ihn für alle vom Brett (der Gastgeber führt die Bretter)
-G.onQuestTaken = (site, id) => { if (!G.mp) return; if (mpGuest()) mpCommand('auftrag', { site, id }); else mpWorldSoon(true); };
+// Aufträge: Wer einen annimmt, nimmt ihn für alle vom Brett. Der Gastgeber führt die Bretter (beim Gast: mpwelt.js)
+G.pvpWithSeat = pvpWith;   // für holdings.js (Belagern nur in der Fehde)
+G.onQuestTaken = () => { if (G.mp && !mpGuest()) mpWorldSoon(true); };
 
 // ---------------------------------------------------------------- Truppen der Mitspieler
-// Kennung einer eigenen Figur für die anderen: 'h' der Held, 'c…' Gefolge, 'g…' Banden deiner Aufträge
+// Kennung einer eigenen Figur für die anderen: 'h' der Held, 'c…' Gefolge, 'w…' (beim Gastgeber) die Gruppen der Welt
 function ridOf(u) {
   if (!u) return null;
   if (u === G.s.player) return 'h';
   if (u.kind === 'companion' && u.status === 'party') return `c${u.id}`;
-  if (u.group && u.group.questId) return `g${u.id}`;
+  if (u.group && !u.group.mirror && mpHostRole()) return `w${u.id}`;
   return null;
 }
 function localByRid(rid) {
   if (rid === 'h') return G.s.player;
   const id = Number(String(rid).slice(1));
   if (rid[0] === 'c') return G.s.companions.find((c) => c.id === id && c.status === 'party' && !c.dead) || null;
-  if (rid[0] === 'g') { for (const g of G.groups) if (g.questId) for (const m of g.members) if (m.id === id) return m; }
+  if (rid[0] === 'w' && mpHostRole()) { for (const g of G.groups) if (!g.mirror) for (const m of g.members) if (m.id === id) return m; }
   return null;
 }
-// Kind der Figur für die anderen: Gefolge, Bande (greift an) oder Ziel (wehrt sich erst, wenn man es angreift)
-function troopKind(u) {
-  if (u.group) return groupHostile(u.group) || u.group.engaged ? 'feind' : 'ziel';
-  return 'gefaehrte';
-}
+function troopKind() { return 'gefaehrte'; }
 function enc(u) {
   const fl = (u.mounted ? 1 : 0) | (u.swing > 0 ? 2 : 0) | (u.run ? 4 : 0) | (u.female ? 8 : 0);
   return [ridOf(u), troopKind(u), u.cls, +u.x.toFixed(2), +u.y.toFixed(2), Math.max(0, Math.round(u.hp)), Math.round(u.st.maxHp), fl,
@@ -195,7 +184,6 @@ mpOnTick((mp, dt) => {
   troopT = 0;
   const list = [];
   for (const c of partyMembers()) if (!c.dead && !c.hidden) list.push(enc(c));
-  for (const g of G.groups) if (g.questId) for (const m of g.members) if (!m.dead) list.push(enc(m));
   if (!list.length && sentEmpty && !hitFx.length && !shots.length && !deaths.length) return;
   sentEmpty = !list.length;
   mpBroadcast('trupp', { u: list, fx: hitFx.splice(0), sh: shots.splice(0), tot: deaths.splice(0) });
@@ -220,7 +208,8 @@ mpOn('trupp', (mp, from, d, p) => {
     }
     const eqKey = JSON.stringify(eq);
     if (u._eqKey !== eqKey) { u._eqKey = eqKey; u.eq = eq; computeStats(u); }
-    u.rk = rk === 'feind' || rk === 'ziel' ? rk : 'gefaehrte'; u.seat = p.seat; u.gid = gid | 0;
+    u.rk = 'gefaehrte'; u.seat = p.seat; u.gid = gid | 0;
+    if (p.unit) { u.feinde = p.unit.feinde; u.waldAlly = p.unit.waldAlly; }
     u.tx = num(x, u.x); u.ty = num(y, u.y);
     u.st.maxHp = Math.max(1, num(mhp, 1)); u.hp = Math.max(0, Math.min(u.st.maxHp, num(hp, 1)));
     u.mounted = !!(fl & 1); u.run = !!(fl & 4); u.female = !!(fl & 8);
@@ -231,7 +220,7 @@ mpOn('trupp', (mp, from, d, p) => {
     u.tunic = typeof tunic === 'string' ? tunic : u.rk === 'gefaehrte' ? p.color : null;
   }
   for (const [rid, u] of T) if (!seen.has(rid)) { T.delete(rid); G.remoteUnits = G.remoteUnits.filter((o) => o !== u); }
-  const byRid = (rid) => (rid === 'h' ? p.unit : T.get(rid));
+  const byRid = (rid) => (rid === 'h' ? p.unit : rid[0] === 'w' ? G.mirrorMember && G.mirrorMember(Number(rid.slice(1))) : T.get(rid));
   for (const [rid, dmg, crit] of Array.isArray(d.fx) ? d.fx.slice(0, 40) : []) {
     const u = byRid(rid);
     if (u) { u.flash = 0.18; u.combatT = 5; G.fx.push({ kind: 'text', x: u.x, y: u.y, text: crit ? `${dmg | 0}!` : String(dmg | 0), color: crit ? '#ffd84a' : '#fff4d8', t: 0, dur: 1.0 }); }
@@ -242,7 +231,7 @@ mpOn('trupp', (mp, from, d, p) => {
   }
   for (const rid of Array.isArray(d.tot) ? d.tot.slice(0, 40) : []) {
     const u = byRid(rid);
-    if (u && rid !== 'h') G.fx.push({ kind: 'corpse', x: u.x, y: u.y, look: unitLook(u), t: 0, dur: 25, typ: u.rk === 'feind' ? 'gruen' : 'rot', v: 1 + Math.floor(Math.random() * 4), flip: Math.random() < 0.5 });
+    if (u && rid !== 'h') G.fx.push({ kind: 'corpse', x: u.x, y: u.y, look: unitLook(u), t: 0, dur: 25, typ: u.cls === 'bandit' || u.look === 'bandit' || u.look === 'wald' ? 'gruen' : 'rot', v: 1 + Math.floor(Math.random() * 4), flip: Math.random() < 0.5 });
   }
 });
 // Weich zwischen den Meldungen bewegen (wie die Helden der Mitspieler, mp.js)
@@ -269,25 +258,23 @@ function smoothTroops(mp, dt) {
 }
 
 // ---------------------------------------------------------------- Kämpfe über die Rechner
-// Wer gegen wen: Banden aus Aufträgen der anderen greifen dich und dein Gefolge an; ein Ziel (etwa ein Steuerzug) erst,
-// wenn du es angegriffen hast; Helden und Gefolge der anderen nur in einer Fehde; deine Auftrags-Banden jeden Menschen
-const provoked = new Set();
-export function pvpProvoke(u) { if (u && u.team === 'remote' && u.rk === 'ziel') provoked.add(`${u.peer}:${u.gid}`); }
+// Wer gegen wen: Helden und Gefolge zweier Spieler nur in einer Fehde; die Gruppen der Welt beim Gastgeber nach
+// mpwelt.js (worldFoe: Banden jeden, Parteien ihre Feinde, Aufgebote und Burgwachen die Feinde ihres Herrn)
 G.remoteFoe = (a, b) => {
   const r = a.team === 'remote' ? a : b, l = r === a ? b : a;
   if (l.team === 'remote' || r.dead) return false;
-  const human = l.team === 'player';
-  if (r.rk === 'feind') return human;
-  if (r.rk === 'ziel') return human && provoked.has(`${r.peer}:${r.gid}`);
-  if (human) return pvpWith(r.seat) === 'fehde';
+  if (l.team === 'player') return pvpWith(r.seat) === 'fehde';
   const g = l.group;
-  return !!(g && g.questId && (g.engaged || groupHostile(g)));
+  if (!g || g.mirror) return false;
+  return !!(G.worldFoe && G.worldFoe(g, r));
 };
-// Ein Schlag auf eine fremde Figur geht an ihren Besitzer
+// Ein Schlag auf eine fremde Figur geht an ihren Besitzer (beim Gast: Gruppen der Welt an den Gastgeber)
 G.onRemoteHit = (a, t, ranged, ox, oy, charge) => {
-  if (!G.mp || !t.peer) return;
+  if (!G.mp) return;
+  const peer = t.peer || (t.group && t.group.mirror ? G.mp.hostId : null), rid = t.rid || `w${t.id}`;
+  if (!peer) return;
   const ak = a === G.s.player ? 'held' : a.kind === 'companion' ? 'gefaehrte' : 'bande';
-  mpSendTo(t.peer, 'treffer', { rid: t.rid, atk: Math.round(a.st.atk * 10) / 10, hatk: a.mounted && a.st.horse ? a.st.horse.atk : 0, x: +ox.toFixed(2), y: +oy.toFixed(2), r: ranged ? 1 : 0, c: charge ? 1 : 0, ak, by: G.s.player.name });
+  mpSendTo(peer, 'treffer', { rid, aid: ridOf(a) || 'h', atk: Math.round(a.st.atk * 10) / 10, hatk: a.mounted && a.st.horse ? a.st.horse.atk : 0, x: +ox.toFixed(2), y: +oy.toFixed(2), r: ranged ? 1 : 0, c: charge ? 1 : 0, ak, by: G.s.player.name });
 };
 mpOn('treffer', (mp, from, d) => {
   if (!d || typeof d.rid !== 'string' || !G.s) return;
@@ -296,7 +283,7 @@ mpOn('treffer', (mp, from, d) => {
   // Held und Gefolge treffen nur Feinde in einer Fehde (alte Meldungen nach einem Friedensschluss zählen nicht)
   const seat = mpSeatOf(from);
   if (d.ak !== 'bande' && !t.group && pvpWith(seat) !== 'fehde') return;
-  applyRemoteHit(t, d);
+  applyRemoteHit(t, { ...d, peer: from, seat });
   if (t === G.s.player && t.dead) log(`${String(d.by || humanName(seat)).slice(0, 24)} hat dich niedergeschlagen.`, 'bad');
 });
 

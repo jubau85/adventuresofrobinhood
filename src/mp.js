@@ -12,7 +12,8 @@ import { G, log } from './state.js';
 import { openTransport, netId } from './net.js';
 import { makeUnit, computeStats } from './units.js';
 import { applyBarons } from './barons.js';
-import { SETTLEMENTS, FACTIONS, HERALDRY } from './data.js';
+import { SETTLEMENTS, FACTIONS, FACTION_IDS, HERALDRY } from './data.js';
+import { isHostileFaction, isAlly } from './politics.js';
 import { SHIRES, claimShire } from './shires.js';
 import { heldSites, holdingOf, dropHolding } from './holdings.js';
 import { applyDamage } from './siege.js';
@@ -139,7 +140,9 @@ function heroState() {
   const p = G.s.player;
   return { x: +p.x.toFixed(2), y: +p.y.toFixed(2), m: !!p.mounted, run: !!p.run, sw: p.swing > 0 ? 1 : 0, dead: !!p.dead,
     eq: { waffe: p.eq.waffe, ruestung: p.eq.ruestung, schild: p.eq.schild, pferd: p.eq.pferd }, fem: !!p.female, col: G.s.color, name: p.name,
-    hp: Math.round(p.hp), mhp: Math.round(p.st.maxHp), lv: p.level };
+    hp: Math.round(p.hp), mhp: Math.round(p.st.maxHp), lv: p.level,
+    // Wem du feind bist (für die Gruppen beim Gastgeber, mpwelt.js)
+    fe: FACTION_IDS.filter((f) => isHostileFaction(f)), wa: isAlly('waldleute') ? 1 : 0 };
 }
 
 function sendWorld(mp, force, to = null) {
@@ -401,6 +404,7 @@ function migrate(mp) {
     mp.tr.broadcast('gastgeber', {});
     mp.tr.broadcast('sitze', { seats: mp.seats });
     log('Der Gastgeber ist fort. Du führst die Partie jetzt weiter.', 'gold');
+    if (G.onBecomeHost) G.onBecomeHost();
   } else mp.hostId = alive[0];
 }
 
@@ -428,6 +432,7 @@ function moveHeroes(dt) {
     const eqKey = JSON.stringify(h.eq || {});
     if (u._eqKey !== eqKey || u.level !== (h.lv || 1)) { u._eqKey = eqKey; u.eq = { ...u.eq, ...h.eq }; u.level = h.lv || 1; computeStats(u); }
     u.name = h.name || p.name; u.tunic = h.col || p.color; u.female = !!h.fem; u.mounted = !!h.m; u.run = !!h.run; u.dead = !!h.dead;
+    u.feinde = Array.isArray(h.fe) ? h.fe.filter((f) => FACTIONS[f]) : []; u.waldAlly = !!h.wa;
     if (h.mhp) { u.st.maxHp = h.mhp; u.hp = Math.max(0, Math.min(h.mhp, h.hp ?? h.mhp)); }
     if (h.sw && !(u.swing > 0)) u.swing = 0.3;
     if (u.swing > 0) u.swing -= dt;

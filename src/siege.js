@@ -7,15 +7,16 @@ import { GROUP_TYPES, FACTIONS, GOODS, T, dirText, MAP_K } from './data.js';
 import { rand, pick, randInt } from './rng.js';
 import { changeRep, addRenown, isHostileFaction } from './politics.js';
 import { cargoFree, addCargo } from './economy.js';
-import { spawnGroup, rebuildUnits, inCombat, makeNpc, partyMembers } from './units.js';
+import { spawnGroup, rebuildUnits, inCombat, makeNpc, partyMembers, humanDist } from './units.js';
 import { isWalkable, landAt, findPath, wallRing, palisadeBand, nearestWalkable } from './world.js';
-import { villageHouses, castleDefense, bSum, burnOuterPlots, castleSite } from './castle.js';
+import { villageHouses, castleDefense, bSum, burnOuterPlots, castleSite, peerCastle } from './castle.js';
 import { ringR } from './plots.js';
 import { baronConquered, baron } from './barons.js';
 import { sfxAt } from './audio.js';
 import { isHeld, isOwnSite, holdingOf, conquer, holdingSiegeOver, holdingHolds } from './holdings.js';
 import { seatSiegeOver } from './war.js';
 import { SHIRES, claimShire } from './shires.js';
+import { humanOwnerColor, humanOwnerSeat } from './mpwelt.js';
 
 // Welches Heer zieht gegen welche Fraktion, je nach Landesteil
 const ATTACKER = {
@@ -381,15 +382,22 @@ function rawPosts(sg, members) {
 function raiseDefenders(sg) {
   const s = sg.site, home = isHome(s), held = isHeld(s), own = home || held;
   // Deine Besatzung in eroberten Burgen: Söldner in Kettenhemd und Armbrustschützen, in deinen Farben
-  const types = home ? ['wache'] : held ? ['soldat', 'armbrust'] : DEFENDER_NPC[s.faction] || ['wache'];
+  let types = home ? ['wache'] : held ? ['soldat', 'armbrust'] : DEFENDER_NPC[s.faction] || ['wache'];
+  // Mehrspieler (beim Gastgeber): die Heimburg eines Gastes mit Wachen nach ihrem Ausbau
+  const pc = !own && peerCastle(s);
   const n = home ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + bSum('wehr') * 2
     : held ? Math.max(3, Math.min(30, holdingOf(s).garrison))
-      : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
+      : pc ? 6 + (pc.lv | 0) * 3
+        : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
   const muster = musterPoints(sg);
   const members = [];
+  // Mehrspieler: die Burg eines anderen Menschen verteidigen Männer in seiner Farbe, Freund und Feind nach seiner Diplomatie
+  const humanCol = !own && G.mp ? humanOwnerColor(s) : null, hSeat = !own && G.mp ? humanOwnerSeat(s) : null;
+  if (pc) types = ['wache'];
   for (let k = 0; k < n; k++) {
     const at = muster[k % muster.length];
     const m = makeNpc(k % 3 === 2 ? types[1] || types[0] : types[0], at.x + rand(-0.3, 0.3), at.y + rand(-0.3, 0.3), Math.floor(G.s.day / 8));
+    if (humanCol) { m.tunic = humanCol; m.livery = humanCol; }
     if (own) m.lookObj = null;
     if (held) { m.tunic = playerColor(); m.livery = playerColor(); }
     members.push(m);
@@ -398,7 +406,8 @@ function raiseDefenders(sg) {
   members.forEach((m, k) => { m.post = posts[k]; });
   const g = spawnGroup('verteidiger', { pos: posts[0] || muster[0], membersUnits: members });
   if (!g) return null;
-  g.faction = own ? null : s.faction; g.defender = s.id; g.wait = 99999; g.path = null; g.homeGuard = own;
+  g.faction = own || hSeat ? null : s.faction; g.defender = s.id; g.wait = 99999; g.path = null; g.homeGuard = own;
+  if (hSeat) g.ownerSeat = hSeat;
   if (sg.side === 'att') g.engaged = true;
   rebuildUnits();
   return g;
@@ -451,11 +460,12 @@ export function posternRoute(tx, ty) {
 // ---------------------------------------------------------------- Ablauf
 export function updateSiege(dt) {
   const sg = G.siege;
-  if (!sg) return;
+  if (!sg || sg.mirror) return;   // Gast: Die Belagerung rechnet der Gastgeber (mpwelt.js)
   const p = G.s.player, s = sg.site, army = sg.army;
   sg.t += dt;
   const alive = (g) => g && g.members.length && G.groups.includes(g);
-  const far = Math.hypot(s.x - p.x, s.y - p.y) > 95;
+  // Fern von allen Menschen (im Mehrspieler auch von den Helden der Mitspieler): nur ausgewürfelt
+  const far = humanDist(s.x, s.y) > 95;
   // Flugbahnen der Steine
   for (const sh of sg.shots) sh.t += dt;
   for (const sh of sg.shots) {
@@ -469,7 +479,8 @@ export function updateSiege(dt) {
   sg.shots = sg.shots.filter((sh) => sh.t < sh.dur + 0.1);
 
   if (!alive(army)) return endSiege(sg, 'abgewehrt');
-  if (far) return resolveAbstract(sg);
+  // (Führt ein Gast, wartet der Gastgeber kurz auf seine nächste Meldung, wo er steht)
+  if (far && !(sg.leadSeat && sg.t < 5)) return resolveAbstract(sg);
   if (sg.stage === 'anmarsch') {
     if (Math.hypot(army.x - sg.camp.x, army.y - sg.camp.y) < 3 || (!army.path && sg.t > 30)) {
       sg.stage = 'belagerung'; sg.t = 0;
@@ -565,7 +576,11 @@ function endSiege(sg, how, quiet = false) {
   const s = sg.site, p = G.s.player, name = isHome(s) ? homeName() : s.name;
   const near = !quiet && Math.hypot(s.x - p.x, s.y - p.y) < 80;
   const mine = isHeld(s);
-  if (sg.lead) {
+  if (G.onSiegeEnd) G.onSiegeEnd(sg, how);
+  // Mehrspieler: Ein Mensch hat die Belagerung angeführt, gegen die Burg eines anderen oder als Gast (mpwelt.js)
+  if ((sg.lead || sg.leadSeat || s.mpHome === 'peer') && G.pvpSiegeEnd && G.pvpSiegeEnd(sg, how)) {
+    if (how === 'gefallen') for (const b of siteBuildings(s.id)) if (Math.random() < 0.3) damageBuilding(b, rand(0.15, 0.35));
+  } else if (sg.lead) {
     // Deine eigene Belagerung: Fällt die Burg, gehört sie dir
     if (how === 'gefallen') { for (const b of siteBuildings(s.id)) if (Math.random() < 0.3) damageBuilding(b, rand(0.15, 0.35)); if (s.baron) baronConquered(s.baron); else conquer(sg); }
     else if (how === 'abgewehrt') log(`Dein Sturm auf ${name} ist gescheitert. Die Überlebenden deines Aufgebots zerstreuen sich.`, 'bad');
@@ -593,7 +608,7 @@ function endSiege(sg, how, quiet = false) {
   } else if (near) log(`Die Belagerer ziehen von ${name} ab.`);
   if (!sg.lead && !mine) sideOutcome(sg, how, quiet);
   // Im Krieg: Fällt eine Grafschaftsburg, wechselt sie den Herrn
-  if (!sg.lead && !mine && !isHome(s)) seatSiegeOver(s, sg.army, how);
+  if (!sg.lead && !sg.leadSeat && !mine && !isHome(s) && !s.mpHome) seatSiegeOver(s, sg.army, how);
   // Tore wieder auf (die Bresche bleibt, bis sie vermauert ist). Heer zieht heim, Besatzung kehrt in die Häuser zurück.
   openGates(sg);
   const army = sg.army;
@@ -635,6 +650,10 @@ export function sideBlock(side) {
   const fa = sg.army.faction, fs = s.faction;
   if (sg.side === side) return 'Auf dieser Seite stehst du schon.';
   if (sg.side) return `Du hast dich schon ${sg.side === 'def' ? 'den Verteidigern' : 'den Belagerern'} angeschlossen.`;
+  // Mehrspieler: nicht an die Seite eines Mitspielers, mit dem du in Fehde liegst
+  const feud = (seat) => !!seat && !!G.pvpWithSeat && G.pvpWithSeat(seat) === 'fehde';
+  if (side === 'att' && feud(sg.leadSeat)) return 'Mit dem Anführer dieses Aufgebots liegst du in Fehde.';
+  if (side === 'def' && feud(humanOwnerSeat(s))) return 'Mit dem Herrn dieser Burg liegst du in Fehde.';
   if (side === 'att') {
     if (sg.army.provoked || sg.army.engaged) return 'Du hast das Heer schon angegriffen. Im Lager will dich niemand sehen.';
     if (isHostileFaction(fa)) return `Der Hauptmann lässt dich nicht ins Lager. Die ${FACTIONS[fa].name} sind dir feindlich gesinnt.`;
@@ -660,6 +679,7 @@ export function joinSiege(side) {
   if (why) { log(why, 'bad'); return false; }
   const sg = G.siege, s = sg.site, army = sg.army;
   sg.side = side;
+  if (sg.mirror && G.onSiegeSide) G.onSiegeSide(side);
   if (side === 'def') {
     army.provoked = true;
     changeRep(army.faction, -5);
@@ -672,6 +692,9 @@ export function joinSiege(side) {
   }
   return true;
 }
+
+// Testmodus: die laufende Belagerung sofort beenden ('gefallen', 'abgewehrt', 'abgezogen')
+export function endSiegeNow(how) { const sg = G.siege; if (!sg || sg.mirror) return false; endSiege(sg, how); return true; }
 
 // Deine eigene Belagerung abbrechen: Die Söldner ziehen ab
 export function abortOwnSiege() {
@@ -686,6 +709,7 @@ export function callStorm() {
   if (!canCallStorm()) return false;
   const sg = G.siege;
   sg.storm = true;
+  if (sg.mirror) { if (G.onSiegeStorm) G.onSiegeStorm(); log(`Auf dein Zeichen bläst das Heer vor ${sg.site.name} zum Sturm!`, 'bad'); return true; }
   if (sg.walls && !sg.walls.st.open) { sg.shotT = Math.min(sg.shotT, 1); log(`Auf dein Zeichen wirft das Trebuchet ohne Pause gegen die Mauer von ${sg.site.name}. Sobald die Bresche offen ist, stürmen alle.`, 'bad'); }
   else log(`Die Hörner blasen zum Sturm auf ${sg.site.name}!`, 'bad');
   return true;
@@ -704,10 +728,11 @@ function keepSides(sg) {
 }
 
 // Dank, Beute und Folgen für deine Seite
-function sideOutcome(sg, how, quiet) {
+export function sideOutcome(sg, how, quiet) {
   const side = sg.side, s = sg.site;
-  if (!side || isHome(s)) return;
-  const fs = FACTIONS[s.faction].short, fa = FACTIONS[sg.army.faction].short;
+  // Die eigene Burg (auch im Mehrspieler die, die man verteidigt): kein Dank und keine Beute der Stadt
+  if (!side || isHome(s) || isOwnSite(s)) return;
+  const fs = (FACTIONS[s.faction] || { short: 'Bürger' }).short, fa = (FACTIONS[sg.army && sg.army.faction] || { short: 'Angreifer' }).short;
   if (quiet) {
     log(`Nachricht aus ${s.name}: ${how === 'gefallen' ? 'Die Stadt ist gefallen.' : 'Die Belagerung ist vorbei.'} Du warst nicht mehr dabei.`);
     return;

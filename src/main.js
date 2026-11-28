@@ -10,7 +10,7 @@ import { generateWorld, groundZ, worldSig } from './world.js';
 import { spawnAnimals, updateAnimals, animalTitle, ANIMAL_INFO, refreshCastleHerd } from './animals.js';
 import {
   makeUnit, rebuildUnits, spawnPeasants, maintainGroups, updateUnits, updateGroups, updateProjectiles,
-  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus, spawnGroup, isEnemy,
+  setPlayerPath, provokeGroup, inCombat, placeNear, groupHostile, partyMembers, startBattle, battleStatus, spawnGroup, isEnemy, engageGroup,
 } from './units.js';
 import { initTowns } from './economy.js';
 import { refreshTownQuests, isHostileFaction, addRenown } from './politics.js';
@@ -20,6 +20,7 @@ import { callStorm } from './siege.js';
 import { startTrip, planTrip, updateTrips } from './travels.js';
 import { initWar, dailyWar, swearTo, takeSeat, war } from './war.js';
 import { initBarons, applyBarons, dailyBarons, DIFFICULTY, barons, declareFeud, changeBaronRel, baronConquered } from './barons.js';
+import { endSiegeNow } from './siege.js';
 import { applyDamage, startSiege, siegeStatus, nearSiegeCamp, isSiegeGroup, posternNear, usePostern, posternRoute, setHomeGate, homeGateClosed, hasHomeGate, homeSite } from './siege.js';
 import { initDynamics, applyCons, updateDynamics, raidVictim, startRaid } from './dynamics.js';
 import { updateTourney, joustPress, tourneyStatus, dailyTourney, joinTourney, findLists, tourneyRects } from './tournament.js';
@@ -32,7 +33,8 @@ import {
 } from './ui.js';
 import { serialize, deserialize, saveGame, readSave, saveSummary } from './save.js';
 import { mpLeave, mpUpdate, mpGuest, mpChat, mpNoteStock, mpHookGuest, mpLobbyBegin, mpLobbyUpdate, shiresIn } from './mp.js';
-import { pvpProvoke } from './pvp.js';
+import './pvp.js';
+import './mpwelt.js';
 import { initLobby } from './lobby.js';
 import { introWanted, startIntro } from './intro.js';
 import { nearestWalkable } from './world.js';
@@ -141,7 +143,7 @@ function startGuest(d, who) {
   G.s.companions.push(squire);
   G.groups = []; G.units = []; G.projectiles = []; G.fx = []; G.messages = []; G.extras = []; G.tour = null; G.exec = null;
   spawnPeasants();
-  maintainGroups(true);
+  // Die Gruppen der Welt (Banden, Heere, Händler) rechnet der Gastgeber und schickt sie (mpwelt.js)
   rebuildUnits();
   spawnAnimals();
   for (const s of G.world.sites) refreshTownQuests(s);
@@ -504,7 +506,7 @@ function attackNearest() {
     if (d < bd) { bd = d; best = u; }
   }
   if (best) {
-    best.group.engaged = true;
+    engageGroup(best.group, 'ich');
     p.attackTarget = best;
     p.path = null;
   }
@@ -515,7 +517,6 @@ function clickUnit(u) {
   const g = u.group;
   // Figuren der Mitspieler: angreifen, wenn sie Feinde sind (Bande, Ziel, Fehde), sonst zur Diplomatie
   if (u.team === 'remote') {
-    if (u.rk === 'ziel') pvpProvoke(u);
     if (isEnemy(p, u)) { p.attackTarget = u; p.path = null; return true; }
     openPanel('map', null, 'mitspieler');
     return true;
@@ -543,7 +544,7 @@ function clickUnit(u) {
     return true;
   }
   if (g.engaged || groupHostile(g)) {
-    g.engaged = true;
+    engageGroup(g, 'ich');
     p.attackTarget = u;
     p.path = null;
     return true;
@@ -1053,4 +1054,4 @@ window.__ritter = G;
 window.__ritterCastle = castleSite;
 window.__ritterPath = (x, y) => setPlayerPath(x, y);
 window.__ritterWalls = () => refreshCastleBlock();
-window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, castlePlots, castleSite, startBuild, startTypeChange, castleOut, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };
+window.__ritterDebug = { birdsNow, castleObstacles, castleLayout, castlePlots, castleSite, startBuild, startTypeChange, castleOut, refreshCastleBlock, fieldSpots, tileToScreen, buildingAtScreen, passHours, refreshCastleHerd, dailyBalance, dailyCastle, audioDebug, startBattle, startSiege, endSiegeNow, startRaid, dailyTourney, joinTourney, findLists, tourneyRects, giveAlms, rescueCondemned, gallowsFor, openPanel, spawnGroup, startOwnSiege, callStorm, grantHolding, holdingOf, dailyHoldings, loseHolding, dailyBarons, barons, declareFeud, changeBaronRel, applyBarons, baronConquered, startTrip, planTrip, updateTrips, makeUnit, initWar, dailyWar, swearTo, takeSeat, war, step: (dt) => { G.time += dt; step(dt); } };

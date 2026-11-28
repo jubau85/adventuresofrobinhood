@@ -117,25 +117,21 @@ export function refreshTownQuests(site) {
 
 export function activeQuests() { return G.s.quests; }
 
+// Aufträge mit einer Gruppe: Art, Umkreis um den Ort, Mindestabstand
+const QUEST_GROUP = { banditen: ['banditen', 22, 10], jagd: ['waldleute', 24, 10], ueberfall: ['steuer', 28, 12] };
 export function acceptQuest(siteId, qid) {
   const town = G.s.towns[siteId];
   const q = town.quests.find((x) => x.id === qid);
   if (!q) return;
   if (G.s.quests.length >= 6) { log('Du hast schon zu viele Aufträge angenommen.', 'bad'); return; }
   town.quests = town.quests.filter((x) => x !== q);
-  // Mehrspieler: für alle vom Brett nehmen (pvp.js)
-  if (G.onQuestTaken) G.onQuestTaken(siteId, q.id);
   q.state = 'aktiv';
   q.deadline = G.s.day + q.days;
-  const site = siteById(siteId);
-  if (q.type === 'banditen') {
-    const g = spawnGroup('banditen', { near: { x: site.x, y: site.y, r: 22, rMin: 10 }, questId: q.id });
-    if (g) { q.groupId = g.id; q.tx = g.x; q.ty = g.y; }
-  } else if (q.type === 'jagd') {
-    const g = spawnGroup('waldleute', { near: { x: site.x, y: site.y, r: 24, rMin: 10 }, questId: q.id });
-    if (g) { q.groupId = g.id; q.tx = g.x; q.ty = g.y; }
-  } else if (q.type === 'ueberfall') {
-    const g = spawnGroup('steuer', { near: { x: site.x, y: site.y, r: 28, rMin: 12 }, questId: q.id });
+  const site = siteById(siteId), spec = QUEST_GROUP[q.type] || null;
+  // Mehrspieler-Gast: Der Gastgeber nimmt den Auftrag für alle vom Brett und stellt die Bande auf (mpwelt.js)
+  if (!(G.mpQuestGroup && G.mpQuestGroup(q, siteId, spec))) {
+    if (G.onQuestTaken) G.onQuestTaken(siteId, q.id);
+    const g = spec && spawnGroup(spec[0], { near: { x: site.x, y: site.y, r: spec[1], rMin: spec[2] }, questId: q.id });
     if (g) { q.groupId = g.id; q.tx = g.x; q.ty = g.y; }
   }
   G.s.quests.push(q);
@@ -182,6 +178,7 @@ export function abandonQuest(q) {
   if (q.groupId) {
     const g = G.groups.find((x) => x.id === q.groupId);
     if (g) g.questId = null;
+    if (G.onQuestDropped) G.onQuestDropped(q);
   }
   changeRep(q.faction, -2);
   log(`Auftrag aufgegeben: ${q.title}.`);
@@ -200,7 +197,7 @@ export function dailyQuests() {
   for (const q of [...G.s.quests]) {
     if (q.state === 'aktiv' && G.s.day > q.deadline) {
       G.s.quests = G.s.quests.filter((x) => x !== q);
-      if (q.groupId) { const g = G.groups.find((x) => x.id === q.groupId); if (g) g.questId = null; }
+      if (q.groupId) { const g = G.groups.find((x) => x.id === q.groupId); if (g) g.questId = null; if (G.onQuestDropped) G.onQuestDropped(q); }
       log(`Frist verstrichen: ${q.title}.`, 'bad');
       changeRep(q.faction, -4);
     }

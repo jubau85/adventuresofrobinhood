@@ -321,7 +321,8 @@ export function isEnemy(a, b) {
   if (a.team === 'player') return !!(b.group && b.group.engaged) || raidVictim(b);
   const ga = a.group;
   if (!ga) return false;
-  if (ga.engaged && b.team === 'player') return true;
+  // Mehrspieler: Eine Gruppe, die nur mit Mitspielern kämpft (foes), lässt dich in Ruhe
+  if (ga.engaged && b.team === 'player') return !ga.foes || ga.foes.has('ich');
   const gb = b.group;
   return !!(gb && gb !== ga && (ga.feud === gb || gb.feud === ga));
 }
@@ -398,8 +399,9 @@ export function attack(u, t) {
 
 function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
   if (t.dead) return;
-  // Eine Figur eines Mitspielers: Den Schaden rechnet ihr Besitzer mit den echten Werten (pvp.js), hier nur der Schlag
-  if (t.team === 'remote') {
+  // Eine Figur eines Mitspielers oder (beim Gast) eine Gruppe, die der Gastgeber rechnet: Den Schaden rechnet ihr
+  // Besitzer mit den echten Werten (pvp.js, mpwelt.js), hier nur der Schlag
+  if (t.team === 'remote' || (t.group && t.group.mirror)) {
     t.flash = 0.18; t.combatT = 5;
     sfxAt(ranged ? 'pfeil' : 'treffer', t.x, t.y, 0.8);
     if (G.onRemoteHit) G.onRemoteHit(a, t, ranged, ox, oy, charge);
@@ -417,6 +419,7 @@ function applyHit(a, t, ranged = false, ox = a.x, oy = a.y, charge = false) {
     if (a.team === 'player' || t.team === 'player') G.fx.push({ kind: 'text', x: t.x, y: t.y, text: 'Schild', color: '#c8d0d8', t: 0, dur: 0.8 });
     return;
   }
+  if (a.team === 'player' && t.group) engageGroup(t.group, 'ich');
   const { dmg, crit } = calcDamage(a, t, face, charge);
   // Für die Schlachtführung: Wann hat es zuletzt Treffer gegeben?
   if (t.group && t.group.tac) t.group.tac.lastHit = G.time;
@@ -473,10 +476,19 @@ export function updateProjectiles(dt) {
 // Figur gerechnet; eine Bande aus deinem Auftrag wehrt sich dann.
 export function applyRemoteHit(t, info) {
   if (!t || t.dead) return;
-  const a = { st: { atk: Math.max(1, +info.atk || 1), horse: info.hatk ? { atk: +info.hatk } : null }, mounted: !!info.hatk, team: 'remote', x: +info.x, y: +info.y };
-  if (t.group) { t.group.engaged = true; t.group.byRemote = true; }
+  const a = { st: { atk: Math.max(1, +info.atk || 1), horse: info.hatk ? { atk: +info.hatk } : null }, mounted: !!info.hatk, team: 'remote', x: +info.x, y: +info.y, peer: info.peer || null, seat: info.seat || null, aid: info.aid || null };
+  if (t.group) { engageGroup(t.group, info.seat || '?'); t.group.byRemote = true; }
   t.lastRemote = info.by || null;
   applyHit(a, t, !!info.r, a.x, a.y, !!info.c);
+}
+
+// Eine Gruppe greift an. Im Mehrspieler merkt sie sich, gegen wen (foes: 'ich' der Gastgeber, sonst Plätze der Gäste);
+// so lässt eine Bande, die mit einem Gast kämpft, die anderen in Ruhe
+export function engageGroup(g, who) {
+  // Beim Gast eine Gruppe des Gastgebers: kurz hier schon im Kampf, dort greift sie an (mpwelt.js)
+  if (g.mirror) { g.engaged = true; g.localEngage = G.time + 3; if (G.onMirrorEngage) G.onMirrorEngage(g); return; }
+  if (!g.engaged) { g.engaged = true; g.foes = G.mp ? new Set([who]) : null; }
+  else if (g.foes) g.foes.add(who);
 }
 
 // Mehrspieler: Abstand der nächsten Menschen (du, die Helden und Gefährten der Mitspieler) zu einem Punkt
@@ -526,8 +538,10 @@ function unitDown(t, killer) {
   if (g && g.tac && killer && killer.group) { const ks = G.killStats || (G.killStats = {}); const k = `${killer.group.type}:${killer.role || '?'}>${t.role || '?'}`; ks[k] = (ks[k] || 0) + 1; }
   countDead(t);
   if (t.kind === 'peasant') { villagerKilled(t); return; }
+  // Mehrspieler: Ein Mitspieler hat getroffen, er bekommt die Erfahrung (mpwelt.js)
+  if (killer && killer.team === 'remote') { if (G.onRemoteKill) G.onRemoteKill(killer, t); }
   // Erfahrung nur für Kämpfe, an denen du beteiligt bist
-  if ((killer && killer.team === 'player') || (g && g.engaged)) {
+  else if ((killer && killer.team === 'player') || (g && g.engaged)) {
     const xp = 6 + t.level * 6;
     grantXp(killer, xp);
     for (const c of partyMembers()) if (c !== killer) grantXp(c, Math.round(xp / 3));
@@ -537,6 +551,7 @@ function unitDown(t, killer) {
     g.members = g.members.filter((m) => m !== t);
     g.fallen.push(t);
     if (g.members.length === 0) {
+      g.lastKiller = killer || null;
       if (g.engaged) groupDestroyed(g);
       else feudLost(g);
     }
@@ -544,12 +559,23 @@ function unitDown(t, killer) {
 }
 
 function groupDestroyed(g) {
-  const gt = GROUP_TYPES[g.type];
+  const items = g.fallen.flatMap((m) => Object.values(m.eq).filter(Boolean)).filter((id) => id !== 'knueppel');
+  // Mehrspieler: Den letzten Schlag hat ein Mitspieler geführt, Beute und Ehre gehen an ihn (mpwelt.js)
+  if (g.lastKiller && g.lastKiller.team === 'remote' && G.onRemoteVictory) G.onRemoteVictory(g, items);
+  else victorySpoils(g.type, items, g.baron, !!g.questId);
+  onQuestGroupDestroyed(g);
+  if (G.onQuestDone && g.questOwner) G.onQuestDone(g);
+  const i = G.groups.indexOf(g);
+  if (i >= 0) G.groups.splice(i, 1);
+}
+// Beute, Ansehen und Ruhm für einen Sieg über eine Gruppe (auch beim Gast, wenn der Gastgeber die Gruppe gerechnet hat)
+export function victorySpoils(type, items, baronId = null, quest = false) {
+  const gt = GROUP_TYPES[type];
+  if (!gt) return;
   const gold = randInt(gt.gold[0], gt.gold[1]);
   G.s.gold += gold;
   const loot = [`${gold} Gold`];
   if (Math.random() < (gt.itemChance || 0)) {
-    const items = g.fallen.flatMap((m) => Object.values(m.eq).filter(Boolean)).filter((id) => id !== 'knueppel');
     if (items.length) {
       const it = pick(items);
       G.s.inventory.push(it);
@@ -561,13 +587,10 @@ function groupDestroyed(g) {
     const n = Math.min(randInt(4, 10), cargoFree());
     if (n > 0) { addCargo(good, n); loot.push(`${n} ${GOODS[good].name}`); }
   }
-  log(`Sieg über ${g.questId ? 'die gesuchte Bande' : gt.acc}! Beute: ${loot.join(', ')}.`, 'good');
+  log(`Sieg über ${quest ? 'die gesuchte Bande' : gt.acc}! Beute: ${loot.join(', ')}.`, 'good');
   if (gt.kill) for (const [f, v] of Object.entries(gt.kill)) changeRep(f, v);
-  if (g.baron) changeBaronRel(g.baron, gt.army ? -12 : -30, gt.army ? 'Du hast sein Heer geschlagen' : 'Du hast seinen Handelszug überfallen');
+  if (baronId) changeBaronRel(baronId, gt.army ? -12 : -30, gt.army ? 'Du hast sein Heer geschlagen' : 'Du hast seinen Handelszug überfallen');
   if (gt.renown) addRenown(gt.renown);
-  onQuestGroupDestroyed(g);
-  const i = G.groups.indexOf(g);
-  if (i >= 0) G.groups.splice(i, 1);
 }
 
 function playerDefeated() {
@@ -591,7 +614,8 @@ function playerDefeated() {
 export function provokeGroup(g) {
   const gt = GROUP_TYPES[g.type];
   g.provoked = true;
-  g.engaged = true;
+  engageGroup(g, 'ich');
+  if (g.mirror && G.onMirrorProvoke) G.onMirrorProvoke(g);
   if (g.faction) changeRep(g.faction, -5);
   log(`Du greifst ${gt.acc} an!`, 'bad');
 }
@@ -645,9 +669,11 @@ export function updateUnits(dt) {
   }
   const party = partyMembers();
   party.forEach((c, k) => { if (!c.dead) updateCompanion(c, k, dt); });
+  const others = !!(G.remoteUnits && G.remoteUnits.length);
   for (const g of G.groups) {
-    // Banden aus Aufträgen kämpfen auch mit den Mitspielern (pvp.js spiegelt sie zu ihnen)
-    const near = Math.hypot(g.x - p.x, g.y - p.y) < 55 || (g.questId && G.remoteUnits && G.remoteUnits.length && humanDist(g.x, g.y) < 55);
+    // Gespiegelte Gruppen (beim Gast) bewegt der Gastgeber (mpwelt.js); im Mehrspieler zählen alle Menschen in der Nähe
+    if (g.mirror) continue;
+    const near = Math.hypot(g.x - p.x, g.y - p.y) < 55 || (others && humanDist(g.x, g.y) < 55);
     for (let k = 0; k < g.members.length; k++) {
       const m = g.members[k];
       if (near || g.engaged || g.feud) updateGroupMember(m, g, k, dt);
@@ -841,9 +867,9 @@ function randomTile(pred, tries = 400) {
   return null;
 }
 
+// Neue Gruppen erscheinen nicht vor deinen Augen (im Mehrspieler vor niemandes Augen)
 function farFromPlayer(x, y, d) {
-  const p = G.s.player;
-  return Math.hypot(p.x - x, p.y - y) > d;
+  return humanDist(x, y) > d;
 }
 
 function farFromSites(x, y, d) {
@@ -1000,8 +1026,9 @@ export function updateGroups(dt) {
   G.pathBudget = 2;
   G.feudT = (G.feudT || 0) - dt;
   if (G.feudT <= 0) { G.feudT = 0.5; checkFeuds(); }
+  const others = !!(G.remoteUnits && G.remoteUnits.length);
   for (const g of G.groups) {
-    if (!g.members.length) continue;
+    if (!g.members.length || g.mirror) continue;
     // Geschwindigkeit des Ankers (aus dem letzten Bild): ihr folgen die Mitglieder gleichmäßig
     if (g._lx !== undefined && dt > 0) {
       g.vx = (g.x - g._lx) / dt; g.vy = (g.y - g._ly) / dt;
@@ -1026,10 +1053,9 @@ export function updateGroups(dt) {
     }
     if (g.engaged) {
       let minD = Infinity;
-      const mp = g.questId && G.remoteUnits && G.remoteUnits.length;
-      for (const m of g.members) minD = Math.min(minD, mp ? humanDist(m.x, m.y) : Math.hypot(m.x - p.x, m.y - p.y));
-      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || (p.dead && !mp)) {
-        g.engaged = false;
+      for (const m of g.members) minD = Math.min(minD, others ? humanDist(m.x, m.y) : Math.hypot(m.x - p.x, m.y - p.y));
+      if (minD > (g.defender || g.siege ? 60 : g.army ? 40 : 17) || (p.dead && !others)) {
+        g.engaged = false; g.foes = null;
         g.path = null; g.wait = g.defender ? 99999 : 2;
         g.x = lead.x; g.y = lead.y;
         log(`${gt.nom} ${gt.pl ? 'lassen' : 'lässt'} von dir ab.`);
@@ -1037,10 +1063,12 @@ export function updateGroups(dt) {
       continue;
     }
     const hostile = groupHostile(g);
+    // Mehrspieler: Menschen der Mitspieler, denen die Gruppe feind ist (Banden, feindliche Partei, Seite einer Belagerung)
+    if (others && G.worldAggro) { const who = G.worldAggro(g, lead); if (who) { engageGroup(g, who); continue; } }
     if (hostile && !(G.s.safeTime > 0)) {
-      const dP = g.questId && G.remoteUnits && G.remoteUnits.length ? humanDist(lead.x, lead.y) : Math.hypot(p.x - lead.x, p.y - lead.y);
+      const dP = Math.hypot(p.x - lead.x, p.y - lead.y);
       if (dP < g.aggro) {
-        g.engaged = true;
+        engageGroup(g, 'ich');
         log(`${gt.nom} ${gt.pl ? 'greifen' : 'greift'} an!`, 'bad');
         continue;
       }
@@ -1157,10 +1185,10 @@ function checkFeuds() {
   const p = G.s.player;
   for (let i = 0; i < gs.length; i++) {
     const a = gs[i];
-    if (!a.members.length || a.feud || a.engaged || (a.peace || 0) > G.time) continue;
+    if (!a.members.length || a.mirror || a.feud || a.engaged || (a.peace || 0) > G.time) continue;
     for (let j = i + 1; j < gs.length; j++) {
       const b = gs[j];
-      if (!b.members.length || b.feud || b.engaged || (b.peace || 0) > G.time) continue;
+      if (!b.members.length || b.mirror || b.feud || b.engaged || (b.peace || 0) > G.time) continue;
       // Verfeindete sehen sich von weitem: Heere stellen sich schon auf Bogenschussweite mal drei auf
       const both = a.army && b.army, range = both ? DEPLOY_DIST : a.army || b.army ? 12 : 9;
       if (Math.abs(a.x - b.x) > range || Math.abs(a.y - b.y) > range || Math.hypot(a.x - b.x, a.y - b.y) > range) continue;

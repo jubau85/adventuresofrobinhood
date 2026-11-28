@@ -72,7 +72,7 @@ function guestDay() {
   dailyCastle();
   dailyHoldings(false);
   dailyQuests();
-  maintainGroups();
+  // Gruppen der Welt kommen vom Gastgeber (mpwelt.js)
   replenishAnimals();
   if (seasonIndex() !== before && G.onSeason) G.onSeason();
   if (G.onNewDay) G.onNewDay();

@@ -214,6 +214,9 @@ export function besiegeBlock(s, n = null) {
   if (!s || s.type !== 'burg' || (!SHIRES[s.id] && !s.baron)) return 'Belagern kannst du nur die Burgen, die eine Grafschaft beherrschen, und die Burgen der Barone.';
   if (s.baron) { const why = baronSiegeBlock(s); if (why) return why; }
   if (isOwnSite(s)) return `${s.name} gehört dir schon.`;
+  // Mehrspieler: die Burg eines anderen Menschen nur in einer Fehde (pvp.js)
+  const own0 = shireOwner(s.id);
+  if (isHumanOwner(own0) && G.pvpWithSeat && G.pvpWithSeat(own0.slice(2)) !== 'fehde') return `${s.name} gehört einem Mitspieler, mit dem Frieden herrscht. Erkläre ihm erst die Fehde (Karte, Reiter „Mitspieler“).`;
   if (G.siege) return G.siege.site === s ? `${s.name} wird gerade belagert.` : `Gerade wird ${G.siege.site.type === 'spieler' ? 'deine Burg' : G.siege.site.name} belagert. Zwei Belagerungen zugleich gibt das Land nicht her.`;
   if (G.battle || inCombat()) return 'Erst muss der Kampf hier vorbei sein.';
   if (G.s.renown < SIEGE_RENOWN) return `Einem Ritter ohne Namen folgt niemand vor eine Burgmauer (Ruhm ${SIEGE_RENOWN} nötig, du hast ${G.s.renown}).`;
@@ -252,6 +255,9 @@ function levyUnits(s, n) {
 export function startOwnSiege(s, n) {
   const why = besiegeBlock(s, n);
   if (why) { log(why, 'bad'); return false; }
+  // Mehrspieler-Gast: Der Gastgeber stellt das Aufgebot auf und rechnet die Belagerung (mpwelt.js)
+  if (G.mpOwnSiege && G.mpOwnSiege(s, n, levyCost(n))) return true;
+  const human = isHumanOwner(shireOwner(s.id));
   const helpers = siegeHelpers(s);
   if (!startSiege(s, 'heer_spieler', null, { makeUnits: levyUnits(s, n), lead: true })) {
     log(`Vor ${s.name} findet sich kein Platz für ein Feldlager.`, 'bad');
@@ -260,8 +266,9 @@ export function startOwnSiege(s, n) {
   G.s.gold -= levyCost(n);
   const sg = G.siege;
   sg.lead = true; sg.side = 'att'; sg.levy = n;
-  // Eine Fehde mit einem Baron ist seine Sache, nicht die seiner Partei
-  if (!s.baron) {
+  if (human && G.noteAttack) G.noteAttack(s);
+  // Eine Fehde mit einem Baron (oder einem Mitspieler) ist seine Sache, nicht die seiner Partei
+  if (!s.baron && !human) {
     changeRep(s.faction, -25);
     for (const f of Object.keys(FACTIONS)) if (rivalsOf(f, s.faction)) changeRep(f, 4);
   }

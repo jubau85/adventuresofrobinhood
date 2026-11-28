@@ -730,7 +730,10 @@ function checkRaid() {
   for (const t of threats) {
     if (Math.random() >= t.chance) continue;
     const home = castleSite(), p = G.s.player;
-    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 * MAP_K && startSiege(home, t.army, Math.min(0.8, 0.35 + G.s.day * 0.02))) { G.s.lastHomeSiege = G.s.day; break; }
+    // Im Mehrspieler rechnet der Gastgeber jede Belagerung; ein Gast bittet ihn darum (mpwelt.js), alle sehen sie
+    const guest = !!(G.mp && G.mp.role === 'guest'), scale = Math.min(0.8, 0.35 + G.s.day * 0.02);
+    if (t.army && !G.siege && !G.battle && G.s.day - (G.s.lastHomeSiege ?? -99) >= 3 && Math.hypot(home.x - p.x, home.y - p.y) < 100 * MAP_K
+      && (guest ? !!G.mpHomeSiege && G.mpHomeSiege(home, t, scale) : startSiege(home, t.army, scale))) { G.s.lastHomeSiege = G.s.day; break; }
     const def = castleDefense();
     const strength = Math.round(t.str * rand(0.8, 1.2));
     if (def >= strength) {

@@ -27,6 +27,7 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   const open = async (tag) => {
     const p = await (tag === 'A' ? ctxA : ctxB).newPage();
     p.on('pageerror', (e) => errors.push(`[${tag}] ${e.message} ${(e.stack || '').split('\n').slice(1, 3).join(' | ')}`));
+    p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|favicon|net::/.test(m.text())) errors.push(`[${tag}] console: ${m.text().slice(0, 300)}`); });
     await p.goto(`${BASE}/index.html`);
     await p.waitForSelector('#btn-new');
     return p;
@@ -220,26 +221,62 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await ev(A, () => window.__ritterPvp.pvpGift('chester', 50));
   await B.waitForTimeout(800);
   ok((await ev(B, () => window.__ritter.s.gold)) === g0 + 50, 'Geschenk kommt an (50 Gold)');
-  // Eine Bande aus As Auftrag: B sieht sie und schlägt zu, bei A verliert sie Leben und wehrt sich
-  const band = await ev(A, () => { const G = window.__ritter, p = G.s.player; const g = window.__ritterDebug.spawnGroup('banditen', { pos: { x: p.x + 3, y: p.y + 3 }, questId: 4711 }); return g && { id: g.id, n: g.members.length, hp: g.members[0].hp }; });
+  // Gemeinsame Welt: Eine Bande beim Gastgeber erscheint bei B als Spiegel; Bs Schlag trifft sie bei A, sie wehrt sich gegen B
+  const band = await ev(A, () => { const G = window.__ritter, p = G.s.player; const g = window.__ritterDebug.spawnGroup('banditen', { pos: { x: p.x + 3, y: p.y + 3 } }); return g && { id: g.id, n: g.members.length, hp: g.members[0].hp }; });
   await B.waitForTimeout(1500);
-  const bandB = await ev(B, () => (window.__ritter.remoteUnits || []).filter((u) => u.rk === 'feind').map((u) => ({ rid: u.rid, foe: window.__ritter.remoteFoe(window.__ritter.s.player, u) })));
-  ok(band && bandB.length === band.n && bandB.every((x) => x.foe), `B sieht die Bande aus As Auftrag (${bandB.length} Mann) als Feinde`);
-  await ev(B, () => { const G = window.__ritter, u = G.remoteUnits.find((x) => x.rk === 'feind'); G.onRemoteHit(G.s.player, u, false, u.x - 0.8, u.y, false); });
+  const bandB = await ev(B, (id) => { const G = window.__ritter, g = G.groups.find((x) => x.id === id && x.mirror); return g ? { n: g.members.length, type: g.type } : null; }, band.id);
+  ok(band && bandB && bandB.n === band.n && bandB.type === 'banditen', `B sieht die Bande des Gastgebers als Spiegel (${bandB && bandB.n} Mann)`);
+  const guestGroups = await ev(B, () => window.__ritter.groups.filter((g) => !g.mirror).length);
+  ok(guestGroups === 0, `B rechnet selbst keine Gruppen der Welt (${guestGroups})`);
+  await ev(B, (id) => { const G = window.__ritter, g = G.groups.find((x) => x.id === id && x.mirror), u = g.members[0]; G.onRemoteHit(G.s.player, u, false, u.x - 0.8, u.y, false); }, band.id);
   await A.waitForTimeout(800);
-  const bandA = await ev(A, (id) => { const g = window.__ritter.groups.find((x) => x.id === id); return g && { hp: Math.min(...g.members.map((m) => m.hp)), engaged: g.engaged }; }, band.id);
-  ok(bandA && bandA.hp < band.hp && bandA.engaged, `Bridas Schlag trifft die Bande bei A (Leben ${Math.round(band.hp)} -> ${Math.round(bandA.hp)}), sie wehrt sich`);
+  const bandA = await ev(A, (id) => { const g = window.__ritter.groups.find((x) => x.id === id); return g && { hp: Math.min(...g.members.map((m) => m.hp)), engaged: g.engaged, foes: g.foes ? [...g.foes] : null }; }, band.id);
+  ok(bandA && bandA.hp < band.hp && bandA.engaged && bandA.foes && bandA.foes.includes('chester'), `Bridas Schlag trifft die Bande bei A (Leben ${Math.round(band.hp)} -> ${Math.round(bandA.hp)}), sie kämpft gegen ${bandA && JSON.stringify(bandA.foes)}`);
+  await B.waitForTimeout(600);
+  const engB = await ev(B, (id) => { const g = window.__ritter.groups.find((x) => x.id === id && x.mirror); return !!(g && g.engaged); }, band.id);
+  ok(engB, 'Bei B steht die Bande im Kampf gegen B');
   await A.screenshot({ path: `${OUT}/mp_bande_A.png` });
   await B.screenshot({ path: `${OUT}/mp_bande_B.png` });
-  // Ein Auftrag vom Brett: Nimmt B ihn an, ist er auch bei A weg
-  const qb = await ev(B, () => { const G = window.__ritter; for (const s of G.world.sites) { const t = G.s.towns[s.id]; if (t && t.quests && t.quests.length && !['spieler'].includes(s.type)) return { site: s.id, q: t.quests[0].id }; } return null; });
+  // B erschlägt die Bande (letzte Schläge von B): Erfahrung und Beute bei B
+  const xp0 = await ev(B, () => window.__ritter.s.player.xp + window.__ritter.s.player.level * 10000);
+  const loot0 = await ev(B, () => window.__ritter.s.gold);
+  for (let k = 0; k < 12; k++) {
+    await ev(A, (id) => { const g = window.__ritter.groups.find((x) => x.id === id); if (g) for (const m of g.members) m.hp = Math.min(m.hp, 1); }, band.id);
+    const left = await ev(B, (id) => { const G = window.__ritter, g = G.groups.find((x) => x.id === id && x.mirror); if (!g) return 0; for (const u of g.members) if (!u.dead && u.hp > 0) G.onRemoteHit(G.s.player, u, false, u.x - 0.8, u.y, false); return g.members.length; }, band.id);
+    await B.waitForTimeout(500);
+    if (!left) break;
+  }
+  await B.waitForTimeout(800);
+  const gone = await ev(A, (id) => !window.__ritter.groups.some((x) => x.id === id), band.id);
+  const xp1 = await ev(B, () => window.__ritter.s.player.xp + window.__ritter.s.player.level * 10000);
+  const loot1 = await ev(B, () => window.__ritter.s.gold);
+  ok(gone && xp1 > xp0 && loot1 >= loot0, `Bande erschlagen: Erfahrung bei B (${xp0} -> ${xp1}), Gold ${loot0} -> ${loot1}`);
+  // Ein Auftrag mit Bande vom Brett: B nimmt ihn an, der Gastgeber stellt die Bande auf; B erledigt sie, der Auftrag ist erfüllt
+  const qb = await ev(B, () => { const G = window.__ritter; for (const s of G.world.sites) { const t = G.s.towns[s.id]; const q = t && t.quests && t.quests.find((x) => x.type === 'banditen' || x.type === 'jagd' || x.type === 'ueberfall'); if (q && s.type !== 'spieler') return { site: s.id, q: q.id, type: q.type }; } return null; });
   if (qb) {
     await ev(B, (x) => { const G = window.__ritter, s = G.world.sites.find((y) => y.id === x.site); window.__ritterDebug.openPanel('town', s, 'auftraege'); const b = document.querySelector(`#panel-body [data-act="accept"][data-q="${x.q}"]`); if (b) b.click(); }, qb);
     await A.waitForTimeout(1500);
     const still = await ev(A, (x) => window.__ritter.s.towns[x.site].quests.some((q) => q.id === x.q), qb);
-    const mine = await ev(B, (x) => window.__ritter.s.quests.some((q) => q.id === x.q), qb);
-    ok(mine && !still, `Auftrag ${qb.q} in ${qb.site}: B hat ihn, bei A ist er vom Brett`);
-  } else ok(true, 'Kein Auftrag auf einem Brett zum Prüfen');
+    const mineQ = await ev(B, (x) => { const q = window.__ritter.s.quests.find((y) => y.id === x.q); return q ? { gid: q.groupId || 0, tx: q.tx, ty: q.ty, state: q.state } : null; }, qb);
+    const hostG = await ev(A, (x) => { const g = window.__ritter.groups.find((y) => y.questId === x.q); return g ? { id: g.id, owner: g.questOwner, n: g.members.length } : null; }, qb);
+    ok(mineQ && !still && hostG && hostG.owner === 'chester' && mineQ.gid === hostG.id, `Auftrag ${qb.q} (${qb.type}) in ${qb.site}: B hat ihn, bei A vom Brett, der Gastgeber stellt die Bande (${JSON.stringify(hostG)})`);
+    if (hostG) {
+      // B reitet hin und schlägt die Bande
+      await ev(B, (q) => { const p = window.__ritter.s.player; p.x = q.tx + 2; p.y = q.ty + 2; p.path = null; }, mineQ);
+      await B.waitForTimeout(1500);
+      const seenQ = await ev(B, (id) => !!window.__ritter.groups.find((g) => g.id === id && g.mirror), hostG.id);
+      ok(seenQ, 'B sieht die Bande seines Auftrags am Ziel');
+      for (let k = 0; k < 12; k++) {
+        await ev(A, (id) => { const g = window.__ritter.groups.find((x) => x.id === id); if (g) for (const m of g.members) m.hp = Math.min(m.hp, 1); }, hostG.id);
+        const left = await ev(B, (id) => { const G = window.__ritter, g = G.groups.find((x) => x.id === id && x.mirror); if (!g) return 0; for (const u of g.members) if (!u.dead && u.hp > 0) G.onRemoteHit(G.s.player, u, false, u.x - 0.8, u.y, false); return g.members.length; }, hostG.id);
+        await B.waitForTimeout(500);
+        if (!left) break;
+      }
+      await B.waitForTimeout(800);
+      const st = await ev(B, (x) => { const q = window.__ritter.s.quests.find((y) => y.id === x.q); return q && q.state; }, qb);
+      ok(st === 'erfuellt', `Bs Auftrag ist erfüllt (${st})`);
+    }
+  } else ok(true, 'Kein Auftrag mit Bande auf einem Brett zum Prüfen');
   await ev(B, () => { const b = document.querySelector('#panel [data-act="close"], #panel .close'); if (b) b.click(); });
 
   // B gewinnt eine weitere Grafschaft (wie nach einer Eroberung): der Gastgeber trägt sie für B ein, B behält sie
@@ -250,6 +287,43 @@ if (RELAY) http.createServer((req, res) => { const f = path.join(ROOT, decodeURI
   await B.waitForTimeout(4500);
   const warB = await ev(B, () => ({ owner: window.__ritter.s.shires.warwick.owner, held: Object.keys(window.__ritter.s.holdings) }));
   ok(warA === 'p:chester' && warB.owner === 'spieler' && warB.held.includes('warwick'), `Eroberung eines Gastes kommt beim Gastgeber an (${warA}) und bleibt (${JSON.stringify(warB)})`);
+  // Belagerung unter Spielern: Im Bündnis nicht; nach der Fehde zieht A gegen Warwick (Bs eroberte Burg)
+  for (const P of [A, B]) await ev(P, () => { const G = window.__ritter; G.s.renown = Math.max(60, G.s.renown); G.s.gold += 3000; G.groups = G.groups.filter((g) => g.mirror); });
+  const tryAlly = await ev(A, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.id === 'warwick'); const r = window.__ritterDebug.startOwnSiege(s, 10); return { r, siege: !!G.siege, msg: G.messages.slice(-1)[0].text }; });
+  ok(!tryAlly.r && !tryAlly.siege && /Fehde/.test(tryAlly.msg), `Im Bündnis keine Belagerung (${tryAlly.msg})`);
+  await ev(A, () => window.__ritterPvp.pvpDeclareFeud('chester'));
+  await B.waitForTimeout(1200);
+  const fz = { A: await ev(A, () => window.__ritterPvp.pvpWith('chester')), B: await ev(B, () => window.__ritterPvp.pvpWith('nottingham')) };
+  ok(fz.A === 'fehde' && fz.B === 'fehde', `Fehde erklärt (${fz.A}, ${fz.B})`);
+  const siA = await ev(A, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.id === 'warwick'), p = G.s.player; p.x = s.x + 16; p.y = s.y + 16; p.path = null; const r = window.__ritterDebug.startOwnSiege(s, 10); return { r, lead: !!(G.siege && G.siege.lead), sides: G.siege && G.siege.sides, msg: G.messages.slice(-1)[0].text }; });
+  ok(siA.r && siA.lead && siA.sides && siA.sides.chester === 'def', `A belagert Warwick, B verteidigt (${JSON.stringify(siA)})`);
+  await B.waitForFunction(() => window.__ritter.siege && window.__ritter.siege.mirror, null, { timeout: 10000 }).catch(() => {});
+  const siB = await ev(B, () => { const G = window.__ritter, sg = G.siege; return { sg: sg && { mirror: sg.mirror, site: sg.site.id, side: sg.side, lead: sg.leadSeat, camp: !!sg.camp }, warn: G.messages.some((m) => /gegen deine Burg Warwick/.test(m.text)) }; });
+  const siAd = siB.sg ? '' : JSON.stringify(await ev(A, () => ({ sg: !!window.__ritter.siege, msgs: window.__ritter.messages.slice(-4).map((m) => m.text) })));
+  ok(siB.sg && siB.sg.mirror && siB.sg.site === 'warwick' && siB.sg.side === 'def' && siB.sg.lead === 'nottingham' && siB.sg.camp && siB.warn, `B sieht die Belagerung seiner Burg und wird gewarnt (${JSON.stringify(siB)}) ${siAd}`);
+  await ev(A, () => window.__ritterDebug.endSiegeNow('gefallen'));
+  await A.waitForTimeout(800);
+  const wA = await ev(A, () => ({ owner: window.__ritter.s.shires.warwick.owner, held: Object.keys(window.__ritter.s.holdings) }));
+  await ev(A, () => window.__ritterDebug.passHours(24));
+  await B.waitForTimeout(4500);
+  const wB = await ev(B, () => ({ owner: window.__ritter.s.shires.warwick.owner, held: Object.keys(window.__ritter.s.holdings), siege: !!window.__ritter.siege }));
+  ok(wA.owner === 'spieler' && wA.held.includes('warwick') && wB.owner === 'p:nottingham' && !wB.held.includes('warwick') && !wB.siege, `Warwick fällt an A (${JSON.stringify(wA)}), B verliert die Burg (${JSON.stringify(wB)})`);
+  // B führt ein Aufgebot gegen As Heimburg: der Gastgeber rechnet es, die Burg wird geplündert, nicht erobert
+  const goldA0 = await ev(A, () => window.__ritter.s.gold), goldB0 = await ev(B, () => window.__ritter.s.gold);
+  await ev(B, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.id === 'nottingham'), p = G.s.player; p.x = s.x + 16; p.y = s.y + 16; p.path = null; });
+  await B.waitForTimeout(1000);
+  const bS = await ev(B, () => { const G = window.__ritter, s = G.world.sites.find((x) => x.id === 'nottingham'); const r = window.__ritterDebug.startOwnSiege(s, 10); return { r, msg: G.messages.slice(-1)[0].text }; });
+  await A.waitForTimeout(1500);
+  const hS = await ev(A, () => { const sg = window.__ritter.siege; return sg && { site: sg.site.id, lead: sg.leadSeat, side: sg.side, army: sg.army ? sg.army.members.length : 0, col: sg.army && sg.army.members[0] ? sg.army.members[0].tunic : null }; });
+  const bM = await ev(B, () => { const sg = window.__ritter.siege; return sg && { mirror: sg.mirror, lead: sg.lead, side: sg.side, army: sg.army ? sg.army.members.length : 0 }; });
+  ok(bS.r && hS && hS.site === 'nottingham' && hS.lead === 'chester' && hS.side === 'def' && hS.army >= 10 && bM && bM.mirror && bM.lead && bM.army === hS.army, `Bs Aufgebot vor Nottingham, beim Gastgeber gerechnet (${JSON.stringify(hS)}), bei B gespiegelt (${JSON.stringify(bM)}) ${bS.msg}`);
+  await A.screenshot({ path: `${OUT}/mp_belagerung_A.png` });
+  await B.screenshot({ path: `${OUT}/mp_belagerung_B.png` });
+  await ev(A, () => window.__ritterDebug.endSiegeNow('gefallen'));
+  await B.waitForTimeout(1500);
+  const plA = await ev(A, () => ({ gold: window.__ritter.s.gold, owner: window.__ritter.s.shires.nottingham.owner }));
+  const plB = await ev(B, () => ({ gold: window.__ritter.s.gold, siege: !!window.__ritter.siege }));
+  ok(plA.gold < goldA0 && plA.owner === 'spieler' && plB.gold > goldB0 - 450 && !plB.siege, `Nottingham geplündert: A ${goldA0} -> ${plA.gold} (bleibt Herr), B ${goldB0} -> ${plB.gold}`);
   // Chat
   await ev(A, () => window.__ritter.mpChat('Seid gegrüßt!'));
   await B.waitForTimeout(800);
