@@ -1,7 +1,7 @@
 {
   "name": "a-knights-tale",
   "productName": "A Knight's Tale",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Mittelalterliches Ritter-Aufbauspiel (Desktop-Fassung)",
   "main": "main.js",
   "private": true,

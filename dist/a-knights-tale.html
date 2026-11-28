@@ -634,7 +634,7 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
   <div id="dialog" hidden role="alertdialog" aria-labelledby="dialog-text">
     <div class="dialog-card">
       <p id="dialog-text"></p>
-      <div class="row"><button class="btn primary" id="dialog-yes">Ja</button><button class="btn" id="dialog-no">Abbrechen</button></div>
+      <div class="row"><button class="btn primary" id="dialog-yes">Ja</button><button class="btn" id="dialog-alt" hidden>Mehr</button><button class="btn" id="dialog-no">Abbrechen</button></div>
     </div>
   </div>
 
@@ -719,8 +719,8 @@ kbd { font-family: var(--font-ui); font-size: 0.72em; padding: 0 0.35em; border:
 <input id="chat-input" hidden maxlength="200" placeholder="Zu allen in der Partie sprechen … (Enter schickt, Esc schließt)" autocomplete="off">
 <div id="loading" hidden><div class="loading-card"><p>Die Welt wird gemalt …</p><div class="loading-bar"><span></span></div></div></div>
 <script>
-window.__aktBuild = '2c68577966';
-window.__aktVersion = '0.8.3';
+window.__aktBuild = 'c9a2595e9b';
+window.__aktVersion = '0.8.4';
 (function () {
 'use strict';
 
@@ -898,7 +898,12 @@ const NPC_TYPES = {
   soeldner: { cls: 'soldat', name: 'Söldner', eq: { waffe: 'streitaxt', ruestung: 'lederwams' }, lv: [2, 3], look: 'raubritter' },
   soldat: { cls: 'soldat', name: 'Soldat', eq: { waffe: 'speer', ruestung: 'kettenhemd', schild: 'drachenschild' }, lv: [1, 3], look: 'soldat' },
   armbrust: { cls: 'soldat', name: 'Armbrustschütze', eq: { waffe: 'armbrust', ruestung: 'gambeson' }, lv: [1, 3], look: 'soldat' },
-  vogt: { cls: 'zivil', name: 'Steuereintreiber', eq: { waffe: 'knueppel', pferd: 'klepper' }, lv: [1, 1], look: 'vogt' },
+  // wagon: fährt in einem Wagen (Platzhalter gezeichnet, render.js drawWagon); motley: bunte Kleider
+  vogt: { cls: 'zivil', name: 'Steuereintreiber', eq: { waffe: 'knueppel', pferd: 'klepper' }, lv: [1, 1], look: 'vogt', wagon: 'kutsche' },
+  gaukler: { cls: 'zivil', name: 'Gaukler', eq: {}, lv: [1, 1], look: 'gaukler', motley: true },
+  gauklerwagen: { cls: 'zivil', name: 'Prinzipal der Gaukler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'gaukler', wagon: 'gaukler', motley: true },
+  postkutscher: { cls: 'zivil', name: 'Postkutscher', eq: { pferd: 'zelter' }, lv: [1, 1], look: 'post', wagon: 'post' },
+  postreiter: { cls: 'soldat', name: 'Postreiter', eq: { waffe: 'kurzschwert', ruestung: 'gambeson', pferd: 'zelter' }, lv: [1, 2], look: 'post' },
   haendler: { cls: 'zivil', name: 'Händler', eq: { pferd: 'klepper' }, lv: [1, 1], look: 'haendler' },
   wache: { cls: 'soldat', name: 'Söldnerwache', eq: { waffe: 'speer', ruestung: 'gambeson', schild: 'rundschild' }, lv: [1, 2], look: 'wache' },
   waldmann: { cls: 'waldlaeufer', name: 'Waldmann', eq: { waffe: 'langbogen', ruestung: 'lederwams' }, lv: [1, 3], look: 'wald' },
@@ -926,6 +931,17 @@ const GROUP_TYPES = {
     name: 'Normannische Patrouille', nom: 'Eine normannische Patrouille', acc: 'die normannische Patrouille', pl: false, faction: 'normannen', members: [['soldat', 2, 3], ['armbrust', 1, 1]],
     gold: [25, 50], itemChance: 0.3, renown: 2, count: 10, spawn: 'patrol', realms: ['en', 'nd', 'wa', 'ir'], realmFaction: { ir: 'normannen' }, speed: 1.24,
     kill: { normannen: -12, sachsen: 4, waldleute: 4 },
+  },
+  // Fahrende: Gaukler ziehen von Ort zu Ort und spielen auf, die Postkutsche bringt Briefe und Nachrichten (reisende.js)
+  gaukler: {
+    name: 'Fahrende Gaukler', nom: 'Die fahrenden Gaukler', acc: 'die Gaukler', pl: true, faction: null, members: [['gauklerwagen', 1, 1], ['gaukler', 2, 3]],
+    gold: [10, 30], renown: 0, count: 4, spawn: 'route', speed: 0.95, entertain: true,
+    kill: { kirche: -8, sachsen: -6, gilde: -4 },
+  },
+  post: {
+    name: 'Postkutsche', nom: 'Die Postkutsche', acc: 'die Postkutsche', pl: false, faction: 'gilde', members: [['postkutscher', 1, 1], ['postreiter', 1, 2]],
+    gold: [40, 90], renown: 0, count: 5, spawn: 'route', speed: 1.3, post: true,
+    kill: { gilde: -15, normannen: -6 },
   },
   steuer: {
     name: 'Steuereintreiber', nom: 'Der Steuereintreiber und seine Wache', acc: 'den Steuereintreiber', pl: true, faction: 'normannen', members: [['vogt', 1, 1], ['soldat', 2, 3]],
@@ -1489,6 +1505,8 @@ const LOOKS = {
   raubritter: { tunic: '#2d2a28', trim: '#8c2f2a' },
   soldat: { tunic: '#a33b32', trim: '#e0d6c0' },
   vogt: { tunic: '#7d2a52', trim: '#d8b54a' },
+  gaukler: { tunic: '#c8402e', trim: '#e8d070' },
+  post: { tunic: '#23402e', trim: '#d8b84a' },
   haendler: { tunic: '#3d6fa3', trim: '#e0c070' },
   wache: { tunic: '#556b7d', trim: '#c9c2b0' },
   wald: { tunic: '#3f6b2f', trim: '#2c4a20', hood: '#355a28' },
@@ -4957,6 +4975,8 @@ function randomName() {
   return { name: Math.random() < 0.7 ? `${first} ${pick(EPITHETS)}` : first, female };
 }
 
+// Bunte Kleider der Gaukler
+const MOTLEY = ['#c8402e', '#e0b030', '#3a7a3a', '#2e5aa8', '#8a3a8a', '#d86a2a'];
 function makeNpc(typeId, x, y, levelBonus = 0) {
   const d = NPC_TYPES[typeId];
   const u = makeUnit({
@@ -4964,6 +4984,8 @@ function makeNpc(typeId, x, y, levelBonus = 0) {
     eq: { ...d.eq }, x, y, look: d.look, npcType: typeId,
   });
   u.mounted = !!u.st.horse;
+  if (d.wagon) u.wagon = d.wagon;
+  if (d.motley) u.tunic = pick(MOTLEY);
   return u;
 }
 
@@ -5770,6 +5792,8 @@ function sitesFor(type) {
   // Prinz Johns Steuereintreiber: in England, Wales, der Normandie und im normannischen Irland
   if (type === 'steuer') return S.filter((s) => s.realm !== 'fr' && s.realm !== 'fl' && s.realm !== 'sc' && (s.faction === 'normannen' || (s.realm !== 'ir' && (s.type === 'dorf' || s.type === 'halle'))));
   if (type === 'haendler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'abtei', 'halle', 'burg'].includes(s.type));
+  if (type === 'gaukler') return S.filter((s) => ['stadt', 'markt', 'dorf', 'halle', 'burg'].includes(s.type));
+  if (type === 'post') return S.filter((s) => ['stadt', 'markt', 'abtei', 'burg'].includes(s.type));
   if (gt && gt.spawn === 'patrol') return S.filter((s) => s.type !== 'lager' && s.type !== 'spieler' && s !== castleSite() && !s.mpHome && s.type !== 'einsiedelei' && (!gt.realms || gt.realms.includes(s.realm)) && (!gt.siteFaction || s.faction === gt.siteFaction)
     && (!gt.realmFaction || !gt.realmFaction[s.realm] || s.faction === gt.realmFaction[s.realm]));
   return S.filter((s) => s.type !== 'einsiedelei');
@@ -5893,9 +5917,12 @@ function chooseDest(g) {
   } else if (gt.spawn === 'patrol') {
     const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 10, 120));
     if (s) dest = { x: s.x + rand(-2, 2), y: s.y + rand(-2, 2) };
+  } else if (g.forced) {
+    // Ein fester Auftrag (Gaukler auf dem Weg zu deiner Burg, reisende.js)
+    dest = g.forced;
   } else {
     const s = pick(reachableSites(sitesFor(g.type), g.x, g.y, 20, 150));
-    if (s) dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) };
+    if (s) { dest = { x: s.x + rand(-1, 1), y: s.y + rand(-1, 1) }; g.destSite = s.id; }
   }
   if (!dest) { g.wait = 3; return; }
   g.path = findPath(W, g.x, g.y, dest.x, dest.y, 90000);
@@ -5977,7 +6004,7 @@ function updateGroups(dt) {
     const dx = target.x - g.x, dy = target.y - g.y, d = Math.hypot(dx, dy);
     if (d <= sp + 0.02) {
       g.x = target.x; g.y = target.y; g.pathI++;
-      if (g.pathI >= g.path.length) { g.path = null; g.wait = rand(3, 9); }
+      if (g.pathI >= g.path.length) { g.path = null; g.wait = rand(3, 9); if (G.onGroupArrive) G.onGroupArrive(g); }
     } else {
       g.x += (dx / d) * sp; g.y += (dy / d) * sp;
     }
@@ -8371,7 +8398,7 @@ function raiseDefenders(sg) {
   let types = home ? ['wache'] : held ? ['soldat', 'armbrust'] : DEFENDER_NPC[s.faction] || ['wache'];
   // Mehrspieler (beim Gastgeber): die Heimburg eines Gastes mit Wachen nach ihrem Ausbau
   const pc = !own && peerCastle(s);
-  const n = home ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + bSum('wehr') * 2
+  const n = home ? 4 + G.s.castle.level * 2 + G.s.companions.filter((c) => c.status === 'garnison').length + bSum('wehr') * 2 + (G.keepSiegeMen ? G.keepSiegeMen() : 0)
     : held ? Math.max(3, Math.min(30, holdingOf(s).garrison))
       : pc ? 6 + (pc.lv | 0) * 3
         : Math.round(10 + (s.type === 'burg' ? 8 : 4) * ((G.fpsAvg || 60) >= 40 ? 1 : 0.6));
@@ -8579,7 +8606,7 @@ function endSiege(sg, how, quiet = false) {
   } else if (how === 'gefallen') {
     for (const b of siteBuildings(s.id)) if (Math.random() < 0.4) damageBuilding(b, rand(0.2, 0.45));
     if (isHome(s)) {
-      const lost = Math.floor(G.s.gold * 0.2);
+      const lost = Math.floor(G.s.gold * 0.2 * (G.keepPlunder ? G.keepPlunder() : 1));
       G.s.gold -= lost;
       for (const g of Object.keys(G.s.castle.storage)) G.s.castle.storage[g] = Math.floor(G.s.castle.storage[g] * 0.6);
       log(`${name} wurde gestürmt und geplündert! Verloren: ${lost} Gold und ein Teil der Vorräte.`, 'bad');
@@ -11173,6 +11200,8 @@ function castleDefense() {
   if (isAlly('schotten')) d += 15;
   if (isAlly('iren')) d += 10;
   if (homeGateClosed()) d += 10;
+  // Räume im Bergfried (bergfried.js): Brunnen, Wachstube, Vorbau, Wehrgang
+  if (G.keepDefense) d += G.keepDefense();
   return Math.round(d);
 }
 
@@ -11188,6 +11217,9 @@ function dailyBalance() {
   if (mills) income.push([mills > 1 ? `Mahlgeld der ${mills} Windmühlen` : 'Mahlgeld der Windmühle', 10 * mills]);
   // Eigene Grafschaften: Abgaben ihrer Orte, abzüglich dessen, was die Kastellane für ihre Burgen behalten
   for (const id of ownedShires()) income.push([`Abgaben ${SHIRES[id].name}`, holdingIncome(id)]);
+  // Schreibstube im Bergfried: ein Zehntel mehr auf alle Einnahmen
+  const scribe = G.keepIncome ? G.keepIncome() : 0;
+  if (scribe) { const sum = income.reduce((a, [, v]) => a + v, 0); if (sum > 0) income.push(['Buchführung der Schreibstube', Math.round(sum * scribe)]); }
   const costs = [];
   const wages = G.s.companions.reduce((a, c) => a + (c.wage || 0), 0);
   if (wages) costs.push(['Sold', wages]);
@@ -11211,7 +11243,8 @@ function dailyBalance() {
   // Holz aus den Forsten eroberter Grafschaften (Vorgabe „Holz erzeugen“)
   for (const [g, n] of Object.entries(holdingGoods())) prod[g] = (prod[g] || 0) + n;
   // Verpflegung: was fehlt, kaufen die Knechte teuer zu
-  const need = foodNeed();
+  // Vorratskeller im Bergfried: weniger verdirbt
+  const need = Math.ceil(foodNeed() * (G.keepFood ? G.keepFood() : 1));
   const avail = foodStock() + prod.getreide + prod.fleisch;
   const short = Math.max(0, need - avail);
   if (short) costs.push(['Zukauf von Nahrung', short * FOOD_PRICE]);
@@ -11329,7 +11362,7 @@ function checkRaid() {
       addRenown(2);
       for (const c of G.s.companions) if (c.status === 'garnison') grantXp(c, 15);
     } else {
-      const lostGold = Math.floor(G.s.gold * 0.15);
+      const lostGold = Math.floor(G.s.gold * 0.15 * (G.keepPlunder ? G.keepPlunder() : 1));
       G.s.gold -= lostGold;
       const lost = [];
       for (const g of GOOD_IDS) {
@@ -12726,7 +12759,8 @@ function baronGiveGift(id) {
   if (giftBlock(id)) return false;
   const b = baron(id);
   G.s.gold -= BARON_GIFT; b.gold += BARON_GIFT; b.lastGift = G.s.day;
-  changeBaronRel(id, b.feud ? 4 : 10, 'Er nimmt dein Geschenk an');
+  // Großer Saal im Bergfried: Empfang mit Bankett (bergfried.js)
+  changeBaronRel(id, b.feud ? 4 : 10 + (G.keepGift ? G.keepGift() : 0), 'Er nimmt dein Geschenk an');
   return true;
 }
 function allianceBlock(id) {
@@ -12734,7 +12768,9 @@ function allianceBlock(id) {
   if (!b || b.gone) return 'Der Baron ist nicht mehr Herr seiner Burg.';
   if (b.ally) return 'Ihr seid schon verbündet.';
   if (b.feud) return 'Erst muss die Fehde beigelegt sein.';
-  if (b.rel < 40) return `Er traut dir noch nicht genug (Verhältnis ${b.rel}, nötig 40).`;
+  // Verschwägert (familie.js): schon ab 25
+  const need = G.familyKin && G.familyKin(id) ? 25 : 40;
+  if (b.rel < need) return `Er traut dir noch nicht genug (Verhältnis ${b.rel}, nötig ${need}).`;
   return null;
 }
 function offerAlliance(id) {
@@ -12757,6 +12793,8 @@ function declareFeud(id, byBaron = false) {
   const b = baron(id);
   b.feud = true; b.ally = false; b.feudSince = G.s.day;
   b.rel = Math.min(b.rel, -50);
+  // Lebt dein Kind als Pfand an seinem Hof, wird es seine Geisel (familie.js)
+  if (G.familyFeud) G.familyFeud(id);
   if (byBaron) log(`${BARONS[id].name} sagt dir die Fehde an! Seine Männer werden gegen ${homeName()} und deine Burgen ziehen. Du darfst nun auch seine Burg belagern.`, 'bad');
   else { log(`Du sagst ${BARONS[id].name} die Fehde an. Ab jetzt darfst du seine Burg ${baronSite(id).name} belagern, und er wird sich wehren.`, 'bad'); }
   return true;
@@ -12774,6 +12812,7 @@ function makePeace(id) {
   G.s.gold -= peaceCost(id); b.gold += peaceCost(id);
   b.feud = false; b.march = null; b.rel = Math.max(b.rel, -15);
   log(`Du zahlst ${BARONS[id].name} Sühne. Die Fehde ist beigelegt.`, 'good');
+  if (G.familyFree) G.familyFree(id, 'Frieden mit dem Baron');
   return true;
 }
 // Darfst du seine Burg belagern? Nur in einer Fehde
@@ -12797,6 +12836,7 @@ function baronConquered(id) {
   addRenown(30);
   for (const sid of baronShires(id)) claimShire(sid, 'spieler');
   log(`${baronSite(id).name} ist gefallen! ${def.name} beugt das Knie: Er zahlt ${ransom} Gold Lösegeld, wird dein Vasall und gibt dir seine Grafschaften. Jeden Tag zahlt er dir Tribut.`, 'gold');
+  if (G.familyFree) G.familyFree(id, 'seine Burg ist gefallen');
   applyBarons();
 }
 
@@ -12871,7 +12911,9 @@ function dailyBarons() {
     // Seite im Krieg prüfen (alle paar Tage)
     if ((G.s.day + id.length) % 6 === 0) baronReconsiderSide(id, say);
     // Fehde gegen dich
-    if (!b.feud && !b.vassal && !b.ally && b.rel <= D.feudAt && G.s.day >= D.feudDay && Math.random() < 0.15 * tr.war) declareFeud(id, true);
+    // Verschwägert oder mit deinem Kind als Pfand an seinem Hof: keine Fehde (familie.js)
+    const kin = !!(G.familyKin && G.familyKin(id));
+    if (!b.feud && !b.vassal && !b.ally && !kin && b.rel <= D.feudAt && G.s.day >= D.feudDay && Math.random() < 0.15 * tr.war) declareFeud(id, true);
     if (b.feud && !b.march && b.men >= 14 && G.s.day - b.lastRaid >= 5 && Math.random() < 0.3 * tr.war) baronPlanFeud(id, say);
     // Das Verhältnis kühlt ab oder erholt sich langsam
     if (!b.feud && b.rel < 0 && Math.random() < 0.3) b.rel++;
@@ -13154,6 +13196,311 @@ function sideStrengthBonus(th, side) {
   }
   return Math.min(25, add);
 }
+
+// ===== familie.js =====
+// Haus und Familie (ein wenig wie bei den großen Herren der Zeit): heiraten, Kinder bekommen und sie für die Diplomatie
+// einsetzen. Alles gehört dem eigenen Helden (G.s.family), auch im Mehrspieler.
+// - Heirat: mit einer Tochter oder einem Sohn eines Barons (in seiner Burg, Audienz; ab einem freundlichen Verhältnis)
+//   oder mit einer Edeldame bzw. einem Edelmann aus sächsischem oder normannischem Haus (Burgtafel, Reiter „Familie“;
+//   bei gutem Ansehen der Partei). Du gibst eine Brautgabe, die andere Seite eine Mitgift. Ein Baron, mit dem du
+//   verschwägert bist, sagt dir keine Fehde an und schließt schon bei einem Verhältnis von 25 ein Bündnis.
+// - Kinder: Verheiratet kommen nach und nach Kinder zur Welt (in der Kemenate des Bergfrieds öfter). Ein Jahr hat
+//   24 Tage (vier Jahreszeiten zu je sechs Tagen).
+// - Pfand: Ein Kind ab einem halben Jahr kann an den Hof eines Barons gehen, als Unterpfand des Friedens. Er hält
+//   Frieden mit dir, das Verhältnis steigt sofort und dann langsam weiter (mit Kinderstube mehr). Holst du es zurück,
+//   kühlt das Verhältnis ab. Sagst du ihm die Fehde an, solange dein Kind bei ihm ist, wird es seine Geisel: Erst
+//   Frieden oder die Eroberung seiner Burg bringen es heim, und dein Wortbruch kostet Ruhm.
+// - Verlobung: Ein Kind kann mit dem Haus eines Barons verlobt werden: Ihr seid verschwägert wie nach einer Heirat.
+
+
+
+
+
+
+const YEAR_DAYS = 24;
+const BRAUTGABE = 150, WARD_AGE = 12, MAX_CHILDREN = 6;
+// Heiratsfähige Kinder der Barone: Tochter, Sohn
+const BARON_KIN = {
+  gwilym: ['Angharad', 'Rhodri'], malcolm: ['Isobel', 'Duncan'], raoul: ['Adélaïde', 'Guérin'],
+  hugh: ['Matilda', 'Walter'], geoffrey: ['Edith', 'Robert'], fergal: ['Gormlaith', 'Donal'],
+};
+// Edle Häuser der Parteien: Name der Familie, Töchter, Söhne
+const HOUSES = {
+  sachsen: { house: 'aus dem Haus Cedrics von Rotherwood', f: ['Rowena', 'Elgiva', 'Wilfreda'], m: ['Athelstan', 'Wulfstan', 'Edwin'] },
+  normannen: { house: 'aus dem Haus de Lacy', f: ['Alix', 'Mathilde', 'Isabeau'], m: ['Raoul', 'Gilbert', 'Henri'] },
+};
+const KIND_NAMEN_F = ['Alys', 'Maud', 'Edith', 'Joan', 'Eleanor', 'Margery', 'Isolde', 'Agnes', 'Cecily', 'Avice'];
+const KIND_NAMEN_M = ['William', 'Hugh', 'Robert', 'Richard', 'Geoffrey', 'Walter', 'Henry', 'Roger', 'Ralph', 'Simon'];
+
+function family() {
+  const f = G.s.family || (G.s.family = { spouse: null, children: [], lastBirth: 0, nextId: 1 });
+  if (!f.children) f.children = [];
+  return f;
+}
+function married() { return !!family().spouse; }
+function childAge(c) { return Math.max(0, G.s.day - c.born); }
+function ageText(c) {
+  const d = childAge(c), y = Math.floor(d / YEAR_DAYS);
+  if (y >= 1) return `${y} ${y === 1 ? 'Jahr' : 'Jahre'}`;
+  const m = Math.max(1, Math.floor(d / (YEAR_DAYS / 12)));
+  return `${m} ${m === 1 ? 'Monat' : 'Monate'}`;
+}
+// Verschwägert mit diesem Baron: Ehe, Verlobung eines Kindes oder ein Kind als Pfand an seinem Hof
+function kinWith(id) {
+  const f = family();
+  return (f.spouse && f.spouse.from === id) || f.children.some((c) => c.at === id && (c.state === 'verlobt' || c.state === 'pfand'));
+}
+function wardAt(id) { return family().children.find((c) => c.at === id && c.state === 'pfand') || null; }
+G.familyKin = (id) => kinWith(id);
+// Für die Kemenate und Kinderstube (bergfried.js)
+let keepBonus = () => ({ births: 1, ward: 0 });
+function setFamilyKeepBonus(fn) { keepBonus = fn; }
+
+// ---------------------------------------------------------------- Heirat
+function partnerOf(id) {
+  const k = BARON_KIN[id];
+  return k ? (G.s.player.female ? k[1] : k[0]) : null;
+}
+function baronMatch(id) {
+  const p = partnerOf(id);
+  return p ? { name: p, female: !G.s.player.female, from: id, house: `${G.s.player.female ? 'Sohn' : 'Tochter'} von ${BARONS[id].name}` } : null;
+}
+function baronMarryBlock(id) {
+  const b = baron(id);
+  if (married()) return 'Du bist schon verheiratet.';
+  if (!b || b.gone || b.human) return 'An diesem Hof gibt es niemanden, um den du werben kannst.';
+  if (b.feud) return 'Mitten in einer Fehde gibt er dir sein Kind nicht.';
+  if (b.rel < 25) return `Er schätzt dich noch nicht genug (Verhältnis ${b.rel}, nötig 25).`;
+  if (G.s.gold < BRAUTGABE) return `Für die Brautgabe fehlt dir Gold (${BRAUTGABE}).`;
+  return null;
+}
+function dowryOf(id) { const b = baron(id); return 80 + (b ? b.level : 1) * 60; }
+function marryBaron(id) {
+  if (baronMarryBlock(id)) return false;
+  const b = baron(id), m = baronMatch(id), dowry = Math.min(dowryOf(id), Math.max(0, b.gold));
+  G.s.gold -= BRAUTGABE; b.gold = b.gold + BRAUTGABE - dowry; G.s.gold += dowry;
+  family().spouse = { ...m, day: G.s.day };
+  changeBaronRel(id, 25, 'Hochzeit, ihr seid verschwägert');
+  addRenown(6);
+  weddingBonus();
+  log(`Hochzeit auf seiner Burg: Du heiratest ${m.name}, ${m.house}. Brautgabe ${BRAUTGABE} Gold, Mitgift ${dowry} Gold. ${BARONS[id].short} ist nun dein Schwiegervater und sagt dir keine Fehde mehr an. Ruhm +6.`, 'gold');
+  return true;
+}
+function houseMatch(fid) {
+  const h = HOUSES[fid];
+  if (!h) return null;
+  const f = family(), pool = G.s.player.female ? h.m : h.f;
+  const name = pool[(f.matchSeed || (f.matchSeed = 1 + Math.floor(Math.random() * 97))) % pool.length];
+  return { name, female: !G.s.player.female, from: null, faction: fid, house: h.house };
+}
+function houseMarryBlock(fid) {
+  if (married()) return 'Du bist schon verheiratet.';
+  const rep = (G.s.rep || {})[fid] ?? 0;
+  if (rep < 20) return `Das Haus schaut auf dein Ansehen bei den ${FACTIONS[fid].name} (${rep}, nötig 20).`;
+  if (G.s.gold < BRAUTGABE) return `Für die Brautgabe fehlt dir Gold (${BRAUTGABE}).`;
+  return null;
+}
+function marryHouse(fid) {
+  if (houseMarryBlock(fid)) return false;
+  const m = houseMatch(fid), dowry = 120;
+  G.s.gold += dowry - BRAUTGABE;
+  family().spouse = { ...m, day: G.s.day };
+  changeRep(fid, 15);
+  addRenown(4);
+  weddingBonus();
+  log(`Hochzeit in der Burgkapelle: Du heiratest ${m.name} ${m.house}. Brautgabe ${BRAUTGABE} Gold, Mitgift ${dowry} Gold. Die ${FACTIONS[fid].name} sehen dich nun als einen der Ihren (Ansehen +15). Ruhm +4.`, 'gold');
+  return true;
+}
+let onWedding = () => {};
+function setWeddingHook(fn) { onWedding = fn; }
+function weddingBonus() { onWedding(); }
+
+// ---------------------------------------------------------------- Kinder
+function dailyFamily() {
+  const f = family();
+  if (f.spouse && f.children.length < MAX_CHILDREN && G.s.day - (f.lastBirth || f.spouse.day) >= 10 && Math.random() < 0.09 * keepBonus().births) birth();
+  // Pfand: Das Verhältnis zum Baron steigt langsam weiter
+  for (const c of f.children) {
+    if (c.state !== 'pfand' || !c.at) continue;
+    const b = baron(c.at);
+    if (!b || b.gone) { c.state = 'daheim'; c.at = null; log(`${c.name} kommt heim: Der Hof, an dem ${c.female ? 'sie' : 'er'} als Pfand lebte, ist nicht mehr.`); continue; }
+    if (G.s.day % 2 === 0 && b.rel < 75) b.rel = Math.min(75, b.rel + 1);
+  }
+}
+function birth(female = Math.random() < 0.5) {
+  const f = family(), taken = new Set(f.children.map((c) => c.name));
+  const pool = (female ? KIND_NAMEN_F : KIND_NAMEN_M).filter((n) => !taken.has(n));
+  const c = { id: f.nextId++, name: pick(pool.length ? pool : (female ? KIND_NAMEN_F : KIND_NAMEN_M)), female, born: G.s.day, state: 'daheim', at: null };
+  f.children.push(c); f.lastBirth = G.s.day;
+  addRenown(1);
+  onBirth(c);
+  log(`${f.spouse ? f.spouse.name : 'Deine Frau'} hat ${c.female ? 'eine Tochter' : 'einen Sohn'} geboren: ${c.name}. Die Glocken läuten in ${G.s.castleName || 'deiner Burg'}.`, 'gold');
+  return c;
+}
+let onBirth = () => {};
+function setBirthHook(fn) { onBirth = fn; }
+
+// ---------------------------------------------------------------- Pfand und Verlobung
+function wardBlock(c, id) {
+  const b = baron(id);
+  if (!c || c.state !== 'daheim') return 'Dieses Kind ist nicht daheim.';
+  if (childAge(c) < WARD_AGE) return `Noch zu klein (ab einem halben Jahr, das sind ${WARD_AGE} Tage).`;
+  if (!b || b.gone || b.human) return 'An diesen Hof kann kein Kind gehen.';
+  if (b.feud) return 'Mitten in einer Fehde nimmt er kein Pfand an.';
+  if (wardAt(id)) return 'An seinem Hof lebt schon eines deiner Kinder.';
+  return null;
+}
+function sendWard(childId, id) {
+  const c = family().children.find((x) => x.id === childId);
+  if (wardBlock(c, id)) return false;
+  c.state = 'pfand'; c.at = id; c.since = G.s.day;
+  changeBaronRel(id, 20 + keepBonus().ward, `${c.name} lebt als Pfand des Friedens an seinem Hof`);
+  addRenown(2);
+  log(`${c.name} reist an den Hof von ${BARONS[id].name}. Solange ${c.female ? 'sie' : 'er'} dort lebt, hält der Baron Frieden mit dir.`, 'good');
+  return true;
+}
+function recallWard(childId) {
+  const c = family().children.find((x) => x.id === childId);
+  if (!c || c.state !== 'pfand') return false;
+  const id = c.at;
+  c.state = 'daheim'; c.at = null;
+  changeBaronRel(id, -10, `Du holst ${c.name} von seinem Hof zurück`);
+  log(`${c.name} kommt zurück nach Hause.`);
+  return true;
+}
+function betrothBlock(c, id) {
+  const b = baron(id);
+  if (!c || c.state !== 'daheim') return 'Dieses Kind ist nicht daheim.';
+  if (!b || b.gone || b.human) return 'Mit diesem Haus ist keine Verlobung möglich.';
+  if (b.feud) return 'Mitten in einer Fehde gibt es keine Verlobung.';
+  if (b.rel < 15) return `Er schätzt dich noch nicht genug (Verhältnis ${b.rel}, nötig 15).`;
+  if (family().children.some((x) => x.state === 'verlobt' && x.at === id)) return 'Ein Kind ist schon mit seinem Haus verlobt.';
+  if (c.female && G.s.gold < 100) return 'Für die Mitgift deiner Tochter fehlt dir Gold (100).';
+  return null;
+}
+function betroth(childId, id) {
+  const c = family().children.find((x) => x.id === childId);
+  if (betrothBlock(c, id)) return false;
+  const b = baron(id);
+  if (c.female) { G.s.gold -= 100; b.gold += 100; } else { const d = Math.min(100, b.gold); b.gold -= d; G.s.gold += d; }
+  c.state = 'verlobt'; c.at = id; c.since = G.s.day;
+  changeBaronRel(id, 25, `${c.name} ist mit seinem Haus verlobt, ihr seid verschwägert`);
+  addRenown(3);
+  log(`${c.name} wird mit einem Kind aus dem Haus von ${BARONS[id].name} verlobt. ${c.female ? 'Mitgift 100 Gold.' : 'Er zahlt dir eine Mitgift.'} Ihr seid nun verschwägert.`, 'gold');
+  return true;
+}
+// Fehde gegen einen Baron, an dessen Hof dein Kind als Pfand lebt: Es wird seine Geisel (barons.js, declareFeud)
+G.familyFeud = (id) => {
+  const c = wardAt(id);
+  if (!c) return;
+  c.state = 'geisel';
+  G.s.renown = Math.max(0, (G.s.renown || 0) - 5);
+  log(`Wortbruch! ${c.name} lebte als Pfand an seinem Hof und ist nun ${BARONS[id].short}s Geisel. Erst Frieden oder seine Burg bringen ${c.female ? 'sie' : 'ihn'} heim. Ruhm −5.`, 'bad');
+};
+// Frieden oder Eroberung: Geiseln kommen heim
+G.familyFree = (id, why) => {
+  for (const c of family().children) if (c.at === id && c.state === 'geisel') { c.state = 'daheim'; c.at = null; log(`${c.name} ist frei und kommt heim (${why}).`, 'good'); }
+};
+function baronKinName(id) { return BARON_IDS.includes(id) ? partnerOf(id) : null; }
+
+// Für Tests
+if (typeof window !== 'undefined') window.__ritterFamilie = { family, birth, sendWard, recallWard, betroth, marryBaron, marryHouse, kinWith };
+
+// ===== bergfried.js =====
+// Der Bergfried von innen (Vorbild: der normannische Donjon von Rochester, um 1127: Keller, Eingangsgeschoss hinter
+// einem Vorbau mit Treppe und Zugbrücke, ein zwei Geschosse hoher Saal mit Galerie, darüber die Gemächer, oben
+// Wehrgang und vier Ecktürme; ein Brunnenschacht in der Kreuzmauer reicht bis in jedes Geschoss).
+// Räume werden je Burgstufe frei: der Holzturm auf der Motte hat zwei, der steinerne Bergfried sieben, der große
+// Donjon der Festung alle dreizehn. Jeder Raum kostet Gold und Baustoffe aus dem Burglager, braucht ein paar Tage
+// und bringt einen Vorteil. Gebaut wird immer ein Raum zur Zeit, neben dem Ausbau draußen.
+// Zustand: G.s.castle.rooms[id] = true, G.s.castle.roomCon = { id, done }.
+// Erst als Text (Burgtafel, Reiter „Bergfried“); später soll ein Klick auf den Bergfried das Innere zeigen.
+
+
+
+
+
+
+const KEEP_FLOORS = [
+  { id: 'wehr', name: 'Wehrgang und Ecktürme', text: 'Oben auf dem Turm, mit Zinnen und Ausguck über das Land.' },
+  { id: 'ober', name: 'Obergeschoss', text: 'Die Gemächer der Familie, mit Kaminen und Aborterkern in der Mauer.' },
+  { id: 'saal', name: 'Saalgeschoss', text: 'Zwei Geschosse hoch, mit Galerie in der Mauer und Bögen in der Kreuzmauer.' },
+  { id: 'eingang', name: 'Eingangsgeschoss', text: 'Hinter dem Vorbau; hier kommt man über Treppe und Zugbrücke herein.' },
+  { id: 'keller', name: 'Keller', text: 'Unter allem, nur über eine Wendeltreppe im Inneren zu erreichen.' },
+];
+// lv: ab welcher Burgstufe (1 Holzburg, 2 Steinburg, 3 Festung)
+const ROOMS = {
+  vorratskeller: { floor: 'keller', lv: 1, name: 'Vorratskeller', cost: { gold: 120, holz: 20 }, days: 1, eff: 'Fässer und Säcke im Trockenen: Es verdirbt weniger, ein Viertel weniger Rationen am Tag.' },
+  brunnen: { floor: 'keller', lv: 2, name: 'Brunnenschacht', cost: { gold: 300, stein: 40 }, days: 2, eff: 'Ein Schacht durch die Kreuzmauer bis in jedes Geschoss: Wasser auch in der Belagerung, Verteidigung +15.' },
+  wachstube: { floor: 'eingang', lv: 1, name: 'Wachstube', cost: { gold: 140, holz: 25 }, days: 1, eff: 'Wachen rund um die Uhr: Verteidigung +10.' },
+  waffenkammer: { floor: 'eingang', lv: 2, name: 'Waffenkammer', cost: { gold: 380, holz: 20, eisen: 20 }, days: 2, eff: 'Speere, Armbrüste und Bolzen für die Burgwache: Bei einer Belagerung verteidigen drei Mann mehr.' },
+  vorbau: { floor: 'eingang', lv: 3, name: 'Vorbau mit Zugbrücke', cost: { gold: 700, stein: 80 }, days: 3, eff: 'Die Treppe zum Eingang liegt in einem eigenen Turm mit Zugbrücke: Verteidigung +20.' },
+  saal: { floor: 'saal', lv: 2, name: 'Großer Saal', cost: { gold: 450, holz: 40, stein: 30 }, days: 2, eff: 'Bankette, Gericht und Empfänge: alle vier Tage +1 Ruhm, Geschenke an Barone wirken stärker (+4).' },
+  kapelle: { floor: 'saal', lv: 2, name: 'Hauskapelle', cost: { gold: 380, stein: 30, wein: 5 }, days: 2, eff: 'Hochzeit und Taufe im eigenen Haus: +3 Ruhm bei jeder Hochzeit und Geburt, alle drei Tage +1 Ansehen bei der Kirche.' },
+  schreibstube: { floor: 'saal', lv: 3, name: 'Schreibstube', cost: { gold: 600, holz: 20, stein: 20 }, days: 2, eff: 'Ein Schreiber führt Buch über Pacht und Abgaben: +10 % auf alle Einnahmen des Tages.' },
+  kemenate: { floor: 'ober', lv: 2, name: 'Kemenate', cost: { gold: 400, holz: 30, wolle: 10 }, days: 2, eff: 'Warme Gemächer mit Kamin für den Burgherrn und seine Familie: Kinder kommen öfter zur Welt.' },
+  kinderstube: { floor: 'ober', lv: 3, name: 'Kinderstube', cost: { gold: 450, holz: 30, wolle: 10 }, days: 2, eff: 'Lehrer für Lesen, Reiten und Fechten: Deine Kinder sind als Pfand mehr wert (+10 Verhältnis).' },
+  gaeste: { floor: 'ober', lv: 3, name: 'Gästegemach', cost: { gold: 500, holz: 20, stein: 30 }, days: 2, eff: 'Würdige Kammern für Gesandte: Verbündete und verschwägerte Barone schätzen dich jeden dritten Tag etwas mehr.' },
+  schatz: { floor: 'ober', lv: 3, name: 'Schatzkammer', cost: { gold: 800, stein: 50, eisen: 20 }, days: 3, eff: 'Hinter eisernen Türen: Bei Überfällen und Plünderungen verlierst du nur halb so viel Gold.' },
+  wehrgang: { floor: 'wehr', lv: 3, name: 'Wehrgang und Ecktürme', cost: { gold: 900, stein: 90 }, days: 3, eff: 'Vier Ecktürme mit Zinnen und ein Ausguck über das Land: Verteidigung +20.' },
+};
+const ROOM_IDS = Object.keys(ROOMS);
+// Name des Bergfrieds je Burgstufe
+function keepName(lv = G.s.castle.level) { return ['Turmstumpf', 'Holzturm auf der Motte', 'Bergfried', 'Großer Donjon'][lv] || 'Bergfried'; }
+
+function rooms() { const C = G.s.castle; return C.rooms || (C.rooms = {}); }
+function hasRoom(id) { return !!rooms()[id]; }
+function roomCon() { return G.s.castle.roomCon || null; }
+function roomsOpen(lv = G.s.castle.level) { return ROOM_IDS.filter((id) => ROOMS[id].lv <= lv); }
+
+function roomBlock(id) {
+  const r = ROOMS[id], C = G.s.castle;
+  if (!r) return 'Diesen Raum gibt es nicht.';
+  if (hasRoom(id)) return 'Schon eingerichtet.';
+  if (C.level < r.lv) return `Erst ab der ${['', 'Holzburg', 'Steinburg', 'Festung'][r.lv]}.`;
+  if (roomCon()) return `Im Bergfried wird schon gebaut (${ROOMS[roomCon().id].name}).`;
+  for (const [k, n] of Object.entries(r.cost)) {
+    if (k === 'gold') { if (G.s.gold < n) return `Dir fehlt Gold (${n}).`; }
+    else if ((C.storage[k] || 0) < n) return `Im Lager fehlt ${GOODS[k] ? GOODS[k].name : k} (${n}).`;
+  }
+  return null;
+}
+function startRoom(id) {
+  if (roomBlock(id)) return false;
+  const r = ROOMS[id], C = G.s.castle;
+  for (const [k, n] of Object.entries(r.cost)) { if (k === 'gold') G.s.gold -= n; else C.storage[k] -= n; }
+  C.roomCon = { id, done: G.s.day + r.days };
+  log(`Im ${keepName()} beginnen die Arbeiten an: ${r.name}. Fertig in ${r.days} ${r.days === 1 ? 'Tag' : 'Tagen'}.`, 'good');
+  return true;
+}
+
+// ---------------------------------------------------------------- Wirkungen
+function keepDefense() { return (hasRoom('brunnen') ? 15 : 0) + (hasRoom('wachstube') ? 10 : 0) + (hasRoom('vorbau') ? 20 : 0) + (hasRoom('wehrgang') ? 20 : 0); }
+G.keepDefense = keepDefense;
+G.keepFood = () => (hasRoom('vorratskeller') ? 0.75 : 1);
+G.keepIncome = () => (hasRoom('schreibstube') ? 0.1 : 0);
+G.keepPlunder = () => (hasRoom('schatz') ? 0.5 : 1);
+G.keepSiegeMen = () => (hasRoom('waffenkammer') ? 3 : 0);
+G.keepGift = () => (hasRoom('saal') ? 4 : 0);
+setFamilyKeepBonus(() => ({ births: hasRoom('kemenate') ? 1.5 : 1, ward: hasRoom('kinderstube') ? 10 : 0 }));
+setWeddingHook(() => { if (hasRoom('kapelle')) { addRenown(3); log('Die Trauung in deiner Hauskapelle spricht sich herum: Ruhm +3.', 'good'); } });
+setBirthHook(() => { if (hasRoom('kapelle')) addRenown(3); });
+
+function dailyKeep() {
+  const C = G.s.castle, con = C.roomCon;
+  if (con && G.s.day >= con.done) {
+    rooms()[con.id] = true; C.roomCon = null;
+    log(`Fertig im ${keepName()} von ${homeName()}: ${ROOMS[con.id].name}. ${ROOMS[con.id].eff}`, 'gold');
+  }
+  if (hasRoom('saal') && G.s.day % 4 === 0) addRenown(1);
+  if (hasRoom('kapelle') && G.s.day % 3 === 0) changeRep('kirche', 1);
+  if (hasRoom('gaeste') && G.s.day % 3 === 0) {
+    for (const id of BARON_IDS) { const b = baron(id); if (b && !b.gone && !b.feud && (b.ally || kinWith(id)) && b.rel < 80) b.rel++; }
+  }
+}
+
+// Für Tests
+if (typeof window !== 'undefined') window.__ritterBergfried = { startRoom, roomBlock, hasRoom, dailyKeep, keepDefense };
 
 // ===== net.js =====
 // Verbindungen für den Mehrspieler: eine kleine Schnittstelle, darunter wahlweise
@@ -14224,7 +14571,7 @@ const WORLD_VIEW = 100;       // so weit um einen Gast schickt der Gastgeber die
 function encMember(m) {
   const fl = (m.mounted ? 1 : 0) | (m.swing > 0 ? 2 : 0) | (m.run ? 4 : 0) | (m.female ? 8 : 0);
   return [m.id, m.cls, +m.x.toFixed(2), +m.y.toFixed(2), Math.max(0, Math.round(m.hp)), Math.round(m.st.maxHp), fl,
-    m.eq.waffe || null, m.eq.ruestung || null, m.eq.schild || null, m.eq.pferd || null, m.tunic || null, m.livery || null, m.look || null, m.level || 1, m.name || ''];
+    m.eq.waffe || null, m.eq.ruestung || null, m.eq.schild || null, m.eq.pferd || null, m.tunic || null, m.livery || null, m.look || null, m.level || 1, m.name || '', m.wagon || 0];
 }
 // seat: für wen; im Kampf heißt die Gruppe nur für den, gegen den sie kämpft (foes)
 function encGroup(g, seat) {
@@ -14293,7 +14640,7 @@ mpOn('gruppen', (mp, from, d) => {
     const was = new Map(g.members.map((m) => [m.id, m])), keep = [];
     for (const q of ms.slice(0, 80)) {
       if (!Array.isArray(q) || !CLASSES[q[1]]) continue;
-      const [mid, cls, mx, my, hp, mhp, mfl, w, ru, sc, pf, tunic, livery, look, lv, name] = q;
+      const [mid, cls, mx, my, hp, mhp, mfl, w, ru, sc, pf, tunic, livery, look, lv, name, wagon] = q;
       const eq = { waffe: ITEMS[w] ? w : null, ruestung: ITEMS[ru] ? ru : null, schild: ITEMS[sc] ? sc : null, pferd: ITEMS[pf] ? pf : null };
       let m = was.get(mid);
       if (!m) {
@@ -14308,6 +14655,7 @@ mpOn('gruppen', (mp, from, d) => {
       m.mounted = !!(mfl & 1); m.run = !!(mfl & 4); m.female = !!(mfl & 8);
       if ((mfl & 2) && !(m.swing > 0)) m.swing = 0.3;
       m.tunic = typeof tunic === 'string' ? tunic : null; m.livery = typeof livery === 'string' ? livery : null; m.look = typeof look === 'string' ? look : null;
+      m.wagon = typeof wagon === 'string' ? wagon : null;
       keep.push(m);
     }
     if (keep.length !== g.members.length) changed = true;
@@ -14599,7 +14947,7 @@ mpOn('feldzug', (mp, from, d) => {
 });
 // Deine Heimburg ist gestürmt: Gold und Vorräte sind zum Teil fort, die Burg bleibt deine
 function plundered(s, by) {
-  const lost = Math.floor(G.s.gold * 0.2);
+  const lost = Math.floor(G.s.gold * 0.2 * (G.keepPlunder ? G.keepPlunder() : 1));
   G.s.gold -= lost;
   for (const k of Object.keys(G.s.castle.storage)) G.s.castle.storage[k] = Math.floor(G.s.castle.storage[k] * 0.6);
   log(`${by} hat ${s.name} gestürmt und geplündert! Verloren: ${lost} Gold und ein Teil der Vorräte. Die Burg bleibt deine.`, 'bad');
@@ -14639,6 +14987,97 @@ mpAddCommand('heimBelagerung', (mp, from, a) => {
 });
 // Für Tests
 if (typeof window !== 'undefined') window.__ritterWelt = { siegeOut, worldFoe, humanDist };
+
+// ===== reisende.js =====
+// Fahrende in der Welt: Gaukler und Postkutsche (Gruppen in data.js, Wagen als Platzhalter gezeichnet in render.js).
+// - Gaukler ziehen mit ihrem Planwagen von Ort zu Ort. Kommen sie an, spielen sie dort auf (Meldung, wenn du in der Nähe
+//   bist). Ein Klick auf sie: Für ein paar Münzen spielen sie dir auf (dein Gefolge ist bis zum Abend guter Dinge,
+//   +15 % Erfahrung), oder du lädst sie auf deine Burg ein: Sie fahren hin und geben dort ein Fest (Ruhm, Ansehen).
+// - Die Postkutsche fährt zwischen Städten, Märkten, Abteien und Burgen. Kommt sie in deiner Nähe an, erzählt man, was
+//   sie an Nachrichten bringt. Ein Klick: Für zwei Münzen erzählt der Kutscher, was er gehört hat, oder du überfällst sie
+//   (Beute, aber Ärger mit der Gilde und den Normannen).
+// - Die Steuereintreiber fahren in einer Kutsche mit Geldtruhe (data.js, NPC vogt).
+
+
+
+
+
+
+
+
+
+const GAUKLER_PLAY = 15, GAUKLER_FEST = 120, POST_NEWS = 2;
+const reiseGast = () => !!(G.mp && G.mp.role === 'guest');
+
+// Ankunft einer Gruppe an ihrem Ziel (units.js, beim Gastgeber oder allein)
+G.onGroupArrive = (g) => {
+  const gt = GROUP_TYPES[g.type];
+  if (!gt) return;
+  if (g.forced) { g.forced = null; if (gt.entertain) feast(); return; }
+  const s = g.destSite && siteById(g.destSite), p = G.s.player;
+  if (!s) return;
+  const near = Math.hypot(s.x - p.x, s.y - p.y) < 70;
+  if (gt.entertain) {
+    s.gauklerDay = G.s.day;
+    if (near) log(`Fahrende Gaukler sind in ${s.name} angekommen: Jongleure, ein Feuerschlucker und ein Bänkelsänger spielen auf dem Platz.`);
+  }
+  if (gt.post && near && Math.random() < 0.6) log(`Die Postkutsche ist in ${s.name} eingetroffen. Man erzählt: „${rumor(s)}“`);
+};
+
+// Ein Fest auf deiner Burg
+function feast() {
+  addRenown(4);
+  changeRep('sachsen', 2); changeRep('gilde', 2);
+  G.s.buff = { day: G.s.day + 1 };
+  G.s.feasts = (G.s.feasts || 0) + 1;
+  log(`Die Gaukler sind auf ${homeName()} angekommen und geben ein Fest: Musik, Feuerschlucker und ein Tanzbär. Ruhm +4, die Sachsen und die Gilde reden gut von dir. Dein Gefolge feiert bis morgen Abend (+15 % Erfahrung).`, 'gold');
+}
+
+function play() {
+  if (G.s.gold < GAUKLER_PLAY) { log(`Für ${GAUKLER_PLAY} Gold spielen sie auf. So viel hast du nicht.`, 'bad'); return; }
+  G.s.gold -= GAUKLER_PLAY;
+  G.s.buff = { day: G.s.day };
+  log('Die Gaukler spielen für dich und dein Gefolge: ein Lied von König Richard, ein paar Späße über Prinz John. Alle sind guter Dinge bis zum Abend (+15 % Erfahrung).', 'good');
+}
+function invite(g) {
+  const home = castleSite();
+  if (!home) return;
+  if (G.s.gold < GAUKLER_FEST) { log(`Für ein Fest wollen die Gaukler ${GAUKLER_FEST} Gold. So viel hast du nicht.`, 'bad'); return; }
+  G.s.gold -= GAUKLER_FEST;
+  // Beim Gast rechnet der Gastgeber die Gaukler: das Fest gibt es dann gleich
+  if (reiseGast() || g.mirror) { feast(); return; }
+  const R = ringR() || 4;
+  g.forced = { x: home.x + 0.5, y: home.y + R + 2.5 };
+  g.path = null; g.wait = 0;
+  log(`Die Gaukler nehmen das Gold und machen sich auf den Weg nach ${homeName()}. Wenn sie ankommen, gibt es ein Fest.`, 'good');
+}
+function news(g) {
+  if (G.s.gold < POST_NEWS) { log('Ohne eine Münze erzählt der Kutscher nichts.', 'bad'); return; }
+  G.s.gold -= POST_NEWS;
+  const lead = g.members[0] || g;
+  const near = G.world.sites.filter((s) => s.type !== 'einsiedelei').sort((a, b) => Math.hypot(a.x - lead.x, a.y - lead.y) - Math.hypot(b.x - lead.x, b.y - lead.y))[0];
+  log(`Der Postkutscher erzählt: „${near ? rumor(near) : 'Nichts Neues auf den Straßen.'}“`);
+}
+
+// Klick auf eine Figur der Fahrenden (main.js, clickUnit): true, wenn hier entschieden wurde
+G.onTravelerClick = (g, u) => {
+  const gt = GROUP_TYPES[g.type];
+  if (!gt || g.engaged || (!gt.entertain && !gt.post)) return false;
+  if (gt.entertain) {
+    const home = castleSite();
+    confirmDialog(`Fahrende Gaukler mit ihrem Planwagen: Jongleure, ein Feuerschlucker und ein Bänkelsänger. Für ${GAUKLER_PLAY} Gold spielen sie dir und deinem Gefolge auf (bis zum Abend +15 % Erfahrung). Für ${GAUKLER_FEST} Gold ziehen sie nach ${homeName()} und geben dort ein Fest (Ruhm +4, Ansehen bei Sachsen und Gilde).`,
+      `Aufspielen (${GAUKLER_PLAY} Gold)`, () => play(), null, home ? { label: `Fest auf der Burg (${GAUKLER_FEST} Gold)`, fn: () => invite(g) } : null);
+    return true;
+  }
+  const dest = g.destSite && siteById(g.destSite);
+  const conseq = gt.kill ? Object.entries(gt.kill).map(([f, v]) => `${f[0].toUpperCase()}${f.slice(1)} ${v}`).join(', ') : '';
+  confirmDialog(`Die Postkutsche${dest ? ` nach ${dest.name}` : ''}: Briefe mit Siegeln, ein Postreiter und ein müder Kutscher. Für ${POST_NEWS} Gold erzählt er, was er unterwegs gehört hat.${conseq ? ` Ein Überfall bringt Beute, aber Ärger (${conseq}).` : ''}`,
+    `Nachrichten (${POST_NEWS} Gold)`, () => news(g), null, { label: 'Überfallen', fn: () => { provokeGroup(g); const p = G.s.player; p.attackTarget = u; p.path = null; } });
+  return true;
+};
+
+// Für Tests
+if (typeof window !== 'undefined') window.__ritterReise = { feast, play };
 
 // ===== camps.js =====
 // Lager im Wald und Söldner: Bei Jägern, Köhlern, Holzfällern, im Steinbruch und bei Hirten kauft man Ware direkt
@@ -14793,6 +15232,8 @@ function mercFaction(site) { return FACTIONS[site.faction] ? FACTIONS[site.facti
 
 
 
+
+
 function hourOf(time = G.s.time) { return (6 + (time / DAY_LEN) * 24) % 24; }
 
 function seasonIndex(day = G.s.day) { return Math.floor((day - 1) / DAYS_PER_SEASON) % 4; }
@@ -14842,8 +15283,10 @@ function passHours(h) {
 function guestDay() {
   const before = seasonIndex();
   G.s.day++;
-  // Eigene Grafschaften, Burgen, Lager, Sold und Verpflegung rechnet jeder selbst
+  // Eigene Grafschaften, Burgen, Lager, Sold und Verpflegung rechnet jeder selbst, ebenso Familie und Bergfried
   dailyCastle();
+  dailyKeep();
+  dailyFamily();
   dailyHoldings(false);
   dailyQuests();
   // Gruppen der Welt kommen vom Gastgeber (mpwelt.js)
@@ -14859,6 +15302,8 @@ function newDay() {
   G.s.day++;
   dailyEconomy();
   dailyCastle();
+  dailyKeep();
+  dailyFamily();
   dailyHoldings();
   dailyWar();
   dailyBarons();
@@ -20366,7 +20811,78 @@ function drawWeapon(c, u, by) {
   c.restore();
 }
 
+// ---------------------------------------------------------------- Wagen (Platzhalter, bis es gemalte Bilder gibt)
+// Kutsche des Steuereintreibers, Postkutsche, Planwagen der Gaukler: ein Pferd vorn (3D, wie beim Reiter), dahinter der
+// Wagenkasten auf vier Rädern, längs der Fahrtrichtung. Wer im Wagen sitzt, ist die Figur selbst (Treffer, Auswahl).
+const WAGONS = {
+  kutsche: { body: '#5e2620', top: '#2a1a14', trim: '#c9a54a', len: 1.0, w: 0.56, h: 13, chest: true },
+  post: { body: '#24442f', top: '#1d1d1b', trim: '#d8b84a', len: 1.0, w: 0.56, h: 14, horn: true },
+  gaukler: { body: '#7a522c', top: null, stripes: ['#c8402e', '#ecd9a0'], len: 1.1, w: 0.6, h: 10 },
+};
+function drawWagon(c, u, x, y) {
+  const Wg = WAGONS[u.wagon] || WAGONS.kutsche, z = zAt(u.x, u.y);
+  const dx = u.dirX ?? 0, dy = u.dirY ?? 1, n = Math.hypot(dx, dy) || 1, fx = dx / n, fy = dy / n;
+  const alongX = Math.abs(fx) >= Math.abs(fy);
+  const cx = u.x - fx * 0.5, cy = u.y - fy * 0.5;             // Wagenkasten hinter dem Pferd
+  const wx = alongX ? Wg.len : Wg.w, wy = alongX ? Wg.w : Wg.len, z0 = z + 4;
+  const coach = () => {
+    drawShadow(c, cx, cy, wx, wy, 10, 0.18);
+    // Deichsel: zwei Stangen vom Kasten nach vorn zum Pferd
+    c.strokeStyle = '#4a3422'; c.lineWidth = 1.2; c.beginPath();
+    for (const s of [-0.16, 0.16]) {
+      const sx = alongX ? 0 : s, sy = alongX ? s : 0;
+      const [a0, a1] = P(cx + fx * Wg.len * 0.5 + sx, cy + fy * Wg.len * 0.5 + sy, z + 6), [b0, b1] = P(u.x + fx * 0.3 + sx, u.y + fy * 0.3 + sy, z + 9);
+      c.moveTo(a0, a1); c.lineTo(b0, b1);
+    }
+    c.stroke();
+    // Räder an den Längsseiten, vorn und hinten
+    c.fillStyle = '#3a2a1c'; c.strokeStyle = '#1d140c'; c.lineWidth = 0.8;
+    for (const a of [-0.36, 0.36]) for (const b of [-0.5, 0.5]) {
+      const ux = alongX ? cx + a * Wg.len : cx + b * Wg.w * 1.02, uy = alongX ? cy + b * Wg.w * 1.02 : cy + a * Wg.len;
+      const [px, py] = P(ux, uy, z + 3.5);
+      c.beginPath(); c.ellipse(px, py, alongX ? 3.4 : 2.0, 3.6, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+    drawBox(c, cx, cy, wx, wy, 2, '#4a3422', z0 - 1);         // Fahrgestell
+    if (Wg.stripes) {
+      // Planwagen: niedriger Kasten, darüber die gestreifte Plane
+      drawBox(c, cx, cy, wx, wy, Wg.h * 0.45, Wg.body, z0, 'plank');
+      const k = 5;
+      for (let i = 0; i < k; i++) {
+        const t0 = -0.5 + i / k, t1 = t0 + 1 / k, col = Wg.stripes[i % 2];
+        const sx = alongX ? cx + (t0 + t1) / 2 * wx : cx, sy = alongX ? cy : cy + (t0 + t1) / 2 * wy;
+        drawBox(c, sx, sy, alongX ? wx / k : wx * 0.96, alongX ? wy * 0.96 : wy / k, Wg.h * 0.75, col, z0 + Wg.h * 0.45);
+      }
+    } else {
+      drawBox(c, cx, cy, wx, wy, Wg.h, Wg.body, z0, 'plank');
+      drawBox(c, cx, cy, wx + 0.06, wy + 0.06, 1.6, Wg.top, z0 + Wg.h);   // Dach
+      // Fenster und Zierleiste
+      const [a0, a1] = P(cx - wx / 2, cy + wy / 2, z0 + Wg.h * 0.55), [b0, b1] = P(cx + wx / 2, cy + wy / 2, z0 + Wg.h * 0.55);
+      c.strokeStyle = Wg.trim; c.lineWidth = 1; c.beginPath(); c.moveTo(a0, a1); c.lineTo(b0, b1); c.stroke();
+      if (Wg.chest) drawBox(c, cx, cy, wx * 0.45, wy * 0.6, 3.2, '#6b4a2a', z0 + Wg.h + 1.6);    // Geldtruhe auf dem Dach
+      if (Wg.horn) { const [hx, hy] = P(cx, cy, z0 + Wg.h + 3); c.fillStyle = Wg.trim; c.beginPath(); c.arc(hx, hy, 1.8, 0, Math.PI * 2); c.fill(); }
+    }
+  };
+  const horse = () => {
+    const hx = u.x + fx * 0.35, hy = u.y + fy * 0.35;
+    const H = u.eq && u.eq.pferd ? horse3dFor(u, unitLook(u)) : null;
+    c.save();
+    c.translate(isoX(hx, hy), isoY(hx, hy) - zAt(hx, hy));
+    c.scale(FIG * 1.14 * (u.facing || 1), FIG * 1.14);
+    if (H) H.paint(c);
+    else { c.fillStyle = '#6b4a2a'; c.beginPath(); c.ellipse(0, -10, 8, 4, 0, 0, Math.PI * 2); c.fill(); }
+    c.restore();
+  };
+  // Was weiter hinten liegt (kleineres x + y), zuerst
+  if (u.x + fx * 0.35 + u.y + fy * 0.35 < cx + cy) { horse(); coach(); } else { coach(); horse(); }
+  if (u.flash > 0) { const [px, py] = P(cx, cy, z0 + Wg.h); c.globalAlpha = Math.min(1, u.flash * 5); c.fillStyle = '#fff'; c.beginPath(); c.ellipse(px, py - 4, 9, 6, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; }
+  if ((u.combatT > 0 || u.hp < u.st.maxHp * 0.999)) {
+    const [px, py] = P(cx, cy, z0 + Wg.h + 10), w = 18;
+    c.fillStyle = 'rgba(20,12,8,0.75)'; c.fillRect(px - w / 2 - 1, py - 1, w + 2, 4);
+    c.fillStyle = u.friendly ? '#7bc15a' : '#d9533f'; c.fillRect(px - w / 2, py, w * Math.max(0, u.hp / u.st.maxHp), 2);
+  }
+}
 function drawFigure(c, u, x, y) {
+  if (u.wagon && !u.dead) { drawWagon(c, u, x, y); return; }
   const L = unitLook(u);
   const m = u.mounted && u.st.horse;
   c.save();
@@ -23080,6 +23596,8 @@ function tick() {
 
 
 
+
+
 function byId(id) { return document.getElementById(id); }
 
 function esc(v) {
@@ -23132,10 +23650,14 @@ function showPrompt(text) {
 
 // ---------------------------------------------------------------- Dialog
 let dialogYes = null, dialogNo = null;
-function confirmDialog(text, yesLabel, onYes, onNo = null) {
+// alt: eine dritte Wahl { label, fn } (etwa: Gaukler aufspielen lassen oder auf die Burg einladen)
+let dialogAlt = null;
+function confirmDialog(text, yesLabel, onYes, onNo = null, alt = null) {
   byId('dialog-text').textContent = text;
   byId('dialog-yes').textContent = yesLabel;
-  dialogYes = onYes; dialogNo = onNo;
+  dialogYes = onYes; dialogNo = onNo; dialogAlt = alt;
+  const ab = byId('dialog-alt');
+  if (ab) { ab.hidden = !alt; if (alt) ab.textContent = alt.label; }
   byId('dialog').hidden = false;
   byId('dialog-yes').focus();
 }
@@ -23647,6 +24169,59 @@ function townQuests(site) {
     ${offers ? `<div class="quests">${offers}</div>` : '<p class="muted">Im Moment gibt es hier nichts zu tun. Schau in ein paar Tagen wieder vorbei.</p>'}`;
 }
 
+// ---------------------------------------------------------------- Bergfried von innen (bergfried.js)
+// Erst als Text: Geschosse von oben nach unten, je Raum, was er bringt und was er kostet. Später zeigt ein Klick auf
+// den Bergfried das Innere als Schnitt durch die Geschosse.
+function keepView() {
+  const C = G.s.castle, con = roomCon();
+  const costText = (c) => Object.entries(c).map(([k, n]) => `${fmt(n)} ${k === 'gold' ? 'Gold' : GOODS[k] ? GOODS[k].name : k}`).join(', ');
+  const floors = KEEP_FLOORS.map((f) => {
+    const ids = Object.keys(ROOMS).filter((id) => ROOMS[id].floor === f.id);
+    const rows = ids.map((id) => {
+      const r = ROOMS[id], built = hasRoom(id), busy = con && con.id === id, locked = C.level < r.lv;
+      const state = built ? '<span class="good">eingerichtet</span>' : busy ? `<span class="gold">im Bau, fertig an Tag ${con.done}</span>` : locked ? `<span class="muted">ab ${['', 'Holzburg', 'Steinburg', 'Festung'][r.lv]}</span>` : '';
+      const why = !built && !busy && !locked ? roomBlock(id) : null;
+      return `<div class="action${locked ? ' muted' : ''}"><div><b>${esc(r.name)}</b> ${state}<p>${esc(r.eff)}${!built && !busy ? ` <span class="muted">Kosten: ${esc(costText(r.cost))}, ${r.days} ${r.days === 1 ? 'Tag' : 'Tage'}.</span>` : ''}</p></div>${!built && !busy && !locked ? `<button class="btn" data-act="room" data-r="${id}" ${why ? `disabled title="${esc(why)}"` : ''}>Einrichten</button>` : ''}</div>`;
+    }).join('');
+    return `<h3>${esc(f.name)}</h3><p class="muted">${esc(f.text)}</p>${rows}`;
+  }).join('');
+  const n = Object.keys(ROOMS).filter((id) => hasRoom(id)).length;
+  return `<div class="notice"><p><b>${esc(keepName())}</b> · ${n} von ${Object.keys(ROOMS).length} Räumen. Vorbild ist der normannische Donjon von Rochester: Keller, Eingangsgeschoss hinter dem Vorbau, ein Saal über zwei Geschosse mit Galerie, darüber die Gemächer der Familie, oben Wehrgang und Ecktürme. Mit jeder Burgstufe kommen Räume dazu; gebaut wird ein Raum zur Zeit, aus Gold und dem Burglager.</p></div>${floors}`;
+}
+
+// ---------------------------------------------------------------- Familie (familie.js)
+const STATE_TEXT = { daheim: 'daheim', pfand: 'als Pfand am Hof von', verlobt: 'verlobt mit dem Haus von', geisel: 'Geisel bei' };
+function familyView() {
+  const f = family(), p = G.s.player;
+  const sp = f.spouse;
+  const spouse = sp ? `<div class="notice good"><p><b>${esc(sp.name)}</b>, ${esc(sp.house)} · verheiratet seit Tag ${sp.day}${sp.from ? ` · ${esc(BARONS[sp.from].short)} ist dein Schwiegervater und sagt dir keine Fehde an` : ''}.</p></div>`
+    : `<div class="notice"><p>Du bist noch nicht verheiratet. Eine Heirat bindet Häuser aneinander: Um ein Kind eines Barons wirbst du an seinem Hof (Audienz in seiner Burg, ab einem Verhältnis von 25). Hier kannst du um eine Braut oder einen Bräutigam aus einem der großen Häuser werben. Brautgabe ${BRAUTGABE} Gold, die andere Seite gibt eine Mitgift.</p></div>
+      ${['sachsen', 'normannen'].map((fid) => { const m = houseMatch(fid), why = houseMarryBlock(fid); return `<div class="action"><div><b>${esc(m.name)} ${esc(m.house)}</b><p>Ansehen bei den ${esc(FACTIONS[fid].name)} +15, Ruhm +4.</p></div><button class="btn" data-act="fmarry" data-f="${fid}" ${why ? `disabled title="${esc(why)}"` : ''}>Werben</button></div>`; }).join('')}`;
+  const kids = f.children.length ? f.children.map((c) => {
+    const where = c.at ? ` ${esc(BARONS[c.at].name)}` : '';
+    const act = c.state === 'pfand' ? `<button class="btn sm" data-act="frecall" data-c="${c.id}">Heimholen</button>` : '';
+    return `<div class="action"><div><b>${esc(c.name)}</b> <span class="muted">${c.female ? 'Tochter' : 'Sohn'}, ${esc(ageText(c))}</span><p>${esc(STATE_TEXT[c.state] || c.state)}${where}${c.state === 'daheim' && childAge(c) < WARD_AGE ? ` (als Pfand ab einem halben Jahr)` : ''}</p></div>${act}</div>`;
+  }).join('') : `<p class="muted">${sp ? 'Noch keine Kinder. Sie kommen mit der Zeit (in der Kemenate des Bergfrieds öfter).' : 'Kinder kommen, wenn du verheiratet bist.'}</p>`;
+  const kin = BARON_IDS.filter((id) => kinWith(id)).map((id) => BARONS[id].short);
+  return `${spouse}<h3>Kinder</h3>${kids}
+    <p class="hint">Ein Jahr hat ${YEAR_DAYS} Tage. Ein Kind kann als Pfand des Friedens an den Hof eines Barons gehen oder mit seinem Haus verlobt werden (Audienz in seiner Burg). Verschwägerte Barone sagen dir keine Fehde an und schließen schon ab einem Verhältnis von 25 ein Bündnis. Sagst du einem Baron die Fehde an, während dein Kind als Pfand bei ihm lebt, wird es seine Geisel.${kin.length ? ` Verschwägert mit: ${esc(kin.join(', '))}.` : ''}</p>`;
+}
+function baronFamilyBox(id) {
+  const b = baron(id), def = BARONS[id], f = family();
+  if (!b || b.human) return '';
+  const btn = (act, label, why, extra = '') => `<button class="btn" data-act="${act}" data-b="${id}" ${extra} ${why ? `disabled title="${esc(why)}"` : ''}>${esc(label)}</button>`;
+  let h = '';
+  const m = baronMatch(id);
+  if (f.spouse && f.spouse.from === id) h += `<p class="good">${esc(f.spouse.name)} ist deine ${f.spouse.female ? 'Frau' : 'Mann'}: Ihr seid verschwägert.</p>`;
+  else if (!married() && m) h += `<div class="action"><div><b>Um ${esc(m.name)} werben</b><p>${esc(m.house)}. Brautgabe ${BRAUTGABE} Gold, Mitgift etwa ${fmt(dowryOf(id))} Gold. Verhältnis +25, Ruhm +6; verschwägert sagt er dir keine Fehde an.</p></div>${btn('bmarry', 'Werben', baronMarryBlock(id))}</div>`;
+  const home = f.children.filter((c) => c.state === 'daheim');
+  for (const c of home) {
+    h += `<div class="action"><div><b>${esc(c.name)}</b> <span class="muted">${c.female ? 'Tochter' : 'Sohn'}, ${esc(ageText(c))}</span><p>Als Pfand an seinen Hof: Verhältnis +20 und weiter steigend, er hält Frieden. Oder mit seinem Haus verloben: Verhältnis +25, ihr seid verschwägert.</p></div>${btn('bward', 'Als Pfand', wardBlock(c, id), `data-c="${c.id}"`)}${btn('bbetroth', 'Verloben', betrothBlock(c, id), `data-c="${c.id}"`)}</div>`;
+  }
+  for (const c of f.children.filter((x) => x.at === id && x.state !== 'daheim')) h += `<p class="muted">${esc(c.name)}: ${esc(STATE_TEXT[c.state])} ${esc(def.short)}.</p>`;
+  return h ? `<h3>Familie</h3>${h}` : '';
+}
+
 // ---------------------------------------------------------------- Burg
 function castlePanel() {
   const f = G.ui.arg && G.ui.arg.focus;
@@ -23656,10 +24231,14 @@ function castlePanel() {
   const seat = !!seatSite();
   if (seat || bLevel('schmiede') || bLevel('stall')) tabs.push(['ruest', seat ? 'Ausrüster' : 'Rüstkammer']);
   if (seat || bLevel('markt')) tabs.push(['markt', 'Markt']);
+  if (G.s.castle.level >= 1) tabs.push(['bergfried', 'Bergfried']);
+  tabs.push(['familie', 'Familie']);
   const site = castleSite();
   let body = '';
   switch (G.ui.tab) {
     case 'ausbau': body = homeShireNote() + gateAction() + castleBuild(); break;
+    case 'bergfried': body = keepView(); break;
+    case 'familie': body = familyView(); break;
     case 'halle': body = castleHall(); break;
     case 'gefolge': body = partyView(true); break;
     case 'lager': body = castleStore(); break;
@@ -24208,6 +24787,7 @@ function baronAudience(site) {
     ${b.ally || b.vassal ? '' : `<div class="action"><div><b>Bündnis anbieten</b><p>Ab einem Verhältnis von 40: Er schickt Männer, wenn du eine Burg belagerst, steht dir gegen Angreifer bei und greift dich nicht an.</p></div>${btn('bally', 'Bündnis', allianceBlock(id))}</div>`}
     ${b.feud ? `<div class="action"><div><b>Frieden schließen</b><p>Er verlangt ${fmt(peaceCost(id))} Gold Sühne. Oder du belagerst seine Burg: Fällt sie, zahlt er Lösegeld und wird dein Vasall.</p></div>${btn('bpeace', 'Sühne zahlen', peaceBlock(id))}</div>`
       : b.vassal ? '' : `<div class="action"><div><b>Fehde ansagen</b><p>Dann darfst du seine Burg belagern (das Aufgebot findest du unten). Er wird seinerseits gegen deine Burgen ziehen.</p></div>${btn('bfeud', 'Fehde', feudBlock(id), 'danger')}</div>`}
+    ${baronFamilyBox(id)}
     ${b.feud ? baronSiegeBox(site) : ''}`;
 }
 function baronSiegeBox(site) {
@@ -24559,6 +25139,12 @@ const ACTIONS = {
   gift: () => giveGift(G.ui.arg),
   bgift: (d) => { baronGiveGift(d.b); refreshPanel(); },
   bally: (d) => { offerAlliance(d.b); refreshPanel(); },
+  bmarry: (d) => { marryBaron(d.b); refreshPanel(); },
+  bward: (d) => { sendWard(Number(d.c), d.b); refreshPanel(); },
+  bbetroth: (d) => { betroth(Number(d.c), d.b); refreshPanel(); },
+  fmarry: (d) => { marryHouse(d.f); refreshPanel(); },
+  frecall: (d) => { recallWard(Number(d.c)); refreshPanel(); },
+  room: (d) => { startRoom(d.r); refreshPanel(); },
   bfeud: (d) => confirmDialog(`${BARONS[d.b].name} die Fehde ansagen? Er wird gegen deine Burgen ziehen, und seine Freunde sehen das ungern.`, 'Fehde', () => { declareFeud(d.b); refreshPanel(); }),
   bpeace: (d) => { makePeace(d.b); refreshPanel(); },
   barongo: (d) => { const s = G.world.sites.find((x) => x.baron === d.b); if (s) { closePanel(); travelTo({ x: s.x, y: s.y + 6 }, null); } },
@@ -24735,6 +25321,7 @@ function initUI() {
   });
   byId('dialog-yes').addEventListener('click', () => closeDialog(true));
   byId('dialog-no').addEventListener('click', () => closeDialog(false));
+  byId('dialog-alt').addEventListener('click', () => { const a = dialogAlt; dialogAlt = null; dialogYes = null; dialogNo = null; byId('dialog').hidden = true; if (a && a.fn) a.fn(); });
 }
 
 
@@ -27423,6 +28010,11 @@ function clickUnit(u) {
     return true;
   }
   const gt = GROUP_TYPES[g.type];
+  // Fahrende (Gaukler, Postkutsche): erst hingehen, dann reden (reisende.js)
+  if ((gt.entertain || gt.post) && G.onTravelerClick) {
+    if (Math.hypot(u.x - p.x, u.y - p.y) > 5) { if (setPlayerPath(u.x, u.y)) G.pendingSite = null; return true; }
+    if (G.onTravelerClick(g, u)) return true;
+  }
   const conseq = gt.kill ? Object.entries(gt.kill).map(([f, v]) => `${FACTIONS[f].short} ${v > 0 ? '+' : ''}${v}`).join(', ') : '';
   const who = gt.acc[0].toUpperCase() + gt.acc.slice(1);
   confirmDialog(`${who} angreifen? Sie sind dir nicht feindlich gesinnt.${conseq ? ` Folgen bei einem Sieg: ${conseq}.` : ''}`, 'Angreifen', () => {
